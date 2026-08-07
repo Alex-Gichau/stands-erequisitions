@@ -1,0 +1,18 @@
+[
+  {
+    "action": "User Activity Summary (5min)",
+    "details": "Batched activity for Alex Gichau:\n- Navigations: 3\n- Button Interactions: 5\n\nRecent Actions:\n・ Navigated to Budgets\n・ Navigated to Dashboard\n・ Navigated to Notification\n・ Pressed: ALEX\nCHURCH\nA\n・ Pressed: UPDATE PASSWORD\n・ Pressed: CANCEL\n・ Pressed: ALEX\nCHURCH\nA\n・ Pressed: UPDATE PASSWORD",
+    "performedBy": "SYSTEM_ACTIVITY_MONITOR",
+    "timestamp": "20/07/2026, 22:54:53",
+    "metadata": {
+      "totalActions": 8,
+      "userId": "v8M6WZQOA1aaxFP7DPRHna9NOOJ2"
+    }
+  },
+  {
+    "action": "test",
+    "details": "test details",
+    "performedBy": "test user",
+    "timestamp": "2026-07-21"
+  }
+]

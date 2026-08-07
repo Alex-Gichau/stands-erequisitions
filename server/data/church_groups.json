@@ -1,0 +1,62 @@
+[
+  {
+    "id": "cg_youth",
+    "name": "Youth Ministry",
+    "description": "Youth activities, fellowship, camps, and worship events",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_womens_guild",
+    "name": "Women's Guild",
+    "description": "Women fellowship, outreach programs, and benevolent support",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_mens_fellowship",
+    "name": "Men's Fellowship",
+    "description": "Men ministry, community service, and facility maintenance",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_sunday_school",
+    "name": "Sunday School & Children",
+    "description": "Children education, learning material, and holiday Bible school",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_praise_worship",
+    "name": "Praise & Worship Team",
+    "description": "Music ministry, sound equipment, instruments, and media production",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_health_welfare",
+    "name": "Health & Welfare Board",
+    "description": "Community aid, medical support, and benevolent care",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_evangelism",
+    "name": "Evangelism & Missions",
+    "description": "Outreach, mission trips, and gospel literature distribution",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_french_congregation",
+    "name": "French Congregation",
+    "description": "French speaking service fellowship, outreach, and ministry",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_music_ministry",
+    "name": "Music Ministry",
+    "description": "Choirs, praise teams, instrument maintenance, and concerts",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_sanctuary_renovation",
+    "name": "Sanctuary Renovation",
+    "description": "Building expansion, interior decoration, and altar upgrades",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  }
+]

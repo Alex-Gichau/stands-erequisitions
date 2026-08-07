@@ -1,0 +1,28 @@
+--- src/components/RequisitionsPanel.tsx
++++ src/components/RequisitionsPanel.tsx
+@@ -3999,14 +3999,15 @@
+                         // Can edit if author and within 15 minutes of posting
+                         const diffMs = Date.now() - new Date(comment.timestamp).getTime();
+                         const canEdit = isAuthor && (diffMs / 60000 <= 15);
+                         
+-                        const initials = (comment.authorName || comment.authorEmail || "?").charAt(0).toUpperCase();
++                        const commentUser = users.find(u => u.id === comment.authorId);
++                        const displayName = comment.authorName || commentUser?.name || comment.authorEmail?.split('@')[0] || commentUser?.email?.split('@')[0] || "Member";
++                        const initials = displayName !== "Member" ? displayName.charAt(0).toUpperCase() : "?";
+ 
+                         return (
+                           <div 
+                             key={comment.id}
+                             className="flex items-start gap-3 bg-slate-50/50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-150 dark:border-slate-800/80 group transition-all"
+                           >
+                             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 animate-in zoom-in duration-200">
+                               {initials}
+                             </div>
+                             <div className="flex-1 min-w-0 space-y-1">
+                               <div className="flex items-center justify-between gap-2 flex-wrap">
+                                 <div className="flex items-center gap-1.5 flex-wrap">
+                                   <span className="font-bold text-slate-800 dark:text-slate-200 text-xs truncate">
+-                                    {isAuthor ? `You (${comment.authorName || comment.authorEmail?.split('@')[0] || "Member"})` : (comment.authorName || comment.authorEmail?.split('@')[0] || "Member")}
++                                    {isAuthor ? `You (${displayName})` : displayName}
+                                   </span>
+                                   {comment.authorRole && (

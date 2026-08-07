@@ -1,0 +1,50 @@
+[
+  {
+    "id": "p_praise_01",
+    "name": "Sound & Media Equipment Upgrade",
+    "group_id": "cg_praise_worship",
+    "allocated_budget": 300000,
+    "spent_amount": 45000,
+    "status": "ACTIVE",
+    "color": "#4f46e5",
+    "fiscal_year": 2026,
+    "requisition_limit": 100000,
+    "accountNumber": "PJ-2026-01"
+  },
+  {
+    "id": "p_youth_01",
+    "name": "Youth Discipleship & Annual Camp",
+    "group_id": "cg_youth",
+    "allocated_budget": 250000,
+    "spent_amount": 0,
+    "status": "ACTIVE",
+    "color": "#06b6d4",
+    "fiscal_year": 2026,
+    "requisition_limit": 150000,
+    "accountNumber": "PJ-2026-02"
+  },
+  {
+    "id": "p_sunday_01",
+    "name": "Children Education & Sunday School",
+    "group_id": "cg_sunday_school",
+    "allocated_budget": 150000,
+    "spent_amount": 28500,
+    "status": "ACTIVE",
+    "color": "#10b981",
+    "fiscal_year": 2026,
+    "requisition_limit": 50000,
+    "accountNumber": "PJ-2026-03"
+  },
+  {
+    "id": "p_health_01",
+    "name": "Community Welfare & Medical Outreach",
+    "group_id": "cg_health_welfare",
+    "allocated_budget": 400000,
+    "spent_amount": 85000,
+    "status": "ACTIVE",
+    "color": "#f59e0b",
+    "fiscal_year": 2026,
+    "requisition_limit": 200000,
+    "accountNumber": "PJ-2026-04"
+  }
+]

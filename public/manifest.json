@@ -1,0 +1,18 @@
+{
+  "short_name": "STANDS",
+  "name": "St Andrews Requisition System",
+  "description": "A premium requisition management platform for church group funding, multi-level approvals, and financial oversight.",
+  "icons": [
+    {
+      "src": "/pcea.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
+}

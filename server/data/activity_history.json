@@ -1,0 +1,26 @@
+[
+  {
+    "action": "USER_LOGIN",
+    "details": "Test login audit log",
+    "performedBy": "gichaumburu@gmail.com",
+    "timestamp": "2026-07-25T13:58:12.317Z",
+    "id": "log-1784987892317",
+    "document_id": "log-1784987892317"
+  },
+  {
+    "id": "log-1784988217300",
+    "action": "TEST_STRICT_CHECK",
+    "details": "Verifying audit log save with strict mode disabled",
+    "performed_by": "system_test@pceastandrews.org",
+    "timestamp": "2026-07-25T14:03:37.300Z",
+    "document_id": "log-1784988217300"
+  },
+  {
+    "id": "log-1784988568663",
+    "action": "USER_LOGIN",
+    "details": "Test login audit log",
+    "performed_by": "gichaumburu@gmail.com",
+    "timestamp": "2026-07-25T14:09:28.663Z",
+    "document_id": "log-1784988568663"
+  }
+]

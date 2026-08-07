@@ -1,0 +1,779 @@
+%PDF-1.3
+%�߬�
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 2796
+>>
+stream
+0.5670000000000001 w
+0 G
+0.06 0.09 0.16 rg
+0. 841.8899999999999864 595.2755905511811534 -311.8110236220472871 re
+f
+79. 70. 229. 0.2 k
+42.5196850393700814 799.3703149606299121 17.0078740157480333 -17.0078740157480333 re
+f
+BT
+/F2 32 Tf
+36.7999999999999972 TL
+1. g
+56.6929133858267775 714.3309448818897636 Td
+(STANDS) Tj
+ET
+BT
+/F2 32 Tf
+36.7999999999999972 TL
+1. g
+56.6929133858267775 671.8112598425196893 Td
+(REQUISITION SYSTEM) Tj
+ET
+0.31 0.27 0.9 rg
+56.6929133858267775 643.4648031496062686 99.2125984251968589 -4.2519685039370083 re
+f
+BT
+/F1 12 Tf
+13.7999999999999989 TL
+0.886 0.91 0.941 rg
+56.6929133858267775 615.1183464566928478 Td
+(Interactive User Manual & Financial Workflow Guide) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.059 0.09 0.165 rg
+56.6929133858267775 473.3860629921259147 Td
+(SYSTEM ARCHITECTURE & MANUAL) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+56.6929133858267775 445.0396062992125508 Td
+(This manual describes the user flows, role architectures, security credentials, and requisition life cycles of the) Tj
+T* (St. Andrews Church Ministry Group Requisition System. Use this document to understand the validation,) Tj
+T* (approval chains, and final mobile/banking disbursement protocols.) Tj
+ET
+0.97 0.98 0.99 rg
+56.6929133858267775 345.8270078740156919 481.8897637795275841 -198.4251968503937178 re
+f
+0.89 0.91 0.94 RG
+56.6929133858267775 345.8270078740156919 481.8897637795275841 -198.4251968503937178 re
+S
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+70.8661417322834666 311.8112598425195756 Td
+(DOCUMENT VERIFICATION SCOPE:) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.278 0.333 0.412 rg
+70.8661417322834666 283.4648031496062686 Td
+(� Onboarding & Identity Approval \(Waiting Room status\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.278 0.333 0.412 rg
+70.8661417322834666 260.7876377952754865 Td
+(� Requisition submission \(Sourcing vendors, budget allocations and files\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.278 0.333 0.412 rg
+70.8661417322834666 238.1104724409448181 Td
+(� Multi-Level Verification Lifecycle \(L1 Verifier & L2 Keymaster sign-off\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.278 0.333 0.412 rg
+70.8661417322834666 215.4333070866141497 Td
+(� Treasury Release Ledger Ops \(Automated payouts and checking account reconciliation\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0.278 0.333 0.412 rg
+70.8661417322834666 192.7561417322833677 Td
+(� Administration Panel Oversight \(User permission controls, audit tables\)) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.278 0.333 0.412 rg
+56.6929133858267775 62.3624409448817687 Td
+(Prepared for: St. Andrews Finance Department) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0.278 0.333 0.412 rg
+396.4726771653543551 62.3624409448817687 Td
+(Document Version: 2.1 \(Production\)) Tj
+ET
+endstream
+endobj
+5 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 6 0 R
+>>
+endobj
+6 0 obj
+<<
+/Length 3520
+>>
+stream
+0.5670000000000001 w
+0.89 0.91 0.94 RG
+0.89 0.91 0.94 RG
+0.8503937007874016 w
+42.5196850393700814 799.3703149606299121 m
+552.7559055118110791 799.3703149606299121 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 807.8742519685039269 Td
+(STANDS REQUISITION APPLET � USER MANUAL) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+420.1959055118111337 807.8742519685039269 Td
+(1. IDENTITY ONBOARDING FLOWS) Tj
+ET
+42.5196850393700814 42.5199212598424126 m
+552.7559055118110791 42.5199212598424126 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+277.3177952755905835 28.3466929133857093 Td
+(Page 2 of 4) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 28.3466929133857093 Td
+(System Live Ledger Integration Documentation) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+425.3959055118110655 28.3466929133857093 Td
+(ST. ANDREWS FINANCE SYSTEM) Tj
+ET
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 762.5199212598424765 Td
+(1. Identity Access Control & Onboarding) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 739.8427559055118081 Td
+(The STANDS Requisition portal adopts a zero-trust architecture. When a new system member registers, they are) Tj
+T* (restricted to a secured 'Waiting Room' state. A Super Administrator or Finance Controller must verify the request,) Tj
+T* (assign the appropriate Ministry Group \(such as Youth, Choir, Outreach\), and authorize Ledger Access before the) Tj
+T* (user can participate in transactions.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.31 0.275 0.898 rg
+42.5196850393700814 666.1419685039369369 Td
+(SECURITY REGISTRATION WORKFLOW FLOWCHART:) Tj
+ET
+0.95 0.96 0.98 rg
+56.6929133858267775 649.1340944881889072 481.8897637795275841 -269.2913385826772128 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.392 0.455 0.545 rg
+166.2977952755905733 515.9057480314959321 Td
+(Security Authorization Flowchart Grid Placeholder) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 337.323070866141677 Td
+(STEP-BY-STEP USER ENTRANCE:) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 308.9766141732283131 Td
+(A. Member Sign Up: ) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+134.8196850393701141 308.9766141732283131 Td
+(User submits credentials, choosing their main email and setting up the password profile.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 274.9608661417322537 Td
+(B. Waiting Room Redirect: ) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+162.5196850393701027 274.9608661417322537 Td
+(System checks credentials in high-security rules; holds the user in state 'Synchronization) Tj
+T* (Pending' page.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 240.9451181102361943 Td
+(C. Admin Verification: ) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+140.119685039370097 240.9451181102361943 Td
+(The Sudo Admin receives an event notification, verifies the registrant's affiliation, selects their) Tj
+T* (active Ministry Group line, and toggles Access Status to 'Approved'.) Tj
+ET
+BT
+/F2 10 Tf
+11.5 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 206.9293700787401349 Td
+(D. Main System Access: ) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+153.3196850393701141 206.9293700787401349 Td
+(Once synchronized, the user is automatically redirected to the system's live home) Tj
+T* (dashboard, populated with their group's budgets and ledger summaries.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 8 0 R
+>>
+endobj
+8 0 obj
+<<
+/Length 3471
+>>
+stream
+0.8503937007874016 w
+0.89 0.91 0.94 RG
+0.89 0.91 0.94 RG
+0.8503937007874016 w
+42.5196850393700814 799.3703149606299121 m
+552.7559055118110791 799.3703149606299121 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 807.8742519685039269 Td
+(STANDS REQUISITION APPLET � USER MANUAL) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+441.1559055118110564 807.8742519685039269 Td
+(2. REQUISITION LIFECYCLES) Tj
+ET
+42.5196850393700814 42.5199212598424126 m
+552.7559055118110791 42.5199212598424126 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+277.3177952755905835 28.3466929133857093 Td
+(Page 3 of 4) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 28.3466929133857093 Td
+(System Live Ledger Integration Documentation) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+425.3959055118110655 28.3466929133857093 Td
+(ST. ANDREWS FINANCE SYSTEM) Tj
+ET
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 762.5199212598424765 Td
+(2. Requisition Submission & Approval Pipeline) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 739.8427559055118081 Td
+(Ledger accounts on STANDS are linked directly to approved ministry projects and budget codes. Submitting a) Tj
+T* (requisition launches a highly trackable status chain. Requisitions require digital vendor validation and) Tj
+T* (multi-signature checkpoints \(L1 & L2 validation\) before arriving in the disbursement ledger.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.31 0.275 0.898 rg
+42.5196850393700814 666.1419685039369369 Td
+(APPROVAL PIPELINE STAGES & DIGITAL CODES:) Tj
+ET
+0.95 0.96 0.98 rg
+56.6929133858267775 649.1340944881889072 481.8897637795275841 -269.2913385826772128 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.392 0.455 0.545 rg
+207.6577952755906153 515.9057480314959321 Td
+(Requisition Pipeline Flow Diagram) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 337.323070866141677 Td
+(UNDERSTANDING STATUS BAR CHECKPOINTS:) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 308.9766141732283131 Td
+(SUBMITTED:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0.278 0.333 0.412 rg
+114.5189763779527539 308.9766141732283131 Td
+(Initial draft submitted by Ministry Rep. Notified instantly on the global ledger. Triggers an) Tj
+T* (email alert to the L1 Verification Board.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 269.2915748031495013 Td
+(APPROVED_L1:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0.278 0.333 0.412 rg
+130.1389763779527584 269.2915748031495013 Td
+(Requisition vetted by L1 Verifiers for compliance, receipts, and vendor validity.) Tj
+T* (Approved for general project scope.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 229.6065354330708033 Td
+(APPROVED_L2:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0.278 0.333 0.412 rg
+130.1389763779527584 229.6065354330708033 Td
+(Treasury sign-off by L2 Keymasters. Authorizes the transaction against corresponding) Tj
+T* (checking accounts.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 189.9214960629919915 Td
+(DISBURSED:) Tj
+ET
+BT
+/F1 11 Tf
+12.6499999999999986 TL
+0.278 0.333 0.412 rg
+115.068976377952751 189.9214960629919915 Td
+(Final ledger payout completed. Records physical banking checks, receipt tokens, and) Tj
+T* (ledger event archives.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 10 0 R
+>>
+endobj
+10 0 obj
+<<
+/Length 2634
+>>
+stream
+0.8503937007874016 w
+0.89 0.91 0.94 RG
+0.89 0.91 0.94 RG
+0.8503937007874016 w
+42.5196850393700814 799.3703149606299121 m
+552.7559055118110791 799.3703149606299121 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 807.8742519685039269 Td
+(STANDS REQUISITION APPLET � USER MANUAL) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+410.5959055118111678 807.8742519685039269 Td
+(3. PORTAL CONTROL & DASHBOARD) Tj
+ET
+42.5196850393700814 42.5199212598424126 m
+552.7559055118110791 42.5199212598424126 l
+S
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+277.3177952755905835 28.3466929133857093 Td
+(Page 4 of 4) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 28.3466929133857093 Td
+(System Live Ledger Integration Documentation) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+0.278 0.333 0.412 rg
+425.3959055118110655 28.3466929133857093 Td
+(ST. ANDREWS FINANCE SYSTEM) Tj
+ET
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 762.5199212598424765 Td
+(3. Control Dashboard & System Administration) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 739.8427559055118081 Td
+(The central administrator dashboard allows real-time insights of active exposure, requisition volume, and upcoming) Tj
+T* (payouts. System roles are granular, authorizing operations from budget adjustments to manual audit logs. The) Tj
+T* (dashboard aggregates project breakdowns to ensure full visibility.) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.31 0.275 0.898 rg
+42.5196850393700814 666.1419685039369369 Td
+(DASHBOARD LIVE TRACKING INTEGRATION OVERVIEW:) Tj
+ET
+0.95 0.57 0.98 rg
+56.6929133858267775 649.1340944881889072 481.8897637795275841 -269.2913385826772128 re
+f
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.392 0.455 0.545 rg
+225.4227952755906017 515.9057480314959321 Td
+(Dashboard View Illustration) Tj
+ET
+BT
+/F2 11 Tf
+12.6499999999999986 TL
+0.059 0.09 0.165 rg
+42.5196850393700814 337.323070866141677 Td
+(GRANULAR USER ROLE ASSIGNMENTS:) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0.278 0.333 0.412 rg
+42.5196850393700814 314.6459055118109518 Td
+(The system implements four tiers of authentication:) Tj
+T* (1. MINISTRY_REP: Can submit new requisitions and edit their group's entries while in draft stage.) Tj
+T* (2. APPROVER_L1: General committee verifiers. Inspects quotes, compares bids, and pushes to Level 2. ) Tj
+T* (3. APPROVER_L2: Senior treasury officers. Checks funding pools, marks final authorization status.) Tj
+T* (4. SUPER_ADMIN: Global system configurations, adding new groups, manual ledger adjustments, and member) Tj
+T* (status edits.) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R ]
+/Count 4
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+19 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+20 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+21 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+22 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+23 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+24 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 11 0 R
+/F2 12 0 R
+/F3 13 0 R
+/F4 14 0 R
+/F5 15 0 R
+/F6 16 0 R
+/F7 17 0 R
+/F8 18 0 R
+/F9 19 0 R
+/F10 20 0 R
+/F11 21 0 R
+/F12 22 0 R
+/F13 23 0 R
+/F14 24 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+25 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260730112813-00'00')
+>>
+endobj
+26 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 27
+0000000000 65535 f 
+0000013194 00000 n 
+0000015034 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000003000 00000 n 
+0000003137 00000 n 
+0000006709 00000 n 
+0000006846 00000 n 
+0000010369 00000 n 
+0000010507 00000 n 
+0000013269 00000 n 
+0000013395 00000 n 
+0000013526 00000 n 
+0000013660 00000 n 
+0000013798 00000 n 
+0000013922 00000 n 
+0000014051 00000 n 
+0000014183 00000 n 
+0000014319 00000 n 
+0000014447 00000 n 
+0000014574 00000 n 
+0000014703 00000 n 
+0000014836 00000 n 
+0000014938 00000 n 
+0000015287 00000 n 
+0000015373 00000 n 
+trailer
+<<
+/Size 27
+/Root 26 0 R
+/Info 25 0 R
+/ID [ <76F3D7D0E067501F679012A90ABBD51F> <76F3D7D0E067501F679012A90ABBD51F> ]
+>>
+startxref
+15477
+%%EOF

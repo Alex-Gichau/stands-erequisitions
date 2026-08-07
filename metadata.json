@@ -1,0 +1,6 @@
+{
+  "name": "St Andrews Requisition System",
+  "description": "A premium requisition management platform for church group funding, multi-level approvals, and financial oversight.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

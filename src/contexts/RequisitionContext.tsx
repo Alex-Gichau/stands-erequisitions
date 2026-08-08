@@ -45,15 +45,6 @@ import {
   updatePassword as updateAuthPassword
 } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCTAlP2_HARk1MYqUv1W_HxfIaRQCtC-HY",
-  authDomain: "fintech-requisitions.firebaseapp.com",
-  projectId: "fintech-requisitions",
-  storageBucket: "fintech-requisitions.firebasestorage.app",
-  messagingSenderId: "2730554389",
-  appId: "1:2730554389:web:eaf336c107434ef442ca1c"
-};
-
 const firebaseApp = initFirebaseApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 

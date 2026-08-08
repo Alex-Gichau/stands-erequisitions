@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { 
   CloudUpload, 
@@ -16,6 +16,17 @@ import { motion, AnimatePresence } from "motion/react";
 export const BackgroundUploadWidget: React.FC = () => {
   const { activeUploadTasks, cancelBackgroundUploadTask, clearCompletedUploadTasks } = useRequisitions();
   const [isMinimized, setIsMinimized] = useState(false);
+
+  // Auto-dismiss completed upload tasks 2.5s after finishing
+  useEffect(() => {
+    const completedTasks = activeUploadTasks.filter(t => t.status === "COMPLETED");
+    if (completedTasks.length > 0) {
+      const timer = setTimeout(() => {
+        clearCompletedUploadTasks();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeUploadTasks, clearCompletedUploadTasks]);
 
   if (!activeUploadTasks || activeUploadTasks.length === 0) {
     return null;
@@ -84,6 +95,13 @@ export const BackgroundUploadWidget: React.FC = () => {
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             >
               {isMinimized ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            <button
+              onClick={clearCompletedUploadTasks}
+              title="Dismiss toast message"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer ml-0.5"
+            >
+              <X size={14} />
             </button>
           </div>
         </div>

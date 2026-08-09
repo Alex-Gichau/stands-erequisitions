@@ -563,6 +563,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
       const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
       const parsedAmount = Number(amount) || 0;
 
+      const readPromises = attachments.map((file) => processFileToAttachmentStrings(file));
+      const nestedEncoded = await Promise.all(readPromises);
+      const encodedAttachments = nestedEncoded.flat();
+
       await addRequisition({
         status: RequisitionStatus.DRAFT,
         projectId: matchingProject ? matchingProject.id : "",
@@ -580,7 +584,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         notificationEmails,
         isSharedRequisition,
         sharedGroups: isSharedRequisition ? sharedGroups : [],
-        attachments: [], // Usually draft doesn't need to parse attachments, keep simple
+        attachments: encodedAttachments,
       });
       if (currentUser?.id) {
         localStorage.removeItem(`stands_requisition_draft_${currentUser.id}`);
@@ -630,7 +634,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
 
       const reqTitle = title.trim() || "Untitled Requisition";
 
-      // 1. Create requisition immediately with empty attachments array
+      // 1. Create requisition immediately with encoded attachments array
       const createdReq = await addRequisition({
         projectId: matchingProject ? matchingProject.id : "",
         title: reqTitle,
@@ -647,7 +651,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         notificationEmails: finalNotificationEmails,
         isSharedRequisition,
         sharedGroups: isSharedRequisition ? sharedGroups : [],
-        attachments: [],
+        attachments: encodedAttachments,
       });
 
       // 2. Queue background file upload task if attachments exist

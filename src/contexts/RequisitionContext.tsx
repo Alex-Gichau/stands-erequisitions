@@ -4103,7 +4103,18 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }
       }
 
-      const updatedReq = { ...req, ...updates, id };
+      const localReq = requisitions.find(r => r.id === id);
+      const reqAttachments = safeNormalizeAttachments(req?.attachments);
+      const localAttachments = safeNormalizeAttachments(localReq?.attachments);
+      const finalAttachments = reqAttachments.length > 0 ? reqAttachments : localAttachments;
+
+      const updatedReq = {
+        ...localReq,
+        ...req,
+        attachments: finalAttachments,
+        ...updates,
+        id
+      };
 
       // OPTIMISTIC UPDATE: Update React state immediately so UI updates instantly (0ms latency feel)
       setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));

@@ -220,7 +220,9 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
         }
       }
 
-      // Immediately save requisition form details & existing attachments
+      const combinedAttachments = [...existingAttachments, ...encodedNew];
+
+      // Immediately save requisition form details & all attachments
       await updateRequisition(req.id, {
         title: title.trim(),
         description: description.trim(),
@@ -232,7 +234,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
         projectId: finalProjectId,
         inProcurement,
         requiresMoreInfo,
-        attachments: existingAttachments,
+        attachments: combinedAttachments,
         notificationEmails: finalNotificationEmails,
         status: finalStatus
       });

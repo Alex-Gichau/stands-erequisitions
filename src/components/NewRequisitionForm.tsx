@@ -8,7 +8,7 @@ import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionCon
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { Upload, X, Paperclip, Loader2, DollarSign, FileText, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store } from "lucide-react";
+import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { RecurrenceType, UserRole } from "../types";
 import { CameraCapture } from "./CameraCapture";
@@ -1641,6 +1641,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                             />
                           ) : file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? (
                             <PdfThumbnailPreview file={file} title={file.name} />
+                          ) : (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || file.type === "application/vnd.ms-excel" || file.type === "text/csv" || /\.(xlsx|xls|csv)$/i.test(file.name)) ? (
+                            <div className="flex items-center justify-center w-full h-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                              <FileSpreadsheet size={18} />
+                            </div>
                           ) : (
                             <span>{file.name.split('.').pop()?.slice(0, 3)}</span>
                           )}

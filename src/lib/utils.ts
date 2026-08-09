@@ -175,6 +175,9 @@ export function getAttachmentFileName(doc: any): string {
     if (raw.startsWith("data:image/png")) return "image.png";
     if (raw.startsWith("data:image/webp")) return "image.webp";
     if (raw.startsWith("data:application/pdf")) return "document.pdf";
+    if (raw.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) return "spreadsheet.xlsx";
+    if (raw.startsWith("data:application/vnd.ms-excel")) return "spreadsheet.xls";
+    if (raw.startsWith("data:text/csv") || raw.startsWith("data:application/csv")) return "data.csv";
   }
 
   const cleaned = raw.replace(/^(\{\s*"\d+"\s*:\s*)+/, "").replace(/(\}\s*)+$/, "").replace(/^"/, "").replace(/"$/, "").trim();

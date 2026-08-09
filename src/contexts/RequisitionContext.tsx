@@ -45,6 +45,15 @@ import {
   updatePassword as updateAuthPassword
 } from "firebase/auth";
 
+const firebaseConfig = {
+  apiKey: "AIzaSyCTAlP2_HARk1MYqUv1W_HxfIaRQCtC-HY",
+  authDomain: "fintech-requisitions.firebaseapp.com",
+  projectId: "fintech-requisitions",
+  storageBucket: "fintech-requisitions.firebasestorage.app",
+  messagingSenderId: "2730554389",
+  appId: "1:2730554389:web:eaf336c107434ef442ca1c"
+};
+
 const firebaseApp = initFirebaseApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 
@@ -885,14 +894,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const lastPresenceTimeRef = React.useRef(0);
 
   const triggerToast = useCallback((toast: Omit<BudgetAlert, "id" | "isRead"> & { isRead?: boolean }) => {
-    // Suppress error toast notifications per user preference
-    const isErrorToast = toast.severity === "HIGH" ||
-      toast.type === "SECURITY_UPDATE" ||
-      toast.message?.toLowerCase().includes("error") ||
-      toast.message?.toLowerCase().includes("failed");
-    if (isErrorToast) return;
-
-    const id = `toast-${Math.random().toString(36).substr(2, 9)}`;
+    const id = `toast-${Math.random().toString(36).substring(2, 9)}`;
     const newToast: BudgetAlert = {
       ...toast,
       id,

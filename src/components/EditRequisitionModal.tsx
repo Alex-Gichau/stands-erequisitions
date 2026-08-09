@@ -8,7 +8,7 @@ import { useRequisitions } from "../contexts/RequisitionContext";
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { X, Loader2, DollarSign, FileText, Repeat, Users, PlusCircle, Save, Activity, Mail, Check, UserPlus, Info, Trash2, Pencil } from "lucide-react";
+import { X, Loader2, DollarSign, FileText, FileSpreadsheet, Repeat, Users, PlusCircle, Save, Activity, Mail, Check, UserPlus, Info, Trash2, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { RecurrenceType, Requisition, RequisitionStatus, UserRole } from "../types";
 import { ApprovalSparkline } from "./ApprovalSparkline";
@@ -608,6 +608,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                       }
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:image/') || url.startsWith('blob:')));
                       const isPdf = !isImage && (/\.(pdf)$/i.test(name) || /\.(pdf)$/i.test(url) || (typeof url === 'string' && url.startsWith('data:application/pdf')));
+                      const isXlsx = !isImage && !isPdf && (/\.(xlsx|xls|csv)$/i.test(name) || /\.(xlsx|xls|csv)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') || url.startsWith('data:application/vnd.ms-excel') || url.startsWith('data:text/csv') || url.startsWith('data:application/csv'))));
 
                       return (
                         <div key={idx} className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl animate-in fade-in">
@@ -617,13 +618,17 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                                 <img src={url} alt={name} className="w-full h-full object-cover" />
                               ) : isPdf ? (
                                 <PdfThumbnailPreview url={url} title={name} />
+                              ) : isXlsx ? (
+                                <div className="w-full h-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                  <FileSpreadsheet size={18} />
+                                </div>
                               ) : (
                                 <FileText size={16} className="text-slate-400" />
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
                               <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate block" title={name}>{name}</span>
-                              <span className="text-[9px] font-mono text-slate-400 uppercase">{isPdf ? "PDF Document" : isImage ? "Image" : "Document"}</span>
+                              <span className="text-[9px] font-mono text-slate-400 uppercase">{isPdf ? "PDF Document" : isImage ? "Image" : isXlsx ? "Excel / CSV Sheet" : "Document"}</span>
                             </div>
                           </div>
                           <button
@@ -649,6 +654,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                     {newAttachments.map((file, idx) => {
                       const isImage = file.type.startsWith("image/");
                       const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                      const isXlsx = file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || file.type === "application/vnd.ms-excel" || file.type === "text/csv" || /\.(xlsx|xls|csv)$/i.test(file.name);
 
                       return (
                         <div key={idx} className="flex items-center justify-between p-2.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl animate-in fade-in">
@@ -658,6 +664,10 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                                 <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
                               ) : isPdf ? (
                                 <PdfThumbnailPreview file={file} title={file.name} />
+                              ) : isXlsx ? (
+                                <div className="w-full h-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                  <FileSpreadsheet size={18} />
+                                </div>
                               ) : (
                                 <FileText size={16} className="text-emerald-600" />
                               )}

@@ -92,8 +92,10 @@ interface ToastItemProps {
 const ToastItem: React.FC<ToastItemProps> = ({ toast, index, removeToast, setCurrentView, darkMode = false }) => {
   const [progress, setProgress] = useState(100);
   const [isHovered, setIsHovered] = useState(false);
-  const duration = toast.severity === "LOW" ? 3000 : 7000; // 3s for low severity, otherwise 7s
-  const intervalTime = 40; // update scale dynamically
+  
+  // Custom duration based on severity: HIGH = 8s, MEDIUM = 5s, LOW = 3.5s
+  const duration = toast.severity === "HIGH" ? 8000 : toast.severity === "MEDIUM" ? 5000 : 3500;
+  const intervalTime = 30; // smooth update step
   const decrement = (intervalTime / duration) * 100;
 
   useEffect(() => {
@@ -118,113 +120,152 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, index, removeToast, setCur
     }
   }, [progress, toast.id, removeToast]);
 
-  const getStyleParams = (toast: BudgetAlert, darkMode: boolean) => {
-    const isError = toast.severity === "HIGH" || toast.type === "SECURITY_UPDATE";
-    const isSuccess = toast.message?.toLowerCase().includes("success") || toast.message?.toLowerCase().includes("approved") || toast.message?.toLowerCase().includes("updated");
+  const styleConfig = useMemo(() => {
+    const isError = toast.severity === "HIGH" || toast.type === "SECURITY_UPDATE" || toast.message?.toLowerCase().includes("error") || toast.message?.toLowerCase().includes("failed");
+    const isSuccess = toast.message?.toLowerCase().includes("success") || toast.message?.toLowerCase().includes("approved") || toast.message?.toLowerCase().includes("updated") || toast.message?.toLowerCase().includes("saved") || toast.message?.toLowerCase().includes("created");
+    const isWarning = toast.severity === "MEDIUM" || toast.type === "OVERSHOOT";
 
     if (isError) {
       return {
-        blobClass: darkMode ? "from-red-500/10 to-transparent" : "from-red-50 to-transparent",
-        icon: (
-          <div className={cn(
-            "flex items-center justify-center p-1 rounded-full border transition-all",
-            darkMode
-              ? "border-red-500/20 bg-red-500/10 text-red-400"
-              : "border-red-100 bg-red-50/50 text-red-500"
-          )}>
-            <AlertTriangle size={16} strokeWidth={2} />
-          </div>
-        )
+        accentBorder: "bg-rose-500",
+        progressBar: "bg-rose-500",
+        badgeBg: darkMode ? "bg-rose-500/15 text-rose-300 border-rose-500/30" : "bg-rose-50 text-rose-700 border-rose-200",
+        iconBg: darkMode ? "bg-rose-500/20 text-rose-400 border-rose-500/30" : "bg-rose-100 text-rose-600 border-rose-200",
+        icon: <AlertTriangle size={16} strokeWidth={2.2} />,
+        label: toast.type ? toast.type.replace(/_/g, " ") : "ALERT",
+        role: "alert",
+        ariaLive: "assertive" as const
       };
     } else if (isSuccess) {
       return {
-        blobClass: darkMode ? "from-emerald-500/10 to-transparent" : "from-green-50 to-transparent",
-        icon: (
-          <div className={cn(
-            "flex items-center justify-center p-1 rounded-full border transition-all",
-            darkMode
-              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-              : "border-green-100 bg-green-50/50 text-green-500"
-          )}>
-            <Check size={16} strokeWidth={2} />
-          </div>
-        )
+        accentBorder: "bg-emerald-500",
+        progressBar: "bg-emerald-500",
+        badgeBg: darkMode ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-emerald-50 text-emerald-800 border-emerald-200",
+        iconBg: darkMode ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-emerald-100 text-emerald-600 border-emerald-200",
+        icon: <Check size={16} strokeWidth={2.2} />,
+        label: toast.type ? toast.type.replace(/_/g, " ") : "SUCCESS",
+        role: "status",
+        ariaLive: "polite" as const
+      };
+    } else if (isWarning) {
+      return {
+        accentBorder: "bg-amber-500",
+        progressBar: "bg-amber-500",
+        badgeBg: darkMode ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-amber-50 text-amber-800 border-amber-200",
+        iconBg: darkMode ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-amber-100 text-amber-600 border-amber-200",
+        icon: <AlertCircle size={16} strokeWidth={2.2} />,
+        label: toast.type ? toast.type.replace(/_/g, " ") : "WARNING",
+        role: "status",
+        ariaLive: "polite" as const
       };
     } else {
       return {
-        blobClass: darkMode ? "from-blue-500/10 to-transparent" : "from-sky-50 to-transparent",
-        icon: (
-          <div className={cn(
-            "flex items-center justify-center p-1 rounded-full border transition-all",
-            darkMode
-              ? "border-blue-500/20 bg-blue-500/10 text-blue-400"
-              : "border-sky-100 bg-sky-50/50 text-sky-500"
-          )}>
-            <Info size={16} strokeWidth={2} />
-          </div>
-        )
+        accentBorder: "bg-sky-500",
+        progressBar: "bg-sky-500",
+        badgeBg: darkMode ? "bg-sky-500/15 text-sky-300 border-sky-500/30" : "bg-sky-50 text-sky-800 border-sky-200",
+        iconBg: darkMode ? "bg-sky-500/20 text-sky-400 border-sky-500/30" : "bg-sky-100 text-sky-600 border-sky-200",
+        icon: <Info size={16} strokeWidth={2.2} />,
+        label: toast.type ? toast.type.replace(/_/g, " ") : "INFO",
+        role: "status",
+        ariaLive: "polite" as const
       };
     }
-  };
-
-  const styleParams = getStyleParams(toast, darkMode);
+  }, [toast, darkMode]);
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: 50, scale: 0.95, y: 15 }}
+      role={styleConfig.role}
+      aria-live={styleConfig.ariaLive}
+      initial={{ opacity: 0, x: 60, scale: 0.92, y: 10 }}
       animate={{
         opacity: 1,
         x: 0,
         scale: 1,
         y: 0,
-        transition: { type: "spring", stiffness: 400, damping: 30, delay: index * 0.05 }
+        transition: { type: "spring", stiffness: 420, damping: 28, delay: index * 0.04 }
       }}
-      exit={{ opacity: 0, scale: 0.95, filter: "blur(2px)", transition: { duration: 0.2 } }}
+      exit={{
+        opacity: 0,
+        x: 40,
+        scale: 0.92,
+        filter: "blur(4px)",
+        transition: { duration: 0.22 }
+      }}
       className={cn(
-        "pointer-events-auto relative overflow-hidden rounded-[18px] max-w-[340px] w-full font-sans border flex items-start p-4 pr-3 min-h-[64px] transition-all duration-300 backdrop-blur-md",
+        "pointer-events-auto relative overflow-hidden rounded-2xl max-w-[360px] w-full font-sans border shadow-2xl backdrop-blur-xl transition-all duration-200 group",
         darkMode
-          ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
-          : "bg-white border-slate-100 text-slate-900 shadow-[0_12px_40px_rgba(0,0,0,0.06)]"
+          ? "bg-slate-900/95 border-slate-800/90 text-slate-100 shadow-slate-950/60"
+          : "bg-white/95 border-slate-200/80 text-slate-900 shadow-slate-300/40"
       )}
       style={{ zIndex: 100 - index }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`absolute inset-y-0 left-0 bg-gradient-to-r ${styleParams.blobClass} w-24 pointer-events-none`} />
+      {/* Left Vertical Accent Line */}
+      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5 transition-colors", styleConfig.accentBorder)} />
 
-      <div className="relative shrink-0 flex items-center justify-center pr-3 pl-0.5">
-        {styleParams.icon}
-      </div>
+      <div className="flex items-start p-3.5 pl-4 pr-10 gap-3">
+        {/* Status Icon */}
+        <div className={cn("shrink-0 p-2 rounded-xl border flex items-center justify-center mt-0.5 transition-transform group-hover:scale-105", styleConfig.iconBg)}>
+          {styleConfig.icon}
+        </div>
 
-      <div className="relative flex-1 min-w-0 pr-8">
-        {toast.type && !toast.message?.toLowerCase().includes("data updated") && toast.message?.length > 40 && (
+        {/* Text Content & Type Badge */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className={cn(
+              "text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md border",
+              styleConfig.badgeBg
+            )}>
+              {styleConfig.label}
+            </span>
+            <span className={cn(
+              "text-[10px] font-medium flex items-center gap-1",
+              darkMode ? "text-slate-500" : "text-slate-400"
+            )}>
+              <Clock size={10} /> Just now
+            </span>
+          </div>
+
           <p className={cn(
-            "text-[12px] font-black tracking-wider uppercase mb-1",
-            darkMode ? "text-slate-400" : "text-slate-500"
+            "text-[12.5px] font-medium leading-snug break-words",
+            darkMode ? "text-slate-200" : "text-slate-700"
           )}>
-            {toast.type.replace(/_/g, " ").toLowerCase()}
+            {toast.message}
           </p>
-        )}
-        <p className={cn(
-          "text-[13px] font-medium leading-relaxed",
-          darkMode ? "text-slate-200" : "text-slate-700"
-        )}>
-          {toast.message}
-        </p>
+        </div>
+
+        {/* Dismiss Close Button */}
+        <button
+          onClick={() => removeToast(toast.id!)}
+          title="Dismiss notification"
+          aria-label="Dismiss notification"
+          className={cn(
+            "absolute top-3 right-2.5 p-1.5 rounded-lg transition-all cursor-pointer opacity-70 hover:opacity-100",
+            darkMode
+              ? "text-slate-400 hover:text-white hover:bg-slate-800"
+              : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
+          )}
+        >
+          <X size={15} strokeWidth={2.2} />
+        </button>
       </div>
 
-      <button
-        onClick={() => removeToast(toast.id!)}
-        className={cn(
-          "absolute top-3.5 right-3 p-1 rounded-full transition-colors",
-          darkMode
-            ? "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
-            : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"
-        )}
-      >
-        <X size={14} strokeWidth={2} />
-      </button>
+      {/* Visible Progress Bar */}
+      <div className={cn("w-full h-1 overflow-hidden", darkMode ? "bg-slate-800/80" : "bg-slate-100")}>
+        <div
+          className={cn("h-full transition-all duration-75 ease-linear", styleConfig.progressBar)}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      {/* Pause Indicator on Hover */}
+      {isHovered && (
+        <div className="absolute bottom-1.5 right-3 text-[9px] font-bold text-slate-400 bg-slate-800/80 dark:bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-700/50 pointer-events-none animate-fade-in">
+          Paused
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -1243,7 +1284,7 @@ function AppContent() {
         </motion.div>
 
         {/* Real-time Toast Notifications */}
-        <div className="fixed bottom-12 right-6 z-[100] flex flex-col gap-3 w-80 pointer-events-none">
+        <div className="fixed bottom-6 sm:bottom-8 right-4 sm:right-6 z-[100] flex flex-col gap-2.5 w-88 sm:w-96 max-w-[calc(100vw-2rem)] pointer-events-none">
           <AnimatePresence mode="popLayout">
             {activeToasts.map((toast, index) => (
               <ToastItem
@@ -1325,7 +1366,7 @@ function AppContent() {
       <>
         <WaitingRoom user={currentUser} onLogout={handleLogout} />
         {/* Real-time Toast Notifications */}
-        <div className="fixed bottom-12 right-6 z-[100] flex flex-col gap-3 w-80 pointer-events-none">
+        <div className="fixed bottom-6 sm:bottom-8 right-4 sm:right-6 z-[100] flex flex-col gap-2.5 w-88 sm:w-96 max-w-[calc(100vw-2rem)] pointer-events-none">
           <AnimatePresence mode="popLayout">
             {activeToasts.map((toast, index) => (
               <ToastItem
@@ -2908,7 +2949,7 @@ function AppContent() {
       </main>
 
       {/* Real-time Toast Notifications */}
-      <div className="fixed bottom-12 right-6 z-[100] flex flex-col gap-3 w-80 pointer-events-none">
+      <div className="fixed bottom-6 sm:bottom-8 right-4 sm:right-6 z-[100] flex flex-col gap-2.5 w-88 sm:w-96 max-w-[calc(100vw-2rem)] pointer-events-none">
         <AnimatePresence mode="popLayout">
           {activeToasts.map((toast, index) => (
             <ToastItem

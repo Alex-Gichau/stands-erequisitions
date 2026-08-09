@@ -106,6 +106,8 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
   const isXlsx = !isHtml && !isPdf && !isImage && (
     cleanUri.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
     cleanUri.startsWith("data:application/vnd.ms-excel") ||
+    cleanUri.startsWith("data:text/csv") ||
+    cleanUri.startsWith("data:application/csv") ||
     /\.(xlsx|xls|csv)(\?.*)?$/i.test(lowerName) ||
     /\.(xlsx|xls|csv)(\?.*)?$/i.test(cleanUri.toLowerCase())
   );
@@ -2977,13 +2979,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     setMentionIndex(-1);
     setIsSubmittingComment(false);
 
-    triggerToast({
-      type: "SYSTEM_INFO",
-      severity: "LOW",
-      message: "Comment posted.",
-      timestamp: new Date().toISOString()
-    });
-
     // Execute database save & notifications in background task
     (async () => {
       try {
@@ -4079,7 +4074,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:image/') || url.startsWith('blob:')));
                       const fileExt = name.split('.').pop()?.toUpperCase() || "DOC";
                       const isDocx = fileExt === "DOCX" || /\.(docx)$/i.test(name) || /\.(docx)$/i.test(url);
-                      const isXlsx = fileExt === "XLSX" || /\.(xlsx)$/i.test(name) || /\.(xlsx)$/i.test(url);
+                      const isXlsx = fileExt === "XLSX" || fileExt === "XLS" || fileExt === "CSV" || /\.(xlsx|xls|csv)$/i.test(name) || /\.(xlsx|xls|csv)$/i.test(url);
                       const isPdf = !isImage && !isDocx && !isXlsx && (fileExt === "PDF" || /\.(pdf)$/i.test(name) || /\.(pdf)$/i.test(url) || (typeof url === 'string' && url.startsWith('data:application/pdf')));
 
                       return (
@@ -4101,10 +4096,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           ) : isXlsx ? (
                             <div className="flex flex-col items-center justify-center p-3 text-center w-full h-full bg-gradient-to-b from-emerald-50/80 to-emerald-100/30 dark:from-emerald-950/30 dark:to-slate-900">
                               <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-1 shadow-sm group-hover:scale-110 transition-transform">
-                                <FileText size={20} />
+                                <FileSpreadsheet size={20} />
                               </div>
                               <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                                EXCEL SHEET
+                                {fileExt === "CSV" ? "CSV SHEET" : "EXCEL SHEET"}
                               </span>
                             </div>
                           ) : isDocx ? (

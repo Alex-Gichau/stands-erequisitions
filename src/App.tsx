@@ -2493,28 +2493,6 @@ function AppContent() {
                 )}
               </AnimatePresence>
             </div>
-
-            <div className="flex items-center gap-2 mt-2">
-              {[
-                { id: "ALL", label: "All Hubs" },
-                { id: "TITLE", label: "By Title" },
-                { id: "GROUP", label: "By Group" },
-                { id: "REQUESTER", label: "By Requester" }
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setSearchFilter(f.id as SearchFilter)}
-                  className={cn(
-                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all",
-                    searchFilter === f.id
-                      ? "bg-primary text-white shadow-sm ring-1 ring-primary/20"
-                      : "bg-slate-500/5 dark:bg-white/5 text-muted hover:text-foreground border border-border/50"
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">

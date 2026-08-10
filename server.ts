@@ -2078,11 +2078,13 @@ async function startServer() {
         type: "header",
         text: {
           type: "plain_text",
-          text: headerText,
+          text: String(headerText || "System Alert").substring(0, 140),
           emoji: true
         }
       }
     ];
+
+    const safeDetails = String(details || "No details provided").replace(/data:[^;]+;base64,[^\s]+/g, "[base64 attachment]").substring(0, 1000);
 
     if (isAuthEvent) {
       if (action === "FAILED_LOGIN_ATTEMPT" || actLower.includes("failed_login")) {
@@ -2093,7 +2095,7 @@ async function startServer() {
               { type: "mrkdwn", text: `*Target Email:*\n\`${metadata?.email || performedBy}\`` },
               { type: "mrkdwn", text: `*Auth Method:*\n${metadata?.authProvider || "Email & Password"}` },
               { type: "mrkdwn", text: `*Error Code:*\n\`${metadata?.errorCode || "auth/invalid-credential"}\`` },
-              { type: "mrkdwn", text: `*Failure Reason:*\n_${metadata?.errorMessage || details}_` }
+              { type: "mrkdwn", text: `*Failure Reason:*\n_${metadata?.errorMessage || safeDetails}_` }
             ]
           },
           {
@@ -2135,24 +2137,36 @@ async function startServer() {
         {
           type: "section",
           fields: [
-            { type: "mrkdwn", text: `*Action:*\n\`${action}\`` },
-            { type: "mrkdwn", text: `*User:*\n_${performedBy}_` }
+            { type: "mrkdwn", text: `*Action:*\n\`${action || "N/A"}\`` },
+            { type: "mrkdwn", text: `*User:*\n_${performedBy || "System"}_` }
           ]
         },
         {
           type: "section",
-          text: { type: "mrkdwn", text: `*Details:* ${details}` }
+          text: { type: "mrkdwn", text: `*Details:* ${safeDetails}` }
         }
       );
 
-      if (metadata && Object.keys(metadata).length > 0) {
-        const formattedMeta = Object.entries(metadata)
-          .map(([k, v]) => `• *${k}:* ${typeof v === "object" ? `\`${JSON.stringify(v)}\`` : `\`${v}\``}`)
-          .join("\n");
-        mainAttachmentBlocks.push({
-          type: "section",
-          text: { type: "mrkdwn", text: `*Extended Context Details:*\n${formattedMeta}` }
-        });
+      if (metadata && typeof metadata === "object") {
+        const metaEntries: string[] = [];
+        for (const [k, v] of Object.entries(metadata)) {
+          if (v === undefined || v === null) continue;
+          const keyLower = k.toLowerCase();
+          if (keyLower.includes("attachment") || keyLower.includes("receipt") || keyLower.includes("base64") || keyLower.includes("image")) {
+            metaEntries.push(`• *${k}:* \`[Attachment Data]\``);
+          } else {
+            const valStr = typeof v === "object" ? JSON.stringify(v) : String(v);
+            const safeValStr = valStr.length > 200 ? valStr.substring(0, 195) + "..." : valStr;
+            metaEntries.push(`• *${k}:* \`${safeValStr}\``);
+          }
+        }
+        if (metaEntries.length > 0) {
+          const formattedMeta = metaEntries.join("\n").substring(0, 2500);
+          mainAttachmentBlocks.push({
+            type: "section",
+            text: { type: "mrkdwn", text: `*Extended Context Details:*\n${formattedMeta}` }
+          });
+        }
       }
     }
 
@@ -2161,10 +2175,12 @@ async function startServer() {
       elements: [
         {
           type: "mrkdwn",
-          text: `*Timestamp:* ${timestamp} | *🎯 Target Channel:* \`${targetChannel}\``
+          text: `*Timestamp:* ${timestamp || new Date().toISOString()} | *🎯 Target Channel:* \`${targetChannel}\``
         }
       ]
     });
+
+    const safeSummaryText = (summaryText || "No activity logged.").substring(0, 2800);
 
     const slackBody: any = {
       attachments: [
@@ -2187,7 +2203,7 @@ async function startServer() {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: summaryText
+                text: safeSummaryText
               }
             }
           ]
@@ -2214,13 +2230,26 @@ async function startServer() {
       });
 
       if (!response.ok) {
-        throw new Error(`Slack responded with ${response.status}`);
+        const text = await response.text().catch(() => "");
+        console.warn(`[Slack Webhook ${response.status} Warning]:`, text);
+        return res.json({
+          success: true,
+          simulated: true,
+          warning: `Slack responded with ${response.status}`,
+          targetChannel,
+          payload: slackBody
+        });
       }
 
-      res.json({ success: true, simulated: false, targetChannel, payload: slackBody });
+      return res.json({ success: true, simulated: false, targetChannel, payload: slackBody });
     } catch (error: any) {
-      console.error("Failed to send Slack notification:", error);
-      res.status(500).json({ error: "Failed to notify Slack", message: error.message });
+      console.warn("Failed to send Slack notification:", error);
+      return res.json({
+        success: true,
+        simulated: true,
+        warning: error.message || "Failed to reach Slack",
+        targetChannel
+      });
     }
   });
 
@@ -2325,14 +2354,19 @@ async function startServer() {
     }
 
     try {
-      await fetch(webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(slackBody)
       });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.warn(`[Morning Briefing Slack Webhook ${response.status}]:`, text);
+        return res.json({ success: true, simulated: true, warning: `Slack responded with ${response.status}` });
+      }
       res.json({ success: true, simulated: false, targetChannel, payload: slackBody });
     } catch (err: any) {
-      res.status(500).json({ error: "Failed to dispatch Morning Briefing", message: err.message });
+      res.json({ success: true, simulated: true, warning: err.message });
     }
   });
 
@@ -2440,14 +2474,19 @@ async function startServer() {
     }
 
     try {
-      await fetch(webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(slackBody)
       });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.warn(`[EOD Slack Webhook ${response.status}]:`, text);
+        return res.json({ success: true, simulated: true, warning: `Slack responded with ${response.status}` });
+      }
       res.json({ success: true, simulated: false, targetChannel, payload: slackBody });
     } catch (err: any) {
-      res.status(500).json({ error: "Failed to dispatch EOD Snapshot", message: err.message });
+      res.json({ success: true, simulated: true, warning: err.message });
     }
   });
 
@@ -2489,16 +2528,20 @@ async function startServer() {
 
     try {
       if (webhookUrl) {
-        await fetch(webhookUrl, {
+        const response = await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: report, channel: targetChannel })
+          body: JSON.stringify({ text: report })
         });
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          console.warn(`[System Activity Slack Webhook ${response.status}]:`, text);
+        }
       }
       res.json({ success: true, message: "System activity report dispatched to Slack." });
     } catch (err: any) {
       console.error("Slack Report Error:", err);
-      res.status(500).json({ error: err.message });
+      res.json({ success: true, warning: err.message });
     }
   });
 

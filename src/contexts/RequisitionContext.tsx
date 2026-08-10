@@ -266,15 +266,23 @@ export function safeNormalizeAttachments(attachments: any): string[] {
     return null;
   };
 
+  if (typeof attachments === 'string') {
+    let trimmed = attachments.trim();
+    if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return safeNormalizeAttachments(parsed);
+      } catch (e) {}
+    }
+    const res = extractItem(attachments);
+    return res ? [res] : [];
+  }
+
   if (Array.isArray(attachments)) {
     return attachments.map(extractItem).filter((x): x is string => Boolean(x));
   }
   if (typeof attachments === 'object' && attachments !== null) {
     return Object.values(attachments).map(extractItem).filter((x): x is string => Boolean(x));
-  }
-  if (typeof attachments === 'string') {
-    const res = extractItem(attachments);
-    return res ? [res] : [];
   }
   return [];
 }
@@ -3876,6 +3884,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       approvalHistory: [],
       flaggedForAudit: reqData.flaggedForAudit !== undefined ? reqData.flaggedForAudit : false,
       fiscalYear: systemSettings.currentFiscalYear || 2026,
+      attachments: safeNormalizeAttachments(reqData.attachments),
     };
 
     // OPTIMISTIC UPDATE: Instantly reflect new requisition in React state for zero UI delay
@@ -4252,18 +4261,54 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     try {
-      const currentReq = requisitions.find(r => r.id === id);
-      if (!currentReq) return;
+      let updatedReq: Requisition | undefined;
+
+      setRequisitions(prev => {
+        const currentReq = prev.find(r => r.id === id);
+        if (currentReq) {
+          const cleanedUpdates = {
+            ...updates,
+            updatedAt: new Date().toISOString(),
+            flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
+          };
+          if (updates.attachments) {
+            cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
+          }
+          updatedReq = { ...currentReq, ...cleanedUpdates };
+          return prev.map(r => r.id === id ? updatedReq! : r);
+        }
+        return prev;
+      });
+
+      if (!updatedReq) {
+        try {
+          const res = await fetch(`/api/db/requisitions/${id}`);
+          if (res.ok) {
+            const dbReq = await res.json();
+            if (dbReq && dbReq.id) {
+              const camelReq = mapSnakeToCamel(dbReq);
+              const cleanedUpdates = {
+                ...updates,
+                updatedAt: new Date().toISOString()
+              };
+              if (updates.attachments) {
+                cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
+              }
+              updatedReq = {
+                ...camelReq,
+                ...cleanedUpdates,
+                id
+              } as Requisition;
+              setRequisitions(prev => [updatedReq!, ...prev.filter(r => r.id !== id)]);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to fetch requisition for update:", e);
+        }
+      }
+
+      if (!updatedReq) return;
       
-      const newAmount = updates.amount !== undefined ? updates.amount : currentReq.amount;
-      const cleanedUpdates = {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-        flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
-      };
-      
-      const updatedReq = { ...currentReq, ...cleanedUpdates };
-      setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));
       await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
 
       if (!skipFirestore && db) {
@@ -4277,15 +4322,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       await addSystemLog("REQUISITION_EDITED", `Requisition '${id}' updated`, { requisitionId: id, updates });
 
-      if (updates.status === RequisitionStatus.SUBMITTED && currentReq.status !== RequisitionStatus.SUBMITTED) {
+      if (updates.status === RequisitionStatus.SUBMITTED && updatedReq.status === RequisitionStatus.SUBMITTED) {
         sendEmailNotification(updatedReq, "SUBMITTED").catch(() => {});
       }
 
-      if (currentReq.projectId) {
-        await syncProjectAmounts(currentReq.projectId);
-      }
-      if (updates.projectId && updates.projectId !== currentReq.projectId) {
-        await syncProjectAmounts(updates.projectId);
+      if (updatedReq.projectId) {
+        await syncProjectAmounts(updatedReq.projectId);
       }
     } catch (err) {
       console.error("[updateRequisition Error]:", err);

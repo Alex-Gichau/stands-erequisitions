@@ -2838,7 +2838,11 @@ export interface DetailModalProps {
 export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initialReq, onClose, onDelete, onGenerateReceipt, onEdit, isPage }) => {
   const { currentUser, updateRequisitionStatus, updateRequisition, sendEmailNotification, uploadReceipts, globalSearchTerm, projects, triggerToast, vendors, requisitions, users, addAlert } = useRequisitions();
   const req = requisitions.find(r => r.id === initialReq.id) || initialReq;
-  const normalizedAttachments = React.useMemo(() => safeNormalizeAttachments(req.attachments), [req.attachments]);
+  const normalizedAttachments = React.useMemo(() => {
+    const fromReq = safeNormalizeAttachments(req.attachments);
+    if (fromReq.length > 0) return fromReq;
+    return safeNormalizeAttachments(initialReq.attachments);
+  }, [req.attachments, initialReq.attachments]);
   const [decisionNote, setDecisionNote] = useState("");
   const [approvalCode, setApprovalCode] = useState("");
   const [showDecisionForm, setShowDecisionForm] = useState<"APPROVE" | "REJECT" | "ESCALATE" | null>(null);

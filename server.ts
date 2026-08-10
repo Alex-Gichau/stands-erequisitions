@@ -1060,7 +1060,8 @@ async function startServer() {
           if (Model) {
             const data = await Model.find({}).lean();
             result[col] = data.map((item: any) => {
-              const { _id, __v, ...rest } = item;
+              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, uploadsDir) : item;
+              const { _id, __v, ...rest } = sanitized;
               const snakeRest = toSnakeCase(rest);
               return { id: snakeRest.id || String(_id), ...snakeRest };
             });
@@ -1070,7 +1071,8 @@ async function startServer() {
         } else {
           const data = readJsonCollection(col);
           result[col] = data.map((item: any) => {
-            const { _id, __v, ...rest } = item;
+            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, uploadsDir) : item;
+            const { _id, __v, ...rest } = sanitized;
             const snakeRest = toSnakeCase(rest);
             return { id: snakeRest.id || String(_id), ...snakeRest };
           });
@@ -1255,7 +1257,10 @@ async function startServer() {
   // Upsert (setDoc) single document by ID
   app.post("/api/db/:collection/:id", express.json({ limit: "50mb" }), async (req, res) => {
     const { collection, id } = req.params;
-    const body = coerceBooleans(req.body);
+    let body = coerceBooleans(req.body);
+    if (collection === "requisitions") {
+      body = sanitizeRequisitionAttachments(body, uploadsDir);
+    }
     try {
       if (mongoose.connection.readyState === 1) {
         const Model = modelMappings[collection];
@@ -1289,7 +1294,10 @@ async function startServer() {
   // Update (updateDoc) single document by ID (partial update)
   app.patch("/api/db/:collection/:id", express.json({ limit: "50mb" }), async (req, res) => {
     const { collection, id } = req.params;
-    const body = coerceBooleans(req.body);
+    let body = coerceBooleans(req.body);
+    if (collection === "requisitions") {
+      body = sanitizeRequisitionAttachments(body, uploadsDir);
+    }
     try {
       if (mongoose.connection.readyState === 1) {
         const Model = modelMappings[collection];

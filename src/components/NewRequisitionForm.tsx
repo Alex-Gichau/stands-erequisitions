@@ -80,14 +80,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     }
     setIsVendorDropdownOpen(false);
     setShowAddVendorForm(false);
-    if (triggerToast) {
-      triggerToast({
-        type: "SYSTEM_INFO",
-        message: `Auto-selected vendor: ${v.name}`,
-        severity: "LOW",
-        timestamp: new Date().toISOString()
-      });
-    }
   };
 
   const [activeTab, setActiveTab] = useState<"SEARCH" | "CREATE">("SEARCH");

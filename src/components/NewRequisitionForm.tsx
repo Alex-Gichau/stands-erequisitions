@@ -1593,7 +1593,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                       : "border-slate-200 dark:border-slate-800 hover:border-primary/40 dark:hover:border-primary/60 hover:bg-primary/5 dark:hover:bg-primary/5"
                   )}
                 >
-                  <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv" onChange={handleFileChange} className="hidden" />
+                  <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.xlsm,.xlsb,.csv,.ods,.tsv,.txt" onChange={handleFileChange} className="hidden" />
                   <div className="w-9 h-9 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Upload size={16} className={cn("text-slate-400 dark:text-slate-300 group-hover:text-primary", isDragging && "text-emerald-500 dark:text-emerald-400")} />
                   </div>

@@ -588,7 +588,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                 <input
                   type="file"
                   ref={fileInputRef}
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.xlsm,.xlsb,.csv,.ods,.tsv,.txt"
                   onChange={handleFileChange}
                   multiple
                   className="hidden"

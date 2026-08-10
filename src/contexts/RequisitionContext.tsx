@@ -46,12 +46,12 @@ import {
 } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCTAlP2_HARk1MYqUv1W_HxfIaRQCtC-HY",
-  authDomain: "fintech-requisitions.firebaseapp.com",
-  projectId: "fintech-requisitions",
-  storageBucket: "fintech-requisitions.firebasestorage.app",
-  messagingSenderId: "2730554389",
-  appId: "1:2730554389:web:eaf336c107434ef442ca1c"
+  apiKey: (import.meta as any).env?.VITE_FIREBASE_API_KEY || "",
+  authDomain: (import.meta as any).env?.VITE_FIREBASE_AUTH_DOMAIN || "fintech-requisitions.firebaseapp.com",
+  projectId: (import.meta as any).env?.VITE_FIREBASE_PROJECT_ID || "fintech-requisitions",
+  storageBucket: (import.meta as any).env?.VITE_FIREBASE_STORAGE_BUCKET || "fintech-requisitions.firebasestorage.app",
+  messagingSenderId: (import.meta as any).env?.VITE_FIREBASE_MESSAGING_SENDER_ID || "2730554389",
+  appId: (import.meta as any).env?.VITE_FIREBASE_APP_ID || "1:2730554389:web:eaf336c107434ef442ca1c"
 };
 
 const firebaseApp = initFirebaseApp(firebaseConfig);

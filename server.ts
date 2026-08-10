@@ -190,7 +190,15 @@ function convertBase64ToLocalFile(attachmentStr: string, uploadsDir: string): st
     else if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
     else if (mimeType.includes("gif")) ext = "gif";
     else if (mimeType.includes("word") || mimeType.includes("document")) ext = "docx";
-    else {
+    else if (mimeType.includes("sheet") || mimeType.includes("excel") || mimeType.includes("spreadsheetml") || mimeType.includes("csv") || mimeType.includes("ods") || mimeType.includes("tab-separated")) {
+      if (mimeType.includes("csv")) ext = "csv";
+      else if (mimeType.includes("ods")) ext = "ods";
+      else if (mimeType.includes("tsv") || mimeType.includes("tab-separated")) ext = "tsv";
+      else if (mimeType.includes("xlsb")) ext = "xlsb";
+      else if (mimeType.includes("xlsm")) ext = "xlsm";
+      else if (mimeType.includes("xls") && !mimeType.includes("xlsx")) ext = "xls";
+      else ext = "xlsx";
+    } else {
       const parts = fileName.split(".");
       if (parts.length > 1) ext = parts[parts.length - 1];
       else ext = "bin";

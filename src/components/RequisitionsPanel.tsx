@@ -61,6 +61,7 @@ import { RequisitionStatus, UserRole, Requisition } from "../types";
 import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
+import * as XLSX from "xlsx";
 
 // Robust, zero-crash AttachmentViewer replacing external DocViewer
 const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) => {
@@ -72,6 +73,13 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
   const [isLoadingText, setIsLoadingText] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState<string>("");
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
+
+  // Spreadsheet state
+  const [spreadsheetSheets, setSpreadsheetSheets] = useState<{ [sheetName: string]: (string | number)[][] }>({});
+  const [activeSheetName, setActiveSheetName] = useState<string>("");
+  const [isLoadingSpreadsheet, setIsLoadingSpreadsheet] = useState<boolean>(false);
+  const [spreadsheetError, setSpreadsheetError] = useState<string | null>(null);
+  const [spreadsheetSearch, setSpreadsheetSearch] = useState<string>("");
 
   const cleanUri = getAbsoluteAttachmentUrl(uri) || uri?.trim() || "";
   const lowerName = (fileName || cleanUri).toLowerCase();
@@ -108,8 +116,14 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
     cleanUri.startsWith("data:application/vnd.ms-excel") ||
     cleanUri.startsWith("data:text/csv") ||
     cleanUri.startsWith("data:application/csv") ||
-    /\.(xlsx|xls|csv)(\?.*)?$/i.test(lowerName) ||
-    /\.(xlsx|xls|csv)(\?.*)?$/i.test(cleanUri.toLowerCase())
+    cleanUri.startsWith("data:text/tab-separated-values") ||
+    cleanUri.startsWith("data:text/tsv") ||
+    cleanUri.startsWith("data:application/ods") ||
+    cleanUri.startsWith("data:application/x-ods") ||
+    cleanUri.startsWith("data:application/vnd.oasis.opendocument.spreadsheet") ||
+    cleanUri.startsWith("data:application/vnd.ms-excel.sheet") ||
+    /\.(xlsx|xls|csv|ods|tsv|xlsm|xlsb)(\?.*)?$/i.test(lowerName) ||
+    /\.(xlsx|xls|csv|ods|tsv|xlsm|xlsb)(\?.*)?$/i.test(cleanUri.toLowerCase())
   );
 
   const isText = !isHtml && !isPdf && !isImage && !isXlsx && (
@@ -217,6 +231,84 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
       }
     }
   }, [isText, cleanUri]);
+
+  // Parse spreadsheet workbook using SheetJS (XLSX)
+  useEffect(() => {
+    if (isXlsx && cleanUri) {
+      setIsLoadingSpreadsheet(true);
+      setSpreadsheetError(null);
+      setSpreadsheetSheets({});
+      setActiveSheetName("");
+      setSpreadsheetSearch("");
+
+      const processWorkbook = (wb: XLSX.WorkBook) => {
+        try {
+          if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
+            throw new Error("Spreadsheet contains no sheets or invalid structure.");
+          }
+          const parsedMap: { [sheetName: string]: (string | number)[][] } = {};
+          wb.SheetNames.forEach((name) => {
+            const worksheet = wb.Sheets[name];
+            if (worksheet) {
+              const rows = XLSX.utils.sheet_to_json<(string | number)[]>(worksheet, {
+                header: 1,
+                defval: "",
+                raw: false
+              });
+              parsedMap[name] = rows;
+            }
+          });
+          setSpreadsheetSheets(parsedMap);
+          setActiveSheetName(wb.SheetNames[0]);
+          setIsLoadingSpreadsheet(false);
+        } catch (err: any) {
+          console.error("Error processing workbook:", err);
+          setSpreadsheetError(err?.message || "Failed to process spreadsheet structure");
+          setIsLoadingSpreadsheet(false);
+        }
+      };
+
+      if (cleanUri.startsWith("data:")) {
+        try {
+          const commaIdx = cleanUri.indexOf(",");
+          if (commaIdx !== -1) {
+            const meta = cleanUri.substring(0, commaIdx);
+            const body = cleanUri.substring(commaIdx + 1);
+            if (meta.includes(";base64")) {
+              const wb = XLSX.read(body, { type: "base64", cellDates: true, raw: false });
+              processWorkbook(wb);
+            } else {
+              const decoded = decodeURIComponent(body);
+              const wb = XLSX.read(decoded, { type: "string", cellDates: true, raw: false });
+              processWorkbook(wb);
+            }
+          } else {
+            throw new Error("Invalid data URI payload format.");
+          }
+        } catch (err: any) {
+          console.error("Data URI parse error:", err);
+          setSpreadsheetError(err?.message || "Failed to decode spreadsheet data URL.");
+          setIsLoadingSpreadsheet(false);
+        }
+      } else {
+        fetch(cleanUri)
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch file`);
+            return res.arrayBuffer();
+          })
+          .then((arrayBuffer) => {
+            const data = new Uint8Array(arrayBuffer);
+            const wb = XLSX.read(data, { type: "array", cellDates: true, raw: false });
+            processWorkbook(wb);
+          })
+          .catch((err) => {
+            console.error("Fetch spreadsheet error:", err);
+            setSpreadsheetError(err?.message || "Failed to fetch spreadsheet from server.");
+            setIsLoadingSpreadsheet(false);
+          });
+      }
+    }
+  }, [isXlsx, cleanUri]);
 
   if (hasError) {
     return (
@@ -371,23 +463,176 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
   }
 
   if (isXlsx) {
+    const sheetNames = Object.keys(spreadsheetSheets);
+    const activeRows = spreadsheetSheets[activeSheetName] || [];
+    
+    // Filter rows based on search term
+    const filteredRows = activeRows.filter((row, idx) => {
+      if (idx === 0) return true; // Always show header row
+      if (!spreadsheetSearch.trim()) return true;
+      const searchLower = spreadsheetSearch.toLowerCase();
+      return row.some((cell) => String(cell).toLowerCase().includes(searchLower));
+    });
+
+    const maxCols = Math.max(0, ...activeRows.map((r) => r.length));
+
     return (
-      <div className="flex flex-col items-center justify-center p-8 text-center h-full min-h-[400px] bg-slate-900/90 rounded-2xl border border-slate-800">
-        <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-3xl flex items-center justify-center mb-5 border border-emerald-500/20 shadow-xl">
-          <FileSpreadsheet size={40} />
+      <div className="flex flex-col h-full w-full bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden relative min-h-[500px]">
+        {/* Top Control Bar */}
+        <div className="p-3 bg-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center border border-emerald-500/20 shrink-0">
+              <FileSpreadsheet size={18} />
+            </div>
+            <div className="overflow-hidden">
+              <h4 className="text-xs font-bold text-slate-100 truncate">{fileName}</h4>
+              <p className="text-[10px] text-slate-400 font-mono">
+                {isLoadingSpreadsheet
+                  ? "Parsing spreadsheet..."
+                  : spreadsheetError
+                  ? "Parse Warning"
+                  : `${activeRows.length} Rows • ${maxCols} Columns`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Search Input */}
+            {!isLoadingSpreadsheet && !spreadsheetError && activeRows.length > 0 && (
+              <div className="relative flex items-center">
+                <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={spreadsheetSearch}
+                  onChange={(e) => setSpreadsheetSearch(e.target.value)}
+                  placeholder="Search in sheet..."
+                  className="pl-8 pr-3 py-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 text-slate-200 text-xs rounded-lg outline-none w-36 sm:w-48 transition-all"
+                />
+                {spreadsheetSearch && (
+                  <button
+                    onClick={() => setSpreadsheetSearch("")}
+                    className="absolute right-2 text-slate-500 hover:text-slate-300"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Download Button */}
+            <a
+              href={cleanUri}
+              download={fileName}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-950/40 shrink-0"
+            >
+              <Download size={13} />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          </div>
         </div>
-        <h4 className="text-lg font-extrabold text-slate-100 mb-1 max-w-md truncate">{fileName}</h4>
-        <p className="text-xs text-slate-400 max-w-sm mb-6">
-          Excel Spreadsheet Document ({fileName.split('.').pop()?.toUpperCase() || "XLSX"}). Click below to download or view in Excel.
-        </p>
-        <div className="flex items-center gap-3">
-          <a
-            href={cleanUri}
-            download={fileName}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/50"
-          >
-            <Download size={15} /> Download Excel Spreadsheet
-          </a>
+
+        {/* Sheet Selector Tabs */}
+        {sheetNames.length > 1 && (
+          <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-900/60 border-b border-slate-800/80 overflow-x-auto scrollbar-thin">
+            {sheetNames.map((name) => (
+              <button
+                key={name}
+                onClick={() => setActiveSheetName(name)}
+                className={cn(
+                  "px-3 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
+                  activeSheetName === name
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                )}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-4 bg-slate-950 relative">
+          {isLoadingSpreadsheet ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[350px] gap-3 text-slate-400">
+              <Loader2 size={28} className="animate-spin text-emerald-400" />
+              <span className="text-xs font-bold tracking-wide uppercase">Reading Spreadsheet Data...</span>
+            </div>
+          ) : spreadsheetError ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center h-full min-h-[350px] bg-slate-900/80 rounded-2xl border border-slate-800">
+              <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-2xl flex items-center justify-center mb-4 border border-amber-500/20">
+                <AlertTriangle size={32} />
+              </div>
+              <h4 className="text-sm font-bold text-slate-200 mb-1">Interactive Viewer Notice</h4>
+              <p className="text-xs text-slate-400 max-w-sm mb-5">
+                {spreadsheetError || "Unable to display grid preview directly. Please download the file to view."}
+              </p>
+              <a
+                href={cleanUri}
+                download={fileName}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+              >
+                <Download size={14} /> Download File ({fileName})
+              </a>
+            </div>
+          ) : activeRows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-slate-400 gap-2">
+              <FileSpreadsheet size={32} className="text-slate-600" />
+              <span className="text-xs font-bold">Sheet is empty or has no content.</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-900/60 shadow-2xl max-h-[70vh]">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-slate-300 font-mono font-bold border-b border-slate-800 sticky top-0 z-10 shadow-sm">
+                    <th className="p-2.5 text-[10px] text-slate-500 bg-slate-950/80 text-center border-r border-slate-800/80 w-12 select-none">
+                      #
+                    </th>
+                    {Array.from({ length: maxCols }).map((_, cIdx) => (
+                      <th
+                        key={cIdx}
+                        className="p-2.5 text-slate-300 border-r border-slate-800/80 whitespace-nowrap min-w-[100px]"
+                      >
+                        {activeRows[0] && activeRows[0][cIdx] !== undefined && activeRows[0][cIdx] !== ""
+                          ? String(activeRows[0][cIdx])
+                          : String.fromCharCode(65 + (cIdx % 26)) + (cIdx >= 26 ? Math.floor(cIdx / 26) : "")}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-slate-200">
+                  {filteredRows.slice(1).map((row, rIdx) => (
+                    <tr
+                      key={rIdx}
+                      className="hover:bg-indigo-500/10 transition-colors group"
+                    >
+                      <td className="p-2 text-[10px] text-slate-500 font-mono text-center bg-slate-950/40 border-r border-slate-800/80 select-none group-hover:text-indigo-400">
+                        {rIdx + 1}
+                      </td>
+                      {Array.from({ length: maxCols }).map((_, cIdx) => {
+                        const cellVal = row[cIdx] !== undefined && row[cIdx] !== null ? String(row[cIdx]) : "";
+                        const isMatch =
+                          spreadsheetSearch.trim() &&
+                          cellVal.toLowerCase().includes(spreadsheetSearch.toLowerCase());
+
+                        return (
+                          <td
+                            key={cIdx}
+                            className={cn(
+                              "p-2 border-r border-slate-800/40 whitespace-pre-wrap max-w-xs break-words font-sans text-xs",
+                              isMatch ? "bg-amber-500/20 text-amber-200 font-semibold" : ""
+                            )}
+                          >
+                            {cellVal}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     );

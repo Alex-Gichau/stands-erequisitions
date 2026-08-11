@@ -3631,7 +3631,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     }
     setIsUploadingReceipt(true);
     try {
-      const base64data = await new Promise<string>((resolve, reject) => {
+      let base64data = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
           if (typeof reader.result === "string") {
@@ -3643,6 +3643,13 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
       });
+
+      const mime = file.type || "image/jpeg";
+      if (!base64data.startsWith("data:")) {
+        base64data = `data:${mime};base64,${base64data}`;
+      } else if (base64data.startsWith("data:;base64,") || base64data.startsWith("data:undefined;base64,")) {
+        base64data = base64data.replace(/^data:[^;]*;base64,/, `data:${mime};base64,`);
+      }
 
       await uploadReceipts(req.id, [base64data]);
     } catch (error) {

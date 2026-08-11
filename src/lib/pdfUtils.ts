@@ -6,8 +6,21 @@ export async function processFileToAttachmentStrings(file: File): Promise<string
   return new Promise<string[]>((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      if (file.type.startsWith("image/")) {
+      let result = reader.result as string;
+      const mime = file.type || "application/octet-stream";
+      if (!result || typeof result !== "string") {
+        resolve([`${file.name}::data:${mime};base64,`]);
+        return;
+      }
+
+      // Ensure data URI strictly conforms to data:[<mediatype>][;base64],<data>
+      if (!result.startsWith("data:")) {
+        result = `data:${mime};base64,${result}`;
+      } else if (result.startsWith("data:;base64,") || result.startsWith("data:undefined;base64,")) {
+        result = result.replace(/^data:[^;]*;base64,/, `data:${mime};base64,`);
+      }
+
+      if (file.type && file.type.startsWith("image/")) {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement("canvas");
@@ -27,7 +40,8 @@ export async function processFileToAttachmentStrings(file: File): Promise<string
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL(file.type || "image/jpeg", 0.85);
+          const imgMime = file.type || "image/jpeg";
+          const compressed = canvas.toDataURL(imgMime, 0.85);
           resolve([`${file.name}::${compressed}`]);
         };
         img.onerror = () => {
@@ -39,7 +53,8 @@ export async function processFileToAttachmentStrings(file: File): Promise<string
       }
     };
     reader.onerror = () => {
-      resolve([`${file.name}::data:text/plain;base64,RXJyb3IgcmVhZGluZyBmaWxl`]);
+      const mime = file.type || "application/octet-stream";
+      resolve([`${file.name}::data:${mime};base64,RXJyb3IgcmVhZGluZyBmaWxl`]);
     };
     reader.readAsDataURL(file);
   });

@@ -1,6 +1,7 @@
 
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -205,23 +206,47 @@ function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: stri
     hasPrefix = true;
   }
   
+  // If already converted to relative or absolute path, return as is
+  if (dataUrl.startsWith("/uploads/") || dataUrl.startsWith("http://") || dataUrl.startsWith("https://")) {
+    return attachmentStr;
+  }
+
   if (dataUrl.startsWith("JVBERi") && !dataUrl.startsWith("data:")) {
     dataUrl = `data:application/pdf;base64,${dataUrl}`;
   }
 
-  if (!dataUrl.startsWith("data:")) {
+  // Handle data URIs missing mediatype or with malformed header
+  if (dataUrl.startsWith("data:")) {
+    if (dataUrl.startsWith("data:;base64,") || dataUrl.startsWith("data:undefined;base64,")) {
+      dataUrl = dataUrl.replace(/^data:[^;]*;base64,/, "data:application/octet-stream;base64,");
+    } else if (!dataUrl.includes(";base64,")) {
+      dataUrl = dataUrl.replace(/^data:/, "data:application/octet-stream;base64,");
+    }
+  } else {
     return attachmentStr;
   }
   
   try {
-    const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!matches) {
-      return attachmentStr;
+    let mimeType = "application/octet-stream";
+    let base64Data = "";
+
+    const matches = dataUrl.match(/^data:([^;]*);base64,(.+)$/s);
+    if (matches) {
+      mimeType = matches[1] || "application/octet-stream";
+      base64Data = matches[2];
+    } else {
+      const commaIdx = dataUrl.indexOf(",");
+      if (commaIdx !== -1) {
+        base64Data = dataUrl.substring(commaIdx + 1);
+      } else {
+        return attachmentStr;
+      }
     }
     
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, "base64");
+    const buffer = Buffer.from(base64Data.trim(), "base64");
+    if (!buffer || buffer.length === 0) {
+      return attachmentStr;
+    }
 
     let ext = "";
     if (mimeType.includes("pdf")) ext = "pdf";
@@ -248,18 +273,23 @@ function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: stri
       cleanFileName = `${cleanFileName}.${ext}`;
     }
 
+    const hash = crypto.createHash("md5").update(buffer).digest("hex").substring(0, 12);
     const targetDir = customUploadsDir || getUploadsDir();
-    const uniquePrefix = Math.random().toString(36).substring(2, 10) + "_" + Date.now();
-    const uniqueFileName = `${uniquePrefix}_${cleanFileName}`;
-    const filePath = path.join(targetDir, uniqueFileName);
+    const hashFileName = `${hash}_${cleanFileName}`;
+    const filePath = path.join(targetDir, hashFileName);
     
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
     
-    fs.writeFileSync(filePath, buffer);
+    const fileUrl = `/uploads/${hashFileName}`;
+
+    if (fs.existsSync(filePath)) {
+      console.log(`[Base64 Purger] Reused existing disk file for (${fileName}): ${fileUrl}`);
+      return hasPrefix ? `${fileName}::${fileUrl}` : fileUrl;
+    }
     
-    const fileUrl = `/uploads/${uniqueFileName}`;
+    fs.writeFileSync(filePath, buffer);
     console.log(`[Base64 Purger] Converted base64 attachment (${fileName}) to VPS disk file: ${fileUrl}`);
     
     return hasPrefix ? `${fileName}::${fileUrl}` : fileUrl;
@@ -339,8 +369,13 @@ async function persistSanitizedRequisition(newItem: any) {
     if (mongoose.connection.readyState === 1) {
       const ReqModel = mongoose.models.Requisition || mongoose.model("Requisition");
       if (ReqModel) {
+        const filterConditions: any[] = [{ id: reqId }];
+        if (typeof reqId === "string" && mongoose.Types.ObjectId.isValid(reqId) && reqId.length === 24) {
+          filterConditions.push({ _id: reqId });
+        }
+        const queryFilter = filterConditions.length > 1 ? { $or: filterConditions } : filterConditions[0];
         await ReqModel.updateOne(
-          { $or: [{ id: reqId }, { _id: reqId }] },
+          queryFilter,
           {
             $set: {
               ...(newItem.attachments ? { attachments: newItem.attachments } : {}),

@@ -273,10 +273,10 @@ function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): a
   if (!item || typeof item !== "object") return item;
 
   let modified = false;
-  let rawAtts = item.attachments || item.attachment;
-
   const targetDir = customUploadsDir || getUploadsDir();
+  const newItem = { ...item };
 
+  let rawAtts = newItem.attachments || newItem.attachment;
   if (Array.isArray(rawAtts)) {
     const cleanAtts = rawAtts.map((att: any) => {
       if (typeof att === "string") {
@@ -287,16 +287,89 @@ function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): a
       return att;
     });
     if (modified) {
-      return { ...item, attachments: cleanAtts };
+      newItem.attachments = cleanAtts;
     }
   } else if (typeof rawAtts === "string") {
     const cleaned = convertBase64ToLocalFile(rawAtts, targetDir);
     if (cleaned !== rawAtts) {
-      return { ...item, attachments: [cleaned] };
+      newItem.attachments = [cleaned];
+      modified = true;
     }
   }
 
-  return item;
+  let rawReceipts = newItem.receipts;
+  if (Array.isArray(rawReceipts)) {
+    let receiptsModified = false;
+    const cleanReceipts = rawReceipts.map((rec: any) => {
+      if (typeof rec === "string") {
+        const cleaned = convertBase64ToLocalFile(rec, targetDir);
+        if (cleaned !== rec) {
+          receiptsModified = true;
+          modified = true;
+        }
+        return cleaned;
+      }
+      return rec;
+    });
+    if (receiptsModified) {
+      newItem.receipts = cleanReceipts;
+    }
+  } else if (typeof rawReceipts === "string") {
+    const cleaned = convertBase64ToLocalFile(rawReceipts, targetDir);
+    if (cleaned !== rawReceipts) {
+      newItem.receipts = [cleaned];
+      modified = true;
+    }
+  }
+
+  if (modified) {
+    persistSanitizedRequisition(newItem).catch((err) =>
+      console.error("[Base64 Purger] Auto-persist error:", err.message || err)
+    );
+  }
+
+  return newItem;
+}
+
+async function persistSanitizedRequisition(newItem: any) {
+  const reqId = newItem.id || newItem._id;
+  if (!reqId) return;
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const ReqModel = mongoose.models.Requisition || mongoose.model("Requisition");
+      if (ReqModel) {
+        await ReqModel.updateOne(
+          { $or: [{ id: reqId }, { _id: reqId }] },
+          {
+            $set: {
+              ...(newItem.attachments ? { attachments: newItem.attachments } : {}),
+              ...(newItem.receipts ? { receipts: newItem.receipts } : {}),
+            },
+          }
+        );
+      }
+    } else {
+      const list = readJsonCollection("requisitions");
+      let changed = false;
+      const updatedList = list.map((r: any) => {
+        if (r.id === reqId || String(r._id) === String(reqId)) {
+          changed = true;
+          return {
+            ...r,
+            ...(newItem.attachments ? { attachments: newItem.attachments } : {}),
+            ...(newItem.receipts ? { receipts: newItem.receipts } : {}),
+          };
+        }
+        return r;
+      });
+      if (changed) {
+        writeJsonCollection("requisitions", updatedList);
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Base64 Purger] Error persisting sanitized requisition ${reqId}:`, err.message || err);
+  }
 }
 
 

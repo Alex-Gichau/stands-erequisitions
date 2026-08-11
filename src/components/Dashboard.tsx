@@ -649,16 +649,6 @@ const Dashboard: React.FC<{
     const events: any[] = [];
     
     // 1. System deadlines
-    if (cellDay === 25) {
-      events.push({
-        id: `sys-monthly-${cellYear}-${cellMonth}-${cellDay}`,
-        title: "Monthly Submission Cut-off",
-        description: "Final monthly cut-off for standard church group requisitions.",
-        type: "SYSTEM_MONTHLY",
-        badge: "Monthly Cut-off"
-      });
-    }
-
     const isQuarterEnd = (cellMonth === 2 && cellDay === 31) || 
                          (cellMonth === 5 && cellDay === 30) || 
                          (cellMonth === 8 && cellDay === 30) || 
@@ -1079,7 +1069,6 @@ const Dashboard: React.FC<{
                 {calendarDays.map((cell, idx) => {
                   const dayEvents = getEventsForDate(cell.year, cell.month, cell.day);
                   const hasWeekly = dayEvents.some(e => e.type === "SYSTEM_WEEKLY");
-                  const hasMonthly = dayEvents.some(e => e.type === "SYSTEM_MONTHLY");
                   const hasQuarterly = dayEvents.some(e => e.type === "SYSTEM_QUARTERLY");
                   const hasReqs = dayEvents.some(e => e.type === "REQ_DEADLINE");
                   const hasAdded = dayEvents.some(e => e.type === "REQ_ADDED");
@@ -1127,12 +1116,6 @@ const Dashboard: React.FC<{
                             className={cn("w-1.5 h-1.5 rounded-full shrink-0", isSelected ? "bg-white" : "bg-emerald-500")} 
                           />
                         )}
-                        {hasMonthly && (
-                          <span 
-                            title="Monthly Review Cut-off"
-                            className={cn("w-1.5 h-1.5 rounded-full shrink-0", isSelected ? "bg-white" : "bg-blue-500")} 
-                          />
-                        )}
                         {hasQuarterly && (
                           <span 
                             title="Quarterly Alignment"
@@ -1173,9 +1156,6 @@ const Dashboard: React.FC<{
               <div className="flex flex-wrap gap-3 pt-2 text-[9px] text-slate-400 border-t border-slate-100 uppercase font-mono">
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-600" /> Scheduled Events
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> Monthly Cut-offs
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-teal-500" /> Disbursed

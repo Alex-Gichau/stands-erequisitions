@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
   
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const [hasActiveModal, setHasActiveModal] = useState<boolean>(false);
 
@@ -96,7 +96,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("sidebar_collapsed");
-      if (saved === "true") {
+      if (saved === "false") {
+        setIsCollapsed(false);
+      } else if (saved === "true") {
         setIsCollapsed(true);
       }
     }
@@ -171,6 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Collapse Toggle */}
       <button 
         onClick={toggleCollapse}
+        title={isCollapsed ? "Expand Navigation" : "Collapse Navigation"}
         className="absolute -right-3 top-24 w-6 h-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all shadow-md dark:shadow-xl hover:scale-110 z-50 cursor-pointer"
       >
         {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
@@ -180,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto no-scrollbar">
         {!isCollapsed && (
           <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-4 ml-2">
-            Operations Cluster
+            NAVIGATION
           </div>
         )}
         
@@ -192,6 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={item.id}
               onClick={() => onViewChange(item.id)}
               data-sidebar-item={item.label}
+              title={isCollapsed ? item.label : undefined}
               className={cn(
                 "w-full flex items-center rounded-2xl transition-all duration-300 group text-[11px] font-black uppercase tracking-widest focus:outline-none relative",
                 isCollapsed ? "justify-center p-3" : "gap-4 px-4 py-3.5",
@@ -270,6 +274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isCollapsed && (
            <button 
             onClick={handleLogoutClick}
+            title="Terminate Session"
             className="w-full mt-4 flex justify-center py-2 text-slate-400 dark:text-slate-500 hover:text-rose-550 dark:hover:text-rose-400 transition-colors cursor-pointer"
           >
             <LogOut size={18} />

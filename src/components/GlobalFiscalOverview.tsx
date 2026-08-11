@@ -70,7 +70,7 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
           <div className="flex items-center gap-2">
             <span className="p-1 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-indigo-100">
               <CalendarRange size={14} />
-              Global Fiscal Year {activeYear}
+              Church Financial Year {activeYear}
             </span>
             <span className={cn(
               "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest leading-none border",
@@ -81,13 +81,13 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
           </div>
           
           <h2 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight leading-tight">
-            Organization-Wide <br />
-            <span className="text-primary">Fiscal Overview</span>
+            STANDS MINISTRIES<br />
+            <span className="text-primary">FINANCIAL OVERVIEW</span>
           </h2>
           
           <p className="text-slate-500 text-xs md:text-sm leading-relaxed max-w-md">
-            Aggregated financial data across all {fiscalStats.projectsCount} ministry groups. 
-            Monitoring utilization velocity and budget headroom in real-time.
+            This requisitions data runs across {fiscalStats.projectsCount} ministry groups. 
+            The data is monitored and updated displayed in realtime.
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2">

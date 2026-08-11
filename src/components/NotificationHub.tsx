@@ -316,7 +316,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Notification Hub</h2>
-          <p className="text-sm text-slate-500">Live operational ledger logs & immediate action queue.</p>
+          <p className="text-sm text-slate-500">All your notifications with action buttons updated here.</p>
         </div>
         
         {/* Statistics, Mark All as Read, or Status bar */}

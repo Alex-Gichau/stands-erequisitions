@@ -411,9 +411,9 @@ const Dashboard: React.FC<{
 
     return [
       { label: "Total Req Value", value: formatCurrency(totalValue), icon: Wallet, color: "text-primary", bg: "bg-primary/5" },
-      { label: "Pending Approvals", value: `${pending} Transactions`, icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50" },
-      { label: "Status Approved", value: `${approved} Transactions`, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
-      { label: "Total Fund Disbursed", value: formatCurrency(disbursed), icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
+      { label: "Pending Approvals", value: `${pending} Pending`, icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50" },
+      { label: "Status Approved", value: `${approved} Approved`, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
+      { label: "Total Req Disbursed", value: formatCurrency(disbursed), icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
     ];
   }, [requisitions]);
 

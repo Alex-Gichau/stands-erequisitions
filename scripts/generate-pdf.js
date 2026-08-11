@@ -353,7 +353,8 @@ try {
   const outputPath = path.join(publicDir, "User_Manual_StAndrews.pdf");
   
   fs.writeFileSync(outputPath, new Uint8Array(uint8));
-  const distDir = path.join(process.cwd(), "dist");
+  const distEnv = process.env.DIST_DIR?.trim() || "dist";
+  const distDir = path.isAbsolute(distEnv) ? distEnv : path.resolve(process.cwd(), distEnv);
   if (fs.existsSync(distDir)) {
     fs.writeFileSync(path.join(distDir, "User_Manual_StAndrews.pdf"), new Uint8Array(uint8));
   }

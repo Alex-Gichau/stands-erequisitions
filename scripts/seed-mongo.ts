@@ -63,7 +63,9 @@ export async function seedDatabase() {
         continue;
       }
 
-      let filePath = path.join(process.cwd(), 'server', 'data', file);
+      const dataDirVal = process.env.DATA_DIR?.trim() || path.join('server', 'data');
+      const resolvedDataDir = path.isAbsolute(dataDirVal) ? dataDirVal : path.resolve(process.cwd(), dataDirVal);
+      let filePath = path.join(resolvedDataDir, file);
       if (!fs.existsSync(filePath)) {
         const fallbackPath = path.join(process.cwd(), file);
         if (fs.existsSync(fallbackPath)) {

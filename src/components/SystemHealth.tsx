@@ -579,7 +579,7 @@ export const SystemHealth: React.FC<{ updateInterval?: number }> = ({ updateInte
               {realHealth.mongodb?.status === 'ok' && realHealth.mongodb?.counts?.church_groups === 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-200 text-[9px] leading-relaxed">
                   <span className="font-bold block mb-1">⚠️ DATABASE IS EMPTY</span>
-                  Your MongoDB collections are currently empty. Wait for the server seeder to automatically populate from `server/data/*.json` on restart.
+                  Your MongoDB collections are currently empty. Wait for the server seeder to automatically populate from `{process.env.DATA_DIR || 'server/data'}/*.json` on restart.
                 </div>
               )}
             </div>

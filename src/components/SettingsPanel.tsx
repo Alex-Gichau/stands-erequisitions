@@ -1189,7 +1189,7 @@ sudo systemctl enable mongod`}
                 {mongoTab === 2 && (
                   <div className="space-y-4">
                     <p className="text-xs leading-relaxed">
-                      Your local visual data resides in static JSON schemas in <code className="font-mono bg-slate-100 dark:bg-slate-900/60 px-1 rounded text-[11px]">server/data/</code> files. You can seed, back up, or dump these datasets natively using our Mongoose models or CLI tools.
+                      Your local visual data resides in static JSON schemas in <code className="font-mono bg-slate-100 dark:bg-slate-900/60 px-1 rounded text-[11px]">{process.env.DATA_DIR || 'server/data/'}</code> files. You can seed, back up, or dump these datasets natively using our Mongoose models or CLI tools.
                     </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

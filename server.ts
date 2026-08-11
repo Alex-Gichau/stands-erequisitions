@@ -39,20 +39,59 @@ const fileMappings: { [key: string]: string } = {
   "supplementary_budgets": "supplementary_budgets.json"
 };
 
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Helper function to resolve paths from environment variables relative to process.cwd() or absolute path
+function resolveEnvPath(envVarName: string, defaultPath: string): string {
+  const envVal = process.env[envVarName]?.trim() || defaultPath;
+  return path.isAbsolute(envVal) ? envVal : path.resolve(process.cwd(), envVal);
 }
-function getFilePath(collection: string) {
-  const fileName = fileMappings[collection] || (collection + ".json");
-  const dirPath = path.join(process.cwd(), "server", "data");
-  if (!fs.existsSync(dirPath)) {
+
+function getUploadsDir(): string {
+  const dir = resolveEnvPath("UPLOADS_DIR", "uploads");
+  if (!fs.existsSync(dir)) {
     try {
-      fs.mkdirSync(dirPath, { recursive: true });
+      fs.mkdirSync(dir, { recursive: true });
     } catch (e) {
-      console.error("[JSON DB] Failed to create data directory:", e);
+      console.error("[Storage] Failed to create uploads directory:", e);
     }
   }
+  return dir;
+}
+
+function getDataDir(): string {
+  const dir = resolveEnvPath("DATA_DIR", path.join("server", "data"));
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+      console.error("[Storage] Failed to create data directory:", e);
+    }
+  }
+  return dir;
+}
+
+function getBaseDataDir(): string {
+  const dir = resolveEnvPath("BASE_DATA_DIR", "data");
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+      console.error("[Storage] Failed to create base data directory:", e);
+    }
+  }
+  return dir;
+}
+
+function getDistDir(): string {
+  return resolveEnvPath("DIST_DIR", "dist");
+}
+
+function getGoogleServiceKeyPath(): string {
+  return resolveEnvPath("GOOGLE_SERVICE_KEY_FILE", "googleService.json");
+}
+
+function getFilePath(collection: string) {
+  const fileName = fileMappings[collection] || (collection + ".json");
+  const dirPath = getDataDir();
   return path.join(dirPath, fileName);
 }
 
@@ -130,7 +169,7 @@ interface Activity {
 // Ensure activity_history.json exists or create it
 function restoreActivities(): Activity[] {
   try {
-    const filePath = path.join(process.cwd(), "activity_history.json");
+    const filePath = path.join(getBaseDataDir(), "activity_history.json");
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       return JSON.parse(content);
@@ -143,7 +182,7 @@ function restoreActivities(): Activity[] {
 
 function persistActivity(activity: Activity) {
   try {
-    const filePath = path.join(process.cwd(), "activity_history.json");
+    const filePath = path.join(getBaseDataDir(), "activity_history.json");
     const activities = restoreActivities();
     activities.push(activity);
     fs.writeFileSync(filePath, JSON.stringify(activities, null, 2), "utf-8");
@@ -152,7 +191,7 @@ function persistActivity(activity: Activity) {
   }
 }
 
-function convertBase64ToLocalFile(attachmentStr: string, uploadsDir: string): string {
+function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: string): string {
   if (!attachmentStr || typeof attachmentStr !== "string") return attachmentStr;
   
   let fileName = "attachment";
@@ -209,12 +248,13 @@ function convertBase64ToLocalFile(attachmentStr: string, uploadsDir: string): st
       cleanFileName = `${cleanFileName}.${ext}`;
     }
 
+    const targetDir = customUploadsDir || getUploadsDir();
     const uniquePrefix = Math.random().toString(36).substring(2, 10) + "_" + Date.now();
     const uniqueFileName = `${uniquePrefix}_${cleanFileName}`;
-    const filePath = path.join(uploadsDir, uniqueFileName);
+    const filePath = path.join(targetDir, uniqueFileName);
     
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
     
     fs.writeFileSync(filePath, buffer);
@@ -229,16 +269,18 @@ function convertBase64ToLocalFile(attachmentStr: string, uploadsDir: string): st
   }
 }
 
-function sanitizeRequisitionAttachments(item: any, uploadsDir: string): any {
+function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): any {
   if (!item || typeof item !== "object") return item;
 
   let modified = false;
   let rawAtts = item.attachments || item.attachment;
 
+  const targetDir = customUploadsDir || getUploadsDir();
+
   if (Array.isArray(rawAtts)) {
     const cleanAtts = rawAtts.map((att: any) => {
       if (typeof att === "string") {
-        const cleaned = convertBase64ToLocalFile(att, uploadsDir);
+        const cleaned = convertBase64ToLocalFile(att, targetDir);
         if (cleaned !== att) modified = true;
         return cleaned;
       }
@@ -248,7 +290,7 @@ function sanitizeRequisitionAttachments(item: any, uploadsDir: string): any {
       return { ...item, attachments: cleanAtts };
     }
   } else if (typeof rawAtts === "string") {
-    const cleaned = convertBase64ToLocalFile(rawAtts, uploadsDir);
+    const cleaned = convertBase64ToLocalFile(rawAtts, targetDir);
     if (cleaned !== rawAtts) {
       return { ...item, attachments: [cleaned] };
     }
@@ -267,7 +309,7 @@ interface SearchLog {
 
 function restoreSearchLogs(): SearchLog[] {
   try {
-    const filePath = path.join(process.cwd(), "search_history.json");
+    const filePath = path.join(getBaseDataDir(), "search_history.json");
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       return JSON.parse(content);
@@ -280,7 +322,7 @@ function restoreSearchLogs(): SearchLog[] {
 
 function persistSearchLog(log: SearchLog) {
   try {
-    const filePath = path.join(process.cwd(), "search_history.json");
+    const filePath = path.join(getBaseDataDir(), "search_history.json");
     const logs = restoreSearchLogs();
     logs.push(log);
     fs.writeFileSync(filePath, JSON.stringify(logs, null, 2), "utf-8");
@@ -303,7 +345,7 @@ interface BugReport {
 
 function restoreBugReports(): BugReport[] {
   try {
-    const filePath = path.join(process.cwd(), "bug_reports.json");
+    const filePath = path.join(getBaseDataDir(), "bug_reports.json");
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       return JSON.parse(content);
@@ -316,7 +358,7 @@ function restoreBugReports(): BugReport[] {
 
 function persistBugReport(report: BugReport) {
   try {
-    const filePath = path.join(process.cwd(), "bug_reports.json");
+    const filePath = path.join(getBaseDataDir(), "bug_reports.json");
     const reports = restoreBugReports();
     reports.push(report);
     fs.writeFileSync(filePath, JSON.stringify(reports, null, 2), "utf-8");
@@ -337,7 +379,7 @@ interface Feedback {
 
 function restoreFeedback(): Feedback[] {
   try {
-    const filePath = path.join(process.cwd(), "feedback.json");
+    const filePath = path.join(getBaseDataDir(), "feedback.json");
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, "utf-8");
       return JSON.parse(content);
@@ -350,7 +392,7 @@ function restoreFeedback(): Feedback[] {
 
 function persistFeedback(feedback: Feedback) {
   try {
-    const filePath = path.join(process.cwd(), "feedback.json");
+    const filePath = path.join(getBaseDataDir(), "feedback.json");
     const reports = restoreFeedback();
     reports.push(feedback);
     fs.writeFileSync(filePath, JSON.stringify(reports, null, 2), "utf-8");
@@ -425,17 +467,10 @@ async function startServer() {
   app.use("/uploads", uploadsRouter);
 
   // Bootstrap JSON database user storage from root users.json if missing
-  const dataDir = path.join(process.cwd(), "server", "data");
-  if (!fs.existsSync(dataDir)) {
-    try {
-      fs.mkdirSync(dataDir, { recursive: true });
-    } catch (e) {
-      console.error("[JSON DB] Failed to create server/data folder:", e);
-    }
-  }
+  const dataDir = getDataDir();
   const usersExportPath = path.join(dataDir, "users_export.json");
   if (!fs.existsSync(usersExportPath)) {
-    const rootUsersPath = path.join(process.cwd(), "users.json");
+    const rootUsersPath = path.join(process.cwd(), process.env.USERS_FILE || "users.json");
     if (fs.existsSync(rootUsersPath)) {
       try {
         fs.copyFileSync(rootUsersPath, usersExportPath);
@@ -463,10 +498,11 @@ async function startServer() {
       const base64Data = matches[2];
       const buffer = Buffer.from(base64Data, "base64");
       
+      const targetDir = getUploadsDir();
       const cleanFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const uniquePrefix = Math.random().toString(36).substring(2, 10) + "_" + Date.now();
       const uniqueFileName = `${uniquePrefix}_${cleanFileName}`;
-      const filePath = path.join(uploadsDir, uniqueFileName);
+      const filePath = path.join(targetDir, uniqueFileName);
       
       fs.writeFileSync(filePath, buffer);
       
@@ -1068,7 +1104,7 @@ async function startServer() {
           if (Model) {
             const data = await Model.find({}).lean();
             result[col] = data.map((item: any) => {
-              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, uploadsDir) : item;
+              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
               const { _id, __v, ...rest } = sanitized;
               const snakeRest = toSnakeCase(rest);
               return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -1079,7 +1115,7 @@ async function startServer() {
         } else {
           const data = readJsonCollection(col);
           result[col] = data.map((item: any) => {
-            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, uploadsDir) : item;
+            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
             const { _id, __v, ...rest } = sanitized;
             const snakeRest = toSnakeCase(rest);
             return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -1103,7 +1139,7 @@ async function startServer() {
       if (mongoose.connection.readyState === 1) {
         const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
         const cleanData = data.map((item: any) => {
-          const sanitized = sanitizeRequisitionAttachments(item, uploadsDir);
+          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
           const { _id, __v, ...rest } = sanitized;
           const snakeRest = toSnakeCase(rest);
           return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -1112,7 +1148,7 @@ async function startServer() {
       } else {
         const data = readJsonCollection("requisitions");
         const cleanData = data.map((item: any) => {
-          const sanitized = sanitizeRequisitionAttachments(item, uploadsDir);
+          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
           const { _id, __v, ...rest } = sanitized;
           const snakeRest = toSnakeCase(rest);
           return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -1132,7 +1168,7 @@ async function startServer() {
   app.post("/api/requisitions", express.json({ limit: "50mb" }), async (req, res) => {
     try {
       let body = req.body;
-      body = sanitizeRequisitionAttachments(body, uploadsDir);
+      body = sanitizeRequisitionAttachments(body, getUploadsDir());
       const id = body.id || `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       
       if (mongoose.connection.readyState === 1) {
@@ -1267,7 +1303,7 @@ async function startServer() {
     const { collection, id } = req.params;
     let body = coerceBooleans(req.body);
     if (collection === "requisitions") {
-      body = sanitizeRequisitionAttachments(body, uploadsDir);
+      body = sanitizeRequisitionAttachments(body, getUploadsDir());
     }
     try {
       if (mongoose.connection.readyState === 1) {
@@ -1304,7 +1340,7 @@ async function startServer() {
     const { collection, id } = req.params;
     let body = coerceBooleans(req.body);
     if (collection === "requisitions") {
-      body = sanitizeRequisitionAttachments(body, uploadsDir);
+      body = sanitizeRequisitionAttachments(body, getUploadsDir());
     }
     try {
       if (mongoose.connection.readyState === 1) {
@@ -3701,8 +3737,8 @@ async function startServer() {
 
     let credentials: any = null;
 
-    // Check if the uploaded service account key file exists at the root
-    const keyPath = path.join(process.cwd(), "googleService.json");
+    // Check if the uploaded service account key file exists
+    const keyPath = getGoogleServiceKeyPath();
     if (fs.existsSync(keyPath)) {
       try {
         const fileContent = fs.readFileSync(keyPath, "utf-8");
@@ -3791,7 +3827,7 @@ async function startServer() {
   }
 
   function handleOfflineFallback(reqObj: any, sheetTitle: string) {
-    const backupPath = path.join(process.cwd(), "financial_records_google_sheets_simulated.json");
+    const backupPath = path.join(getBaseDataDir(), "financial_records_google_sheets_simulated.json");
     let records: any[] = [];
     try {
       if (fs.existsSync(backupPath)) {
@@ -4082,7 +4118,7 @@ async function startServer() {
       }
 
       // Local persistent backup storage fallback
-      const backupDir = path.join(process.cwd(), "data", "drive_backups");
+      const backupDir = path.join(getBaseDataDir(), "drive_backups");
       if (!fs.existsSync(backupDir)) {
         fs.mkdirSync(backupDir, { recursive: true });
       }
@@ -4108,8 +4144,8 @@ async function startServer() {
   });
 
   // Helper storage functions for Backup Email Autosend
-  const backupEmailLogsPath = path.join(process.cwd(), "data", "backup_email_logs.json");
-  const backupEmailConfigPath = path.join(process.cwd(), "data", "backup_email_config.json");
+  const backupEmailLogsPath = path.join(getBaseDataDir(), "backup_email_logs.json");
+  const backupEmailConfigPath = path.join(getBaseDataDir(), "backup_email_config.json");
 
   const isBackupDueServer = (config: any) => {
     if (!config || config.enabled === false) return false;
@@ -4456,7 +4492,7 @@ async function startServer() {
 
       // 2. Save Server Disk Snapshot if enabled
       if (features.saveServerDiskSnapshot !== false) {
-        const backupDir = path.join(process.cwd(), "data", "email_json_backups");
+        const backupDir = path.join(getBaseDataDir(), "email_json_backups");
         if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
         fs.writeFileSync(path.join(backupDir, fileName), jsonContent, "utf-8");
       }
@@ -4677,7 +4713,7 @@ async function startServer() {
       }
 
       // Write backup file locally for disk fallback
-      const backupDir = path.join(process.cwd(), "data", "email_json_backups");
+      const backupDir = path.join(getBaseDataDir(), "email_json_backups");
       if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
       const localFilePath = path.join(backupDir, fileName);
       fs.writeFileSync(localFilePath, jsonContent, "utf-8");
@@ -4733,7 +4769,7 @@ async function startServer() {
   // SYSTEM HEALTH DATA SLACK ALERT SCHEDULER
   // ==========================================
 
-  const healthSlackConfigPath = path.join(process.cwd(), "data", "system_health_slack_config.json");
+  const healthSlackConfigPath = path.join(getBaseDataDir(), "system_health_slack_config.json");
 
   const getHealthSlackConfig = () => {
     const dirPath = path.dirname(healthSlackConfigPath);
@@ -4986,7 +5022,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = getDistDir();
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

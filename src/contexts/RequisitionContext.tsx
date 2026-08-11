@@ -3868,7 +3868,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (matchingProj) {
       const requisitionLimit = matchingProj.requisitionLimit || matchingProj.allocatedBudget || 0;
       if (reqData.amount > requisitionLimit) {
-        throw new Error(`Requisition Limit Violation: Action blocked. This requisition amount of KES ${reqData.amount.toLocaleString()} exceeds the group's ('${matchingProj.name}') maximum requisition limit of KES ${requisitionLimit.toLocaleString()}.`);
+        throw new Error(`Group is not allocated a budget : Requisition Limit Violation. This requisition amount of KES ${reqData.amount.toLocaleString()} exceeds the group's ('${matchingProj.name}') maximum requisition limit of KES ${requisitionLimit.toLocaleString()}.`);
       }
     }
 

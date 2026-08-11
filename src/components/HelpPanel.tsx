@@ -229,6 +229,57 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onPlayTour }) => {
           </div>
         </div>
       )
+    },
+    {
+      id: "master-plan",
+      category: "System Architecture & Plan",
+      title: "Master Operational Plan & Technical Roadmap",
+      keywords: ["plan", "roadmap", "architecture", "attachment", "rfc 2397", "backup", "drive", "security", "ledger", "mongodb", "cloud run"],
+      summary: "Detailed architecture overview, attachment handling standards, approval governance, and implementation roadmap.",
+      content: (
+        <div className="space-y-4 leading-relaxed text-xs text-slate-600 dark:text-slate-300 font-medium">
+          <p>
+            The St. Andrew's PCEA eRequisitions Portal is engineered as a high-reliability, full-stack financial workflow platform. This document outlines our active system architecture, data processing standards, and operational roadmap:
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block">1. Full-Stack Express + Vite Runtime</span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Operates with an Express Node.js server bundled to CommonJS (<code>dist/server.cjs</code>) via <code>esbuild</code>, serving Vite React 18 frontend assets. Binds to port <code>3000</code> behind Cloud Run reverse proxies.
+              </p>
+            </div>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest block">2. Attachment RFC 2397 & Normalization</span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Client uploads output strict RFC 2397 Data URIs (<code>data:&lt;mediatype&gt;;base64,...</code>). All absolute attachment URLs (e.g. from <code>accounts.pceastandrews.org</code>) are automatically normalized to local endpoints (<code>/uploads/...</code> or <code>/api/attachments/...</code>).
+              </p>
+            </div>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest block">3. Financial Governance & Approvals</span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Strict 4-stage pipeline: <strong>Submitted</strong> → <strong>Level 1 Verified</strong> → <strong>Level 2 Treasury Authorized</strong> → <strong>Disbursed / Ledger Settled</strong>. Prevents double-payouts and enforces budget limits.
+              </p>
+            </div>
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block">4. Redundant Disaster Recovery</span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Automated 5-hour Google Drive backups target <code>ict.team@pceastandrews.org</code>. Includes automated email dispatch, Slack webhook alerts, and local JSON snapshots.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/40 rounded-xl space-y-2">
+            <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-widest block">Operational Implementation Phases:</span>
+            <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+              <li><strong>Phase 1 (Completed):</strong> Standardized attachment uploaders with RFC 2397 Data URI compliance, URL normalizer for domain references, and clean document thumbnail rendering without intrusive red PDF badges.</li>
+              <li><strong>Phase 2 (Active):</strong> Integrated Master Operational Plan in system documentation and AGENTS.md project specification.</li>
+              <li><strong>Phase 3 (Upcoming):</strong> Enhanced attachment compression pipeline and offline transaction queueing for poor connection environments.</li>
+              <li><strong>Phase 4 (Deployment):</strong> Cloud Run container deployment with automated SSL termination and continuous health probes.</li>
+            </ul>
+          </div>
+        </div>
+      )
     }
   ], []);
 
@@ -305,7 +356,8 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onPlayTour }) => {
               { id: "doc-sandbox", label: "3.0 TRY THE SYSTEM", icon: Sliders },
               { id: "doc-roles", label: "4.0 USER ROLES & ACCESS", icon: ShieldCheck },
               { id: "doc-shortcuts", label: "5.0 KEYBOARD SHORTCUTS", icon: Key },
-              { id: "doc-reference", label: "6.0 SUPPORT ARTICLES", icon: FileText }
+              { id: "doc-reference", label: "6.0 SUPPORT ARTICLES", icon: FileText },
+              { id: "doc-plan", label: "7.0 ARCHITECTURE & PLAN", icon: BookOpen }
             ].map((section) => {
               const Icon = section.icon;
               return (
@@ -862,6 +914,67 @@ export const HelpPanel: React.FC<HelpPanelProps> = ({ onPlayTour }) => {
                   </p>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* 7.0 MASTER OPERATIONAL PLAN & ARCHITECTURE */}
+          <section id="doc-plan" className="scroll-mt-6 space-y-6">
+            <div className="border-b border-slate-200 dark:border-slate-800 pb-2 flex items-center justify-between">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
+                <span className="text-indigo-600 dark:text-indigo-400 font-mono">7.0</span> Master Operational Plan & Architecture
+              </h2>
+              <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                Active Specification
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+              This master operational plan details the core technical guidelines, file and asset handling policies, financial governance rules, and system roadmap for the St. Andrew's PCEA eRequisitions Portal.
+            </p>
+
+            <div className="space-y-6">
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+                <h3 className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider flex items-center gap-2">
+                  <Activity size={14} /> 7.1 Core Full-Stack Architecture
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  The application uses an Express server (`server.ts`) running on Node.js, bundled via `esbuild` to `dist/server.cjs`. The React 18 client is built using Vite and Tailwind CSS, providing an interactive, responsive experience across desktop and mobile devices.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                    <strong>Port & Ingress:</strong> Bound strictly to `0.0.0.0:3000` with reverse proxy support.
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                    <strong>Storage Engine:</strong> Dual JSON/MongoDB data layer with disk fallback in `server/data/`.
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                    <strong>Health Diagnostics:</strong> Integrated system health metrics monitoring RAM, uptime, and ledger count.
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+                <h3 className="text-xs font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-wider flex items-center gap-2">
+                  <FileText size={14} /> 7.2 Attachment Processing & RFC 2397 Standards
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  All attachment uploads strictly adhere to RFC 2397 Data URIs (<code>data:[&lt;mediatype&gt;][;base64],&lt;data&gt;</code>).
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  <li><strong>URL Normalization:</strong> External domain links (e.g. from `https://accounts.pceastandrews.org/uploads/...`) are dynamically normalized to local endpoints (`/uploads/...` or `/api/attachments/...`).</li>
+                  <li><strong>MIME Types:</strong> Uploads router inspects extension signatures with `mime-types` to guarantee correct `Content-Type` headers (`application/pdf`, `image/png`, etc.).</li>
+                  <li><strong>Document Rendering:</strong> Embedded `PdfThumbnailPreview` renders clean canvas/iframe previews without intrusive badge overlays.</li>
+                </ul>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+                <h3 className="text-xs font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider flex items-center gap-2">
+                  <ShieldCheck size={14} /> 7.3 Governance, Auditing & Disaster Recovery
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Financial security is guaranteed through a 4-tier approval workflow (`SUBMITTED` &rarr; `APPROVED_L1` &rarr; `APPROVED_L2` &rarr; `DISBURSED`). Automated 5-hour backups snapshot all ledger books, requisitions, users, and audit logs directly to Google Drive targeting `ict.team@pceastandrews.org`.
+                </p>
+              </div>
             </div>
           </section>
 

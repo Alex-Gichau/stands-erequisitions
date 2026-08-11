@@ -1542,6 +1542,254 @@ async function startServer() {
     res.json(report);
   });
 
+  // Helper function to generate diagrammatic representation of requisition status for email updates
+  function generateRequisitionStatusDiagramHtml(status: string): string {
+    const currentStatus = (status || "").toUpperCase();
+
+    let s1State = "completed"; // SUBMITTED
+    let s2State = "pending";   // L1
+    let s3State = "pending";   // L2
+    let s4State = "pending";   // DISBURSED
+
+    let line12Color = "#334155";
+    let line23Color = "#334155";
+    let line34Color = "#334155";
+
+    if (currentStatus === "SUBMITTED") {
+      s1State = "completed";
+      s2State = "pending";
+      s3State = "pending";
+      s4State = "pending";
+      line12Color = "#334155";
+      line23Color = "#334155";
+      line34Color = "#334155";
+    } else if (currentStatus === "APPROVED_L1") {
+      s1State = "completed";
+      s2State = "completed";
+      s3State = "active";
+      s4State = "pending";
+      line12Color = "#10b981";
+      line23Color = "#10b981";
+      line34Color = "#334155";
+    } else if (currentStatus === "APPROVED_L2") {
+      s1State = "completed";
+      s2State = "completed";
+      s3State = "completed";
+      s4State = "active";
+      line12Color = "#10b981";
+      line23Color = "#10b981";
+      line34Color = "#10b981";
+    } else if (currentStatus === "DISBURSED") {
+      s1State = "completed";
+      s2State = "completed";
+      s3State = "completed";
+      s4State = "completed";
+      line12Color = "#10b981";
+      line23Color = "#10b981";
+      line34Color = "#10b981";
+    } else if (currentStatus === "REJECTED" || currentStatus === "REVISED") {
+      s1State = "completed";
+      s2State = "returned";
+      s3State = "pending";
+      s4State = "pending";
+      line12Color = "#ef4444";
+      line23Color = "#334155";
+      line34Color = "#334155";
+    } else if (currentStatus === "DELETED") {
+      s1State = "returned";
+      s2State = "pending";
+      s3State = "pending";
+      s4State = "pending";
+      line12Color = "#ef4444";
+      line23Color = "#334155";
+      line34Color = "#334155";
+    }
+
+    // SVG Icons
+    const checkIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    
+    const shieldActiveIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>`;
+    
+    const coinsPendingIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"></circle><path d="M16 12a5 5 0 1 1-5 5"></path><path d="M12 8h.01"></path></svg>`;
+
+    const coinsActiveIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"></circle><path d="M16 12a5 5 0 1 1-5 5"></path><path d="M12 8h.01"></path></svg>`;
+
+    const xIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+    const getNodeConfig = (stepKey: string, state: string) => {
+      if (state === "completed") {
+        return {
+          bg: "background-color: #10b981; border: 1px solid #059669; box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);",
+          icon: checkIcon,
+          titleColor: "#10b981",
+          subColor: "#94a3b8"
+        };
+      }
+      if (state === "active") {
+        if (stepKey === "L2") {
+          return {
+            bg: "background-color: #0f172a; border: 2px solid #2563eb; box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);",
+            icon: shieldActiveIcon,
+            titleColor: "#3b82f6",
+            subColor: "#94a3b8"
+          };
+        }
+        if (stepKey === "DISBURSED") {
+          return {
+            bg: "background-color: #0f172a; border: 2px solid #0284c7; box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);",
+            icon: coinsActiveIcon,
+            titleColor: "#38bdf8",
+            subColor: "#94a3b8"
+          };
+        }
+        return {
+          bg: "background-color: #10b981; border: 1px solid #059669; box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);",
+          icon: checkIcon,
+          titleColor: "#10b981",
+          subColor: "#94a3b8"
+        };
+      }
+      if (state === "returned") {
+        return {
+          bg: "background-color: #ef4444; border: 1px solid #dc2626; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);",
+          icon: xIcon,
+          titleColor: "#ef4444",
+          subColor: "#fca5a5"
+        };
+      }
+      const defaultIcon = stepKey === "DISBURSED" ? coinsPendingIcon : (stepKey === "L2" ? shieldActiveIcon : checkIcon);
+      return {
+        bg: "background-color: #1e293b; border: 1px solid #334155;",
+        icon: defaultIcon,
+        titleColor: "#64748b",
+        subColor: "#475569"
+      };
+    };
+
+    const n1 = getNodeConfig("SUBMITTED", s1State);
+    const n2 = getNodeConfig("L1", s2State);
+    const n3 = getNodeConfig("L2", s3State);
+    const n4 = getNodeConfig("DISBURSED", s4State);
+
+    const t2Title = s2State === "returned" ? "RETURNED" : "L1 APPROVED";
+    const t2Sub = s2State === "returned" ? "REVISION REQ" : "LEADER VERIFY";
+
+    return `
+      <div style="background-color: #0b0f19; border-radius: 12px; padding: 22px 12px 18px 12px; margin: 20px 0; border: 1px solid #1e293b; box-shadow: inset 0 1px 2px rgba(255,255,255,0.05);">
+        <!-- Stepper Nodes & Connecting Lines Table -->
+        <table style="width: 100%; border-collapse: collapse; margin: 0 auto; table-layout: fixed;">
+          <tr>
+            <!-- Left Line Segment -->
+            <td style="width: 5%; vertical-align: middle; padding: 0;">
+              <div style="height: 3px; background-color: #10b981; border-radius: 2px;"></div>
+            </td>
+
+            <!-- Node 1: SUBMITTED -->
+            <td style="width: 44px; text-align: center; vertical-align: middle; padding: 0;">
+              <div style="width: 40px; height: 40px; border-radius: 12px; ${n1.bg} display: inline-block;">
+                <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="text-align: center; vertical-align: middle; padding: 0;">
+                      ${n1.icon}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+
+            <!-- Line 1-2 -->
+            <td style="vertical-align: middle; padding: 0;">
+              <div style="height: 3px; background-color: ${line12Color}; border-radius: 2px;"></div>
+            </td>
+
+            <!-- Node 2: L1 APPROVED -->
+            <td style="width: 44px; text-align: center; vertical-align: middle; padding: 0;">
+              <div style="width: 40px; height: 40px; border-radius: 12px; ${n2.bg} display: inline-block;">
+                <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="text-align: center; vertical-align: middle; padding: 0;">
+                      ${n2.icon}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+
+            <!-- Line 2-3 -->
+            <td style="vertical-align: middle; padding: 0;">
+              <div style="height: 3px; background-color: ${line23Color}; border-radius: 2px;"></div>
+            </td>
+
+            <!-- Node 3: L2 APPROVED -->
+            <td style="width: 44px; text-align: center; vertical-align: middle; padding: 0;">
+              <div style="width: 40px; height: 40px; border-radius: 12px; ${n3.bg} display: inline-block;">
+                <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="text-align: center; vertical-align: middle; padding: 0;">
+                      ${n3.icon}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+
+            <!-- Line 3-4 -->
+            <td style="vertical-align: middle; padding: 0;">
+              <div style="height: 3px; background-color: ${line34Color}; border-radius: 2px;"></div>
+            </td>
+
+            <!-- Node 4: DISBURSED -->
+            <td style="width: 44px; text-align: center; vertical-align: middle; padding: 0;">
+              <div style="width: 40px; height: 40px; border-radius: 12px; ${n4.bg} display: inline-block;">
+                <table style="width: 100%; height: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="text-align: center; vertical-align: middle; padding: 0;">
+                      ${n4.icon}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </td>
+
+            <!-- Right Line Segment -->
+            <td style="width: 5%; vertical-align: middle; padding: 0;">
+              <div style="height: 3px; background-color: ${s4State === "completed" ? "#10b981" : "#475569"}; border-radius: 2px;"></div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Stepper Labels Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed;">
+          <tr>
+            <!-- Label 1 -->
+            <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
+              <div style="font-size: 10px; font-weight: 800; color: ${n1.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">SUBMITTED</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n1.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">ENTRY LOGGED</div>
+            </td>
+
+            <!-- Label 2 -->
+            <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
+              <div style="font-size: 10px; font-weight: 800; color: ${n2.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">${t2Title}</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n2.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">${t2Sub}</div>
+            </td>
+
+            <!-- Label 3 -->
+            <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
+              <div style="font-size: 10px; font-weight: 800; color: ${n3.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">L2 APPROVED</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n3.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">BOARD CONSENT</div>
+            </td>
+
+            <!-- Label 4 -->
+            <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
+              <div style="font-size: 10px; font-weight: 800; color: ${n4.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">DISBURSED</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n4.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">FUNDS PAID</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+  }
+
   // API Route for Sending Email
   app.post("/api/send-email", async (req, res) => {
     const { 
@@ -1788,6 +2036,9 @@ async function startServer() {
           <div style="padding: 24px; color: #334155;">
             <p style="font-size: 15px; line-height: 1.5; margin-top: 0; color: #0f172a;">Hello <strong>${requesterName || "Requester"}</strong>,</p>
             <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 16px;">${mainMessage}</p>
+
+            <!-- Requisition Workflow Status Diagrammatic Representation -->
+            ${generateRequisitionStatusDiagramHtml(status)}
 
             ${decisionBoxHtml}
 

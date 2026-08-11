@@ -111,14 +111,14 @@ export function normalizeAttachmentUrl(url: any): string {
   // Clean trailing escaped quotes or braces if any
   trimmed = trimmed.replace(/["}\s]+$/, "").replace(/^["{\s]+/, "").trim();
 
-  // Normalize absolute HTTP/HTTPS URLs containing /uploads/ or /api/attachments/ to relative path
+  // Normalize absolute HTTP/HTTPS URLs (e.g. from accounts.pceastandrews.org) containing /uploads/ or /api/attachments/ to relative path
   if (trimmed.includes("/uploads/")) {
     const parts = trimmed.split("/uploads/");
-    return "/uploads/" + parts[1];
+    return "/uploads/" + parts[parts.length - 1];
   }
   if (trimmed.includes("/api/attachments/")) {
     const parts = trimmed.split("/api/attachments/");
-    return "/api/attachments/" + parts[1];
+    return "/api/attachments/" + parts[parts.length - 1];
   }
 
   // If starts with uploads/ without leading slash

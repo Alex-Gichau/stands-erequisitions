@@ -306,15 +306,7 @@ export const PdfThumbnailPreview: React.FC<PdfThumbnailPreviewProps> = ({
       {/* Transparent overlay for click events */}
       <div className="absolute inset-0 z-10 bg-transparent pointer-events-none" />
 
-      {/* Optional PDF Badge */}
-      {showOverlayBadge && (
-        <div className="absolute top-1.5 left-1.5 z-20">
-          <span className="px-1.5 py-0.5 bg-rose-600/90 backdrop-blur-md text-white text-[7px] font-black uppercase tracking-wider rounded-md border border-white/20 shadow-sm flex items-center gap-1">
-            <FileText size={8} />
-            PDF
-          </span>
-        </div>
-      )}
+      {/* Optional PDF Badge (Removed as requested) */}
     </div>
   );
 };

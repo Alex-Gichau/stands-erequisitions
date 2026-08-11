@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { numberToWords } from "../utils/numberUtils";
-import { formatCurrency, cn, uploadAttachmentsToLocalServer } from "../lib/utils";
+import { formatCurrency, cn, uploadAttachmentsToLocalServer, getAttachmentFileName, getAbsoluteAttachmentUrl } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
 import { X, Loader2, DollarSign, FileText, FileSpreadsheet, Repeat, Users, PlusCircle, Save, Activity, Mail, Check, UserPlus, Info, Trash2, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -64,6 +64,15 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
       ? req.attachments 
       : (typeof req.attachments === "string" && req.attachments ? [req.attachments] : [])
   );
+
+  useEffect(() => {
+    if (req.attachments) {
+      const norm = Array.isArray(req.attachments)
+        ? req.attachments
+        : (typeof req.attachments === "string" && req.attachments ? [req.attachments] : []);
+      setExistingAttachments(norm);
+    }
+  }, [req.attachments]);
   const [newAttachments, setNewAttachments] = useState<File[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -199,10 +208,15 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
     setUploadSuccessMessage(null);
 
     try {
-      // Process and encode any new attachments
+      // Process and encode any new attachments to base64 Data URIs
       const readPromises = newAttachments.map((file) => processFileToAttachmentStrings(file));
       const nestedEncoded = await Promise.all(readPromises);
       const encodedNew = nestedEncoded.flat();
+
+      // Upload base64 payloads to VPS server storage (/uploads/...)
+      const uploadedNewUrls = encodedNew.length > 0
+        ? await uploadAttachmentsToLocalServer(encodedNew)
+        : [];
       
       const matchingProject = projects.find(p => p.groupId === selectedGroup || p.name === selectedGroup);
       const finalProjectId = projectId || (matchingProject ? matchingProject.id : "");
@@ -220,9 +234,9 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
         }
       }
 
-      const combinedAttachments = [...existingAttachments, ...encodedNew];
+      const combinedAttachments = [...existingAttachments, ...uploadedNewUrls];
 
-      // Immediately save requisition form details & all attachments
+      // Save requisition form details & all attachments synchronously
       await updateRequisition(req.id, {
         title: title.trim(),
         description: description.trim(),
@@ -239,25 +253,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
         status: finalStatus
       });
 
-      const uploadedCount = newAttachments.length;
-
-      // Queue background upload if new attachments exist
-      if (encodedNew.length > 0) {
-        const reqId = req.id;
-        const reqTitle = title.trim();
-        const currentExisting = [...existingAttachments];
-
-        startBackgroundUploadTask({
-          title: reqTitle,
-          requisitionId: reqId,
-          files: encodedNew,
-          onComplete: async (newUploadedUrls) => {
-            const combined = [...currentExisting, ...newUploadedUrls];
-            await updateRequisition(reqId, { attachments: combined });
-          }
-        });
-      }
-
+      setExistingAttachments(combinedAttachments);
       setNewAttachments([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -601,13 +597,8 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block font-sans">Current Registered Attachments</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {existingAttachments.map((att, idx) => {
-                      let name = att;
-                      let url = att;
-                      if (att.includes("::")) {
-                        const parts = att.split("::");
-                        name = parts[0];
-                        url = parts[1];
-                      }
+                      const name = getAttachmentFileName(att);
+                      const url = getAbsoluteAttachmentUrl(att);
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:image/') || url.startsWith('blob:')));
                       const isPdf = !isImage && (/\.(pdf)$/i.test(name) || /\.(pdf)$/i.test(url) || (typeof url === 'string' && url.startsWith('data:application/pdf')));
                       const isXlsx = !isImage && !isPdf && (/\.(xlsx|xls|csv)$/i.test(name) || /\.(xlsx|xls|csv)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') || url.startsWith('data:application/vnd.ms-excel') || url.startsWith('data:text/csv') || url.startsWith('data:application/csv'))));

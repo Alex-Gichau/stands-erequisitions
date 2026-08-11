@@ -626,7 +626,12 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
 
       const reqTitle = title.trim() || "Untitled Requisition";
 
-      // 1. Create requisition immediately with encoded attachments array
+      // 1. Convert/upload any base64 attachments to server storage first
+      const uploadedAttachmentUrls = encodedAttachments.length > 0
+        ? await uploadAttachmentsToLocalServer(encodedAttachments)
+        : [];
+
+      // 2. Create requisition with clean server attachment URLs
       const createdReq = await addRequisition({
         projectId: matchingProject ? matchingProject.id : "",
         title: reqTitle,
@@ -643,21 +648,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         notificationEmails: finalNotificationEmails,
         isSharedRequisition,
         sharedGroups: isSharedRequisition ? sharedGroups : [],
-        attachments: encodedAttachments,
+        attachments: uploadedAttachmentUrls,
       });
-
-      // 2. Queue background file upload task if attachments exist
-      if (encodedAttachments.length > 0 && createdReq?.id) {
-        const createdReqId = createdReq.id;
-        startBackgroundUploadTask({
-          title: reqTitle,
-          requisitionId: createdReqId,
-          files: encodedAttachments,
-          onComplete: async (uploadedUrls) => {
-            await updateRequisition(createdReqId, { attachments: uploadedUrls });
-          }
-        });
-      }
 
       // Clear the local draft from storage upon successful submission
       if (currentUser?.id) {

@@ -279,8 +279,69 @@ export async function sendSlackNotification(params: {
 }
 
 export async function uploadAttachmentToLocalServer(att: string): Promise<string> {
-  if (typeof att !== "string") return att;
-  // Use data URIs directly for uploading and fetching of images and documents
+  if (typeof att !== "string" || !att) return att;
+
+  let fileName = "attachment";
+  let dataUrl = att.trim();
+
+  if (dataUrl.includes("::")) {
+    const parts = dataUrl.split("::");
+    fileName = parts[0].trim();
+    dataUrl = parts.slice(1).join("::").trim();
+  }
+
+  // If already converted or points to a server relative or absolute URL, return normalized URL
+  if (
+    dataUrl.startsWith("/uploads/") ||
+    dataUrl.startsWith("uploads/") ||
+    dataUrl.startsWith("/api/attachments/") ||
+    dataUrl.startsWith("api/attachments/") ||
+    dataUrl.startsWith("http://") ||
+    dataUrl.startsWith("https://") ||
+    dataUrl.startsWith("blob:")
+  ) {
+    return normalizeAttachmentUrl(att);
+  }
+
+  // Pre-process raw base64 missing data URI scheme prefix
+  if (!dataUrl.startsWith("data:")) {
+    const rawHead = dataUrl.substring(0, 30);
+    if (rawHead.startsWith("JVBERi")) {
+      dataUrl = `data:application/pdf;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("iVBOR")) {
+      dataUrl = `data:image/png;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("/9j/")) {
+      dataUrl = `data:image/jpeg;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("R0lGOD")) {
+      dataUrl = `data:image/gif;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("UklGR")) {
+      dataUrl = `data:image/webp;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("UEsDB")) {
+      dataUrl = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${dataUrl}`;
+    } else if (/^[A-Za-z0-9+/=\r\n\s]+$/.test(dataUrl.substring(0, 100))) {
+      dataUrl = `data:application/octet-stream;base64,${dataUrl}`;
+    } else {
+      return att;
+    }
+  }
+
+  // Upload base64 payload to VPS endpoint /api/attachments/upload
+  try {
+    const response = await fetch("/api/attachments/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName, dataUrl })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.url) {
+        return fileName ? `${fileName}::${data.url}` : data.url;
+      }
+    }
+  } catch (err) {
+    console.error("[uploadAttachmentToLocalServer] Local upload error:", err);
+  }
+
   return att;
 }
 

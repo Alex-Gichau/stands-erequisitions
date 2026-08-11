@@ -13,6 +13,7 @@ import { seedDatabase } from "./scripts/seed-mongo.ts";
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import uploadsRouter from "./uploads.ts";
+import mime from "mime-types";
 
 dotenv.config();
 
@@ -195,44 +196,72 @@ function persistActivity(activity: Activity) {
 function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: string): string {
   if (!attachmentStr || typeof attachmentStr !== "string") return attachmentStr;
   
+  const trimmedInput = attachmentStr.trim();
+  if (!trimmedInput) return attachmentStr;
+
   let fileName = "attachment";
-  let dataUrl = attachmentStr;
+  let dataUrl = trimmedInput;
   let hasPrefix = false;
   
-  if (attachmentStr.includes("::")) {
-    const separatorIndex = attachmentStr.indexOf("::");
-    fileName = attachmentStr.substring(0, separatorIndex);
-    dataUrl = attachmentStr.substring(separatorIndex + 2);
+  if (trimmedInput.includes("::")) {
+    const separatorIndex = trimmedInput.indexOf("::");
+    fileName = trimmedInput.substring(0, separatorIndex).trim();
+    dataUrl = trimmedInput.substring(separatorIndex + 2).trim();
     hasPrefix = true;
   }
   
-  // If already converted to relative or absolute path, return as is
-  if (dataUrl.startsWith("/uploads/") || dataUrl.startsWith("http://") || dataUrl.startsWith("https://")) {
+  // Fast path check: If already offloaded to relative or absolute path, return as is
+  if (
+    dataUrl.startsWith("/uploads/") ||
+    dataUrl.startsWith("uploads/") ||
+    dataUrl.startsWith("/api/attachments/") ||
+    dataUrl.startsWith("api/attachments/") ||
+    dataUrl.startsWith("http://") ||
+    dataUrl.startsWith("https://") ||
+    dataUrl.startsWith("blob:")
+  ) {
     return attachmentStr;
   }
 
-  if (dataUrl.startsWith("JVBERi") && !dataUrl.startsWith("data:")) {
-    dataUrl = `data:application/pdf;base64,${dataUrl}`;
+  // Pre-process raw base64 missing data URI prefix to ensure RFC 2397 compliance
+  if (!dataUrl.startsWith("data:")) {
+    const rawHead = dataUrl.substring(0, 30);
+    if (rawHead.startsWith("JVBERi")) {
+      dataUrl = `data:application/pdf;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("iVBOR")) {
+      dataUrl = `data:image/png;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("/9j/")) {
+      dataUrl = `data:image/jpeg;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("R0lGOD")) {
+      dataUrl = `data:image/gif;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("UklGR")) {
+      dataUrl = `data:image/webp;base64,${dataUrl}`;
+    } else if (rawHead.startsWith("UEsDB")) {
+      dataUrl = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${dataUrl}`;
+    } else if (/^[A-Za-z0-9+/=\r\n\s]+$/.test(dataUrl.substring(0, 100))) {
+      dataUrl = `data:application/octet-stream;base64,${dataUrl}`;
+    } else {
+      return attachmentStr;
+    }
   }
 
-  // Handle data URIs missing mediatype or with malformed header
+  // Enforce RFC 2397 mediatype standards and fix malformed headers
   if (dataUrl.startsWith("data:")) {
-    if (dataUrl.startsWith("data:;base64,") || dataUrl.startsWith("data:undefined;base64,")) {
+    if (dataUrl.startsWith("data:;base64,") || dataUrl.startsWith("data:undefined;base64,") || dataUrl.startsWith("data:null;base64,")) {
       dataUrl = dataUrl.replace(/^data:[^;]*;base64,/, "data:application/octet-stream;base64,");
     } else if (!dataUrl.includes(";base64,")) {
       dataUrl = dataUrl.replace(/^data:/, "data:application/octet-stream;base64,");
     }
-  } else {
-    return attachmentStr;
   }
   
   try {
     let mimeType = "application/octet-stream";
     let base64Data = "";
 
-    const matches = dataUrl.match(/^data:([^;]*);base64,(.+)$/s);
+    // RFC 2397 compliant regex parsing: data:[<mediatype>][;base64],<data>
+    const matches = dataUrl.match(/^data:([^;,]+)?(?:;[^\s;,]+)*;base64,(.+)$/s);
     if (matches) {
-      mimeType = matches[1] || "application/octet-stream";
+      mimeType = (matches[1] || "application/octet-stream").toLowerCase().trim();
       base64Data = matches[2];
     } else {
       const commaIdx = dataUrl.indexOf(",");
@@ -243,29 +272,52 @@ function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: stri
       }
     }
     
-    const buffer = Buffer.from(base64Data.trim(), "base64");
+    // Clean base64 body of whitespace / line breaks
+    const cleanBase64 = base64Data.replace(/[\s\r\n]/g, "");
+    const buffer = Buffer.from(cleanBase64, "base64");
     if (!buffer || buffer.length === 0) {
       return attachmentStr;
     }
 
+    // Refine mimeType from decoded buffer magic bytes if mimeType is generic or missing
+    if (mimeType === "application/octet-stream" || mimeType === "text/plain") {
+      if (buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+        mimeType = "application/pdf";
+      } else if (buffer.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+        mimeType = "image/png";
+      } else if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+        mimeType = "image/jpeg";
+      } else if (buffer.length >= 4 && buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+        mimeType = "image/gif";
+      } else if (buffer.length >= 12 && buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38 && buffer.toString("ascii", 8, 12) === "WEBP") {
+        mimeType = "image/webp";
+      } else if (buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+        mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      }
+    }
+
     let ext = "";
-    if (mimeType.includes("pdf")) ext = "pdf";
-    else if (mimeType.includes("png")) ext = "png";
-    else if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
-    else if (mimeType.includes("gif")) ext = "gif";
-    else if (mimeType.includes("word") || mimeType.includes("document")) ext = "docx";
-    else if (mimeType.includes("sheet") || mimeType.includes("excel") || mimeType.includes("spreadsheetml") || mimeType.includes("csv") || mimeType.includes("ods") || mimeType.includes("tab-separated")) {
-      if (mimeType.includes("csv")) ext = "csv";
-      else if (mimeType.includes("ods")) ext = "ods";
-      else if (mimeType.includes("tsv") || mimeType.includes("tab-separated")) ext = "tsv";
-      else if (mimeType.includes("xlsb")) ext = "xlsb";
-      else if (mimeType.includes("xlsm")) ext = "xlsm";
-      else if (mimeType.includes("xls") && !mimeType.includes("xlsx")) ext = "xls";
-      else ext = "xlsx";
+    const lookupExt = mime.extension(mimeType);
+    if (lookupExt && lookupExt !== "bin") {
+      ext = lookupExt === "jpeg" ? "jpg" : lookupExt;
     } else {
-      const parts = fileName.split(".");
-      if (parts.length > 1) ext = parts[parts.length - 1];
-      else ext = "bin";
+      if (mimeType.includes("pdf")) ext = "pdf";
+      else if (mimeType.includes("png")) ext = "png";
+      else if (mimeType.includes("jpeg") || mimeType.includes("jpg")) ext = "jpg";
+      else if (mimeType.includes("gif")) ext = "gif";
+      else if (mimeType.includes("webp")) ext = "webp";
+      else if (mimeType.includes("word") || mimeType.includes("document")) ext = "docx";
+      else if (mimeType.includes("sheet") || mimeType.includes("excel") || mimeType.includes("spreadsheetml") || mimeType.includes("csv")) {
+        if (mimeType.includes("csv")) ext = "csv";
+        else ext = "xlsx";
+      } else {
+        const parts = fileName.split(".");
+        if (parts.length > 1) {
+          ext = parts[parts.length - 1].toLowerCase().replace(/[^a-z0-9]/g, "");
+        } else {
+          ext = "bin";
+        }
+      }
     }
     
     let cleanFileName = fileName.replace(/[^a-zA-Z0-9_.-]/g, "_");
@@ -353,19 +405,37 @@ function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): a
   }
 
   if (modified) {
-    persistSanitizedRequisition(newItem).catch((err) =>
-      console.error("[Base64 Purger] Auto-persist error:", err.message || err)
-    );
+    // Immediately persist sanitized paths to disk/DB to prevent repeated redundant conversions during GET requests
+    persistSanitizedRequisitionSync(newItem);
   }
 
   return newItem;
 }
 
-async function persistSanitizedRequisition(newItem: any) {
+function persistSanitizedRequisitionSync(newItem: any) {
   const reqId = newItem.id || newItem._id;
   if (!reqId) return;
 
   try {
+    // 1. Immediately update JSON collection on disk
+    const list = readJsonCollection("requisitions");
+    let changed = false;
+    const updatedList = list.map((r: any) => {
+      if (r.id === reqId || String(r._id) === String(reqId)) {
+        changed = true;
+        return {
+          ...r,
+          ...(newItem.attachments ? { attachments: newItem.attachments } : {}),
+          ...(newItem.receipts ? { receipts: newItem.receipts } : {}),
+        };
+      }
+      return r;
+    });
+    if (changed) {
+      writeJsonCollection("requisitions", updatedList);
+    }
+
+    // 2. Immediately update MongoDB document
     if (mongoose.connection.readyState === 1) {
       const ReqModel = mongoose.models.Requisition || mongoose.model("Requisition");
       if (ReqModel) {
@@ -374,7 +444,7 @@ async function persistSanitizedRequisition(newItem: any) {
           filterConditions.push({ _id: reqId });
         }
         const queryFilter = filterConditions.length > 1 ? { $or: filterConditions } : filterConditions[0];
-        await ReqModel.updateOne(
+        ReqModel.updateOne(
           queryFilter,
           {
             $set: {
@@ -382,28 +452,68 @@ async function persistSanitizedRequisition(newItem: any) {
               ...(newItem.receipts ? { receipts: newItem.receipts } : {}),
             },
           }
-        );
-      }
-    } else {
-      const list = readJsonCollection("requisitions");
-      let changed = false;
-      const updatedList = list.map((r: any) => {
-        if (r.id === reqId || String(r._id) === String(reqId)) {
-          changed = true;
-          return {
-            ...r,
-            ...(newItem.attachments ? { attachments: newItem.attachments } : {}),
-            ...(newItem.receipts ? { receipts: newItem.receipts } : {}),
-          };
-        }
-        return r;
-      });
-      if (changed) {
-        writeJsonCollection("requisitions", updatedList);
+        ).catch((err: any) => {
+          console.error(`[Base64 Purger] Mongo update error for ${reqId}:`, err.message || err);
+        });
       }
     }
   } catch (err: any) {
     console.error(`[Base64 Purger] Error persisting sanitized requisition ${reqId}:`, err.message || err);
+  }
+}
+
+async function purgeAndPersistAllRequisitions() {
+  try {
+    const targetDir = getUploadsDir();
+    let totalPurged = 0;
+
+    // Purge from JSON store
+    const list = readJsonCollection("requisitions");
+    let jsonModified = false;
+    const updatedList = list.map((item: any) => {
+      const sanitized = sanitizeRequisitionAttachments(item, targetDir);
+      if (
+        JSON.stringify(sanitized.attachments) !== JSON.stringify(item.attachments) ||
+        JSON.stringify(sanitized.receipts) !== JSON.stringify(item.receipts)
+      ) {
+        jsonModified = true;
+        totalPurged++;
+        return sanitized;
+      }
+      return item;
+    });
+
+    if (jsonModified) {
+      writeJsonCollection("requisitions", updatedList);
+      console.log(`[Base64 Purger] Startup sweep: Purged base64 attachments from ${totalPurged} JSON requisitions records.`);
+    }
+
+    // Purge from MongoDB if connected
+    if (mongoose.connection.readyState === 1) {
+      const ReqModel = mongoose.models.Requisition || mongoose.model("Requisition");
+      if (ReqModel) {
+        const dbItems = await ReqModel.find({}).lean();
+        let dbPurged = 0;
+        for (const item of dbItems) {
+          const sanitized = sanitizeRequisitionAttachments(item, targetDir);
+          if (
+            JSON.stringify(sanitized.attachments) !== JSON.stringify(item.attachments) ||
+            JSON.stringify(sanitized.receipts) !== JSON.stringify(item.receipts)
+          ) {
+            await ReqModel.updateOne(
+              { _id: item._id },
+              { $set: { attachments: sanitized.attachments, receipts: sanitized.receipts } }
+            );
+            dbPurged++;
+          }
+        }
+        if (dbPurged > 0) {
+          console.log(`[Base64 Purger] Startup sweep: Purged base64 attachments from ${dbPurged} MongoDB documents.`);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error("[Base64 Purger] Startup sweep error:", err.message || err);
   }
 }
 
@@ -962,6 +1072,9 @@ async function startServer() {
 
   // Connect on startup
   await connectToMongo();
+
+  // Perform startup base64 purger sweep across all requisitions
+  await purgeAndPersistAllRequisitions();
 
   // --- AUTH ENDPOINTS (PUBLIC: BYPASSES MIDDLEWARE) ---
   /**

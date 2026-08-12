@@ -1724,12 +1724,37 @@ export const VendorsPanel: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase tracking-widest border",
-                          v.isRegistered ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100 font-black"
-                        )}>
-                          {v.isRegistered ? "Verified Partner" : "Unlisted Payee"}
-                        </span>
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase tracking-widest border",
+                            v.isRegistered ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100 font-black"
+                          )}>
+                            {v.isRegistered ? "Verified Partner" : "Unlisted Payee"}
+                          </span>
+                          {!v.isRegistered && (
+                            <button
+                              onClick={() => {
+                                setName(v.name);
+                                setEditingVendorId(null);
+                                setContact("");
+                                setLocation("");
+                                setOfferings(v.categories.join(", "));
+                                setShowAddForm(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                triggerToast({
+                                  type: "FINANCE_DISBURSEMENT",
+                                  severity: "LOW",
+                                  message: `✍️ Pre-filled details for "${v.name}". Complete registration below.`,
+                                  timestamp: new Date().toISOString()
+                                });
+                              }}
+                              className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 tracking-wider flex items-center gap-1 transition-colors mt-0.5 hover:underline focus:outline-none cursor-pointer"
+                            >
+                              <PlusCircle size={10} />
+                              Add Vendor to List
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center font-mono text-xs font-bold text-slate-700">{v.count} Reqs</td>
                       <td className="px-6 py-4 text-right font-mono font-black text-emerald-600 text-xs">Ksh {v.disbursed.toLocaleString()}</td>

@@ -108,7 +108,7 @@ function getFileTypeBadge(fileName: string) {
 }
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
-import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName } from "../lib/utils";
+import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName, getNamedImagePlaceholder } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
 import * as XLSX from "xlsx";
@@ -132,6 +132,7 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
   const [spreadsheetSearch, setSpreadsheetSearch] = useState<string>("");
 
   const cleanUri = getAbsoluteAttachmentUrl(uri) || uri?.trim() || "";
+  const [imageSrc, setImageSrc] = useState<string>(cleanUri);
   const lowerName = (fileName || cleanUri).toLowerCase();
 
   // Check if data URI payload is HTML
@@ -194,6 +195,7 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
     setTextContent(null);
     setHtmlContent(null);
     setPdfDataUri("");
+    setImageSrc(cleanUri || uri);
 
     if (isHtml && isDataUri) {
       try {
@@ -448,10 +450,22 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
 
         <div className="flex-1 overflow-auto flex items-center justify-center p-6 min-h-[400px]">
           <img
-            src={cleanUri}
+            src={imageSrc}
             alt={fileName}
             referrerPolicy="no-referrer"
-            onError={() => setHasError(true)}
+            onError={(e) => {
+              const rawUrl = uri && uri.includes("::") ? uri.split("::")[1] : uri;
+              if (rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) && imageSrc !== rawUrl) {
+                setImageSrc(rawUrl);
+              } else {
+                const placeholder = getNamedImagePlaceholder(fileName);
+                if (imageSrc !== placeholder) {
+                  setImageSrc(placeholder);
+                } else {
+                  setHasError(true);
+                }
+              }
+            }}
             style={{
               transform: `scale(${zoom}) rotate(${rotation}deg)`,
               transition: "transform 0.2s ease-out",
@@ -889,9 +903,12 @@ const DocumentPreviewModal = ({
             {currentDoc?.uri && (
               <button
                 onClick={() => {
+                  const downloadUrl = getAbsoluteAttachmentUrl(currentDoc.uri) || currentDoc.uri;
                   const link = document.createElement("a");
-                  link.href = currentDoc.uri;
-                  link.download = currentDoc.fileName;
+                  link.href = downloadUrl;
+                  link.download = currentDoc.fileName || "attachment";
+                  link.target = "_blank";
+                  link.rel = "noopener noreferrer";
                   link.click();
                 }}
                 className="p-2 bg-slate-850 border border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-colors cursor-pointer"

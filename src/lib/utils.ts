@@ -18,6 +18,28 @@ export const DEFAULT_IMAGE_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIC
 </svg>
 `);
 
+export function getNamedImagePlaceholder(fileName: string = "Image"): string {
+  const safeName = (fileName || "Image Attachment")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+  const ext = safeName.split('.').pop()?.toUpperCase() || 'IMG';
+
+  return "data:image/svg+xml;utf8," + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400" fill="none">
+  <rect width="600" height="400" fill="#090D16" rx="16"/>
+  <rect x="2" y="2" width="596" height="396" rx="14" stroke="#1E293B" stroke-width="2"/>
+  <rect x="230" y="80" width="140" height="130" rx="16" fill="#1E293B" stroke="#334155" stroke-width="2"/>
+  <path d="M260 170L280 140L300 160L320 130L340 170H260Z" fill="#38BDF8"/>
+  <circle cx="325" cy="115" r="10" fill="#F59E0B"/>
+  <rect x="260" y="55" width="80" height="20" rx="10" fill="#0EA5E9"/>
+  <text x="300" y="69" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="900" fill="#FFFFFF" letter-spacing="0.1em">${ext}</text>
+  <text x="300" y="250" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="800" fill="#F8FAFC">${safeName}</text>
+  <text x="300" y="280" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#64748B">Attachment preview generated from file record</text>
+</svg>
+`);
+}
+
 export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, fallbackUrl: string = DEFAULT_IMAGE_PLACEHOLDER) {
   const target = e.currentTarget;
   if (target && target.src !== fallbackUrl) {
@@ -72,11 +94,18 @@ export function unwrapAttachmentTarget(val: any, depth = 0): { url?: string; nam
   }
 
   if (typeof val === "object") {
-    const name = val.name || val.fileName || val.title;
-    const directUrl = val.url || val.dataUrl || val.link || val.path;
+    const name = val.name || val.fileName || val.file_name || val.title;
+    const directUrl =
+      val.dataUri ||
+      val.data_uri ||
+      val.dataUrl ||
+      val.data_url ||
+      val.url ||
+      val.link ||
+      val.path;
 
-    if (typeof directUrl === "string") {
-      return { url: directUrl, name: typeof name === "string" ? name : undefined };
+    if (typeof directUrl === "string" && directUrl.trim().length > 0) {
+      return { url: directUrl.trim(), name: typeof name === "string" ? name.trim() : undefined };
     }
 
     const keys = Object.keys(val);
@@ -111,14 +140,14 @@ export function normalizeAttachmentUrl(url: any): string {
   // Clean trailing escaped quotes or braces if any
   trimmed = trimmed.replace(/["}\s]+$/, "").replace(/^["{\s]+/, "").trim();
 
-  // Normalize absolute HTTP/HTTPS URLs (e.g. from accounts.pceastandrews.org) containing /uploads/ or /api/attachments/ to relative path
-  if (trimmed.includes("/uploads/")) {
-    const parts = trimmed.split("/uploads/");
-    return "/uploads/" + parts[parts.length - 1];
-  }
-  if (trimmed.includes("/api/attachments/")) {
-    const parts = trimmed.split("/api/attachments/");
-    return "/api/attachments/" + parts[parts.length - 1];
+  // Preserve raw HTTP/HTTPS URLs, base64 Data URIs, and Blob URLs directly
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:") ||
+    trimmed.startsWith("blob:")
+  ) {
+    return trimmed;
   }
 
   // If starts with uploads/ without leading slash
@@ -352,17 +381,16 @@ export async function uploadAttachmentToLocalServer(att: string): Promise<string
     dataUrl = parts.slice(1).join("::").trim();
   }
 
-  // If already converted or points to a server relative or absolute URL, return normalized URL
+  // Preserve raw HTTP/HTTPS URLs, base64 Data URIs, and Blob URLs directly
   if (
-    dataUrl.startsWith("/uploads/") ||
-    dataUrl.startsWith("uploads/") ||
-    dataUrl.startsWith("/api/attachments/") ||
-    dataUrl.startsWith("api/attachments/") ||
     dataUrl.startsWith("http://") ||
     dataUrl.startsWith("https://") ||
-    dataUrl.startsWith("blob:")
+    dataUrl.startsWith("data:") ||
+    dataUrl.startsWith("blob:") ||
+    dataUrl.startsWith("/uploads/") ||
+    dataUrl.startsWith("uploads/")
   ) {
-    return normalizeAttachmentUrl(att);
+    return att;
   }
 
   // Pre-process raw base64 missing data URI scheme prefix
@@ -385,23 +413,7 @@ export async function uploadAttachmentToLocalServer(att: string): Promise<string
     } else {
       return att;
     }
-  }
-
-  // Upload base64 payload to VPS endpoint /api/attachments/upload
-  try {
-    const response = await fetch("/api/attachments/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileName, dataUrl })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.url) {
-        return fileName ? `${fileName}::${data.url}` : data.url;
-      }
-    }
-  } catch (err) {
-    console.error("[uploadAttachmentToLocalServer] Local upload error:", err);
+    return fileName ? `${fileName}::${dataUrl}` : dataUrl;
   }
 
   return att;

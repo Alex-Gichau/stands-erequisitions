@@ -86,7 +86,7 @@ const BudgetCircularGaugeItem: React.FC<BudgetCircularGaugeItemProps> = ({ proje
       {/* Top Header line of card */}
       <div className="w-full space-y-1 pt-2">
         <div className="flex items-center justify-center gap-1">
-          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Headroom Base</span>
+          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">MINISTRY BUDGET</span>
           {alertIcon}
         </div>
         <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-wider line-clamp-1 group-hover:text-primary transition-colors pr-1 pl-1" title={name}>
@@ -129,7 +129,7 @@ const BudgetCircularGaugeItem: React.FC<BudgetCircularGaugeItemProps> = ({ proje
             {remainingPct.toFixed(0)}%
           </span>
           <span className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">
-            HEADROOM
+            AVAILABLE
           </span>
         </div>
       </div>
@@ -271,7 +271,7 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
           <div className="flex items-center gap-2">
             <span className="p-1 px-1.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 w-fit border border-indigo-100">
               <PiggyBank size={12} />
-              Ministry Headroom Breakdown
+              Ministry Available Budget
             </span>
             {assignedGroupsList.length > 0 && (
               <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-emerald-200">
@@ -280,10 +280,10 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
             )}
           </div>
           <h3 className="text-sm md:text-base font-black text-slate-900 uppercase tracking-tight">
-            Ministry Headroom & Safe-To-Spend Gauges
+            Ministry Available Budget Safe-To-Spend
           </h3>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-            Realtime headroom calculation showing uncommitted cash balances for active church group categories
+            Realtime available calculation showing uncommitted cash balances for active church group categories
           </p>
         </div>
 

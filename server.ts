@@ -443,12 +443,17 @@ function sanitizeAttachmentObject(att: any, targetDir: string): any {
       }
     }
   } else if (typeof att === "object" && att !== null) {
-    name = att.name || att.fileName || att.title || "Attachment";
-    url = att.url || att.dataUrl || att.link || att.path || "";
+    name = att.name || att.fileName || att.file_name || att.title || "Attachment";
+    url = att.url || att.dataUrl || att.data_url || att.link || att.path || "";
     
     const baseName = url ? path.basename(url) : "";
-    filePath = baseName ? path.join(targetDir, baseName) : (att.filePath || "");
-    dataUri = att.dataUri || att.base64 || "";
+    filePath = baseName ? path.join(targetDir, baseName) : (att.filePath || att.file_path || "");
+    dataUri = att.dataUri || att.data_uri || att.base64 || "";
+
+    // If dataUri is missing but url is base64, use url as dataUri
+    if (!dataUri && (url.startsWith("data:") || /^[A-Za-z0-9+/=\r\n\s]+$/.test(url.substring(0, 100)))) {
+      dataUri = url;
+    }
 
     // If dataUri is missing but the local file exists, populate it!
     if (!dataUri && filePath && fs.existsSync(filePath)) {

@@ -24,8 +24,8 @@ This document defines the system architecture, file processing standards, financ
    - Supported Formats: PDF documents, Images (PNG, JPG, WEBP), Excel spreadsheets (`.xlsx`, `.xls`, `.csv`), and Word documents (`.docx`).
 
 2. **Attachment URL Normalization**:
-   - The utility `normalizeAttachmentUrl` in `src/lib/utils.ts` cleans and strips domain prefixes (e.g. `https://accounts.pceastandrews.org/uploads/...` or `https://accounts.pceastandrews.org/api/attachments/...`).
-   - Converts external domain links to clean relative endpoints (`/uploads/<filename>` or `/api/attachments/<fileId>`).
+   - The utility `normalizeAttachmentUrl` in `src/lib/utils.ts` preserves RFC 2397 base64 Data URIs (`data:...`) and raw external HTTP/HTTPS URLs (e.g. `https://accounts.pceastandrews.org/...`) directly without domain stripping or forced local file conversion.
+   - Ensures attachments remain 100% self-contained, durable across container restarts, and fully functional for upload, in-app preview, and direct download.
 
 3. **Backend Uploads & Asset Router**:
    - Serves uploaded files from `UPLOADS_DIR` (default `./uploads`) using `mime-types` for Content-Type resolution (`application/pdf`, `image/png`, etc.).

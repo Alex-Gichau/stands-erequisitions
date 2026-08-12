@@ -770,37 +770,45 @@ function persistFeedback(feedback: Feedback) {
 function generateSlackFullReport(): string {
   const activities = restoreActivities();
   if (activities.length === 0) {
-    return "🤷‍♂️ *No historical user activities recorded yet. It's quiet in here!* 🦗";
+    return "🤷‍♂️ *No historical user activities recorded yet.*";
   }
 
   // Sort chronologically/descending to display latest info on top
-  // Limit to most recent 15 activities to stay within Slack's 3000 character limit per block
   const sorted = [...activities]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 15);
 
   const getEmojiForAction = (action: string) => {
     const a = action.toLowerCase();
-    if (a.includes("login") || a.includes("sign_in")) return "👋";
-    if (a.includes("logout") || a.includes("sign_out")) return "✌️";
-    if (a.includes("create") || a.includes("add") || a.includes("submit")) return "✨";
+    if (a.includes("login") || a.includes("sign_in")) return "🔑";
+    if (a.includes("logout") || a.includes("sign_out")) return "🚪";
+    if (a.includes("create") || a.includes("add") || a.includes("submit")) return "➕";
     if (a.includes("update") || a.includes("edit") || a.includes("save")) return "📝";
     if (a.includes("delete") || a.includes("remove")) return "🗑️";
     if (a.includes("approve")) return "✅";
     if (a.includes("reject")) return "❌";
-    if (a.includes("disburse") || a.includes("payment")) return "💸";
+    if (a.includes("disburse") || a.includes("payment")) return "💵";
     if (a.includes("cancel")) return "🛑";
-    if (a.includes("email")) return "📧";
+    if (a.includes("email")) return "✉️";
     if (a.includes("sync")) return "🔄";
     return "🔹";
   };
 
-  let report = "🚀 *LATEST USER ACTIVITY REPORT* 🚀\n\n";
+  let report = "☑️ *COMPLETED SYSTEM EVENTS CHECKLIST* ☑️\n\n";
 
   sorted.forEach((act) => {
-    const timeStr = new Date(act.timestamp).toLocaleString("en-KE", { timeZone: "Africa/Nairobi" });
+    const dateObj = new Date(act.timestamp);
+    const timeStr = dateObj.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "Africa/Nairobi" });
     const emoji = getEmojiForAction(act.action);
-    const entry = `${emoji} *[${timeStr}]* 👤 _${act.performedBy}_ \n⚡ *${act.action}* 💬 ${act.details}\n`;
+    
+    // Clean up username repeating in details to prevent stuttering
+    let displayDetails = act.details || "";
+    if (act.performedBy && displayDetails.startsWith(act.performedBy)) {
+      displayDetails = displayDetails.replace(act.performedBy, "").trim();
+      displayDetails = displayDetails.replace(/^[\s,:-]+/, "");
+    }
+    
+    const entry = `☑️ *${timeStr}* | ${emoji} \`${act.action}\` — *${act.performedBy}*: _${displayDetails}_\n`;
     
     // Safety check: Don't exceed block limit (3000 chars)
     if ((report + entry).length < 2900) {
@@ -809,7 +817,7 @@ function generateSlackFullReport(): string {
   });
 
   if (activities.length > 15) {
-    report += `\n... and ${activities.length - 15} more activities in the ledger.`;
+    report += `\n_...and ${activities.length - 15} more activities recorded in the registry_`;
   }
 
   return report;
@@ -2882,33 +2890,47 @@ async function startServer() {
 
     const safeSummaryText = (summaryText || "No activity logged.").substring(0, 2800);
 
-    const slackBody: any = {
-      attachments: [
-        {
-          color: color,
-          blocks: mainAttachmentBlocks
-        },
-        {
-          color: "#4A5568",
-          blocks: [
-            {
-              type: "header",
-              text: {
-                type: "plain_text",
-                text: "🧵 SYSTEM AUDIT EVENT STREAM",
-                emoji: true
-              }
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: safeSummaryText
-              }
+    const attachments: any[] = [
+      {
+        color: color,
+        blocks: mainAttachmentBlocks
+      }
+    ];
+
+    // Only append the historical audit event stream if explicitly requested,
+    // or for security warnings/critical/abnormal levels
+    const shouldIncludeAuditStream = 
+      req.body.includeAuditStream === true || 
+      action === "SECURITY_WARNING" || 
+      action === "FAILED_LOGIN_ATTEMPT" || 
+      level === "critical" || 
+      level === "abnormal";
+
+    if (shouldIncludeAuditStream) {
+      attachments.push({
+        color: "#4A5568",
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "🧵 SYSTEM AUDIT EVENT STREAM",
+              emoji: true
             }
-          ]
-        }
-      ]
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: safeSummaryText
+            }
+          }
+        ]
+      });
+    }
+
+    const slackBody: any = {
+      attachments
     };
 
     if (!webhookUrl) {

@@ -3217,8 +3217,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     const trimmed = commentText.trim();
     if (!trimmed) return;
 
-    // Resolve author name cleanly and consistently
-    const calculatedAuthorName = resolveSenderName(currentUser, users);
+    // Resolve author name cleanly and consistently from user profile
+    const calculatedAuthorName = currentUser?.name?.trim() || resolveSenderName(currentUser, users);
+    const authorPhoto = currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
 
     const newComment = {
       id: `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -3226,6 +3227,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       authorName: calculatedAuthorName,
       authorEmail: currentUser?.email || "",
       authorRole: currentUser?.role || "USER",
+      authorPhotoURL: authorPhoto,
       text: trimmed,
       timestamp: new Date().toISOString()
     };
@@ -4446,15 +4448,26 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                         const diffMs = Date.now() - new Date(comment.timestamp).getTime();
                         const canEdit = isAuthor && (diffMs / 60000 <= 15);
                         
-                        const displayName = resolveSenderName(
-                          {
-                            id: comment.authorId,
-                            email: comment.authorEmail,
-                            name: comment.authorName,
-                            role: comment.authorRole
-                          },
-                          users
+                        const commentUser = users.find((u: any) => 
+                          (u.id && comment.authorId && u.id === comment.authorId) || 
+                          (u.email && comment.authorEmail && u.email.toLowerCase() === comment.authorEmail.toLowerCase())
                         );
+
+                        const displayName = (isAuthor && currentUser?.name)
+                          ? currentUser.name
+                          : (commentUser?.name || resolveSenderName(
+                              {
+                                id: comment.authorId,
+                                email: comment.authorEmail,
+                                name: comment.authorName,
+                                role: comment.authorRole
+                              },
+                              users
+                            ));
+
+                        const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
+                          ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
+                          : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
 
                         const initials = displayName ? displayName.charAt(0).toUpperCase() : "C";
 
@@ -4463,9 +4476,18 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             key={comment.id}
                             className="flex items-start gap-3 bg-slate-50/50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-150 dark:border-slate-800/80 group transition-all"
                           >
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 animate-in zoom-in duration-200">
-                              {initials}
-                            </div>
+                            {photoURL ? (
+                              <img 
+                                src={photoURL} 
+                                alt={displayName} 
+                                className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-xs"
+                                onError={handleImageError}
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 animate-in zoom-in duration-200">
+                                {initials}
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0 space-y-1">
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -4582,6 +4604,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                         </div>
                         <div className="divide-y divide-slate-50 dark:divide-slate-800/40">
                           {filteredMentionUsers.map(u => {
+                            const uPhoto = u.photoURL || (u as any).avatarUrl;
                             const initials = (u.name || u.email || "?").charAt(0).toUpperCase();
                             return (
                               <button
@@ -4590,9 +4613,18 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                 onClick={() => insertMention(u)}
                                 className="w-full text-left px-3.5 py-2.5 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all group cursor-pointer"
                               >
-                                <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700/80 font-bold text-xs flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-150 dark:group-hover:bg-indigo-950/40 dark:group-hover:text-indigo-300 dark:group-hover:border-indigo-900/60 transition-all shrink-0">
-                                  {initials}
-                                </div>
+                                {uPhoto ? (
+                                  <img 
+                                    src={uPhoto} 
+                                    alt={u.name} 
+                                    className="w-7 h-7 rounded-full object-cover border border-slate-250 dark:border-slate-700 shrink-0"
+                                    onError={handleImageError}
+                                  />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-250 dark:border-slate-700/80 font-bold text-xs flex items-center justify-center text-slate-600 dark:text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-150 dark:group-hover:bg-indigo-950/40 dark:group-hover:text-indigo-300 dark:group-hover:border-indigo-900/60 transition-all shrink-0">
+                                    {initials}
+                                  </div>
+                                )}
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 justify-between">
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 truncate">
@@ -4613,7 +4645,19 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       </div>
                     )}
 
-                    <div className="flex gap-2.5 items-end bg-white dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
+                    <div className="flex gap-2.5 items-start bg-white dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
+                      {currentUser?.photoURL || (currentUser as any)?.avatarUrl ? (
+                        <img 
+                          src={currentUser.photoURL || (currentUser as any)?.avatarUrl} 
+                          alt={currentUser.name || "User"} 
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 mt-1 shadow-xs"
+                          onError={handleImageError}
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 mt-1">
+                          {(currentUser?.name || "U").charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <textarea
                         ref={commentTextareaRef}
                         value={commentText}

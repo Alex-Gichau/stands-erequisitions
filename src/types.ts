@@ -83,6 +83,7 @@ export interface Comment {
   authorName: string;
   authorEmail: string;
   authorRole: string;
+  authorPhotoURL?: string;
   text: string;
   timestamp: string;
 }

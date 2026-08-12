@@ -53,37 +53,58 @@ import {
   Maximize2,
   Minimize2,
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  Info,
+  HardDrive,
+  Mail,
+  UserPlus,
+  MessageSquare,
+  Send,
+  Smile,
+  Reply,
+  SmilePlus,
+  MoreHorizontal,
+  Heart,
+  ThumbsUp,
+  CornerDownRight
 } from "lucide-react";
-import { Info, HardDrive, Mail, UserPlus, MessageSquare, Send, CheckCheck, Smile, Reply, CornerUpLeft, SmilePlus } from "lucide-react";
 
-// WhatsApp-style date and time formatting helpers
-function formatWhatsAppTime(timestamp?: string): string {
-  if (!timestamp) return "";
+// Relative time formatting helper (e.g., "1h ago", "2m ago", "just now")
+function formatRelativeTime(timestamp?: string): string {
+  if (!timestamp) return "just now";
   const d = new Date(timestamp);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  if (isNaN(d.getTime())) return "just now";
+
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+  if (diffSec < 30) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function getWhatsAppDateLabel(timestamp?: string): string {
-  if (!timestamp) return "";
-  const d = new Date(timestamp);
-  if (isNaN(d.getTime())) return "";
-  
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  
-  if (targetDate.getTime() === today.getTime()) {
-    return "TODAY";
-  } else if (targetDate.getTime() === yesterday.getTime()) {
-    return "YESTERDAY";
-  } else {
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase();
+// File extension pill helper
+function getFileTypeBadge(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  if (['ppt', 'pptx'].includes(ext)) {
+    return { bg: 'bg-amber-500 text-white', label: 'P', iconColor: 'text-amber-600' };
   }
+  if (['xls', 'xlsx', 'csv'].includes(ext)) {
+    return { bg: 'bg-emerald-600 text-white', label: 'X', iconColor: 'text-emerald-600' };
+  }
+  if (['pdf'].includes(ext)) {
+    return { bg: 'bg-rose-600 text-white', label: 'PDF', iconColor: 'text-rose-600' };
+  }
+  if (['doc', 'docx'].includes(ext)) {
+    return { bg: 'bg-blue-600 text-white', label: 'W', iconColor: 'text-blue-600' };
+  }
+  return { bg: 'bg-slate-600 text-white', label: 'FILE', iconColor: 'text-slate-600' };
 }
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
@@ -4497,160 +4518,92 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 )}
               </section>
 
-              {/* Discussion & Feedback Thread (WhatsApp Chat Emulation) */}
-              <section className="space-y-3 pt-6 border-t border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-[10px] md:text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <MessageSquare size={13} className="text-emerald-500" />
-                    <span>Discussion Chat</span>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-[9px]">
-                      {Array.isArray(req.comments) ? req.comments.length : 0}
-                    </span>
+              {/* Discussion & Comments Thread (Fresh Clean Card Layout) */}
+              <section className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <MessageSquare size={14} className="text-indigo-500" />
+                    <span>Comments ({Array.isArray(req.comments) ? req.comments.length : 0})</span>
                   </h4>
-                  <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Live Thread</span>
-                  </span>
                 </div>
                 
-                <div className="space-y-3">
-                  {/* WhatsApp Chat Container */}
-                  <div className="bg-slate-100/80 dark:bg-slate-950 p-3 md:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 min-h-[300px] max-h-[420px] overflow-y-auto space-y-2.5 shadow-inner relative">
-                    {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
-                      let lastDateLabel = "";
-                      return req.comments.map((comment: any) => {
-                        const dateLabel = getWhatsAppDateLabel(comment.timestamp);
-                        const showDateDivider = dateLabel && dateLabel !== lastDateLabel;
-                        if (showDateDivider) {
-                          lastDateLabel = dateLabel;
-                        }
+                <div className="space-y-4">
+                  {/* Comments Feed List */}
+                  {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
+                    const allComments = req.comments;
+                    const topLevelComments = allComments.filter((c: any) => !c.replyTo?.id);
 
-                        const isAuthor = comment.authorId === currentUser?.id || comment.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
-                        const canDelete = isAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
-                        
-                        // Can edit if author and within 15 minutes of posting
-                        const diffMs = Date.now() - new Date(comment.timestamp).getTime();
-                        const canEdit = isAuthor && (diffMs / 60000 <= 15);
-                        
-                        const commentUser = users.find((u: any) => 
-                          (u.id && comment.authorId && u.id === comment.authorId) || 
-                          (u.email && comment.authorEmail && u.email.toLowerCase() === comment.authorEmail.toLowerCase())
-                        );
+                    return (
+                      <div className="space-y-4">
+                        {topLevelComments.map((comment: any) => {
+                          const replies = allComments.filter((c: any) => c.replyTo?.id === comment.id);
 
-                        const displayName = resolveSenderName(
-                          {
-                            id: comment.authorId,
-                            email: comment.authorEmail,
-                            name: (isAuthor && currentUser?.name) ? currentUser.name : comment.authorName,
-                            role: comment.authorRole
-                          },
-                          users
-                        ) || comment.authorName || comment.authorEmail || "";
+                          const isAuthor = comment.authorId === currentUser?.id || comment.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
+                          const canDelete = isAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
+                          const diffMs = Date.now() - new Date(comment.timestamp).getTime();
+                          const canEdit = isAuthor && (diffMs / 60000 <= 15);
+                          
+                          const commentUser = users.find((u: any) => 
+                            (u.id && comment.authorId && u.id === comment.authorId) || 
+                            (u.email && comment.authorEmail && u.email.toLowerCase() === comment.authorEmail.toLowerCase())
+                          );
 
-                        const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
-                          ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
-                          : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
+                          const displayName = resolveSenderName(
+                            {
+                              id: comment.authorId,
+                              email: comment.authorEmail,
+                              name: (isAuthor && currentUser?.name) ? currentUser.name : comment.authorName,
+                              role: comment.authorRole
+                            },
+                            users
+                          ) || comment.authorName || comment.authorEmail || "User";
 
-                        const initials = displayName ? displayName.charAt(0).toUpperCase() : (comment.authorName?.charAt(0).toUpperCase() || "U");
-                        const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
+                          const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
+                            ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
+                            : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
 
-                        return (
-                          <React.Fragment key={comment.id}>
-                            {showDateDivider && (
-                              <div className="flex justify-center my-3 sticky top-1 z-10">
-                                <span className="bg-white/90 dark:bg-slate-800/90 text-slate-500 dark:text-slate-300 font-extrabold text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow-2xs border border-slate-200/80 dark:border-slate-700/80 backdrop-blur-xs">
-                                  {dateLabel}
-                                </span>
-                              </div>
-                            )}
+                          const initials = displayName.charAt(0).toUpperCase();
+                          const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
 
-                            {isAuthor ? (
-                              /* Outgoing WhatsApp Bubble (Current User) */
-                              <div className="flex justify-end my-1.5 group items-end gap-2">
-                                <div className="relative max-w-[85%] sm:max-w-[75%] bg-emerald-600 dark:bg-emerald-700 text-white p-3 rounded-2xl rounded-tr-xs shadow-xs text-xs space-y-1">
-                                  {/* Quoted reply block */}
-                                  {comment.replyTo && (
-                                    <div className="bg-emerald-700/60 dark:bg-emerald-800/70 border-l-3 border-emerald-200 p-2 rounded-r-xl mb-1 text-[11px]">
-                                      <span className="font-bold text-[10px] block text-emerald-100">
-                                        {comment.replyTo.authorName}
-                                      </span>
-                                      <span className="truncate block text-emerald-50/90 text-[10.5px]">
-                                        {comment.replyTo.text}
-                                      </span>
-                                    </div>
-                                  )}
+                          const reactionCounts = reactions.reduce((acc: any, r: any) => {
+                            acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                            return acc;
+                          }, {});
 
-                                  {editingCommentId === comment.id ? (
-                                    <div className="space-y-2 w-full mt-1 animate-in fade-in duration-150 text-slate-800">
-                                      <textarea
-                                        value={editingCommentText}
-                                        onChange={(e) => setEditingCommentText(e.target.value)}
-                                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                        rows={2}
-                                        autoFocus
-                                      />
-                                      <div className="flex items-center gap-1.5 justify-end">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setEditingCommentId(null);
-                                            setEditingCommentText("");
-                                          }}
-                                          className="px-2 py-0.5 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 rounded-lg"
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleUpdateComment(comment.id, editingCommentText)}
-                                          className="px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg"
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
+                          return (
+                            <div key={comment.id} className="bg-slate-50/90 dark:bg-slate-900/60 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs group relative">
+                              {/* Comment Header */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  {photoURL ? (
+                                    <img 
+                                      src={photoURL} 
+                                      alt={displayName} 
+                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs"
+                                      onError={handleImageError}
+                                    />
                                   ) : (
-                                    <div className="break-words whitespace-pre-wrap text-emerald-50 leading-relaxed text-xs">
-                                      {renderFormattedCommentText(comment.text)}
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center shrink-0">
+                                      {initials}
                                     </div>
                                   )}
-
-                                  {/* Timestamp + Blue Ticks */}
-                                  <div className="flex items-center justify-end gap-1 text-[9px] text-emerald-100/90 mt-0.5 select-none font-medium">
-                                    {comment.isEdited && <span className="italic">edited</span>}
-                                    <span>{formatWhatsAppTime(comment.timestamp)}</span>
-                                    <CheckCheck size={13} className="text-cyan-200 shrink-0" />
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                      {displayName}
+                                    </span>
+                                    <span className="text-slate-400 text-xs font-normal">•</span>
+                                    <span className="text-xs text-slate-400 font-medium">
+                                      {formatRelativeTime(comment.timestamp)}
+                                    </span>
+                                    {comment.isEdited && (
+                                      <span className="text-[10px] text-slate-400 italic">(edited)</span>
+                                    )}
                                   </div>
+                                </div>
 
-                                  {/* Reactions list */}
-                                  {reactions.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                                      {reactions.map((r: any, idx: number) => (
-                                        <span key={idx} className="bg-emerald-700/80 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold border border-emerald-500/50">
-                                          {r.emoji}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Hover Action Floating Bar */}
-                                  <div className="absolute top-1 -left-20 hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-md z-20">
-                                    <button
-                                      type="button"
-                                      onClick={() => setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text })}
-                                      className="p-1 text-slate-500 hover:text-emerald-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                                      title="Reply to comment"
-                                    >
-                                      <Reply size={12} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleReaction(comment.id, "👍")}
-                                      className="p-1 text-slate-500 hover:text-amber-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                                      title="React 👍"
-                                    >
-                                      👍
-                                    </button>
+                                {/* Actions / Menu */}
+                                {(canEdit || canDelete) && (
+                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                     {canEdit && (
                                       <button
                                         type="button"
@@ -4658,183 +4611,296 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                           setEditingCommentId(comment.id);
                                           setEditingCommentText(comment.text);
                                         }}
-                                        className="p-1 text-slate-500 hover:text-indigo-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800"
                                         title="Edit"
                                       >
-                                        <Pencil size={11} />
+                                        <Pencil size={13} />
                                       </button>
                                     )}
                                     {canDelete && (
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteComment(comment.id)}
-                                        className="p-1 text-slate-500 hover:text-rose-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
                                         title="Delete"
                                       >
-                                        <Trash2 size={11} />
+                                        <Trash2 size={13} />
                                       </button>
                                     )}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              /* Incoming WhatsApp Bubble (Other Users) */
-                              <div className="flex justify-start my-1.5 group items-start gap-2">
-                                {photoURL ? (
-                                  <img 
-                                    src={photoURL} 
-                                    alt={displayName} 
-                                    className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 mt-1 shadow-xs"
-                                    onError={handleImageError}
-                                  />
-                                ) : (
-                                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 mt-1 border border-indigo-200 dark:border-indigo-800">
-                                    {initials}
                                   </div>
                                 )}
-                                <div className="relative max-w-[85%] sm:max-w-[75%] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-3 rounded-2xl rounded-tl-xs shadow-xs text-xs space-y-1">
-                                  {/* Author Name Header */}
-                                  <div className="flex items-center justify-between gap-2 pb-0.5 border-b border-slate-100 dark:border-slate-800/60">
-                                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-[11px] truncate">
-                                      {displayName}
-                                    </span>
-                                    {comment.authorRole && (
-                                      <span className={cn(
-                                        "px-1.5 py-0.2 rounded text-[7px] font-extrabold uppercase tracking-wider border",
-                                        getRoleBadgeColor(comment.authorRole)
-                                      )}>
-                                        {comment.authorRole.replace('_', ' ')}
-                                      </span>
-                                    )}
-                                  </div>
+                              </div>
 
-                                  {/* Quoted reply block */}
-                                  {comment.replyTo && (
-                                    <div className="bg-slate-100 dark:bg-slate-800/80 border-l-3 border-indigo-500 p-2 rounded-r-xl mb-1 text-[11px]">
-                                      <span className="font-bold text-[10px] block text-indigo-600 dark:text-indigo-400">
-                                        {comment.replyTo.authorName}
-                                      </span>
-                                      <span className="truncate block text-slate-600 dark:text-slate-300 text-[10.5px]">
-                                        {comment.replyTo.text}
-                                      </span>
-                                    </div>
-                                  )}
-
-                                  {editingCommentId === comment.id ? (
-                                    <div className="space-y-2 w-full mt-1 animate-in fade-in duration-150">
-                                      <textarea
-                                        value={editingCommentText}
-                                        onChange={(e) => setEditingCommentText(e.target.value)}
-                                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                        rows={2}
-                                        autoFocus
-                                      />
-                                      <div className="flex items-center gap-1.5 justify-end">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setEditingCommentId(null);
-                                            setEditingCommentText("");
-                                          }}
-                                          className="px-2 py-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-lg"
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleUpdateComment(comment.id, editingCommentText)}
-                                          className="px-2 py-0.5 text-[10px] font-bold text-white bg-indigo-600 rounded-lg"
-                                        >
-                                          Save
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="break-words whitespace-pre-wrap text-slate-800 dark:text-slate-100 leading-relaxed text-xs">
-                                      {renderFormattedCommentText(comment.text)}
-                                    </div>
-                                  )}
-
-                                  {/* Timestamp */}
-                                  <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 select-none font-medium">
-                                    {comment.isEdited && <span className="italic mr-0.5">edited</span>}
-                                    <span>{formatWhatsAppTime(comment.timestamp)}</span>
-                                  </div>
-
-                                  {/* Reactions list */}
-                                  {reactions.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                                      {reactions.map((r: any, idx: number) => (
-                                        <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[10px] px-1.5 py-0.2 rounded-full font-bold border border-slate-200 dark:border-slate-700">
-                                          {r.emoji}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {/* Hover Action Floating Bar */}
-                                  <div className="absolute top-1 -right-20 hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-md z-20">
+                              {/* Comment Body */}
+                              {editingCommentId === comment.id ? (
+                                <div className="space-y-2 mt-2">
+                                  <textarea
+                                    value={editingCommentText}
+                                    onChange={(e) => setEditingCommentText(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    rows={2}
+                                    autoFocus
+                                  />
+                                  <div className="flex items-center gap-2 justify-end">
                                     <button
                                       type="button"
-                                      onClick={() => setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text })}
-                                      className="p-1 text-slate-500 hover:text-indigo-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                                      title="Reply to comment"
+                                      onClick={() => {
+                                        setEditingCommentId(null);
+                                        setEditingCommentText("");
+                                      }}
+                                      className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200"
                                     >
-                                      <Reply size={12} />
+                                      Cancel
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleToggleReaction(comment.id, "👍")}
-                                      className="p-1 text-slate-500 hover:text-amber-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                                      title="React 👍"
+                                      onClick={() => handleUpdateComment(comment.id, editingCommentText)}
+                                      className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700"
                                     >
-                                      👍
+                                      Save
                                     </button>
-                                    {canDelete && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteComment(comment.id)}
-                                        className="p-1 text-slate-500 hover:text-rose-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
-                                        title="Delete"
-                                      >
-                                        <Trash2 size={11} />
-                                      </button>
-                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            )}
-                          </React.Fragment>
-                        );
-                      });
-                    })() : (
-                      <div className="py-12 flex flex-col items-center justify-center text-center text-slate-400">
-                        <MessageSquare size={24} className="mb-2 text-emerald-500 opacity-60" />
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">No messages in chat</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Start the conversation or ask a question below.</p>
-                      </div>
-                    )}
-                    <div ref={commentsEndRef} />
-                  </div>
+                              ) : (
+                                <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
+                                  {renderFormattedCommentText(comment.text)}
+                                </p>
+                              )}
 
-                  {/* Add Comment Input Form */}
-                  <div className="relative space-y-2">
-                    {/* Quoted Message Preview Banner (WhatsApp style) */}
+                              {/* Attached Files Box if files exist */}
+                              {Array.isArray(req.attachments) && req.attachments.length > 0 && comment === topLevelComments[0] && (
+                                <div className="bg-slate-100/70 dark:bg-slate-800/50 p-3 rounded-2xl space-y-2">
+                                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                                    {req.attachments.length} {req.attachments.length === 1 ? 'file attached' : 'files attached'}
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {req.attachments.slice(0, 3).map((att: any, idx: number) => {
+                                      const attUrl = typeof att === 'string' ? att : (att?.url || '');
+                                      const fileName = getAttachmentFileName(attUrl);
+                                      const badge = getFileTypeBadge(fileName);
+                                      return (
+                                        <a
+                                          key={idx}
+                                          href={getAbsoluteAttachmentUrl(attUrl)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:shadow-xs transition-all"
+                                        >
+                                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${badge.bg}`}>
+                                            {badge.label}
+                                          </span>
+                                          <span className="truncate max-w-[140px]">{fileName}</span>
+                                        </a>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Reactions & Reply Action Bar */}
+                              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                                {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => handleToggleReaction(comment.id, emoji)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs font-medium"
+                                  >
+                                    <span>{emoji}</span>
+                                    <span className="font-bold text-[11px]">{count}</span>
+                                  </button>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReaction(comment.id, "👍")}
+                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-500 transition-all cursor-pointer shadow-2xs"
+                                  title="React 👍"
+                                >
+                                  👍
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReaction(comment.id, "❤️")}
+                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-500 transition-all cursor-pointer shadow-2xs"
+                                  title="React ❤️"
+                                >
+                                  ❤️
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text });
+                                    if (commentTextareaRef.current) {
+                                      commentTextareaRef.current.focus();
+                                    }
+                                  }}
+                                  className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                  <Reply size={13} />
+                                  <span>Reply</span>
+                                </button>
+                              </div>
+
+                              {/* Nested Replies Section with Left Connector Line */}
+                              {replies.length > 0 && (
+                                <div className="pt-2 space-y-3">
+                                  {/* Replies Header Summary */}
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pl-1">
+                                    <div className="flex -space-x-1.5 overflow-hidden">
+                                      {replies.slice(0, 4).map((rep: any, idx: number) => {
+                                        const repUser = users.find((u: any) => u.id === rep.authorId || u.email?.toLowerCase() === rep.authorEmail?.toLowerCase());
+                                        const pUrl = repUser?.photoURL || (repUser as any)?.avatarUrl || rep.authorPhotoURL || "";
+                                        return pUrl ? (
+                                          <img key={idx} src={pUrl} alt="" className="inline-block h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover" />
+                                        ) : (
+                                          <div key={idx} className="inline-flex h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 bg-indigo-100 text-indigo-700 font-bold text-[9px] items-center justify-center">
+                                            {(rep.authorName || 'U').charAt(0)}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    <span>
+                                      {replies.length} {replies.length === 1 ? 'reply' : 'replies'} from {replies.map((r: any) => r.authorName.split(' ')[0]).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).slice(0, 3).join(', ')}
+                                    </span>
+                                  </div>
+
+                                  {/* Vertical Thread Connector Line */}
+                                  <div className="border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-3.5 space-y-3">
+                                    {replies.map((reply: any) => {
+                                      const isReplyAuthor = reply.authorId === currentUser?.id || reply.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
+                                      const canDeleteReply = isReplyAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
+                                      
+                                      const replyUser = users.find((u: any) => 
+                                        (u.id && reply.authorId && u.id === reply.authorId) || 
+                                        (u.email && reply.authorEmail && u.email.toLowerCase() === reply.authorEmail.toLowerCase())
+                                      );
+
+                                      const replyDisplayName = resolveSenderName(
+                                        {
+                                          id: reply.authorId,
+                                          email: reply.authorEmail,
+                                          name: (isReplyAuthor && currentUser?.name) ? currentUser.name : reply.authorName,
+                                          role: reply.authorRole
+                                        },
+                                        users
+                                      ) || reply.authorName || reply.authorEmail || "User";
+
+                                      const replyPhotoURL = (isReplyAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
+                                        ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
+                                        : (replyUser?.photoURL || (replyUser as any)?.avatarUrl || reply.authorPhotoURL || "");
+
+                                      const replyReactions = Array.isArray(reply.reactions) ? reply.reactions : [];
+                                      const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
+                                        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                        return acc;
+                                      }, {});
+
+                                      return (
+                                        <div key={reply.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 space-y-2 text-xs relative group/reply shadow-2xs">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                              {replyPhotoURL ? (
+                                                <img 
+                                                  src={replyPhotoURL} 
+                                                  alt={replyDisplayName} 
+                                                  className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0"
+                                                  onError={handleImageError}
+                                                />
+                                              ) : (
+                                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                                  {replyDisplayName.charAt(0).toUpperCase()}
+                                                </div>
+                                              )}
+                                              <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                                                {replyDisplayName}
+                                              </span>
+                                              <span className="text-slate-400 text-[10px]">•</span>
+                                              <span className="text-[11px] text-slate-400 font-medium">
+                                                {formatRelativeTime(reply.timestamp)}
+                                              </span>
+                                            </div>
+
+                                            {canDeleteReply && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteComment(reply.id)}
+                                                className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover/reply:opacity-100 transition-opacity"
+                                                title="Delete reply"
+                                              >
+                                                <Trash2 size={12} />
+                                              </button>
+                                            )}
+                                          </div>
+
+                                          <p className="text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap pl-8">
+                                            {renderFormattedCommentText(reply.text)}
+                                          </p>
+
+                                          {/* Reply Reactions */}
+                                          <div className="flex items-center gap-1.5 pl-8 pt-0.5">
+                                            {Object.entries(replyReactionCounts).map(([emoji, count]: [string, any]) => (
+                                              <button
+                                                key={emoji}
+                                                type="button"
+                                                onClick={() => handleToggleReaction(reply.id, emoji)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 font-medium border border-slate-200/60 dark:border-slate-700"
+                                              >
+                                                <span>{emoji}</span>
+                                                <span className="font-bold">{count}</span>
+                                              </button>
+                                            ))}
+
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleReaction(reply.id, "👍")}
+                                              className="inline-flex items-center justify-center p-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 text-slate-400 hover:text-amber-500"
+                                              title="React 👍"
+                                            >
+                                              👍
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })() : (
+                    <div className="p-8 bg-slate-50/60 dark:bg-slate-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400">
+                      <MessageSquare size={24} className="mx-auto mb-2 opacity-40 text-slate-400" />
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">No comments yet</p>
+                      <p className="text-xs text-slate-400 mt-1">Be the first to post feedback or ask a question below.</p>
+                    </div>
+                  )}
+
+                  <div ref={commentsEndRef} />
+
+                  {/* Add Comment Input Card */}
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-3.5 shadow-sm space-y-2.5 relative">
+                    {/* Replying Banner */}
                     {replyingTo && (
-                      <div className="p-2.5 bg-slate-100 dark:bg-slate-900 border-l-4 border-emerald-500 rounded-r-2xl flex items-center justify-between gap-2 shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-150">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <CornerUpLeft size={11} />
+                      <div className="p-2.5 bg-indigo-50/80 dark:bg-indigo-950/60 border-l-4 border-indigo-500 rounded-r-2xl flex items-center justify-between gap-2 shadow-2xs">
+                        <div className="min-w-0 flex-1 text-xs">
+                          <p className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
+                            <Reply size={12} />
                             <span>Replying to {replyingTo.authorName}</span>
                           </p>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5">
+                          <p className="text-slate-600 dark:text-slate-300 truncate mt-0.5 text-[11px]">
                             {replyingTo.text}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => setReplyingTo(null)}
-                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200/60"
                         >
                           <X size={14} />
                         </button>
@@ -4843,8 +4909,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                     {/* Emoji Quick Picker Bar */}
                     {showEmojiPicker && (
-                      <div className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg flex items-center gap-1.5 flex-wrap z-30 animate-in fade-in duration-150">
-                        {["👍", "❤️", "😊", "🙏", "👏", "😂", "🔥", "🎉", "💡", "✅", "📌", "❓", "💯", "🤝", "🙌", "⭐", "💰"].map((emoji) => (
+                      <div className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg flex items-center gap-1 flex-wrap z-30">
+                        {["👍", "❤️", "😊", "🙏", "👏", "👀", "🔥", "🎉", "💡", "✅", "💯", "⭐"].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -4910,66 +4976,52 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       </div>
                     )}
 
-                    {/* WhatsApp Style Input Box */}
-                    <div className="flex gap-2 items-center bg-white dark:bg-slate-950 p-2 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => setShowEmojiPicker(prev => !prev)}
-                        className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition-all shrink-0"
-                        title="Add Emoji"
-                      >
-                        <Smile size={18} />
-                      </button>
+                    {/* Textarea Input */}
+                    <textarea
+                      ref={commentTextareaRef}
+                      value={commentText}
+                      onChange={handleCommentTextareaChange}
+                      placeholder={replyingTo ? `Replying to ${replyingTo.authorName}...` : "Write a comment or use @name to tag team members..."}
+                      rows={2}
+                      className="w-full px-3 py-2 text-xs bg-transparent border-0 focus:outline-none resize-none text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-0 min-h-[48px]"
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape" && mentionSearch !== null) {
+                          e.preventDefault();
+                          setMentionSearch(null);
+                          setMentionIndex(-1);
+                        } else if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddComment();
+                        }
+                      }}
+                    />
 
-                      {currentUser?.photoURL || (currentUser as any)?.avatarUrl ? (
-                        <img 
-                          src={currentUser.photoURL || (currentUser as any)?.avatarUrl} 
-                          alt={currentUser.name || "User"} 
-                          className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-xs hidden sm:block"
-                          onError={handleImageError}
-                        />
-                      ) : (
-                        <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900 font-bold text-xs items-center justify-center shrink-0 hidden sm:flex">
-                          {(currentUser?.name || "U").charAt(0).toUpperCase()}
-                        </div>
-                      )}
-
-                      <textarea
-                        ref={commentTextareaRef}
-                        value={commentText}
-                        onChange={handleCommentTextareaChange}
-                        placeholder="Type a message or use @name to tag..."
-                        rows={1}
-                        className="flex-1 px-2.5 py-1.5 text-xs bg-transparent border-0 focus:outline-none resize-none text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-0 max-h-24 min-h-[36px]"
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape" && mentionSearch !== null) {
-                            e.preventDefault();
-                            setMentionSearch(null);
-                            setMentionIndex(-1);
-                          } else if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddComment();
-                          }
-                        }}
-                      />
+                    {/* Bottom Controls Bar */}
+                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/80 pt-2 px-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowEmojiPicker(prev => !prev)}
+                          className="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="Add Emoji"
+                        >
+                          <Smile size={16} />
+                        </button>
+                      </div>
 
                       <button
                         type="button"
                         onClick={() => handleAddComment()}
-                        disabled={isSubmittingComment || !commentText.trim()}
-                        className="w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:opacity-50 text-white rounded-full transition-all shrink-0 flex items-center justify-center shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
-                        title="Send Message"
+                        disabled={!commentText.trim() || isSubmittingComment}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                       >
                         {isSubmittingComment ? (
-                          <Loader2 size={15} className="animate-spin" />
+                          <Loader2 size={13} className="animate-spin" />
                         ) : (
-                          <Send size={15} className="ml-0.5" />
+                          <Send size={13} />
                         )}
+                        <span>{replyingTo ? "Post Reply" : "Post Comment"}</span>
                       </button>
-                    </div>
-                    <div className="flex items-center justify-between px-2 text-[9px] text-slate-400">
-                      <span>Press <kbd className="px-1 py-0.2 bg-slate-100 dark:bg-slate-800 border rounded font-mono">Enter</kbd> to send</span>
-                      <span><kbd className="px-1 py-0.2 bg-slate-100 dark:bg-slate-800 border rounded font-mono">Shift + Enter</kbd> for line break</span>
                     </div>
                   </div>
                 </div>

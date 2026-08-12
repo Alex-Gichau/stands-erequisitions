@@ -55,7 +55,36 @@ import {
   Lock,
   ArrowLeft
 } from "lucide-react";
-import { Info, HardDrive, Mail, UserPlus, MessageSquare, Send } from "lucide-react";
+import { Info, HardDrive, Mail, UserPlus, MessageSquare, Send, CheckCheck, Smile, Reply, CornerUpLeft, SmilePlus } from "lucide-react";
+
+// WhatsApp-style date and time formatting helpers
+function formatWhatsAppTime(timestamp?: string): string {
+  if (!timestamp) return "";
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function getWhatsAppDateLabel(timestamp?: string): string {
+  if (!timestamp) return "";
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return "";
+  
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const targetDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  
+  if (targetDate.getTime() === today.getTime()) {
+    return "TODAY";
+  } else if (targetDate.getTime() === yesterday.getTime()) {
+    return "YESTERDAY";
+  } else {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase();
+  }
+}
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
 import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName } from "../lib/utils";
@@ -3126,6 +3155,44 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
 
+  // WhatsApp Chat states
+  const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (commentsEndRef.current) {
+      commentsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [req.comments?.length]);
+
+  const handleToggleReaction = async (commentId: string, emoji: string) => {
+    try {
+      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentUserId = currentUser?.id || "anon";
+      const currentUserName = currentUser?.name || "User";
+
+      const updatedComments = currentComments.map((c: any) => {
+        if (c.id !== commentId) return c;
+        const reactions = Array.isArray(c.reactions) ? [...c.reactions] : [];
+        const existingIdx = reactions.findIndex((r: any) => r.emoji === emoji && r.userId === currentUserId);
+
+        if (existingIdx >= 0) {
+          reactions.splice(existingIdx, 1);
+        } else {
+          reactions.push({ emoji, userId: currentUserId, userName: currentUserName });
+        }
+
+        return { ...c, reactions };
+      });
+
+      req.comments = updatedComments;
+      await updateRequisition(req.id, { comments: updatedComments });
+    } catch (err) {
+      console.error("Failed to toggle reaction:", err);
+    }
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -3229,7 +3296,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       authorRole: currentUser?.role || "USER",
       authorPhotoURL: authorPhoto,
       text: trimmed,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      ...(replyingTo ? { replyTo: { id: replyingTo.id, authorName: replyingTo.authorName, text: replyingTo.text } } : {})
     };
     
     const currentComments = Array.isArray(req.comments) ? req.comments : [];
@@ -3240,6 +3308,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     setCommentText("");
     setMentionSearch(null);
     setMentionIndex(-1);
+    setReplyingTo(null);
+    setShowEmojiPicker(false);
     setIsSubmittingComment(false);
 
     // Execute database save & notifications in background task
@@ -4427,20 +4497,34 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 )}
               </section>
 
-              {/* Discussion & Feedback Thread */}
-              <section className="space-y-4 pt-6 border-t border-slate-200">
+              {/* Discussion & Feedback Thread (WhatsApp Chat Emulation) */}
+              <section className="space-y-3 pt-6 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <MessageSquare size={12} className="text-indigo-500" />
-                    Discussion & Feedback ({Array.isArray(req.comments) ? req.comments.length : 0})
+                  <h4 className="text-[10px] md:text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <MessageSquare size={13} className="text-emerald-500" />
+                    <span>Discussion Chat</span>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-extrabold text-[9px]">
+                      {Array.isArray(req.comments) ? req.comments.length : 0}
+                    </span>
                   </h4>
+                  <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Live Thread</span>
+                  </span>
                 </div>
                 
-                <div className="space-y-4">
-                  {/* Comments List */}
-                  {Array.isArray(req.comments) && req.comments.length > 0 ? (
-                    <div className="space-y-3.5 max-h-[350px] overflow-y-auto pr-1">
-                      {req.comments.map((comment: any) => {
+                <div className="space-y-3">
+                  {/* WhatsApp Chat Container */}
+                  <div className="bg-slate-100/80 dark:bg-slate-950 p-3 md:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 min-h-[300px] max-h-[420px] overflow-y-auto space-y-2.5 shadow-inner relative">
+                    {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
+                      let lastDateLabel = "";
+                      return req.comments.map((comment: any) => {
+                        const dateLabel = getWhatsAppDateLabel(comment.timestamp);
+                        const showDateDivider = dateLabel && dateLabel !== lastDateLabel;
+                        if (showDateDivider) {
+                          lastDateLabel = dateLabel;
+                        }
+
                         const isAuthor = comment.authorId === currentUser?.id || comment.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
                         const canDelete = isAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
                         
@@ -4453,148 +4537,329 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           (u.email && comment.authorEmail && u.email.toLowerCase() === comment.authorEmail.toLowerCase())
                         );
 
-                        const displayName = (isAuthor && currentUser?.name)
-                          ? currentUser.name
-                          : (commentUser?.name || resolveSenderName(
-                              {
-                                id: comment.authorId,
-                                email: comment.authorEmail,
-                                name: comment.authorName,
-                                role: comment.authorRole
-                              },
-                              users
-                            ));
+                        const displayName = resolveSenderName(
+                          {
+                            id: comment.authorId,
+                            email: comment.authorEmail,
+                            name: (isAuthor && currentUser?.name) ? currentUser.name : comment.authorName,
+                            role: comment.authorRole
+                          },
+                          users
+                        ) || comment.authorName || comment.authorEmail || "";
 
                         const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
                           ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
                           : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
 
-                        const initials = displayName ? displayName.charAt(0).toUpperCase() : "C";
+                        const initials = displayName ? displayName.charAt(0).toUpperCase() : (comment.authorName?.charAt(0).toUpperCase() || "U");
+                        const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
 
                         return (
-                          <div 
-                            key={comment.id}
-                            className="flex items-start gap-3 bg-slate-50/50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-150 dark:border-slate-800/80 group transition-all"
-                          >
-                            {photoURL ? (
-                              <img 
-                                src={photoURL} 
-                                alt={displayName} 
-                                className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-xs"
-                                onError={handleImageError}
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 animate-in zoom-in duration-200">
-                                {initials}
+                          <React.Fragment key={comment.id}>
+                            {showDateDivider && (
+                              <div className="flex justify-center my-3 sticky top-1 z-10">
+                                <span className="bg-white/90 dark:bg-slate-800/90 text-slate-500 dark:text-slate-300 font-extrabold text-[9px] uppercase tracking-wider px-3 py-1 rounded-full shadow-2xs border border-slate-200/80 dark:border-slate-700/80 backdrop-blur-xs">
+                                  {dateLabel}
+                                </span>
                               </div>
                             )}
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-bold text-slate-800 dark:text-slate-200 text-xs truncate">
-                                    {isAuthor ? `You (${displayName})` : displayName}
-                                  </span>
-                                  {comment.authorRole && (
-                                    <span className={cn(
-                                      "px-1.5 py-0.2 rounded text-[7.5px] font-extrabold uppercase tracking-wider border",
-                                      getRoleBadgeColor(comment.authorRole)
-                                    )}>
-                                      {comment.authorRole.replace('_', ' ')}
-                                    </span>
+
+                            {isAuthor ? (
+                              /* Outgoing WhatsApp Bubble (Current User) */
+                              <div className="flex justify-end my-1.5 group items-end gap-2">
+                                <div className="relative max-w-[85%] sm:max-w-[75%] bg-emerald-600 dark:bg-emerald-700 text-white p-3 rounded-2xl rounded-tr-xs shadow-xs text-xs space-y-1">
+                                  {/* Quoted reply block */}
+                                  {comment.replyTo && (
+                                    <div className="bg-emerald-700/60 dark:bg-emerald-800/70 border-l-3 border-emerald-200 p-2 rounded-r-xl mb-1 text-[11px]">
+                                      <span className="font-bold text-[10px] block text-emerald-100">
+                                        {comment.replyTo.authorName}
+                                      </span>
+                                      <span className="truncate block text-emerald-50/90 text-[10.5px]">
+                                        {comment.replyTo.text}
+                                      </span>
+                                    </div>
                                   )}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[9px] text-slate-400 font-medium">
-                                    {formatDate(comment.timestamp)}
-                                  </span>
-                                  {comment.isEdited && (
-                                    <span className="text-[8px] text-slate-400 dark:text-slate-500 italic bg-slate-100/80 dark:bg-slate-800/50 px-1 py-0.2 rounded border border-slate-200/50 dark:border-slate-700/40">
-                                      edited
-                                    </span>
+
+                                  {editingCommentId === comment.id ? (
+                                    <div className="space-y-2 w-full mt-1 animate-in fade-in duration-150 text-slate-800">
+                                      <textarea
+                                        value={editingCommentText}
+                                        onChange={(e) => setEditingCommentText(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                        rows={2}
+                                        autoFocus
+                                      />
+                                      <div className="flex items-center gap-1.5 justify-end">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingCommentId(null);
+                                            setEditingCommentText("");
+                                          }}
+                                          className="px-2 py-0.5 text-[10px] font-bold text-slate-600 bg-white hover:bg-slate-100 rounded-lg"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateComment(comment.id, editingCommentText)}
+                                          className="px-2 py-0.5 text-[10px] font-bold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="break-words whitespace-pre-wrap text-emerald-50 leading-relaxed text-xs">
+                                      {renderFormattedCommentText(comment.text)}
+                                    </div>
                                   )}
-                                </div>
-                              </div>
-                              
-                              {editingCommentId === comment.id ? (
-                                <div className="space-y-2 w-full mt-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                                  <textarea
-                                    value={editingCommentText}
-                                    onChange={(e) => setEditingCommentText(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100"
-                                    rows={2}
-                                    autoFocus
-                                  />
-                                  <div className="flex items-center gap-1.5 justify-end">
+
+                                  {/* Timestamp + Blue Ticks */}
+                                  <div className="flex items-center justify-end gap-1 text-[9px] text-emerald-100/90 mt-0.5 select-none font-medium">
+                                    {comment.isEdited && <span className="italic">edited</span>}
+                                    <span>{formatWhatsAppTime(comment.timestamp)}</span>
+                                    <CheckCheck size={13} className="text-cyan-200 shrink-0" />
+                                  </div>
+
+                                  {/* Reactions list */}
+                                  {reactions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                                      {reactions.map((r: any, idx: number) => (
+                                        <span key={idx} className="bg-emerald-700/80 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold border border-emerald-500/50">
+                                          {r.emoji}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Hover Action Floating Bar */}
+                                  <div className="absolute top-1 -left-20 hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-md z-20">
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        setEditingCommentId(null);
-                                        setEditingCommentText("");
-                                      }}
-                                      className="px-2.5 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-750 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-750 dark:text-slate-300 rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                                      onClick={() => setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text })}
+                                      className="p-1 text-slate-500 hover:text-emerald-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                      title="Reply to comment"
                                     >
-                                      <X size={10} />
-                                      <span>Cancel</span>
+                                      <Reply size={12} />
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleUpdateComment(comment.id, editingCommentText)}
-                                      className="px-2.5 py-1 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-sm hover:shadow"
+                                      onClick={() => handleToggleReaction(comment.id, "👍")}
+                                      className="p-1 text-slate-500 hover:text-amber-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                      title="React 👍"
                                     >
-                                      <Check size={10} />
-                                      <span>Save</span>
+                                      👍
                                     </button>
+                                    {canEdit && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingCommentId(comment.id);
+                                          setEditingCommentText(comment.text);
+                                        }}
+                                        className="p-1 text-slate-500 hover:text-indigo-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        title="Edit"
+                                      >
+                                        <Pencil size={11} />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteComment(comment.id)}
+                                        className="p-1 text-slate-500 hover:text-rose-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={11} />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
-                              ) : (
-                                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed break-words whitespace-pre-wrap pr-4">
-                                  {renderFormattedCommentText(comment.text)}
-                                </p>
-                              )}
-                            </div>
-                            
-                            {/* Action Button Controls */}
-                            {editingCommentId !== comment.id && (canEdit || canDelete) && (
-                              <div className="flex items-center gap-0.5 shrink-0 select-none opacity-60 group-hover:opacity-100 transition-opacity">
-                                {canEdit && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setEditingCommentId(comment.id);
-                                      setEditingCommentText(comment.text);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer flex items-center justify-center"
-                                    title="Edit comment (First 15m)"
-                                  >
-                                    <Pencil size={11} />
-                                  </button>
+                              </div>
+                            ) : (
+                              /* Incoming WhatsApp Bubble (Other Users) */
+                              <div className="flex justify-start my-1.5 group items-start gap-2">
+                                {photoURL ? (
+                                  <img 
+                                    src={photoURL} 
+                                    alt={displayName} 
+                                    className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 mt-1 shadow-xs"
+                                    onError={handleImageError}
+                                  />
+                                ) : (
+                                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 mt-1 border border-indigo-200 dark:border-indigo-800">
+                                    {initials}
+                                  </div>
                                 )}
-                                {canDelete && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteComment(comment.id)}
-                                    className="p-1 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer flex items-center justify-center"
-                                    title="Delete comment"
-                                  >
-                                    <Trash2 size={11} />
-                                  </button>
-                                )}
+                                <div className="relative max-w-[85%] sm:max-w-[75%] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-3 rounded-2xl rounded-tl-xs shadow-xs text-xs space-y-1">
+                                  {/* Author Name Header */}
+                                  <div className="flex items-center justify-between gap-2 pb-0.5 border-b border-slate-100 dark:border-slate-800/60">
+                                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-[11px] truncate">
+                                      {displayName}
+                                    </span>
+                                    {comment.authorRole && (
+                                      <span className={cn(
+                                        "px-1.5 py-0.2 rounded text-[7px] font-extrabold uppercase tracking-wider border",
+                                        getRoleBadgeColor(comment.authorRole)
+                                      )}>
+                                        {comment.authorRole.replace('_', ' ')}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Quoted reply block */}
+                                  {comment.replyTo && (
+                                    <div className="bg-slate-100 dark:bg-slate-800/80 border-l-3 border-indigo-500 p-2 rounded-r-xl mb-1 text-[11px]">
+                                      <span className="font-bold text-[10px] block text-indigo-600 dark:text-indigo-400">
+                                        {comment.replyTo.authorName}
+                                      </span>
+                                      <span className="truncate block text-slate-600 dark:text-slate-300 text-[10.5px]">
+                                        {comment.replyTo.text}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {editingCommentId === comment.id ? (
+                                    <div className="space-y-2 w-full mt-1 animate-in fade-in duration-150">
+                                      <textarea
+                                        value={editingCommentText}
+                                        onChange={(e) => setEditingCommentText(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        rows={2}
+                                        autoFocus
+                                      />
+                                      <div className="flex items-center gap-1.5 justify-end">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingCommentId(null);
+                                            setEditingCommentText("");
+                                          }}
+                                          className="px-2 py-0.5 text-[10px] font-bold text-slate-500 bg-slate-100 rounded-lg"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleUpdateComment(comment.id, editingCommentText)}
+                                          className="px-2 py-0.5 text-[10px] font-bold text-white bg-indigo-600 rounded-lg"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="break-words whitespace-pre-wrap text-slate-800 dark:text-slate-100 leading-relaxed text-xs">
+                                      {renderFormattedCommentText(comment.text)}
+                                    </div>
+                                  )}
+
+                                  {/* Timestamp */}
+                                  <div className="flex items-center justify-end gap-1 text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 select-none font-medium">
+                                    {comment.isEdited && <span className="italic mr-0.5">edited</span>}
+                                    <span>{formatWhatsAppTime(comment.timestamp)}</span>
+                                  </div>
+
+                                  {/* Reactions list */}
+                                  {reactions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                                      {reactions.map((r: any, idx: number) => (
+                                        <span key={idx} className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[10px] px-1.5 py-0.2 rounded-full font-bold border border-slate-200 dark:border-slate-700">
+                                          {r.emoji}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Hover Action Floating Bar */}
+                                  <div className="absolute top-1 -right-20 hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-md z-20">
+                                    <button
+                                      type="button"
+                                      onClick={() => setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text })}
+                                      className="p-1 text-slate-500 hover:text-indigo-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                      title="Reply to comment"
+                                    >
+                                      <Reply size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleReaction(comment.id, "👍")}
+                                      className="p-1 text-slate-500 hover:text-amber-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                      title="React 👍"
+                                    >
+                                      👍
+                                    </button>
+                                    {canDelete && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteComment(comment.id)}
+                                        className="p-1 text-slate-500 hover:text-rose-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700"
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={11} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             )}
-                          </div>
+                          </React.Fragment>
                         );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-slate-50/50 dark:bg-slate-900/10 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400">
-                      <MessageSquare size={20} className="mx-auto mb-2 opacity-40 text-slate-400" />
-                      <p className="text-[10px] font-bold uppercase tracking-widest leading-none">No comments posted yet</p>
-                      <p className="text-[9px] text-slate-400/80 mt-1 uppercase">Leave a comment or ask for info below.</p>
-                    </div>
-                  )}
+                      });
+                    })() : (
+                      <div className="py-12 flex flex-col items-center justify-center text-center text-slate-400">
+                        <MessageSquare size={24} className="mb-2 text-emerald-500 opacity-60" />
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">No messages in chat</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Start the conversation or ask a question below.</p>
+                      </div>
+                    )}
+                    <div ref={commentsEndRef} />
+                  </div>
 
                   {/* Add Comment Input Form */}
-                  <div className="relative">
+                  <div className="relative space-y-2">
+                    {/* Quoted Message Preview Banner (WhatsApp style) */}
+                    {replyingTo && (
+                      <div className="p-2.5 bg-slate-100 dark:bg-slate-900 border-l-4 border-emerald-500 rounded-r-2xl flex items-center justify-between gap-2 shadow-sm animate-in fade-in slide-in-from-bottom-1 duration-150">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <CornerUpLeft size={11} />
+                            <span>Replying to {replyingTo.authorName}</span>
+                          </p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 truncate mt-0.5">
+                            {replyingTo.text}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(null)}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Emoji Quick Picker Bar */}
+                    {showEmojiPicker && (
+                      <div className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg flex items-center gap-1.5 flex-wrap z-30 animate-in fade-in duration-150">
+                        {["👍", "❤️", "😊", "🙏", "👏", "😂", "🔥", "🎉", "💡", "✅", "📌", "❓", "💯", "🤝", "🙌", "⭐", "💰"].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              setCommentText(prev => prev + emoji);
+                              setShowEmojiPicker(false);
+                            }}
+                            className="p-1.5 text-base hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-transform active:scale-110 cursor-pointer"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Mention Suggestions Popover */}
                     {mentionSearch !== null && filteredMentionUsers.length > 0 && (
                       <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl shadow-xl z-50 overflow-hidden max-h-[220px] overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -4645,26 +4910,37 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       </div>
                     )}
 
-                    <div className="flex gap-2.5 items-start bg-white dark:bg-slate-950 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
+                    {/* WhatsApp Style Input Box */}
+                    <div className="flex gap-2 items-center bg-white dark:bg-slate-950 p-2 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker(prev => !prev)}
+                        className="p-2 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30 rounded-xl transition-all shrink-0"
+                        title="Add Emoji"
+                      >
+                        <Smile size={18} />
+                      </button>
+
                       {currentUser?.photoURL || (currentUser as any)?.avatarUrl ? (
                         <img 
                           src={currentUser.photoURL || (currentUser as any)?.avatarUrl} 
                           alt={currentUser.name || "User"} 
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 mt-1 shadow-xs"
+                          className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-xs hidden sm:block"
                           onError={handleImageError}
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-900 font-bold text-xs flex items-center justify-center shrink-0 mt-1">
+                        <div className="w-7 h-7 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900 font-bold text-xs items-center justify-center shrink-0 hidden sm:flex">
                           {(currentUser?.name || "U").charAt(0).toUpperCase()}
                         </div>
                       )}
+
                       <textarea
                         ref={commentTextareaRef}
                         value={commentText}
                         onChange={handleCommentTextareaChange}
-                        placeholder="Discuss this requisition, leave feedback, or use @name to tag a team member..."
-                        rows={2}
-                        className="flex-1 px-3 py-2 text-xs bg-transparent border-0 focus:outline-none resize-none text-slate-800 dark:text-slate-100 placeholder-slate-450 focus:ring-0 min-h-[42px]"
+                        placeholder="Type a message or use @name to tag..."
+                        rows={1}
+                        className="flex-1 px-2.5 py-1.5 text-xs bg-transparent border-0 focus:outline-none resize-none text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-0 max-h-24 min-h-[36px]"
                         onKeyDown={(e) => {
                           if (e.key === "Escape" && mentionSearch !== null) {
                             e.preventDefault();
@@ -4676,19 +4952,24 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           }
                         }}
                       />
+
                       <button
                         type="button"
                         onClick={() => handleAddComment()}
                         disabled={isSubmittingComment || !commentText.trim()}
-                        className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-200 dark:disabled:bg-indigo-950 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 shadow-sm hover:shadow cursor-pointer"
+                        className="w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:opacity-50 text-white rounded-full transition-all shrink-0 flex items-center justify-center shadow-md hover:shadow-lg active:scale-95 cursor-pointer"
+                        title="Send Message"
                       >
                         {isSubmittingComment ? (
-                          <Loader2 size={13} className="animate-spin" />
+                          <Loader2 size={15} className="animate-spin" />
                         ) : (
-                          <Send size={13} />
+                          <Send size={15} className="ml-0.5" />
                         )}
-                        <span>Send</span>
                       </button>
+                    </div>
+                    <div className="flex items-center justify-between px-2 text-[9px] text-slate-400">
+                      <span>Press <kbd className="px-1 py-0.2 bg-slate-100 dark:bg-slate-800 border rounded font-mono">Enter</kbd> to send</span>
+                      <span><kbd className="px-1 py-0.2 bg-slate-100 dark:bg-slate-800 border rounded font-mono">Shift + Enter</kbd> for line break</span>
                     </div>
                   </div>
                 </div>

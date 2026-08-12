@@ -195,7 +195,7 @@ export function resolveSenderName(
   userObj: { id?: string; email?: string; name?: string; role?: string } | null | undefined,
   usersList: any[] = []
 ): string {
-  if (!userObj) return "Church Officer";
+  if (!userObj) return "";
 
   const isGeneric = (n?: string) => {
     if (!n) return true;
@@ -205,42 +205,48 @@ export function resolveSenderName(
       trimmed === "member" ||
       trimmed === "system user" ||
       trimmed === "church officer" ||
+      trimmed === "church member" ||
       trimmed === "anonymous" ||
       trimmed === "user" ||
-      trimmed.includes("@")
+      trimmed === "unknown user"
     );
   };
 
-  // 1. Check matching user record in database users array
+  // 1. Check matching user record in database users array by ID or Email first
   const matched = Array.isArray(usersList) ? usersList.find(u => 
     (u.id && userObj.id && u.id === userObj.id) ||
     (u.email && userObj.email && u.email.toLowerCase() === userObj.email.toLowerCase())
   ) : null;
 
   const matchedName = matched?.name?.trim();
-  if (matchedName && !isGeneric(matchedName)) {
+  if (matchedName && !isGeneric(matchedName) && !matchedName.includes("@")) {
     return matchedName;
   }
 
-  // 2. Check userObj.name
-  const currentName = userObj.name?.trim();
-  if (currentName && !isGeneric(currentName)) {
-    return currentName;
+  // 2. Check direct userObj.name
+  const directName = userObj.name?.trim();
+  if (directName && !isGeneric(directName) && !directName.includes("@")) {
+    return directName;
   }
 
-  // 3. Fallback to formatting email address prefix
-  const email = userObj.email || matched?.email;
-  if (email && typeof email === "string" && email.includes("@")) {
-    const emailPrefix = email.split('@')[0];
+  // 3. Fallback to formatting email address prefix into a clean name
+  const rawEmail = userObj.email || matched?.email || (directName && directName.includes("@") ? directName : undefined) || (matchedName && matchedName.includes("@") ? matchedName : undefined);
+  if (rawEmail && typeof rawEmail === "string" && rawEmail.includes("@")) {
+    const emailPrefix = rawEmail.split('@')[0];
     if (emailPrefix) {
       const parts = emailPrefix.split(/[._-]/).filter(Boolean);
       if (parts.length > 0) {
         return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
       }
+      return emailPrefix;
     }
   }
 
-  return "Church Officer";
+  // 4. Return whatever name exists on directName or matchedName without applying any generic fallback string
+  if (directName) return directName;
+  if (matchedName) return matchedName;
+
+  return userObj.email || userObj.id || "";
 }
 
 export function formatDate(dateString: string) {

@@ -203,6 +203,10 @@ export function resolveSenderName(
     return (
       !trimmed ||
       trimmed === "member" ||
+      trimmed === "church group" ||
+      trimmed === "church group代表 (general rep)" ||
+      trimmed === "church group representative" ||
+      trimmed === "church group rep" ||
       trimmed === "system user" ||
       trimmed === "church officer" ||
       trimmed === "church member" ||
@@ -212,7 +216,7 @@ export function resolveSenderName(
     );
   };
 
-  // 1. Check matching user record in database users array by ID or Email first
+  // Tier 1: Look up in active User Directory (by ID or Email)
   const matched = Array.isArray(usersList) ? usersList.find(u => 
     (u.id && userObj.id && u.id === userObj.id) ||
     (u.email && userObj.email && u.email.toLowerCase() === userObj.email.toLowerCase())
@@ -223,13 +227,13 @@ export function resolveSenderName(
     return matchedName;
   }
 
-  // 2. Check direct userObj.name
+  // Tier 2: Check direct userObj.name (if not a generic role/group fallback string)
   const directName = userObj.name?.trim();
   if (directName && !isGeneric(directName) && !directName.includes("@")) {
     return directName;
   }
 
-  // 3. Fallback to formatting email address prefix into a clean name
+  // Tier 3: Parse clean human name from Email prefix (e.g. "alex.gichau@pcea.org" -> "Alex Gichau")
   const rawEmail = userObj.email || matched?.email || (directName && directName.includes("@") ? directName : undefined) || (matchedName && matchedName.includes("@") ? matchedName : undefined);
   if (rawEmail && typeof rawEmail === "string" && rawEmail.includes("@")) {
     const emailPrefix = rawEmail.split('@')[0];
@@ -242,11 +246,11 @@ export function resolveSenderName(
     }
   }
 
-  // 4. Return whatever name exists on directName or matchedName without applying any generic fallback string
-  if (directName) return directName;
-  if (matchedName) return matchedName;
+  // Tier 4: Return specific name if present, else raw email or user ID (never "Church Group" or "Member")
+  if (directName && !isGeneric(directName)) return directName;
+  if (matchedName && !isGeneric(matchedName)) return matchedName;
 
-  return userObj.email || userObj.id || "";
+  return userObj.email || userObj.id || "User";
 }
 
 export function formatDate(dateString: string) {

@@ -74,7 +74,12 @@ import {
   Info,
   Bug,
   HeartHandshake,
-  MessageSquare
+  MessageSquare,
+  Target,
+  SlidersHorizontal,
+  Megaphone,
+  Wrench,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PerformanceTracker } from "./components/PerformanceTracker";
@@ -120,6 +125,38 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, index, removeToast, setCur
     }
   }, [progress, toast.id, removeToast]);
 
+  const title = useMemo(() => {
+    if ((toast as any).title) return (toast as any).title;
+    if (toast.type) {
+      switch (toast.type) {
+        case "OVERSHOOT":
+          return "Budget Overshoot";
+        case "LARGE_REQUEST":
+          return "Large Request Alert";
+        case "SECURITY_UPDATE":
+          return "Security Notice";
+        case "L2_APPROVED":
+          return "Requisition Approved";
+        case "FINANCE_DISBURSEMENT":
+          return "Disbursement Ready";
+        case "SYSTEM_INFO":
+          return "System Notice";
+        case "EXPIRY":
+          return "Expiration Alert";
+        default:
+          return String(toast.type)
+            .toLowerCase()
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, l => l.toUpperCase());
+      }
+    }
+    const msgLower = toast.message?.toLowerCase() || "";
+    if (msgLower.includes("error") || msgLower.includes("failed")) return "Action Failed";
+    if (msgLower.includes("success") || msgLower.includes("approved") || msgLower.includes("saved") || msgLower.includes("created")) return "Action Successful";
+    if (msgLower.includes("warning") || msgLower.includes("exceed")) return "System Warning";
+    return "Notification";
+  }, [toast]);
+
   const styleConfig = useMemo(() => {
     const isError = toast.severity === "HIGH" || toast.type === "SECURITY_UPDATE" || toast.message?.toLowerCase().includes("error") || toast.message?.toLowerCase().includes("failed");
     const isSuccess = toast.message?.toLowerCase().includes("success") || toast.message?.toLowerCase().includes("approved") || toast.message?.toLowerCase().includes("updated") || toast.message?.toLowerCase().includes("saved") || toast.message?.toLowerCase().includes("created");
@@ -127,133 +164,105 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, index, removeToast, setCur
 
     if (isError) {
       return {
-        accentBorder: "bg-rose-500",
+        ambientGlow: "bg-rose-400 dark:bg-rose-600",
         progressBar: "bg-rose-500",
-        badgeBg: darkMode ? "bg-rose-500/15 text-rose-300 border-rose-500/30" : "bg-rose-50 text-rose-700 border-rose-200",
-        iconBg: darkMode ? "bg-rose-500/20 text-rose-400 border-rose-500/30" : "bg-rose-100 text-rose-600 border-rose-200",
-        icon: <AlertTriangle size={16} strokeWidth={2.2} />,
-        label: toast.type ? toast.type.replace(/_/g, " ") : "ALERT",
+        icon: <Megaphone size={18} className="text-rose-500 stroke-[2.2]" />,
         role: "alert",
         ariaLive: "assertive" as const
       };
     } else if (isSuccess) {
       return {
-        accentBorder: "bg-emerald-500",
+        ambientGlow: "bg-emerald-400 dark:bg-emerald-600",
         progressBar: "bg-emerald-500",
-        badgeBg: darkMode ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-emerald-50 text-emerald-800 border-emerald-200",
-        iconBg: darkMode ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" : "bg-emerald-100 text-emerald-600 border-emerald-200",
-        icon: <Check size={16} strokeWidth={2.2} />,
-        label: toast.type ? toast.type.replace(/_/g, " ") : "SUCCESS",
+        icon: <Target size={18} className="text-emerald-500 stroke-[2.2]" />,
         role: "status",
         ariaLive: "polite" as const
       };
     } else if (isWarning) {
       return {
-        accentBorder: "bg-amber-500",
+        ambientGlow: "bg-amber-400 dark:bg-amber-600",
         progressBar: "bg-amber-500",
-        badgeBg: darkMode ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-amber-50 text-amber-800 border-amber-200",
-        iconBg: darkMode ? "bg-amber-500/20 text-amber-400 border-amber-500/30" : "bg-amber-100 text-amber-600 border-amber-200",
-        icon: <AlertCircle size={16} strokeWidth={2.2} />,
-        label: toast.type ? toast.type.replace(/_/g, " ") : "WARNING",
+        icon: <SlidersHorizontal size={18} className="text-amber-500 stroke-[2.2]" />,
         role: "status",
         ariaLive: "polite" as const
       };
     } else {
       return {
-        accentBorder: "bg-sky-500",
+        ambientGlow: "bg-cyan-400 dark:bg-cyan-600",
         progressBar: "bg-sky-500",
-        badgeBg: darkMode ? "bg-sky-500/15 text-sky-300 border-sky-500/30" : "bg-sky-50 text-sky-800 border-sky-200",
-        iconBg: darkMode ? "bg-sky-500/20 text-sky-400 border-sky-500/30" : "bg-sky-100 text-sky-600 border-sky-200",
-        icon: <Info size={16} strokeWidth={2.2} />,
-        label: toast.type ? toast.type.replace(/_/g, " ") : "INFO",
+        icon: <Wrench size={18} className="text-cyan-500 stroke-[2.2]" />,
         role: "status",
         ariaLive: "polite" as const
       };
     }
-  }, [toast, darkMode]);
+  }, [toast]);
 
   return (
     <motion.div
       layout
       role={styleConfig.role}
       aria-live={styleConfig.ariaLive}
-      initial={{ opacity: 0, x: 60, scale: 0.92, y: 10 }}
+      initial={{ opacity: 0, y: 16, scale: 0.95 }}
       animate={{
         opacity: 1,
-        x: 0,
-        scale: 1,
         y: 0,
-        transition: { type: "spring", stiffness: 420, damping: 28, delay: index * 0.04 }
+        scale: 1,
+        transition: { type: "spring", stiffness: 380, damping: 26, delay: index * 0.04 }
       }}
       exit={{
         opacity: 0,
-        x: 40,
-        scale: 0.92,
+        y: -10,
+        scale: 0.95,
         filter: "blur(4px)",
-        transition: { duration: 0.22 }
+        transition: { duration: 0.2 }
       }}
       className={cn(
-        "pointer-events-auto relative overflow-hidden rounded-2xl max-w-[360px] w-full font-sans border shadow-2xl backdrop-blur-xl transition-all duration-200 group",
+        "pointer-events-auto relative overflow-hidden rounded-2xl w-full max-w-[380px] font-sans border shadow-xl backdrop-blur-md transition-all duration-200 group",
         darkMode
-          ? "bg-slate-900/95 border-slate-800/90 text-slate-100 shadow-slate-950/60"
-          : "bg-white/95 border-slate-200/80 text-slate-900 shadow-slate-300/40"
+          ? "bg-slate-900/90 border-slate-800/80 text-slate-100 shadow-slate-950/60"
+          : "bg-white/95 border-slate-200/60 text-slate-900 shadow-slate-200/60"
       )}
       style={{ zIndex: 100 - index }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Left Vertical Accent Line */}
-      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5 transition-colors", styleConfig.accentBorder)} />
+      {/* Soft ambient gradient glow wash on the left */}
+      <div
+        className={cn(
+          "absolute -left-6 -top-6 w-32 h-32 rounded-full blur-2xl pointer-events-none opacity-60 dark:opacity-30 transition-opacity",
+          styleConfig.ambientGlow
+        )}
+      />
 
-      <div className="flex items-start p-3.5 pl-4 pr-10 gap-3">
-        {/* Status Icon */}
-        <div className={cn("shrink-0 p-2 rounded-xl border flex items-center justify-center mt-0.5 transition-transform group-hover:scale-105", styleConfig.iconBg)}>
+      <div className="relative z-10 flex items-start p-3.5 sm:p-4 gap-3.5 pr-9">
+        {/* Clean White Squarish Icon Tile */}
+        <div className="shrink-0 w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 shadow-xs flex items-center justify-center transition-transform group-hover:scale-105 mt-0.5">
           {styleConfig.icon}
         </div>
 
-        {/* Text Content & Type Badge */}
+        {/* Content: Title & Description */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={cn(
-              "text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md border",
-              styleConfig.badgeBg
-            )}>
-              {styleConfig.label}
-            </span>
-            <span className={cn(
-              "text-[10px] font-medium flex items-center gap-1",
-              darkMode ? "text-slate-500" : "text-slate-400"
-            )}>
-              <Clock size={10} /> Just now
-            </span>
-          </div>
-
-          <p className={cn(
-            "text-[12.5px] font-medium leading-snug break-words",
-            darkMode ? "text-slate-200" : "text-slate-700"
-          )}>
+          <h5 className="text-[13.5px] font-semibold text-slate-900 dark:text-slate-100 leading-tight tracking-tight">
+            {title}
+          </h5>
+          <p className="text-slate-500 dark:text-slate-400 text-xs font-normal leading-snug mt-1 break-words">
             {toast.message}
           </p>
         </div>
 
-        {/* Dismiss Close Button */}
+        {/* Close Button */}
         <button
           onClick={() => removeToast(toast.id!)}
           title="Dismiss notification"
           aria-label="Dismiss notification"
-          className={cn(
-            "absolute top-3 right-2.5 p-1.5 rounded-lg transition-all cursor-pointer opacity-70 hover:opacity-100",
-            darkMode
-              ? "text-slate-400 hover:text-white hover:bg-slate-800"
-              : "text-slate-400 hover:text-slate-900 hover:bg-slate-100"
-          )}
+          className="absolute top-3.5 right-3 p-1 rounded-lg text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-slate-300 transition-colors cursor-pointer"
         >
-          <X size={15} strokeWidth={2.2} />
+          <X size={16} strokeWidth={1.8} />
         </button>
       </div>
 
-      {/* Visible Progress Bar */}
-      <div className={cn("w-full h-1 overflow-hidden", darkMode ? "bg-slate-800/80" : "bg-slate-100")}>
+      {/* Discrete subtle progress line at bottom */}
+      <div className="w-full h-0.5 bg-slate-100/60 dark:bg-slate-800/80 overflow-hidden relative z-10">
         <div
           className={cn("h-full transition-all duration-75 ease-linear", styleConfig.progressBar)}
           style={{ width: `${progress}%` }}
@@ -262,7 +271,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast, index, removeToast, setCur
 
       {/* Pause Indicator on Hover */}
       {isHovered && (
-        <div className="absolute bottom-1.5 right-3 text-[9px] font-bold text-slate-400 bg-slate-800/80 dark:bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-700/50 pointer-events-none animate-fade-in">
+        <div className="absolute bottom-1.5 right-3 text-[9px] font-bold text-slate-400 bg-slate-800/80 dark:bg-slate-900/90 px-1.5 py-0.5 rounded border border-slate-700/50 pointer-events-none animate-fade-in z-20">
           Paused
         </div>
       )}

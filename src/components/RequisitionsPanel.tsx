@@ -3306,7 +3306,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     if (!trimmed) return;
 
     // Resolve author name cleanly and consistently from user profile
-    const calculatedAuthorName = currentUser?.name?.trim() || resolveSenderName(currentUser, users);
+    const calculatedAuthorName = resolveSenderName(currentUser, users);
     const authorPhoto = currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
 
     const newComment = {

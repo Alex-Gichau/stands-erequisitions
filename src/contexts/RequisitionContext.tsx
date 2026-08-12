@@ -33,7 +33,7 @@ import {
 } from "../types";
 import { getProjectRequisitions } from "../utils/budgetUtils";
 import { databaseService } from "../lib/databaseService";
-import { uploadAttachmentsToLocalServer, unwrapAttachmentTarget, sendSlackNotification } from "../lib/utils";
+import { uploadAttachmentsToLocalServer, unwrapAttachmentTarget, sendSlackNotification, resolveSenderName } from "../lib/utils";
 import { triggerAutosendBackupEmail, AUTOSEND_DEFAULT_EMAIL, getLocalAutosendConfig } from "../services/autosendBackupService";
 import { initializeApp as initFirebaseApp } from "firebase/app";
 import { 
@@ -3839,7 +3839,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           description: req.description || "",
           payableTo: req.payableTo || "N/A",
           submittedAt: req.submittedAt || new Date().toISOString(),
-          approverName: approverName || currentUser?.name || currentUser?.email || "Reviewing Official",
+          approverName: approverName || resolveSenderName(currentUser, users),
           approvalReason: details || ""
         })
       });

@@ -351,6 +351,137 @@ function convertBase64ToLocalFile(attachmentStr: string, customUploadsDir?: stri
   }
 }
 
+function sanitizeAttachmentObject(att: any, targetDir: string): any {
+  if (!att) return null;
+
+  let name = "Attachment";
+  let url = "";
+  let filePath = "";
+  let dataUri = "";
+
+  if (typeof att === "string") {
+    const trimmed = att.trim();
+    if (!trimmed) return null;
+
+    let parsedName = "";
+    let rawContent = trimmed;
+
+    if (trimmed.includes("::")) {
+      const separatorIndex = trimmed.indexOf("::");
+      parsedName = trimmed.substring(0, separatorIndex).trim();
+      rawContent = trimmed.substring(separatorIndex + 2).trim();
+    }
+
+    // Process and convert if base64 Data URI
+    const isBase64 = rawContent.startsWith("data:") || /^[A-Za-z0-9+/=\r\n\s]+$/.test(rawContent.substring(0, 100));
+
+    if (isBase64) {
+      // It's a base64 or raw base64. Let's write it to disk using the standard convertBase64ToLocalFile
+      const fileResult = convertBase64ToLocalFile(att, targetDir);
+      
+      let resultUrl = fileResult;
+      let resultName = parsedName || "Attachment";
+
+      if (fileResult.includes("::")) {
+        const parts = fileResult.split("::");
+        resultName = parts[0];
+        resultUrl = parts[1];
+      }
+
+      name = resultName;
+      url = resultUrl;
+      filePath = path.join(targetDir, path.basename(resultUrl));
+      
+      // Ensure we have a standard compliant data URI
+      let standardDataUri = rawContent;
+      if (!standardDataUri.startsWith("data:")) {
+        const rawHead = standardDataUri.substring(0, 30);
+        if (rawHead.startsWith("JVBERi")) {
+          standardDataUri = `data:application/pdf;base64,${standardDataUri}`;
+        } else if (rawHead.startsWith("iVBOR")) {
+          standardDataUri = `data:image/png;base64,${standardDataUri}`;
+        } else if (rawHead.startsWith("/9j/")) {
+          standardDataUri = `data:image/jpeg;base64,${standardDataUri}`;
+        } else if (rawHead.startsWith("R0lGOD")) {
+          standardDataUri = `data:image/gif;base64,${standardDataUri}`;
+        } else if (rawHead.startsWith("UklGR")) {
+          standardDataUri = `data:image/webp;base64,${standardDataUri}`;
+        } else if (rawHead.startsWith("UEsDB")) {
+          standardDataUri = `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${standardDataUri}`;
+        } else {
+          standardDataUri = `data:application/octet-stream;base64,${standardDataUri}`;
+        }
+      }
+      dataUri = standardDataUri;
+    } else {
+      // It's a plain path or relative URL
+      url = rawContent;
+      name = parsedName || path.basename(rawContent) || "Attachment";
+      filePath = path.join(targetDir, path.basename(rawContent));
+
+      // Try reading file content from disk to populate dataUri
+      if (fs.existsSync(filePath)) {
+        try {
+          const fileBuffer = fs.readFileSync(filePath);
+          const base64 = fileBuffer.toString("base64");
+          const ext = path.extname(filePath).toLowerCase();
+          let mimeType = "application/octet-stream";
+          if (ext === ".pdf") mimeType = "application/pdf";
+          else if (ext === ".png") mimeType = "image/png";
+          else if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
+          else if (ext === ".gif") mimeType = "image/gif";
+          else if (ext === ".webp") mimeType = "image/webp";
+          else if (ext === ".xlsx") mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+          else if (ext === ".xls") mimeType = "application/vnd.ms-excel";
+          else if (ext === ".csv") mimeType = "text/csv";
+          else if (ext === ".docx") mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+          dataUri = `data:${mimeType};base64,${base64}`;
+        } catch (err) {
+          console.error("[sanitizeAttachmentObject] Error reading file for dataUri:", err);
+        }
+      }
+    }
+  } else if (typeof att === "object" && att !== null) {
+    name = att.name || att.fileName || att.title || "Attachment";
+    url = att.url || att.dataUrl || att.link || att.path || "";
+    
+    const baseName = url ? path.basename(url) : "";
+    filePath = baseName ? path.join(targetDir, baseName) : (att.filePath || "");
+    dataUri = att.dataUri || att.base64 || "";
+
+    // If dataUri is missing but the local file exists, populate it!
+    if (!dataUri && filePath && fs.existsSync(filePath)) {
+      try {
+        const fileBuffer = fs.readFileSync(filePath);
+        const base64 = fileBuffer.toString("base64");
+        const ext = path.extname(filePath).toLowerCase();
+        let mimeType = "application/octet-stream";
+        if (ext === ".pdf") mimeType = "application/pdf";
+        else if (ext === ".png") mimeType = "image/png";
+        else if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
+        else if (ext === ".gif") mimeType = "image/gif";
+        else if (ext === ".webp") mimeType = "image/webp";
+        else if (ext === ".xlsx") mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        else if (ext === ".xls") mimeType = "application/vnd.ms-excel";
+        else if (ext === ".csv") mimeType = "text/csv";
+        else if (ext === ".docx") mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        dataUri = `data:${mimeType};base64,${base64}`;
+      } catch (err) {
+        console.error("[sanitizeAttachmentObject] Error reading object file for dataUri:", err);
+      }
+    }
+  }
+
+  return {
+    name,
+    url,
+    filePath,
+    dataUri
+  };
+}
+
 function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): any {
   if (!item || typeof item !== "object") return item;
 
@@ -358,23 +489,38 @@ function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): a
   const targetDir = customUploadsDir || getUploadsDir();
   const newItem = { ...item };
 
+  const isDifferent = (oldVal: any, newVal: any) => {
+    if (!oldVal || !newVal) return true;
+    if (typeof oldVal !== typeof newVal) return true;
+    if (typeof oldVal === "string") {
+      return oldVal !== newVal.url && oldVal !== `${newVal.name}::${newVal.url}`;
+    }
+    return (
+      oldVal.name !== newVal.name ||
+      oldVal.url !== newVal.url ||
+      oldVal.filePath !== newVal.filePath ||
+      oldVal.dataUri !== newVal.dataUri
+    );
+  };
+
   let rawAtts = newItem.attachments || newItem.attachment;
   if (Array.isArray(rawAtts)) {
     const cleanAtts = rawAtts.map((att: any) => {
-      if (typeof att === "string") {
-        const cleaned = convertBase64ToLocalFile(att, targetDir);
-        if (cleaned !== att) modified = true;
-        return cleaned;
+      const sanitizedObj = sanitizeAttachmentObject(att, targetDir);
+      if (sanitizedObj && isDifferent(att, sanitizedObj)) {
+        modified = true;
       }
-      return att;
-    });
-    if (modified) {
+      return sanitizedObj;
+    }).filter(Boolean);
+
+    if (modified || cleanAtts.length !== rawAtts.length) {
       newItem.attachments = cleanAtts;
+      modified = true;
     }
-  } else if (typeof rawAtts === "string") {
-    const cleaned = convertBase64ToLocalFile(rawAtts, targetDir);
-    if (cleaned !== rawAtts) {
-      newItem.attachments = [cleaned];
+  } else if (typeof rawAtts === "string" && rawAtts.trim()) {
+    const sanitizedObj = sanitizeAttachmentObject(rawAtts, targetDir);
+    if (sanitizedObj) {
+      newItem.attachments = [sanitizedObj];
       modified = true;
     }
   }
@@ -383,29 +529,26 @@ function sanitizeRequisitionAttachments(item: any, customUploadsDir?: string): a
   if (Array.isArray(rawReceipts)) {
     let receiptsModified = false;
     const cleanReceipts = rawReceipts.map((rec: any) => {
-      if (typeof rec === "string") {
-        const cleaned = convertBase64ToLocalFile(rec, targetDir);
-        if (cleaned !== rec) {
-          receiptsModified = true;
-          modified = true;
-        }
-        return cleaned;
+      const sanitizedObj = sanitizeAttachmentObject(rec, targetDir);
+      if (sanitizedObj && isDifferent(rec, sanitizedObj)) {
+        receiptsModified = true;
+        modified = true;
       }
-      return rec;
-    });
-    if (receiptsModified) {
+      return sanitizedObj;
+    }).filter(Boolean);
+
+    if (receiptsModified || cleanReceipts.length !== rawReceipts.length) {
       newItem.receipts = cleanReceipts;
     }
-  } else if (typeof rawReceipts === "string") {
-    const cleaned = convertBase64ToLocalFile(rawReceipts, targetDir);
-    if (cleaned !== rawReceipts) {
-      newItem.receipts = [cleaned];
+  } else if (typeof rawReceipts === "string" && rawReceipts.trim()) {
+    const sanitizedObj = sanitizeAttachmentObject(rawReceipts, targetDir);
+    if (sanitizedObj) {
+      newItem.receipts = [sanitizedObj];
       modified = true;
     }
   }
 
   if (modified) {
-    // Immediately persist sanitized paths to disk/DB to prevent repeated redundant conversions during GET requests
     persistSanitizedRequisitionSync(newItem);
   }
 
@@ -1951,6 +2094,7 @@ async function startServer() {
       const ministryName = groupName || "General Ministry";
       const actualApprover = approverName || "Reviewing Official";
       const decisionNote = approvalReason || details || "";
+      const cleanCommentText = decisionNote ? String(decisionNote).replace(/^"+|"+$/g, '').trim() : "";
 
       let formattedSubmittedAt = "N/A";
       if (submittedAt) {
@@ -2122,6 +2266,41 @@ async function startServer() {
             </div>
           `;
           nextStepsText = `This requisition has been removed from active workflow queues. All subscribers receiving updates for this record have been notified.`;
+          break;
+
+        case "Comment Mention":
+          subject = `[Comment Mention] ${actualApprover} mentioned you on: ${reqName}`;
+          headerTitle = "You Were Mentioned in a Comment";
+          mainMessage = `<strong>${actualApprover}</strong> mentioned you in a comment on requisition "<strong>${reqName}</strong>".`;
+          decisionBoxHtml = `
+            <div style="margin-top: 16px; padding: 16px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">
+                Comment Sender: <strong>${actualApprover}</strong>
+              </p>
+              <p style="margin: 0; font-size: 14px; color: #1e3a8a; line-height: 1.5; font-style: italic;">
+                "${cleanCommentText}"
+              </p>
+            </div>
+          `;
+          nextStepsText = `Click the button below to view the requisition and respond to the comment.`;
+          break;
+
+        case "New Comment Thread Activity":
+        case "COMMENT":
+          subject = `[New Comment] ${actualApprover} commented on: ${reqName}`;
+          headerTitle = "New Comment Posted";
+          mainMessage = `<strong>${actualApprover}</strong> posted a new comment on requisition "<strong>${reqName}</strong>".`;
+          decisionBoxHtml = `
+            <div style="margin-top: 16px; padding: 16px; background-color: #f8fafc; border-left: 4px solid #4f46e5; border-radius: 6px;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #3730a3; text-transform: uppercase; letter-spacing: 0.5px;">
+                Comment Sender: <strong>${actualApprover}</strong>
+              </p>
+              <p style="margin: 0; font-size: 14px; color: #1e1b4b; line-height: 1.5; font-style: italic;">
+                "${cleanCommentText}"
+              </p>
+            </div>
+          `;
+          nextStepsText = `Click the button below to view the requisition thread and join the discussion.`;
           break;
 
         default:

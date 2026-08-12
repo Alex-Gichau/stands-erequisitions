@@ -191,6 +191,58 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+export function resolveSenderName(
+  userObj: { id?: string; email?: string; name?: string; role?: string } | null | undefined,
+  usersList: any[] = []
+): string {
+  if (!userObj) return "Church Officer";
+
+  const isGeneric = (n?: string) => {
+    if (!n) return true;
+    const trimmed = n.trim().toLowerCase();
+    return (
+      !trimmed ||
+      trimmed === "member" ||
+      trimmed === "system user" ||
+      trimmed === "church officer" ||
+      trimmed === "anonymous" ||
+      trimmed === "user" ||
+      trimmed.includes("@")
+    );
+  };
+
+  // 1. Check matching user record in database users array
+  const matched = Array.isArray(usersList) ? usersList.find(u => 
+    (u.id && userObj.id && u.id === userObj.id) ||
+    (u.email && userObj.email && u.email.toLowerCase() === userObj.email.toLowerCase())
+  ) : null;
+
+  const matchedName = matched?.name?.trim();
+  if (matchedName && !isGeneric(matchedName)) {
+    return matchedName;
+  }
+
+  // 2. Check userObj.name
+  const currentName = userObj.name?.trim();
+  if (currentName && !isGeneric(currentName)) {
+    return currentName;
+  }
+
+  // 3. Fallback to formatting email address prefix
+  const email = userObj.email || matched?.email;
+  if (email && typeof email === "string" && email.includes("@")) {
+    const emailPrefix = email.split('@')[0];
+    if (emailPrefix) {
+      const parts = emailPrefix.split(/[._-]/).filter(Boolean);
+      if (parts.length > 0) {
+        return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ");
+      }
+    }
+  }
+
+  return "Church Officer";
+}
+
 export function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString("en-KE", {
     year: "numeric",

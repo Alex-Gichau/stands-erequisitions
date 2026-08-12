@@ -58,7 +58,7 @@ import {
 import { Info, HardDrive, Mail, UserPlus, MessageSquare, Send } from "lucide-react";
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
-import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError } from "../lib/utils";
+import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
 import * as XLSX from "xlsx";
@@ -3091,6 +3091,18 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [decisionNote, setDecisionNote] = useState("");
   const [approvalCode, setApprovalCode] = useState("");
   const [showDecisionForm, setShowDecisionForm] = useState<"APPROVE" | "REJECT" | "ESCALATE" | null>(null);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const [loading, setLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -3205,8 +3217,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     const trimmed = commentText.trim();
     if (!trimmed) return;
 
-    // Resolve author name cleanly
-    const calculatedAuthorName = currentUser?.name || (currentUser?.email ? currentUser.email.split('@')[0] : "Church Officer");
+    // Resolve author name cleanly and consistently
+    const calculatedAuthorName = resolveSenderName(currentUser, users);
 
     const newComment = {
       id: `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -4434,26 +4446,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                         const diffMs = Date.now() - new Date(comment.timestamp).getTime();
                         const canEdit = isAuthor && (diffMs / 60000 <= 15);
                         
-                        const commentUser = users.find(u => 
-                          (u.id && u.id === comment.authorId) || 
-                          (u.email && comment.authorEmail && u.email.toLowerCase() === comment.authorEmail.toLowerCase())
+                        const displayName = resolveSenderName(
+                          {
+                            id: comment.authorId,
+                            email: comment.authorEmail,
+                            name: comment.authorName,
+                            role: comment.authorRole
+                          },
+                          users
                         );
-
-                        let displayName = "";
-                        if (isAuthor && currentUser?.name) {
-                          displayName = currentUser.name;
-                        } else if (commentUser?.name) {
-                          displayName = commentUser.name;
-                        } else if (comment.authorName && comment.authorName !== "Member" && comment.authorName !== "System User") {
-                          displayName = comment.authorName;
-                        } else if (comment.authorEmail) {
-                          const emailPrefix = comment.authorEmail.split('@')[0];
-                          displayName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).replace(/[._-]/g, ' ');
-                        } else if (currentUser?.name) {
-                          displayName = currentUser.name;
-                        } else {
-                          displayName = "Church Officer";
-                        }
 
                         const initials = displayName ? displayName.charAt(0).toUpperCase() : "C";
 
@@ -4878,91 +4879,123 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           </div>
         </div>
 
-        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col md:flex-row gap-3 md:gap-4 justify-between items-center max-w-full overflow-hidden">
-          <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto justify-start overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-none shrink-0">
+        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end gap-3 w-full max-w-full">
+          {/* More Options Dropdown */}
+          <div ref={moreMenuRef} className="relative shrink-0">
             <button 
-              onClick={() => {
-                onDelete();
-                onClose();
-              }}
-              className="p-2 sm:p-2.5 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 hover:text-rose-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 md:border-0 shrink-0"
-              title="Delete Document"
+              onClick={() => setIsMoreOpen(!isMoreOpen)}
+              className="px-3.5 sm:px-5 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5"
+              title="More Options"
             >
-              <Trash2 size={16} />
+              <MoreVertical size={14} />
+              <span>Options</span>
+              <ChevronDown size={12} className={cn("transition-transform duration-200", isMoreOpen && "rotate-180")} />
             </button>
-            {onEdit && req.status !== RequisitionStatus.REJECTED && (
-              currentUser?.role === UserRole.ADMIN ||
-              currentUser?.role === UserRole.SUPER_ADMIN ||
-              (req.status === RequisitionStatus.DRAFT && req.requesterId === currentUser?.id)
-            ) && (
-              <button 
-                onClick={onEdit}
-                className="p-2 sm:p-2.5 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-slate-400 hover:text-amber-500 rounded-xl transition-all border border-slate-100 dark:border-slate-800 md:border-0 shrink-0"
-                title="Edit Requisition details"
-              >
-                <Pencil size={16} />
-              </button>
-            )}
-            {currentUser?.role === UserRole.ADMIN && (
-              <button 
-                onClick={handleToggleAuditFlag}
-                className={cn(
-                  "p-2 sm:p-2.5 rounded-xl transition-all border border-slate-100 dark:border-slate-800 md:border-0 flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider shrink-0",
-                  req.flaggedForAudit 
-                    ? "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-100" 
-                    : "bg-slate-50 dark:bg-slate-800/60 border-slate-100 dark:border-slate-800 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            {isMoreOpen && (
+              <div className="absolute bottom-full right-0 mb-2 w-56 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl shadow-xl z-[100] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                {/* Print Receipt */}
+                <button 
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    printRequisitionReceipt(req);
+                  }}
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                >
+                  <Printer size={15} className="text-slate-400" />
+                  <span>Print Receipt</span>
+                </button>
+
+                {/* Generate Receipt */}
+                <button 
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    onGenerateReceipt();
+                  }}
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                >
+                  <FileText size={15} className="text-slate-400" />
+                  <span>Generate Receipt</span>
+                </button>
+
+                {/* Copy Details */}
+                <button 
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    handleCopyDetails();
+                  }}
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                >
+                  <Copy size={15} className="text-slate-400" />
+                  <span>Copy Details</span>
+                </button>
+
+                {/* Share Link */}
+                <button 
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    handleCopyShareLink();
+                  }}
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                >
+                  <Share2 size={15} className="text-slate-400" />
+                  <span>Share Link</span>
+                </button>
+
+                {/* Audit Flag Toggle (Admins only) */}
+                {currentUser?.role === UserRole.ADMIN && (
+                  <button 
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      handleToggleAuditFlag();
+                    }}
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  >
+                    <Flag size={15} className={cn("text-slate-400", req.flaggedForAudit && "text-rose-500 fill-rose-500")} />
+                    <span>{req.flaggedForAudit ? "Remove Audit Flag" : "Flag for Audit"}</span>
+                  </button>
                 )}
-                title={req.flaggedForAudit ? "Remove Flag for Audit" : "Flag for Audit"}
-              >
-                <Flag size={16} className={req.flaggedForAudit ? "fill-rose-600" : ""} />
-                <span className="hidden sm:inline">{req.flaggedForAudit ? "Flagged" : "Audit"}</span>
-              </button>
+
+                {/* Edit details */}
+                {onEdit && req.status !== RequisitionStatus.REJECTED && (
+                  currentUser?.role === UserRole.ADMIN ||
+                  currentUser?.role === UserRole.SUPER_ADMIN ||
+                  (req.status === RequisitionStatus.DRAFT && req.requesterId === currentUser?.id)
+                ) && (
+                  <button 
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      onEdit();
+                    }}
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer"
+                  >
+                    <Pencil size={15} className="text-slate-400" />
+                    <span>Edit Details</span>
+                  </button>
+                )}
+
+                {/* Delete Document */}
+                <button 
+                  onClick={() => {
+                    setIsMoreOpen(false);
+                    onDelete();
+                    onClose();
+                  }}
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer"
+                >
+                  <Trash2 size={15} />
+                  <span>Delete Document</span>
+                </button>
+              </div>
             )}
-            <button 
-              onClick={onGenerateReceipt}
-              className="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary rounded-xl transition-all border border-slate-100 dark:border-slate-800 md:border-0 shrink-0" 
-              title="Generate Receipt Template"
-            >
-              <FileText size={16} />
-            </button>
-            <button 
-              onClick={() => printRequisitionReceipt(req)}
-              className="p-2 sm:p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-primary rounded-xl transition-all border border-slate-100 dark:border-slate-800 md:border-0 shrink-0" 
-              title="Print Formal Receipt"
-            >
-              <Printer size={16} />
-            </button>
-            <button 
-              onClick={handleCopyDetails}
-              className="p-2 sm:p-2.5 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-primary rounded-xl transition-all border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider shrink-0" 
-              title="Copy Requisition Details"
-            >
-              <Copy size={16} />
-              <span className="hidden sm:inline">Copy Details</span>
-            </button>
-            <button 
-              onClick={handleCopyShareLink}
-              className="p-2 sm:p-2.5 bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100/80 text-indigo-600 dark:text-indigo-400 hover:text-primary rounded-xl transition-all border border-indigo-200/60 dark:border-indigo-900/40 flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider shrink-0" 
-              title="Copy Direct Shareable Link"
-            >
-              <Share2 size={16} />
-              <span className="hidden sm:inline">Share Link</span>
-            </button>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto shrink-0 justify-end flex-wrap sm:flex-nowrap">
-             <button 
-              onClick={onClose}
-              className="flex-1 md:flex-none px-3.5 md:px-8 py-2.5 bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-[9px] md:text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer uppercase tracking-widest"
-            >
-              EXIT
-            </button>
-            
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end flex-wrap sm:flex-nowrap">
             {!showDecisionForm && canAct() && (
-              <div className="flex flex-1 md:flex-none items-center gap-1.5 md:gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2">
                 {req.status !== RequisitionStatus.DISBURSED && (
                   <button 
                     onClick={() => setShowDecisionForm("REJECT")}
-                    className="flex-1 md:flex-none px-2.5 sm:px-6 py-2.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50 rounded-xl text-[9px] md:text-xs font-bold hover:bg-rose-100 transition-all cursor-pointer uppercase tracking-widest"
+                    className="px-4 sm:px-6 py-2.5 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/50 rounded-xl text-[10px] md:text-xs font-black hover:bg-rose-100 transition-all cursor-pointer uppercase tracking-widest"
                   >
                     REJECT
                   </button>
@@ -4971,14 +5004,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   <>
                     <button 
                       onClick={() => setShowDecisionForm("ESCALATE")}
-                      className="flex-1 md:flex-none px-2.5 sm:px-6 py-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50 rounded-xl text-[9px] md:text-xs font-bold hover:bg-amber-100 transition-all cursor-pointer uppercase tracking-widest"
+                      className="px-4 sm:px-6 py-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/50 rounded-xl text-[10px] md:text-xs font-black hover:bg-amber-100 transition-all cursor-pointer uppercase tracking-widest"
                     >
                       ESCALATE
                     </button>
                     <button 
                       disabled={loading}
                       onClick={() => handleDecision("APPROVE")}
-                      className="flex-1 md:flex-none px-2.5 sm:px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-[9px] md:text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
+                      className="px-4 sm:px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] md:text-xs font-black hover:bg-emerald-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
                     >
                       APPROVE
                     </button>
@@ -4988,7 +5021,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                    <button 
                      disabled={loading}
                      onClick={() => handleDecision("APPROVE")}
-                     className="flex-1 md:flex-none px-2.5 sm:px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-[9px] md:text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
+                     className="px-4 sm:px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] md:text-xs font-black hover:bg-emerald-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50"
                    >
                      APPROVE L2
                    </button>
@@ -5003,7 +5036,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                    setIsAmountVerified(false);
                    setShowAssignConfirm(true);
                  }}
-                 className="flex-1 md:flex-none px-4 sm:px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[9px] md:text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-indigo-100 dark:shadow-none"
+                 className="px-4 sm:px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] md:text-xs font-black hover:bg-indigo-700 transition-all cursor-pointer uppercase tracking-widest shadow-lg shadow-indigo-100 dark:shadow-none"
                >
                 ASSIGN TO BUDGET
               </button>

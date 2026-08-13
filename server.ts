@@ -4826,7 +4826,7 @@ async function startServer() {
   const backupEmailConfigPath = path.join(getBaseDataDir(), "backup_email_config.json");
 
   const isBackupDueServer = (config: any) => {
-    if (!config || config.enabled === false) return false;
+    if (!config || config.enabled === false || config.features?.sendEmail === false) return false;
     const now = new Date();
     const lastSent = config.lastSentTimestamp ? new Date(config.lastSentTimestamp) : null;
     const freq = config.frequency || "WEEKLY";
@@ -5024,7 +5024,10 @@ async function startServer() {
   const executeAutomatedBackupDispatch = async (triggerType = "SCHEDULED") => {
     try {
       const config = getBackupEmailConfig();
-      if (!config.enabled) return;
+      if (!config.enabled || config.features?.sendEmail === false) {
+        console.log("[Autosend Backup Service] Automated backup emails are disabled in configuration. Skipping execution.");
+        return;
+      }
 
       const features = config.features || {
         sendEmail: true,
@@ -5268,6 +5271,21 @@ async function startServer() {
   app.post("/api/backup-autosend-email", async (req, res) => {
     try {
       const config = getBackupEmailConfig();
+      const isForced = req.body?.force === true;
+
+      // STRICT CHECK: If backup emails or master backup is disabled in settings, do not send email
+      if (!config.enabled || config.features?.sendEmail === false) {
+        if (!isForced) {
+          console.log("[Autosend Backup Route] Email dispatch blocked — Backup emails are currently OFF in settings.");
+          return res.json({
+            success: false,
+            disabled: true,
+            status: "DISABLED_IN_CONFIG",
+            message: "Backup email dispatches are currently turned OFF in Backup Configuration."
+          });
+        }
+      }
+
       const targetEmail = (req.body?.email || config.targetEmail || "geeshau.standsmedia@gmail.com").trim();
       
       const requisitions = req.body?.requisitions || readJsonCollection("requisitions") || [];

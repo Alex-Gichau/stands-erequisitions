@@ -209,7 +209,18 @@ export const fetchAutosendStatus = async (): Promise<{ config: AutosendConfig; l
 
 export const updateAutosendConfigOnServer = async (configUpdate: Partial<AutosendConfig>): Promise<AutosendConfig> => {
   const current = getLocalAutosendConfig();
-  const newConfig = { ...current, ...configUpdate };
+  
+  // If master enabled is toggled OFF, automatically disable sendEmail feature
+  let features = configUpdate.features || current.features;
+  if (configUpdate.enabled === false) {
+    features = { ...features, sendEmail: false };
+  }
+
+  const newConfig = { 
+    ...current, 
+    ...configUpdate,
+    features
+  };
   saveLocalAutosendConfig(newConfig);
 
   try {
@@ -234,7 +245,8 @@ export const updateAutosendConfigOnServer = async (configUpdate: Partial<Autosen
 export const triggerAutosendBackupEmail = async (
   email?: string,
   contextData?: any,
-  triggerType: "MANUAL" | "SCHEDULED" | "AUTO_DRIVE" = "MANUAL"
+  triggerType: "MANUAL" | "SCHEDULED" | "AUTO_DRIVE" = "MANUAL",
+  force: boolean = false
 ): Promise<{ success: boolean; message: string; log?: BackupEmailLog }> => {
   const targetEmail = (email || AUTOSEND_DEFAULT_EMAIL).trim();
 
@@ -256,11 +268,19 @@ export const triggerAutosendBackupEmail = async (
       body: JSON.stringify({
         email: targetEmail,
         triggerType,
+        force,
         ...payload
       })
     });
 
     const data = await res.json();
+
+    if (data.disabled || (!data.success && data.status === "DISABLED_IN_CONFIG")) {
+      return {
+        success: false,
+        message: data.message || "Backup email dispatches are currently turned OFF in settings."
+      };
+    }
 
     if (res.ok && data.success) {
       const logEntry: BackupEmailLog = {
@@ -288,7 +308,7 @@ export const triggerAutosendBackupEmail = async (
         log: logEntry
       };
     } else {
-      throw new Error(data.error || "Failed to autosend JSON backup email");
+      throw new Error(data.error || data.message || "Failed to autosend JSON backup email");
     }
   } catch (err: any) {
     console.error("Autosend backup email error:", err);

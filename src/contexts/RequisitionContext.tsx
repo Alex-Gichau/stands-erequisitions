@@ -3126,50 +3126,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             localStorage.setItem(LAST_BACKUP_TIME_KEY, new Date().toISOString());
             console.log("[Google Drive Auto-Backup] 5-hour backup completed successfully for ict.team@pceastandrews.org.");
           }
-
-          // Trigger Autosend Backup Email based on schedule frequency (default Weekly Friday 04:00 AM)
-          const cfg = getLocalAutosendConfig();
-          if (cfg.enabled) {
-            let isEmailBackupDue = false;
-            const lastSent = cfg.lastSentTimestamp ? new Date(cfg.lastSentTimestamp) : null;
-            const now = new Date();
-
-            if (cfg.frequency === "5-HOURS") {
-              isEmailBackupDue = !lastSent || (now.getTime() - lastSent.getTime()) >= 5 * 60 * 60 * 1000;
-            } else if (cfg.frequency === "DAILY") {
-              isEmailBackupDue = !lastSent || (now.getTime() - lastSent.getTime()) >= 24 * 60 * 60 * 1000;
-            } else {
-              // WEEKLY: Friday 04:00 AM
-              const currentDay = now.getDay();
-              let daysSinceFriday = currentDay >= 5 ? currentDay - 5 : currentDay + 2;
-              const lastFriday4AM = new Date(now);
-              lastFriday4AM.setDate(now.getDate() - daysSinceFriday);
-              lastFriday4AM.setHours(4, 0, 0, 0);
-              if (currentDay === 5 && now.getHours() < 4) {
-                lastFriday4AM.setDate(lastFriday4AM.getDate() - 7);
-              }
-              if (!lastSent || lastSent.getTime() < lastFriday4AM.getTime()) {
-                if (now.getTime() >= lastFriday4AM.getTime()) {
-                  isEmailBackupDue = true;
-                }
-              }
-            }
-
-            if (isEmailBackupDue) {
-              triggerAutosendBackupEmail(cfg.targetEmail || AUTOSEND_DEFAULT_EMAIL, {
-                systemSettings,
-                requisitions,
-                users,
-                projects,
-                churchGroups,
-                ledgerBooks,
-                systemLogs,
-                customCalendarEvents
-              }, "SCHEDULED").catch(err => {
-                console.warn("[Autosend Email Backup] Scheduled auto-dispatch attempt failed:", err);
-              });
-            }
-          }
         } catch (e) {
           console.warn("[Google Drive Auto-Backup] Scheduled backup check failed:", e);
         }

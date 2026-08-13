@@ -125,7 +125,7 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
     setIsSendingEmail(true);
     setStatusMessage(`Compiling database JSON snapshot & sending to ${AUTOSEND_DEFAULT_EMAIL}...`);
     try {
-      const res = await triggerAutosendBackupEmail(AUTOSEND_DEFAULT_EMAIL, contextData, "AUTO_DRIVE");
+      const res = await triggerAutosendBackupEmail(AUTOSEND_DEFAULT_EMAIL, contextData, "AUTO_DRIVE", true);
       if (res.success) {
         setStatusMessage(`✅ Dispatched backup JSON email to ${AUTOSEND_DEFAULT_EMAIL}`);
       } else {

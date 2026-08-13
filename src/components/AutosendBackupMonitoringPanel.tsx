@@ -140,11 +140,16 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
 
   const handleToggleMasterEnabled = async () => {
     const nextState = !config.enabled;
-    const updated = await updateAutosendConfigOnServer({ enabled: nextState });
+    const nextFeatures = {
+      ...featuresInput,
+      sendEmail: nextState
+    };
+    const updated = await updateAutosendConfigOnServer({ enabled: nextState, features: nextFeatures });
     setConfig(updated);
+    if (updated.features) setFeaturesInput(updated.features);
     setStatusNotification({
       type: nextState ? "success" : "info",
-      message: nextState ? "Automated scheduled backups ENABLED." : "Automated scheduled backups PAUSED."
+      message: nextState ? "Automated scheduled backups ENABLED." : "Automated scheduled backups PAUSED and backup emails TURNED OFF."
     });
   };
 
@@ -160,12 +165,18 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
     setStatusNotification({ type: "info", message: `Backup schedule frequency set to ${freq}.` });
   };
 
-  const handleFeatureToggle = (key: keyof BackupTargetFeatures) => {
+  const handleFeatureToggle = async (key: keyof BackupTargetFeatures) => {
     const updatedFeatures = {
       ...featuresInput,
       [key]: !featuresInput[key]
     };
     setFeaturesInput(updatedFeatures);
+    const updated = await updateAutosendConfigOnServer({ features: updatedFeatures });
+    setConfig(updated);
+    setStatusNotification({
+      type: "info",
+      message: `Updated backup feature '${key}': ${updatedFeatures[key] ? "ENABLED" : "DISABLED"}`
+    });
   };
 
   const handleSendNow = async () => {
@@ -173,7 +184,8 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
     setStatusNotification({ type: "info", message: `Compiling system JSON snapshot & executing backup dispatch...` });
 
     try {
-      const res = await triggerAutosendBackupEmail(emailInput, contextData, "MANUAL");
+      // Force allow manual dispatch if button explicitly pressed by admin
+      const res = await triggerAutosendBackupEmail(emailInput, contextData, "MANUAL", true);
       if (res.success) {
         setStatusNotification({
           type: "success",
@@ -276,116 +288,150 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
             className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2 shadow-sm shrink-0 ${
               config.enabled
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"
-                : "bg-slate-700 hover:bg-slate-800 text-white"
+                : "bg-amber-600 hover:bg-amber-700 text-white"
             }`}
           >
             {config.enabled ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-            <span>{config.enabled ? "TURN OFF BACKUPS" : "TURN ON BACKUPS"}</span>
+            <span>{config.enabled ? "DISABLE BACKUPS" : "ENABLE BACKUPS"}</span>
           </button>
         </div>
       </div>
 
+      {(!config.enabled || !featuresInput.sendEmail) && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 flex items-center gap-3">
+          <AlertCircle size={20} className="shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="text-xs">
+            <span className="font-bold uppercase tracking-wider block">
+              Backup Email Dispatches Disabled
+            </span>
+            <span>
+              {!config.enabled 
+                ? "Master scheduled backups are currently PAUSED. No automated backup emails will be generated or sent."
+                : "The 'Send Email Attachment' target feature is toggled OFF. Automated email snapshots will be skipped."}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Frequency & Execution Time Picker */}
-      <div className="bg-gradient-to-br from-indigo-50/70 via-slate-50 to-blue-50/70 dark:from-indigo-950/20 dark:via-slate-900/40 dark:to-blue-950/20 border border-indigo-200/80 dark:border-indigo-900/40 rounded-3xl p-6 space-y-6">
-        <div className="flex items-center gap-2.5 border-b border-indigo-200/50 dark:border-indigo-900/40 pb-4">
-          <Clock size={18} className="text-indigo-600 dark:text-indigo-400" />
-          <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
-            Choose Schedule Interval & Execution Time
-          </h4>
+      <div className="bg-gradient-to-br from-indigo-50/90 via-slate-50 to-blue-50/90 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900 border border-indigo-200/80 dark:border-slate-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl">
+        <div className="flex items-center gap-3 border-b border-indigo-200/60 dark:border-slate-800 pb-4">
+          <div className="p-2.5 bg-indigo-600 text-white rounded-2xl shadow-md shadow-indigo-500/20">
+            <Clock size={20} />
+          </div>
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+              Choose Schedule Interval & Execution Time
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+              Set automated dispatch frequency and local server target execution hour
+            </p>
+          </div>
         </div>
 
         {/* Frequency Buttons */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
             Schedule Interval Frequency
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
-              { id: "WEEKLY", label: "Weekly", sub: "Once a week" },
-              { id: "MONTHLY", label: "Monthly", sub: "Once a month" },
-              { id: "EVERY_5_DAYS", label: "Every 5 Days", sub: "120 Hours" },
-              { id: "DAILY", label: "Daily", sub: "Every 24 Hours" },
-              { id: "5-HOURS", label: "Every 5 Hours", sub: "Fast cycle" }
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleFrequencyChange(item.id as BackupFrequency)}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                  config.frequency === item.id
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-500/20"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-indigo-300"
-                }`}
-              >
-                <div className="text-xs font-black uppercase tracking-wider">{item.label}</div>
-                <div className={`text-[9px] font-medium mt-0.5 ${config.frequency === item.id ? "text-indigo-100" : "text-muted-foreground"}`}>
-                  {item.sub}
-                </div>
-              </button>
-            ))}
+              { id: "WEEKLY", label: "WEEKLY", sub: "Once a week" },
+              { id: "MONTHLY", label: "MONTHLY", sub: "Once a month" },
+              { id: "EVERY_5_DAYS", label: "EVERY 5 DAYS", sub: "120 Hours" },
+              { id: "DAILY", label: "DAILY", sub: "Every 24 Hours" },
+              { id: "5-HOURS", label: "EVERY 5 HOURS", sub: "Fast cycle" }
+            ].map((item) => {
+              const isSelected = config.frequency === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleFrequencyChange(item.id as BackupFrequency)}
+                  className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                    isSelected
+                      ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/25 scale-[1.02]"
+                      : "bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                  }`}
+                >
+                  <div className="text-xs font-black tracking-wider uppercase">{item.label}</div>
+                  <div className={`text-[10px] font-medium mt-1 ${isSelected ? "text-indigo-100" : "text-slate-500 dark:text-slate-400"}`}>
+                    {item.sub}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Time of Day Picker & Specific Day Selectors */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-2 border-t border-indigo-200/50 dark:border-indigo-900/40">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-4 border-t border-indigo-200/60 dark:border-slate-800">
           {/* Time Picker */}
-          <div className="md:col-span-6 space-y-2">
+          <div className="md:col-span-6 space-y-2.5">
             <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
               Scheduled Dispatch Time of Day (24-Hour Format / Local Time)
             </label>
-            <div className="flex gap-2">
-              <input
-                type="time"
-                value={scheduleTimeInput}
-                onChange={(e) => setScheduleTimeInput(e.target.value)}
-                className="px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-black text-foreground focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm font-mono"
-              />
-              <div className="flex gap-1 overflow-x-auto py-0.5">
-                {PRESET_TIMES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setScheduleTimeInput(t)}
-                    className={`px-2.5 py-2.5 rounded-xl text-[10px] font-bold font-mono transition-all cursor-pointer border ${
-                      scheduleTimeInput === t
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+              <div className="relative shrink-0">
+                <input
+                  type="time"
+                  value={scheduleTimeInput}
+                  onChange={(e) => setScheduleTimeInput(e.target.value)}
+                  className="px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm font-mono"
+                />
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto py-1">
+                {PRESET_TIMES.map((t) => {
+                  const isPresetActive = scheduleTimeInput === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setScheduleTimeInput(t)}
+                      className={`px-3 py-2.5 rounded-xl text-[11px] font-black font-mono transition-all cursor-pointer border ${
+                        isPresetActive
+                          ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/20"
+                          : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
 
           {/* Conditional Day of Week or Day of Month Selectors */}
           {config.frequency === "WEEKLY" && (
-            <div className="md:col-span-6 space-y-2">
+            <div className="md:col-span-6 space-y-2.5">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
                 Target Day of the Week
               </label>
-              <div className="grid grid-cols-7 gap-1">
-                {DAYS_OF_WEEK.map((d) => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    onClick={() => setDayOfWeekInput(d.value)}
-                    className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all cursor-pointer text-center border ${
-                      dayOfWeekInput === d.value
-                        ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100"
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-7 gap-1.5">
+                {DAYS_OF_WEEK.map((d) => {
+                  const isDayActive = dayOfWeekInput === d.value;
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setDayOfWeekInput(d.value)}
+                      className={`py-2.5 rounded-xl text-[11px] font-black uppercase transition-all cursor-pointer text-center border ${
+                        isDayActive
+                          ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20"
+                          : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {config.frequency === "MONTHLY" && (
-            <div className="md:col-span-6 space-y-2">
+            <div className="md:col-span-6 space-y-2.5">
               <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
                 Target Day of the Month
               </label>
@@ -393,7 +439,7 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
                 <select
                   value={dayOfMonthInput}
                   onChange={(e) => setDayOfMonthInput(parseInt(e.target.value, 10))}
-                  className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-bold text-foreground focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer"
+                  className="flex-1 px-4 py-3 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-2xl text-xs font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer"
                 >
                   {Array.from({ length: 28 }, (_, i) => i + 1).map((num) => (
                     <option key={num} value={num}>
@@ -409,260 +455,293 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
       </div>
 
       {/* Backup Target Features & Destinations Toggles ("All Backup Features Together") */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
-          <div className="flex items-center gap-2">
-            <Sliders size={18} className="text-indigo-600 dark:text-indigo-400" />
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground">
-              Backup Destination Features & Data Content Toggles
-            </h4>
+      <div className="space-y-6 pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-md shadow-indigo-500/20">
+              <Sliders size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Backup Destination Features & Data Content Toggles
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                Configure target dispatch channels and data snapshot content modules
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full border border-indigo-200 dark:border-indigo-800/40">
+          <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 bg-indigo-100/80 dark:bg-indigo-950/60 px-4 py-1.5 rounded-full border border-indigo-200 dark:border-indigo-800/60 shadow-xs shrink-0 self-start sm:self-auto">
             {activeFeaturesCount} of 6 Backup Modules Active
           </span>
         </div>
 
         {/* Feature Toggles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {/* 1. Email Attachment Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.sendEmail 
-              ? "bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/40" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-indigo-50/70 dark:bg-slate-800/90 border-indigo-300 dark:border-indigo-600 shadow-md shadow-indigo-500/5" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-600 text-white rounded-xl">
-                  <Mail size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-2xl shadow-sm">
+                    <Mail size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      EMAIL JSON ATTACHMENT
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Dispatches JSON file via email</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Email JSON Attachment
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Dispatches JSON file via email</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("sendEmail")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.sendEmail ? "bg-indigo-600 shadow-md shadow-indigo-500/30" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.sendEmail ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("sendEmail")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.sendEmail ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.sendEmail ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              {featuresInput.sendEmail && (
+                <div className="mt-3 pt-3 border-t border-indigo-200/60 dark:border-slate-700 space-y-1.5">
+                  <label className="text-[9px] font-black uppercase text-slate-500 dark:text-slate-400 block">
+                    Recipient Email
+                  </label>
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-950 border border-indigo-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              )}
             </div>
-            {featuresInput.sendEmail && (
-              <div className="mt-3 pt-2 border-t border-indigo-200/40 dark:border-indigo-800/20">
-                <label className="text-[9px] font-black uppercase text-muted-foreground block mb-1">
-                  Recipient Email
-                </label>
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-[11px] font-mono font-bold text-foreground"
-                />
-              </div>
-            )}
           </div>
 
           {/* 2. Google Drive Auto-Sync Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.googleDriveSync 
-              ? "bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-blue-50/70 dark:bg-slate-800/90 border-blue-300 dark:border-blue-600 shadow-md shadow-blue-500/5" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-600 text-white rounded-xl">
-                  <Cloud size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-sm">
+                    <Cloud size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      GOOGLE DRIVE AUTO-SYNC
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Syncs snapshot to Google Drive</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Google Drive Auto-Sync
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Syncs snapshot to Google Drive</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("googleDriveSync")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.googleDriveSync ? "bg-blue-600 shadow-md shadow-blue-500/30" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.googleDriveSync ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("googleDriveSync")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.googleDriveSync ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.googleDriveSync ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              <div className="pt-2 border-t border-blue-200/60 dark:border-slate-700">
+                <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300 font-mono">
+                  Target: ict.team@pceastandrews.org
+                </p>
+              </div>
             </div>
-            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-mono mt-3">
-              Target: ict.team@pceastandrews.org
-            </p>
           </div>
 
           {/* 3. Server Local Snapshot Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.saveServerDiskSnapshot 
-              ? "bg-slate-50 dark:bg-slate-900/60 border-slate-300 dark:border-slate-800" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-slate-100/80 dark:bg-slate-800/90 border-slate-400 dark:border-slate-600 shadow-md" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-slate-800 text-white rounded-xl">
-                  <HardDrive size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-slate-800 dark:bg-slate-700 text-white rounded-2xl shadow-sm">
+                    <HardDrive size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      SERVER LOCAL DISK COPY
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Saves JSON in server /data/backups</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Server Local Disk Copy
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Saves JSON in server /data/backups</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("saveServerDiskSnapshot")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.saveServerDiskSnapshot ? "bg-slate-800 dark:bg-slate-600 shadow-md" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.saveServerDiskSnapshot ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("saveServerDiskSnapshot")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.saveServerDiskSnapshot ? "bg-slate-800 dark:bg-slate-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.saveServerDiskSnapshot ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              <div className="pt-2 border-t border-slate-300/60 dark:border-slate-700">
+                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                  Storage: Persistent Disk Buffer
+                </p>
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground font-mono mt-3">
-              Storage: Persistent Disk Buffer
-            </p>
           </div>
 
           {/* 4. Include Audit Logs Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.includeAuditLogs 
-              ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-amber-50/70 dark:bg-slate-800/90 border-amber-300 dark:border-amber-600 shadow-md shadow-amber-500/5" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-amber-600 text-white rounded-xl">
-                  <ShieldCheck size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-600 text-white rounded-2xl shadow-sm">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      INCLUDE AUDIT & SECURITY LOGS
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Packs system admin audit trails</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Include Audit & Security Logs
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Packs system admin audit trails</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("includeAuditLogs")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.includeAuditLogs ? "bg-amber-600 shadow-md shadow-amber-500/30" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.includeAuditLogs ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("includeAuditLogs")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.includeAuditLogs ? "bg-amber-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.includeAuditLogs ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              <div className="pt-2 border-t border-amber-200/60 dark:border-slate-700">
+                <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300 font-mono">
+                  Logs Included: {contextData.systemLogs?.length || 0} Records
+                </p>
+              </div>
             </div>
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-mono mt-3">
-              Logs Included: {contextData.systemLogs?.length || 0} Records
-            </p>
           </div>
 
           {/* 5. Include Ledger & Calendar Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.includeCalendarAndLedger 
-              ? "bg-purple-50/40 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/40" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-purple-50/70 dark:bg-slate-800/90 border-purple-300 dark:border-purple-600 shadow-md shadow-purple-500/5" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-purple-600 text-white rounded-xl">
-                  <Calendar size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-purple-600 text-white rounded-2xl shadow-sm">
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      LEDGER BOOKS & CALENDAR DATA
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Packs financial books & events</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Ledger Books & Calendar Data
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Packs financial books & events</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("includeCalendarAndLedger")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.includeCalendarAndLedger ? "bg-purple-600 shadow-md shadow-purple-500/30" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.includeCalendarAndLedger ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("includeCalendarAndLedger")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.includeCalendarAndLedger ? "bg-purple-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.includeCalendarAndLedger ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              <div className="pt-2 border-t border-purple-200/60 dark:border-slate-700">
+                <p className="text-[11px] font-bold text-purple-700 dark:text-purple-300 font-mono">
+                  Ledgers: {contextData.ledgerBooks?.length || 0} | Events: {contextData.customCalendarEvents?.length || 0}
+                </p>
+              </div>
             </div>
-            <p className="text-[10px] text-purple-600 dark:text-purple-400 font-mono mt-3">
-              Ledgers: {contextData.ledgerBooks?.length || 0} | Events: {contextData.customCalendarEvents?.length || 0}
-            </p>
           </div>
 
           {/* 6. Slack / Webhook Alert Toggle */}
-          <div className={`p-4 rounded-2xl border transition-all ${
+          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.slackAlertEnabled 
-              ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" 
-              : "bg-muted/20 border-border opacity-70"
+              ? "bg-emerald-50/70 dark:bg-slate-800/90 border-emerald-300 dark:border-emerald-600 shadow-md shadow-emerald-500/5" 
+              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
           }`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-emerald-600 text-white rounded-xl">
-                  <Bell size={16} />
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-600 text-white rounded-2xl shadow-sm">
+                    <Bell size={18} />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                      SLACK / WEBHOOK NOTIFICATION
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Sends summary alert on backup run</p>
+                  </div>
                 </div>
-                <div>
-                  <h5 className="text-xs font-black uppercase tracking-wider text-foreground">
-                    Slack / Webhook Notification
-                  </h5>
-                  <p className="text-[10px] text-muted-foreground">Sends summary alert on backup run</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => handleFeatureToggle("slackAlertEnabled")}
+                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
+                    featuresInput.slackAlertEnabled ? "bg-emerald-600 shadow-md shadow-emerald-500/30" : "bg-slate-300 dark:bg-slate-700"
+                  }`}
+                >
+                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
+                    featuresInput.slackAlertEnabled ? "translate-x-5.5" : "translate-x-0.5"
+                  }`} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => handleFeatureToggle("slackAlertEnabled")}
-                className={`w-10 h-6 rounded-full transition-all relative p-0.5 cursor-pointer ${
-                  featuresInput.slackAlertEnabled ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-700"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white transition-all ${
-                  featuresInput.slackAlertEnabled ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </button>
+
+              {featuresInput.slackAlertEnabled && (
+                <div className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-slate-700 space-y-1.5">
+                  <input
+                    type="url"
+                    placeholder="Slack Webhook URL (https://hooks.slack.com/...)"
+                    value={featuresInput.slackWebhookUrl || ""}
+                    onChange={(e) => setFeaturesInput({ ...featuresInput, slackWebhookUrl: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white shadow-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+              )}
             </div>
-            {featuresInput.slackAlertEnabled && (
-              <div className="mt-3 pt-2 border-t border-emerald-200/40">
-                <input
-                  type="url"
-                  placeholder="Slack Webhook URL (https://hooks.slack.com/...)"
-                  value={featuresInput.slackWebhookUrl || ""}
-                  onChange={(e) => setFeaturesInput({ ...featuresInput, slackWebhookUrl: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-[10px] font-mono text-foreground"
-                />
-              </div>
-            )}
           </div>
         </div>
 
         {/* Save All Settings Button */}
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-4">
           <button
             type="button"
             onClick={() => handleSaveFullConfig()}
             disabled={isSavingConfig}
-            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+            className="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-3 cursor-pointer shadow-lg shadow-indigo-600/30 disabled:opacity-50"
           >
-            {isSavingConfig ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-            <span>Save Backup Settings & Schedule</span>
+            {isSavingConfig ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
+            <span>SAVE BACKUP SETTINGS & SCHEDULE</span>
           </button>
         </div>
       </div>

@@ -2667,6 +2667,241 @@ async function startServer() {
     }
   });
 
+  // GET /api/email-audit-logs - Aggregate and retrieve all email audit trail events
+  app.get("/api/email-audit-logs", async (req, res) => {
+    try {
+      const activities = restoreActivities();
+      const backupLogs = getBackupEmailLogs();
+
+      const emailAuditList: any[] = [];
+
+      // 1. Process activity_history events
+      for (const act of activities) {
+        const actionStr = String(act.action || "").toUpperCase();
+        const detailsStr = String(act.details || "");
+        const detailsLower = detailsStr.toLowerCase();
+
+        const isEmailEvent = 
+          actionStr.includes("EMAIL") || 
+          actionStr.includes("MAIL") || 
+          actionStr.includes("PASSWORD_RESET") ||
+          actionStr.includes("AUTOSEND_BACKUP") ||
+          detailsLower.includes("email") ||
+          detailsLower.includes("mail to") ||
+          detailsLower.includes("backup snapshot") ||
+          detailsLower.includes("password reset email");
+
+        if (!isEmailEvent) continue;
+
+        let category = "REQUISITION_WORKFLOW";
+        if (actionStr.includes("BACKUP") || detailsLower.includes("backup")) {
+          category = "BACKUP_SNAPSHOT";
+        } else if (actionStr.includes("PASSWORD_RESET") || detailsLower.includes("password reset")) {
+          category = "PASSWORD_RESET";
+        } else if (actionStr.includes("BULK") || detailsLower.includes("bulk email")) {
+          category = "BULK_ANNOUNCEMENT";
+        } else if (actionStr.includes("SUMMARY") || detailsLower.includes("digest")) {
+          category = "DIGEST_SUMMARY";
+        } else if (actionStr.includes("ALERT") || detailsLower.includes("alert")) {
+          category = "SYSTEM_ALERT";
+        }
+
+        let status = "DELIVERED";
+        if (actionStr.includes("SIMULATED") || detailsLower.includes("simulated") || detailsLower.includes("simulated_local_store")) {
+          status = "SIMULATED";
+        } else if (actionStr.includes("SKIPPED") || detailsLower.includes("skipped") || detailsLower.includes("disabled_in_config")) {
+          status = "SKIPPED";
+        } else if (actionStr.includes("FAILED") || detailsLower.includes("failed") || detailsLower.includes("error")) {
+          status = "FAILED";
+        }
+
+        // Extract recipient email
+        let recipientEmail = act.metadata?.email || act.metadata?.recipientEmail || "";
+        if (!recipientEmail) {
+          const emailMatch = detailsStr.match(/<([^>]+@[^>]+)>/) || detailsStr.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i) || detailsStr.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+          if (emailMatch) recipientEmail = emailMatch[1] || emailMatch[0];
+        }
+        if (!recipientEmail && category === "BACKUP_SNAPSHOT") {
+          recipientEmail = "ict.team@pceastandrews.org";
+        }
+
+        // Extract recipient name
+        let recipientName = act.metadata?.recipientName || act.metadata?.requesterName || "";
+        if (!recipientName) {
+          const nameMatch = detailsStr.match(/to\s+([^<]+)\s*</i) || detailsStr.match(/for\s+user:\s*([^)]+)/i);
+          if (nameMatch) recipientName = nameMatch[1].trim();
+        }
+
+        // Extract subject / title
+        let subject = act.metadata?.subject || act.metadata?.requisitionTitle || "";
+        if (!subject) {
+          const regardingMatch = detailsStr.match(/regarding\s+'([^']+)'/i) || detailsStr.match(/Requisition:\s*([^\n(]+)/i) || detailsStr.match(/for\s+'([^']+)'/i);
+          if (regardingMatch) subject = regardingMatch[1].trim();
+          else subject = detailsStr;
+        }
+
+        // Extract Requisition details
+        const requisitionId = act.metadata?.requisitionId || (detailsStr.match(/REQ-[A-Z0-9-]+/i) ? detailsStr.match(/REQ-[A-Z0-9-]+/i)![0] : undefined);
+        const amount = act.metadata?.amount;
+
+        emailAuditList.push({
+          id: (act as any).id || (act as any).document_id || `email-log-${new Date(act.timestamp).getTime()}-${Math.random().toString(36).substr(2, 6)}`,
+          timestamp: act.timestamp || new Date().toISOString(),
+          action: act.action,
+          category,
+          recipientEmail: recipientEmail || "ict.team@pceastandrews.org",
+          recipientName: recipientName || (recipientEmail ? recipientEmail.split("@")[0] : "System Recipient"),
+          ccList: act.metadata?.ccList || act.metadata?.notificationEmails || [],
+          subject,
+          requisitionId,
+          requisitionTitle: act.metadata?.requisitionTitle || (requisitionId ? subject : undefined),
+          amount,
+          status,
+          performedBy: act.performedBy || (act as any).performed_by || "SYSTEM_MAILER",
+          details: detailsStr,
+          metadata: act.metadata,
+          fileName: act.metadata?.fileName,
+          sizeKb: act.metadata?.sizeKb
+        });
+      }
+
+      // 2. Process backup_email_logs that might not be in activity_history
+      for (const blog of backupLogs) {
+        const exists = emailAuditList.some(e => e.timestamp === blog.timestamp || e.id === blog.id);
+        if (!exists) {
+          let bStatus = "DELIVERED";
+          if (blog.status === "SIMULATED_LOCAL_STORE") bStatus = "SIMULATED";
+          else if (blog.status === "DISABLED_IN_CONFIG" || blog.status === "SKIPPED") bStatus = "SKIPPED";
+          else if (blog.status === "FAILED") bStatus = "FAILED";
+
+          emailAuditList.push({
+            id: blog.id || `backup-log-${new Date(blog.timestamp).getTime()}`,
+            timestamp: blog.timestamp,
+            action: "AUTOSEND_BACKUP_EMAIL",
+            category: "BACKUP_SNAPSHOT",
+            recipientEmail: blog.targetEmail || "ict.team@pceastandrews.org",
+            recipientName: "ICT & Core Systems Backup",
+            subject: `STANDS eRequisitions Database Backup Snapshot (${blog.fileName || "system_backup.json"})`,
+            status: bStatus,
+            performedBy: blog.triggerType === "CRON_SCHEDULE" ? "Automated 5-Hour Scheduler" : "SUPER_ADMIN_SYSTEM",
+            details: `Automated database snapshot dispatch (${blog.sizeKb || 0} KB) to ${blog.targetEmail || "ict.team@pceastandrews.org"}. Status: ${blog.status}`,
+            fileName: blog.fileName,
+            sizeKb: blog.sizeKb,
+            metadata: {
+              summary: blog.summary,
+              triggerType: blog.triggerType
+            }
+          });
+        }
+      }
+
+      // Sort by timestamp descending
+      emailAuditList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json({
+        success: true,
+        count: emailAuditList.length,
+        logs: emailAuditList
+      });
+    } catch (err: any) {
+      console.error("Error retrieving email audit logs:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to retrieve email audit logs" });
+    }
+  });
+
+  // POST /api/send-test-email - Trigger diagnostic test email for audit tracking
+  app.post("/api/send-test-email", async (req, res) => {
+    const { to = "ict.team@pceastandrews.org", subject = "STANDS System Email Diagnostic Test", testType = "DIAGNOSTIC_VERIFICATION", performer = "SUPER_ADMIN" } = req.body;
+    const timestamp = new Date().toISOString();
+
+    if (!process.env.SMTP_PASS) {
+      persistActivity({
+        action: "EMAIL_SIMULATED",
+        details: `Diagnostic Test Email simulated for <${to}> regarding '${subject}' (SMTP credentials not active in environment)`,
+        performedBy: performer,
+        timestamp,
+        metadata: {
+          testType,
+          recipientEmail: to,
+          subject,
+          status: "SIMULATED"
+        }
+      });
+
+      return res.json({
+        success: true,
+        deliveredTo: to,
+        status: "SIMULATED",
+        message: "Test email registered in System Audit Trail in Simulation/Safe Mode."
+      });
+    }
+
+    try {
+      const testHtml = `
+        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          <div style="background-color: #0f172a; padding: 24px; text-align: left;">
+            <span style="color: #38bdf8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">STANDS eRequisitions</span>
+            <h1 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 6px 0 0 0;">System Audit Diagnostic Verification</h1>
+          </div>
+          <div style="padding: 24px; color: #334155;">
+            <p style="font-size: 14px; line-height: 1.6;">This is an automated diagnostic email generated by the System Administrator to test SMTP mailer routing and verify live system audit logging.</p>
+            <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin: 16px 0;">
+              <p style="margin: 0; font-size: 13px; font-weight: 700; color: #065f46;">Diagnostic Check: PASSED</p>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #047857;">Timestamp: ${timestamp}</p>
+            </div>
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 24px;">PCEA St. Andrew's Church eRequisitions Audit Ledger</p>
+          </div>
+        </div>
+      `;
+
+      await transporter.sendMail({
+        from: `"STANDS eRequisitions" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
+        to,
+        subject: `[Diagnostic Test] ${subject}`,
+        html: testHtml
+      });
+
+      persistActivity({
+        action: "EMAIL_DISPATCH",
+        details: `Diagnostic Test Email successfully delivered to <${to}> regarding '${subject}'`,
+        performedBy: performer,
+        timestamp,
+        metadata: {
+          testType,
+          recipientEmail: to,
+          subject,
+          status: "DELIVERED"
+        }
+      });
+
+      res.json({
+        success: true,
+        deliveredTo: to,
+        status: "DELIVERED",
+        message: `Diagnostic test email sent successfully to ${to} and recorded in audit ledger.`
+      });
+    } catch (err: any) {
+      persistActivity({
+        action: "EMAIL_FAILED",
+        details: `Diagnostic Test Email to <${to}> failed: ${err.message || "Unknown error"}`,
+        performedBy: performer,
+        timestamp,
+        metadata: {
+          testType,
+          recipientEmail: to,
+          subject,
+          status: "FAILED",
+          error: err.message
+        }
+      });
+
+      res.status(500).json({
+        success: false,
+        error: err.message || "Failed to dispatch test email"
+      });
+    }
+  });
+
   // API Route for Slack Notifications (Expanded with rich auth blocks & channel routing)
   app.post("/api/notify-slack", async (req, res) => {
     const { action, details, performedBy, timestamp, metadata, level = "normal" } = req.body;

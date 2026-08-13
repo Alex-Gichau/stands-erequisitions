@@ -3777,7 +3777,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const requisitionUrl = `${origin}?reqId=${encodeURIComponent(req.id)}`;
 
     try {
-      await fetch("/api/send-email", {
+      const resp = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3799,10 +3799,30 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           approvalReason: details || ""
         })
       });
+
+      const resData = await resp.json().catch(() => ({}));
+      const isSimulated = resData?.simulated || !resData?.success;
+      
+      // Log to system audit trail
+      await addSystemLog(
+        isSimulated ? "EMAIL_SIMULATED" : "EMAIL_DISPATCH",
+        `Email notification (${status}) sent to <${targetEmail || notificationEmailsList[0] || "recipient"}> regarding '${req.title}'`,
+        {
+          recipientEmail: targetEmail || notificationEmailsList[0] || "",
+          recipientName: customRecipientName || req.requesterName,
+          notificationEmails: notificationEmailsList,
+          requisitionId: req.id,
+          requisitionTitle: req.title,
+          status: isSimulated ? "SIMULATED" : "DELIVERED",
+          workflowStatus: status,
+          amount: req.amount,
+          simulated: isSimulated
+        }
+      ).catch(e => console.warn("[Email Notification] Audit log failed:", e));
     } catch (err) {
       console.error("Failed to trigger email notification:", err);
     }
-  }, [users, currentUser]);
+  }, [users, currentUser, addSystemLog]);
 
   const addRequisition = useCallback(async (reqData: any) => {
     return withDbLoading("Submitting requisition to database...", async () => {

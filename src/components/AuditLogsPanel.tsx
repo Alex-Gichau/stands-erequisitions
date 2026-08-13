@@ -26,6 +26,7 @@ import { cn } from "../lib/utils";
 import { getTimeUntilMidnightPT } from "../lib/errorMonitor";
 import { getFirestoreWriteCount } from "../lib/quotaMonitor";
 import { AuditSummaryWidget } from "./AuditSummaryWidget";
+import { EmailHistoryAuditPanel } from "./EmailHistoryAuditPanel";
 
 export const AuditLogsPanel: React.FC = () => {
   const { systemLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets } = useRequisitions();
@@ -477,10 +478,7 @@ export const AuditLogsPanel: React.FC = () => {
       </div>
       </div>
       ) : (
-        <div className="text-center py-20 bg-white border-2 border-slate-100 rounded-[2.5rem]">
-            <h2 className="text-lg font-black uppercase tracking-tight text-slate-900">Email History</h2>
-            <p className="text-[10px] font-bold uppercase text-slate-400 mt-2">Automated email delivery tracking ledger</p>
-        </div>
+        <EmailHistoryAuditPanel systemLogs={systemLogs} />
       )}
     </div>
   );

@@ -236,6 +236,26 @@ export interface SystemLog {
   metadata?: any;
 }
 
+export interface EmailAuditLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  category: "REQUISITION_WORKFLOW" | "BACKUP_SNAPSHOT" | "PASSWORD_RESET" | "BULK_ANNOUNCEMENT" | "SYSTEM_ALERT" | "DIGEST_SUMMARY" | "OTHER";
+  recipientEmail: string;
+  recipientName?: string;
+  ccList?: string[];
+  subject: string;
+  requisitionId?: string;
+  requisitionTitle?: string;
+  amount?: number;
+  status: "DELIVERED" | "SIMULATED" | "SKIPPED" | "FAILED" | "PENDING";
+  performedBy: string;
+  details: string;
+  metadata?: any;
+  sizeKb?: number;
+  fileName?: string;
+}
+
 export interface SavedReport {
   id: string;
   title: string;

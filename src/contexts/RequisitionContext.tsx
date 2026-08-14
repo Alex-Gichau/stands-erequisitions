@@ -594,32 +594,32 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
   {
     id: UserRole.CHURCH_GROUP,
     role: UserRole.CHURCH_GROUP,
-    access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true },
-    actions: { canCreateRequisition: true, canApproveL1: false, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true }
+    access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
+    actions: { canCreateRequisition: true, canApproveL1: false, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.APPROVER_L1,
     role: UserRole.APPROVER_L1,
-    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true },
-    actions: { canCreateRequisition: false, canApproveL1: true, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true }
+    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
+    actions: { canCreateRequisition: false, canApproveL1: true, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.APPROVER_L2,
     role: UserRole.APPROVER_L2,
-    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true },
-    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: true, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true }
+    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
+    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: true, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.FINANCE,
     role: UserRole.FINANCE,
-    access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: true, users: false, settings: true, accessControl: false, auditTrail: true, transactions: true },
-    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: false, canDisburse: true, canDeleteRequisition: false, canManageUsers: false, canManageSettings: true, canViewTransactions: true }
+    access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: true, users: false, settings: true, accessControl: false, auditTrail: true, transactions: true, vendors: true, notifications: true },
+    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: false, canDisburse: true, canDeleteRequisition: false, canManageUsers: false, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
   },
   {
     id: UserRole.ADMIN,
     role: UserRole.ADMIN,
-    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: true, users: true, settings: true, accessControl: true, auditTrail: true, transactions: true },
-    actions: { canCreateRequisition: true, canApproveL1: true, canApproveL2: true, canDisburse: true, canDeleteRequisition: true, canManageUsers: true, canManageSettings: true, canViewTransactions: true }
+    access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: true, users: true, settings: true, accessControl: true, auditTrail: true, transactions: true, vendors: true, notifications: true },
+    actions: { canCreateRequisition: true, canApproveL1: true, canApproveL2: true, canDisburse: true, canDeleteRequisition: true, canManageUsers: true, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
   }
 ];
 
@@ -639,17 +639,21 @@ function normalizePermissionConfig(p: any): PermissionConfig {
     accessControl: Boolean(rawAccess.accessControl !== undefined ? rawAccess.accessControl : (rawAccess.access_control !== undefined ? rawAccess.access_control : false)),
     auditTrail: Boolean(rawAccess.auditTrail !== undefined ? rawAccess.auditTrail : (rawAccess.audit_trail !== undefined ? rawAccess.audit_trail : false)),
     transactions: Boolean(rawAccess.transactions !== undefined ? rawAccess.transactions : true),
+    vendors: Boolean(rawAccess.vendors !== undefined ? rawAccess.vendors : true),
+    notifications: Boolean(rawAccess.notifications !== undefined ? rawAccess.notifications : true),
   };
 
   const actions = {
     canCreateRequisition: Boolean(rawActions.canCreateRequisition !== undefined ? rawActions.canCreateRequisition : (rawActions.can_create_requisition !== undefined ? rawActions.can_create_requisition : false)),
-    canApproveL1: Boolean(rawActions.canApproveL1 !== undefined ? rawActions.canApproveL1 : (rawActions.can_approve_l1 !== undefined ? rawActions.can_approve_l1 : false)),
-    canApproveL2: Boolean(rawActions.canApproveL2 !== undefined ? rawActions.canApproveL2 : (rawActions.can_approve_l2 !== undefined ? rawActions.can_approve_l2 : false)),
+    canApproveL1: Boolean(rawActions.canApproveL1 !== undefined ? rawActions.canApproveL1 : (rawActions.can_approve_l1 !== undefined ? rawActions.can_approve_l1 : (rawActions.can_approve_l_1 !== undefined ? rawActions.can_approve_l_1 : false))),
+    canApproveL2: Boolean(rawActions.canApproveL2 !== undefined ? rawActions.canApproveL2 : (rawActions.can_approve_l2 !== undefined ? rawActions.can_approve_l2 : (rawActions.can_approve_l_2 !== undefined ? rawActions.can_approve_l_2 : false))),
     canDisburse: Boolean(rawActions.canDisburse !== undefined ? rawActions.canDisburse : (rawActions.can_disburse !== undefined ? rawActions.can_disburse : false)),
     canDeleteRequisition: Boolean(rawActions.canDeleteRequisition !== undefined ? rawActions.canDeleteRequisition : (rawActions.can_delete_requisition !== undefined ? rawActions.can_delete_requisition : false)),
     canManageUsers: Boolean(rawActions.canManageUsers !== undefined ? rawActions.canManageUsers : (rawActions.can_manage_users !== undefined ? rawActions.can_manage_users : false)),
     canManageSettings: Boolean(rawActions.canManageSettings !== undefined ? rawActions.canManageSettings : (rawActions.can_manage_settings !== undefined ? rawActions.can_manage_settings : false)),
     canViewTransactions: Boolean(rawActions.canViewTransactions !== undefined ? rawActions.canViewTransactions : (rawActions.can_view_transactions !== undefined ? rawActions.can_view_transactions : true)),
+    canExportReports: Boolean(rawActions.canExportReports !== undefined ? rawActions.canExportReports : (rawActions.can_export_reports !== undefined ? rawActions.can_export_reports : false)),
+    canManageBudgets: Boolean(rawActions.canManageBudgets !== undefined ? rawActions.canManageBudgets : (rawActions.can_manage_budgets !== undefined ? rawActions.can_manage_budgets : false)),
   };
 
   const role = (p?.role || p?.id || "") as UserRole;
@@ -861,18 +865,18 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     
     const config = permissionConfigs.find(c => c.role === currentUser.role);
-    if (!config) {
-      const defaults: Record<string, string[]> = {
-        [UserRole.CHURCH_GROUP]: ["dashboard", "requisitions", "notifications", "finance"],
-        [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance"],
-        [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance"],
-        [UserRole.FINANCE]: ["dashboard", "requisitions", "finance", "reports", "notifications", "settings", "auditTrail", "transactions"],
-        [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
-      };
-      return defaults[currentUser.role]?.includes(viewId) ?? false;
+    if (config && config.access && (config.access as any)[viewId] !== undefined) {
+      return Boolean((config.access as any)[viewId]);
     }
     
-    return (config.access as any)[viewId] ?? false;
+    const defaults: Record<string, string[]> = {
+      [UserRole.CHURCH_GROUP]: ["dashboard", "requisitions", "notifications", "finance", "transactions", "vendors"],
+      [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors"],
+      [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors"],
+      [UserRole.FINANCE]: ["dashboard", "requisitions", "finance", "reports", "notifications", "settings", "auditTrail", "transactions", "vendors"],
+      [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
+    };
+    return defaults[currentUser.role]?.includes(viewId) ?? false;
   }, [currentUser, permissionConfigs, systemSettings]);
 
   const canPerform = useCallback((actionId: keyof PermissionConfig["actions"]) => {
@@ -880,18 +884,21 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (currentUser.role === UserRole.SUPER_ADMIN) return true;
 
     const config = permissionConfigs.find(c => c.role === currentUser.role);
-    if (!config) {
-      if (actionId === 'canCreateRequisition') return currentUser.role === UserRole.CHURCH_GROUP || currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canApproveL1') return currentUser.role === UserRole.APPROVER_L1 || currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canApproveL2') return currentUser.role === UserRole.APPROVER_L2 || currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canDisburse') return currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canDeleteRequisition') return currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canManageUsers') return currentUser.role === UserRole.ADMIN;
-      if (actionId === 'canManageSettings') return currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.FINANCE;
-      return false;
+    if (config && config.actions && config.actions[actionId] !== undefined) {
+      return Boolean(config.actions[actionId]);
     }
 
-    return config.actions[actionId] ?? false;
+    if (actionId === 'canCreateRequisition') return currentUser.role === UserRole.CHURCH_GROUP || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canApproveL1') return currentUser.role === UserRole.APPROVER_L1 || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canApproveL2') return currentUser.role === UserRole.APPROVER_L2 || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canDisburse') return currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canDeleteRequisition') return currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canManageUsers') return currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canManageSettings') return currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.FINANCE;
+    if (actionId === 'canViewTransactions') return true;
+    if (actionId === 'canExportReports') return currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canManageBudgets') return currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.ADMIN;
+    return false;
   }, [currentUser, permissionConfigs]);
 
   const removeToast = useCallback((id: string) => {
@@ -2894,16 +2901,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             if (data.length > 0) {
               setPermissionConfigs(prev => {
                 const map = new Map<string, PermissionConfig>();
+                // 1. Base defaults
                 DEFAULT_PERMISSIONS.forEach(p => map.set(p.role, p));
-                data.forEach(p => {
-                  const existing = map.get(p.role);
-                  map.set(p.role, normalizePermissionConfig({
-                    id: p.id || existing?.id || p.role,
-                    role: p.role,
-                    access: { ...(existing?.access || {}), ...(p.access || {}) },
-                    actions: { ...(existing?.actions || {}), ...(p.actions || {}) }
-                  }));
-                });
+                // 2. Cached previous state
                 prev.forEach(p => {
                   if (p && p.role) {
                     const existing = map.get(p.role);
@@ -2914,6 +2914,16 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                       actions: { ...(existing?.actions || {}), ...(p.actions || {}) }
                     }));
                   }
+                });
+                // 3. Authoritative server database state
+                data.forEach(p => {
+                  const existing = map.get(p.role);
+                  map.set(p.role, normalizePermissionConfig({
+                    id: p.id || existing?.id || p.role,
+                    role: p.role,
+                    access: { ...(existing?.access || {}), ...(p.access || {}) },
+                    actions: { ...(existing?.actions || {}), ...(p.actions || {}) }
+                  }));
                 });
                 const result = Array.from(map.values());
                 try {
@@ -3834,6 +3844,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         throw new Error("This fiscal year is ARCHIVED. Creation or submission of new requisitions is blocked.");
       }
 
+      if (!canPerform('canCreateRequisition')) {
+        throw new Error("Permission Denied: You do not possess permission to initiate or submit requisitions.");
+      }
+
     const id = `req-${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date();
     const expiryDays = systemSettings?.requisitionExpiryDays ?? 7;
@@ -3996,6 +4010,17 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (!reqSnap.exists()) return;
       const req = reqSnap.data() as Requisition;
 
+      // Security check: Verify permission rights for specific workflow transitions
+      if (status === RequisitionStatus.APPROVED_L1 && !canPerform('canApproveL1')) {
+        throw new Error("Permission Denied: You do not possess Level 1 Approval Authority.");
+      }
+      if (status === RequisitionStatus.APPROVED_L2 && !canPerform('canApproveL2')) {
+        throw new Error("Permission Denied: You do not possess Level 2 Approval Authority.");
+      }
+      if (status === RequisitionStatus.DISBURSED && !canPerform('canDisburse')) {
+        throw new Error("Permission Denied: You do not possess Disbursement Authority.");
+      }
+
       // Security check: Restricted approver can only approve requisitions of their affiliated groups
       const isRestrictedRole = currentUser?.role ? [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2].includes(currentUser.role) : false;
       if (isRestrictedRole) {
@@ -4153,6 +4178,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const deleteRequisition = useCallback(async (id: string, reason?: string) => {
     const targetReq = requisitions.find(r => r.id === id);
+    const isOwnerOfDraft = targetReq?.status === RequisitionStatus.DRAFT && (targetReq?.requesterId === currentUser?.id || targetReq?.requesterEmail === currentUser?.email);
+    if (!canPerform('canDeleteRequisition') && !isOwnerOfDraft) {
+      throw new Error("Permission Denied: You do not have permission to delete requisitions from the ledger.");
+    }
+
     // OPTIMISTIC DELETE: Immediately remove from UI
     setRequisitions(prev => prev.filter(r => r.id !== id));
 

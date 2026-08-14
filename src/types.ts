@@ -321,6 +321,8 @@ export interface PermissionConfig {
     accessControl: boolean;
     auditTrail: boolean;
     transactions: boolean;
+    vendors?: boolean;
+    notifications?: boolean;
   };
   actions: {
     canCreateRequisition: boolean;
@@ -331,6 +333,8 @@ export interface PermissionConfig {
     canManageUsers: boolean;
     canManageSettings: boolean;
     canViewTransactions: boolean;
+    canExportReports?: boolean;
+    canManageBudgets?: boolean;
   };
 }
 

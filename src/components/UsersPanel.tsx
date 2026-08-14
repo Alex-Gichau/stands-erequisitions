@@ -59,7 +59,9 @@ export const UsersPanel: React.FC = () => {
     deleteChurchGroup,
     addSystemLog,
     loading,
-    sendBulkEmail
+    sendBulkEmail,
+    canAccess,
+    canPerform
   } = useRequisitions();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<string>("ALL");
@@ -381,7 +383,8 @@ export const UsersPanel: React.FC = () => {
     }
   };
 
-  if (currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) {
+  const hasUserAccess = canAccess('users') || canPerform('canManageUsers') || currentUser?.role === UserRole.SUPER_ADMIN;
+  if (!hasUserAccess) {
     return (
       <div className="h-full flex items-center justify-center p-12">
         <div className="text-center space-y-6 max-w-md animate-in fade-in transition-all">

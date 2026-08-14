@@ -29,7 +29,7 @@ import { AuditSummaryWidget } from "./AuditSummaryWidget";
 import { EmailHistoryAuditPanel } from "./EmailHistoryAuditPanel";
 
 export const AuditLogsPanel: React.FC = () => {
-  const { systemLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets } = useRequisitions();
+  const { systemLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets, canAccess } = useRequisitions();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedActionFilter, setSelectedActionFilter] = useState("ALL");
   const [selectedLevelFilter, setSelectedLevelFilter] = useState("ALL");
@@ -86,12 +86,12 @@ export const AuditLogsPanel: React.FC = () => {
     return filteredLogs.slice(startIndex, startIndex + ROWS_PER_PAGE);
   }, [filteredLogs, currentPage, ROWS_PER_PAGE]);
 
-  if (currentUser?.role !== UserRole.SUPER_ADMIN) {
+  if (!canAccess('auditTrail') && currentUser?.role !== UserRole.SUPER_ADMIN) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center space-y-4">
         <ShieldAlert className="text-rose-500 w-16 h-16" />
         <h2 className="text-2xl font-black uppercase">Access Restricted</h2>
-        <p className="text-slate-500 max-w-md font-medium">The System Audit Trail is only accessible to Super Admins. Please contact your administrator if you believe this is an error.</p>
+        <p className="text-slate-500 max-w-md font-medium">The System Audit Trail is restricted. Please contact your administrator if you believe this is an error.</p>
       </div>
     );
   }

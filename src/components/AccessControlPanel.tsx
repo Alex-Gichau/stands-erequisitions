@@ -100,10 +100,13 @@ export const AccessControlPanel: React.FC = () => {
     { id: "requisitions", label: "Requisitions Tracker", description: "Submit and follow requisition status" },
     { id: "approvals", label: "Authorization Hub", description: "Decision making for pending requests" },
     { id: "finance", label: "Budgets & Ledger", description: "Financial management and disbursement" },
+    { id: "transactions", label: "Transaction Logs", description: "Access to comprehensive transaction history and disbursement logs" },
     { id: "reports", label: "Impact Reports", description: "Analytics and historical snapshots" },
+    { id: "vendors", label: "Vendors Directory", description: "Access to church service providers and vendor catalog" },
     { id: "users", label: "User Management", description: "Control authentication and role assignments" },
     { id: "settings", label: "System Triggers", description: "Security trace and system configuration" },
     { id: "auditTrail", label: "Dashboard Audit Trail", description: "Visibility of the live activity feed on user dashboards" },
+    { id: "notifications", label: "Alerts & Notifications", description: "Visibility of system notifications and alerts" },
   ];
 
   const actionPermissions = [
@@ -111,9 +114,12 @@ export const AccessControlPanel: React.FC = () => {
     { id: "canApproveL1", label: "Level 1 Approval Authority", description: "Permission to grant first-tier authorization" },
     { id: "canApproveL2", label: "Level 2 Approval Authority", description: "Permission to grant final-tier authorization" },
     { id: "canDisburse", label: "Disbursement Authority", description: "Permission to process final payouts" },
+    { id: "canManageBudgets", label: "Budget Limits Administration", description: "Permission to allocate, adjust, and close fiscal budget lines" },
+    { id: "canExportReports", label: "Export Financial Reports", description: "Permission to download CSV and financial transaction logs" },
     { id: "canDeleteRequisition", label: "Ledger Modification", description: "Permission to delete draft or error entries" },
     { id: "canManageUsers", label: "Identity Control", description: "Permission to invite and suspend users" },
-    { id: "canManageSettings", label: "System Hardening", description: "Permission to modify audit policies" },
+    { id: "canManageSettings", label: "System Hardening", description: "Permission to modify audit policies and global settings" },
+    { id: "canViewTransactions", label: "View Transaction History", description: "Permission to inspect detailed transaction ledgers" },
   ];
 
   return (

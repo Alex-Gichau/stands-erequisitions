@@ -143,7 +143,8 @@ export const FinanceLedgerPanel: React.FC = () => {
     createLedgerBook,
     updateLedgerBookBudget,
     seedAllEcosystemData,
-    syncingTargets
+    syncingTargets,
+    canPerform
   } = useRequisitions();
 
   const handleToggleYearClosure = async () => {
@@ -248,8 +249,11 @@ export const FinanceLedgerPanel: React.FC = () => {
   // Background refresh hook usage
   useBackgroundRefresh(60000);
 
-  // Modal State
-  const isFinanceOrAdmin = currentUser?.role === UserRole.FINANCE || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN;
+  // Modal State & Authorization
+  const canManageBudgets = canPerform('canManageBudgets') || canPerform('canManageSettings') || currentUser?.role === UserRole.SUPER_ADMIN;
+  const canExport = canPerform('canExportReports') || currentUser?.role === UserRole.SUPER_ADMIN;
+  const canDisburse = canPerform('canDisburse') || currentUser?.role === UserRole.SUPER_ADMIN;
+  const isFinanceOrAdmin = canManageBudgets || canDisburse || currentUser?.role === UserRole.FINANCE || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN;
   const [confirmModal, setConfirmModal] = React.useState<{
     isOpen: boolean;
     title: string;
@@ -1050,6 +1054,11 @@ export const FinanceLedgerPanel: React.FC = () => {
 
   // Export general ledger transactions to CSV for Excel/Google Sheets
   const handleDownloadCSV = async () => {
+    if (!canExport) {
+      alert("Permission Denied: You do not possess authority to export financial ledger reports.");
+      return;
+    }
+
     if (ledgerEntries.length === 0) {
       alert("No transaction logs found to export.");
       return;
@@ -1924,14 +1933,16 @@ export const FinanceLedgerPanel: React.FC = () => {
               </select>
 
               {/* Export CSV Button */}
-              <button
-                onClick={handleDownloadCSV}
-                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs rounded-lg px-3 py-1.5 font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                title="Export current filtered ledger logs to CSV"
-              >
-                <Download size={13} strokeWidth={2.5} />
-                <span>Export CSV</span>
-              </button>
+              {canExport && (
+                <button
+                  onClick={handleDownloadCSV}
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs rounded-lg px-3 py-1.5 font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  title="Export current filtered ledger logs to CSV"
+                >
+                  <Download size={13} strokeWidth={2.5} />
+                  <span>Export CSV</span>
+                </button>
+              )}
             </div>
           </div>
 

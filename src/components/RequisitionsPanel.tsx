@@ -3148,7 +3148,7 @@ export interface DetailModalProps {
 }
 
 export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initialReq, onClose, onDelete, onGenerateReceipt, onEdit, isPage }) => {
-  const { currentUser, updateRequisitionStatus, updateRequisition, sendEmailNotification, uploadReceipts, globalSearchTerm, projects, triggerToast, vendors, requisitions, users, addAlert } = useRequisitions();
+  const { currentUser, updateRequisitionStatus, updateRequisition, sendEmailNotification, uploadReceipts, globalSearchTerm, projects, triggerToast, vendors, requisitions, users, addAlert, canPerform } = useRequisitions();
   const req = requisitions.find(r => r.id === initialReq.id) || initialReq;
   const normalizedAttachments = React.useMemo(() => {
     const fromReq = safeNormalizeAttachments(req.attachments);
@@ -3911,9 +3911,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
   const canAct = () => {
     if (!currentUser) return false;
-    if (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN) return true;
-    if (currentUser.role === UserRole.APPROVER_L1 && req.status === RequisitionStatus.SUBMITTED) return true;
-    if (currentUser.role === UserRole.APPROVER_L2 && (req.status === RequisitionStatus.APPROVED_L1 || req.status === RequisitionStatus.ESCALATED)) return true;
+    if (currentUser.role === UserRole.SUPER_ADMIN) return true;
+    if (canPerform('canApproveL1') && req.status === RequisitionStatus.SUBMITTED) return true;
+    if (canPerform('canApproveL2') && (req.status === RequisitionStatus.APPROVED_L1 || req.status === RequisitionStatus.ESCALATED)) return true;
     return false;
   };
 

@@ -4289,16 +4289,54 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [requisitions, setRequisitions, addSystemLog, syncProjectAmounts, sendEmailNotification, currentUser, withDbLoading]);
 
   const updateRequisition = useCallback(async (id: string, updates: Partial<Requisition>) => {
+    if (!navigator.onLine) {
+      throw new Error("Offline Mode: You are offline. All financial data is in read-only mode, and modifications are currently locked.");
+    }
+
+    if (systemSettings?.fiscalYearStatus === "ARCHIVED") {
+      throw new Error("This fiscal year is ARCHIVED. Editing requisitions is blocked.");
+    }
+
+    const isLightweightUpdate = Object.keys(updates).every(k => 
+      k === "comments" || 
+      k === "notificationEmails" || 
+      k === "notification_emails" || 
+      k === "requiresMoreInfo" || 
+      k === "additionalInfo" || 
+      k === "flaggedForAudit"
+    );
+
+    // Fast-path for comments and metadata updates (0ms UI lag, lightweight PATCH)
+    if (isLightweightUpdate) {
+      let updatedReq: Requisition | undefined;
+      setRequisitions(prev => {
+        const currentReq = prev.find(r => r.id === id);
+        if (currentReq) {
+          const cleanedUpdates = {
+            ...updates,
+            updatedAt: new Date().toISOString(),
+            flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
+          };
+          updatedReq = { ...currentReq, ...cleanedUpdates };
+          return prev.map(r => r.id === id ? updatedReq! : r);
+        }
+        return prev;
+      });
+
+      try {
+        await databaseService.patchRequisition(id, updates);
+        if (!skipFirestore && db) {
+          const reqRef = doc(db, "requisitions", id);
+          await updateDoc(reqRef, cleanFirestoreData(updates)).catch(() => {});
+        }
+      } catch (err) {
+        console.error("[updateRequisition Lightweight Patch Error]:", err);
+      }
+      return;
+    }
+
     return withDbLoading("Saving requisition changes...", async () => {
-      if (!navigator.onLine) {
-        throw new Error("Offline Mode: You are offline. All financial data is in read-only mode, and modifications are currently locked.");
-      }
-
-      if (systemSettings?.fiscalYearStatus === "ARCHIVED") {
-        throw new Error("This fiscal year is ARCHIVED. Editing requisitions is blocked.");
-      }
-
-    if (isFirestoreQuotaExceeded()) {
+      if (isFirestoreQuotaExceeded()) {
       console.log("[Quota Fallback] Firestore limits exceeded. Executing updateRequisition offline fallback.");
       const currentReq = requisitions.find(r => r.id === id);
       if (!currentReq) return;

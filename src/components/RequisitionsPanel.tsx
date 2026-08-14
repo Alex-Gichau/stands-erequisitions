@@ -3260,7 +3260,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         return { ...c, reactions };
       });
 
-      req.comments = updatedComments;
       await updateRequisition(req.id, { comments: updatedComments });
     } catch (err) {
       console.error("Failed to toggle reaction:", err);
@@ -3387,7 +3386,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     const updatedComments = [...currentComments, newComment];
 
     // Optimistically update local UI & reset form fields instantly (0ms delay)
-    req.comments = updatedComments;
     setCommentText("");
     setInlineReplyText("");
     setInlineReplyCommentId(null);

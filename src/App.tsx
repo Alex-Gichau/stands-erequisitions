@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
 // @ts-ignore
 const db = {};
 const doc = (a: any, b: any, c?: any) => { };
@@ -17,30 +17,33 @@ import { Sidebar } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import { sendSlackNotification } from "./lib/utils";
-import { RequisitionsPanel } from "./components/RequisitionsPanel";
 import { NotificationHub } from "./components/NotificationHub";
-import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator";
-import { ApprovalsPanel } from "./components/ApprovalsPanel";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { UsersPanel } from "./components/UsersPanel";
 import { WaitingRoom } from "./components/WaitingRoom";
 import { ProfilePrompt } from "./components/ProfilePrompt";
-import { ReportsPanel } from "./components/ReportsPanel";
-import { FinanceLedgerPanel } from "./components/FinanceLedgerPanel";
-import { AccessControlPanel } from "./components/AccessControlPanel";
-import { VendorsPanel } from "./components/VendorsPanel";
-import { AuditLogsPanel } from "./components/AuditLogsPanel";
-import { HelpPanel } from "./components/HelpPanel";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { ProductTour } from "./components/ProductTour";
 import { FeedbackModal } from "./components/FeedbackModal";
-import TransactionsPanel from "./components/TransactionsPanel";
 import { BugReportModal } from "./components/BugReportModal";
 import { ContactFinanceModal } from "./components/ContactFinanceModal";
 import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
+import { PanelSkeletonFallback } from "./components/PanelSkeletonFallback";
 import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearAllRecentSearchTerms } from "./lib/searchHistory";
 import { databaseService } from "./lib/databaseService";
 import { UserRole, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
+
+// Route-based & Panel Code Splitting (React.lazy)
+const RequisitionsPanel = lazy(() => import("./components/RequisitionsPanel").then(m => ({ default: m.RequisitionsPanel })));
+const ApprovalsPanel = lazy(() => import("./components/ApprovalsPanel").then(m => ({ default: m.ApprovalsPanel })));
+const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
+const UsersPanel = lazy(() => import("./components/UsersPanel").then(m => ({ default: m.UsersPanel })));
+const ReportsPanel = lazy(() => import("./components/ReportsPanel").then(m => ({ default: m.ReportsPanel })));
+const FinanceLedgerPanel = lazy(() => import("./components/FinanceLedgerPanel").then(m => ({ default: m.FinanceLedgerPanel })));
+const AccessControlPanel = lazy(() => import("./components/AccessControlPanel").then(m => ({ default: m.AccessControlPanel })));
+const VendorsPanel = lazy(() => import("./components/VendorsPanel").then(m => ({ default: m.VendorsPanel })));
+const AuditLogsPanel = lazy(() => import("./components/AuditLogsPanel").then(m => ({ default: m.AuditLogsPanel })));
+const HelpPanel = lazy(() => import("./components/HelpPanel").then(m => ({ default: m.HelpPanel })));
+const TransactionsPanel = lazy(() => import("./components/TransactionsPanel"));
+const ReceiptTemplateGenerator = lazy(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
 import {
   Bell,
   ArrowRight,
@@ -1685,22 +1688,30 @@ function AppContent() {
       return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
     }
 
-    switch (currentView) {
-      case "dashboard": return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
-      case "notifications": return <NotificationHub onSelectRequisition={(req) => { setSelectedRequisition(req); setCurrentView("requisitions"); }} />;
-      case "requisitions": return <RequisitionsPanel />;
-      case "vendors": return <VendorsPanel />;
-      case "approvals": return <ApprovalsPanel />;
-      case "settings": return <SettingsPanel />;
-      case "users": return <UsersPanel />;
-      case "reports": return <ReportsPanel />;
-      case "transactions": return <TransactionsPanel />;
-      case "finance": return <FinanceLedgerPanel />;
-      case "accessControl": return <AccessControlPanel />;
-      case "auditTrail": return <AuditLogsPanel />;
-      case "help": return <HelpPanel onPlayTour={() => setIsTourOpen(true)} />;
-      default: return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
-    }
+    const renderPanel = () => {
+      switch (currentView) {
+        case "dashboard": return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+        case "notifications": return <NotificationHub onSelectRequisition={(req) => { setSelectedRequisition(req); setCurrentView("requisitions"); }} />;
+        case "requisitions": return <RequisitionsPanel />;
+        case "vendors": return <VendorsPanel />;
+        case "approvals": return <ApprovalsPanel />;
+        case "settings": return <SettingsPanel />;
+        case "users": return <UsersPanel />;
+        case "reports": return <ReportsPanel />;
+        case "transactions": return <TransactionsPanel />;
+        case "finance": return <FinanceLedgerPanel />;
+        case "accessControl": return <AccessControlPanel />;
+        case "auditTrail": return <AuditLogsPanel />;
+        case "help": return <HelpPanel onPlayTour={() => setIsTourOpen(true)} />;
+        default: return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+      }
+    };
+
+    return (
+      <Suspense fallback={<PanelSkeletonFallback viewName={currentView} />}>
+        {renderPanel()}
+      </Suspense>
+    );
   };
 
   const unreadNotificationsCount = notificationItems.filter(item => !readNoticeIds.includes(item.id)).length;
@@ -2952,10 +2963,12 @@ function AppContent() {
       </div>
 
       {isGeneratingReceiptFromHub && (
-        <ReceiptTemplateGenerator
-          req={isGeneratingReceiptFromHub}
-          onClose={() => setIsGeneratingReceiptFromHub(null)}
-        />
+        <Suspense fallback={null}>
+          <ReceiptTemplateGenerator
+            req={isGeneratingReceiptFromHub}
+            onClose={() => setIsGeneratingReceiptFromHub(null)}
+          />
+        </Suspense>
       )}
 
       <ProductTour

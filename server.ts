@@ -1499,7 +1499,19 @@ async function startServer() {
           });
         }
       }
-      res.json(result);
+
+      const jsonString = JSON.stringify(result);
+      const etag = `"${crypto.createHash("md5").update(jsonString).digest("hex")}"`;
+
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, no-cache, must-revalidate");
+
+      const ifNoneMatch = req.headers["if-none-match"];
+      if (ifNoneMatch && (ifNoneMatch === etag || ifNoneMatch === etag.replace(/"/g, ''))) {
+        return res.status(304).end();
+      }
+
+      res.type("application/json").send(jsonString);
     } catch (err: any) {
       console.error("[MongoDB Bulk Get] Error:", err);
       res.status(500).json({ error: err.message || err });

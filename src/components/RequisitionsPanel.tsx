@@ -108,6 +108,7 @@ function getFileTypeBadge(fileName: string) {
 }
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
+import { compressImageFile } from "../lib/imageCompression";
 import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName, getNamedImagePlaceholder } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
@@ -3753,17 +3754,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     }
     setIsUploadingReceipt(true);
     try {
-      let base64data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") {
-            resolve(reader.result);
-          } else {
-            reject(new Error("Failed to read captured image as data URL"));
-          }
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
+      let base64data = await compressImageFile(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.82,
+        mimeType: "image/webp",
       });
 
       const mime = file.type || "image/jpeg";

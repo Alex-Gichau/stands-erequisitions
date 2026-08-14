@@ -906,6 +906,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const isFetchingDbRef = React.useRef(false);
+  const lastDbEtagRef = React.useRef<string>("");
   const lastPresenceTimeRef = React.useRef(0);
 
   const triggerToast = useCallback((toast: Omit<BudgetAlert, "id" | "isRead"> & { isRead?: boolean }) => {
@@ -2605,12 +2606,20 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
 
       try {
-        const headers = await getAuthHeaders();
+        const headers: Record<string, string> = await getAuthHeaders();
+        if (lastDbEtagRef.current) {
+          headers["If-None-Match"] = lastDbEtagRef.current;
+        }
         let response;
         try {
           response = await fetch("/api/db-all", { headers });
         } catch (fetchErr) {
           console.warn("Network Error when fetching database:", fetchErr);
+          return;
+        }
+
+        if (response?.status === 304) {
+          // Zero modifications in database since last cycle - skip all parsing and re-renders
           return;
         }
 
@@ -2621,6 +2630,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             console.warn(`[DB Sync] Server returned status ${response?.status || "unknown"}`);
           }
           return;
+        }
+
+        const etagHeader = response.headers.get("ETag");
+        if (etagHeader) {
+          lastDbEtagRef.current = etagHeader;
         }
 
         let dbData: any = null;

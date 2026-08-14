@@ -3228,12 +3228,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [inlineReplyText, setInlineReplyText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const modalScrollRef = useRef<HTMLDivElement>(null);
 
+  // Ensure requisition detail page/modal always displays starting from the top
   useEffect(() => {
-    if (commentsEndRef.current) {
-      commentsEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [req.comments?.length]);
+    if (leftPanelRef.current) leftPanelRef.current.scrollTop = 0;
+    if (rightPanelRef.current) rightPanelRef.current.scrollTop = 0;
+    if (modalScrollRef.current) modalScrollRef.current.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [req.id]);
 
   const handleToggleReaction = async (commentId: string, emoji: string) => {
     try {
@@ -3838,7 +3843,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       id: "submission",
       timestamp: req.submittedAt,
       title: "Requisition Created",
-      subtitle: "Entry logged into the ledger system",
+      subtitle: "Requisition Submitted for approval",
       type: "CREATED",
       actorName: req.requesterName,
       role: "Church Group 代表 (General Rep)"
@@ -4057,19 +4062,19 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             const steps = [
               {
                 title: "Submitted",
-                desc: "Entry logged",
+                desc: "Submitted for approval",
                 icon: User,
                 status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming"
               },
               {
                 title: "L1 Approved",
-                desc: "Leader Verify",
+                desc: "First Level Approval",
                 icon: ShieldCheck,
                 status: isRejected && req.rejectionReason?.includes("L1") ? "rejected" : (currentStep > 1 ? "completed" : currentStep === 1 ? "active" : "upcoming")
               },
               {
                 title: "L2 Approved",
-                desc: "Board Consent",
+                desc: "Second Level Approval",
                 icon: ShieldCheck,
                 status: isEscalated ? "escalated" : (isRejected && !req.rejectionReason?.includes("L1") ? "rejected" : (currentStep > 2 ? "completed" : currentStep === 2 ? "active" : "upcoming"))
               },
@@ -4171,9 +4176,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             );
           })()}
 
-          <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3 overflow-y-auto lg:overflow-hidden">
+          <div ref={modalScrollRef} className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3 overflow-y-auto lg:overflow-hidden">
             {/* Left Content */}
-            <div className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            <div ref={leftPanelRef} className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
               <section className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-[0.2em]">Requisition Description</h4>
@@ -5246,7 +5251,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             </div>
 
             {/* Right Sidebar - History & Status */}
-            <div className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 uppercase tracking-widest">History & Audit Timeline</h4>

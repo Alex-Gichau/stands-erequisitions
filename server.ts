@@ -1953,7 +1953,7 @@ async function startServer() {
     const n4 = getNodeConfig("DISBURSED", s4State);
 
     const t2Title = s2State === "returned" ? "RETURNED" : "L1 APPROVED";
-    const t2Sub = s2State === "returned" ? "REVISION REQ" : "LEADER VERIFY";
+    const t2Sub = s2State === "returned" ? "REVISION REQ" : "FIRST LEVEL APPROVAL";
 
     return `
       <div style="background-color: #0b0f19; border-radius: 12px; padding: 22px 12px 18px 12px; margin: 20px 0; border: 1px solid #1e293b; box-shadow: inset 0 1px 2px rgba(255,255,255,0.05);">
@@ -2045,7 +2045,7 @@ async function startServer() {
             <!-- Label 1 -->
             <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
               <div style="font-size: 10px; font-weight: 800; color: ${n1.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">SUBMITTED</div>
-              <div style="font-size: 8px; font-weight: 700; color: ${n1.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">ENTRY LOGGED</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n1.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">SENT FOR APPROVAL</div>
             </td>
 
             <!-- Label 2 -->
@@ -2057,7 +2057,7 @@ async function startServer() {
             <!-- Label 3 -->
             <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
               <div style="font-size: 10px; font-weight: 800; color: ${n3.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">L2 APPROVED</div>
-              <div style="font-size: 8px; font-weight: 700; color: ${n3.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">BOARD CONSENT</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n3.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">SECOND LEVEL</div>
             </td>
 
             <!-- Label 4 -->

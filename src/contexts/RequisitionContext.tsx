@@ -350,6 +350,55 @@ export function safeNormalizeApprovalHistory(history: any): any[] {
   return [];
 }
 
+export function safeNormalizeComments(comments: any): any[] {
+  if (!comments) return [];
+  let parsed = comments;
+  if (typeof comments === 'string') {
+    const trimmed = comments.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        return [];
+      }
+    } else {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((c: any) => {
+    if (typeof c === 'string') {
+      try {
+        c = JSON.parse(c);
+      } catch (e) {
+        return null;
+      }
+    }
+    if (!c || typeof c !== 'object') return null;
+    const authorAvatar = c.authorAvatar || c.author_avatar || c.authorPhotoURL || c.author_photo_url || "";
+    const authorName = c.authorName || c.author_name || c.authorEmail || c.author_email || "User";
+    const authorEmail = c.authorEmail || c.author_email || "";
+    const authorRole = c.authorRole || c.author_role || "USER";
+    const createdAt = c.createdAt || c.created_at || c.timestamp || new Date().toISOString();
+    return {
+      id: c.id || `comment_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      authorId: c.authorId || c.author_id || "anonymous",
+      authorName,
+      authorEmail,
+      authorRole,
+      authorAvatar,
+      authorPhotoURL: authorAvatar,
+      text: c.text || "",
+      timestamp: createdAt,
+      createdAt,
+      parentId: c.parentId !== undefined ? c.parentId : (c.parent_id !== undefined ? c.parent_id : (c.replyTo?.id || null)),
+      replyTo: c.replyTo || (c.parent_id ? { id: c.parent_id, authorName: c.parent_author_name || "User", text: "" } : undefined),
+      reactions: c.reactions || {},
+      isEdited: Boolean(c.isEdited || c.is_edited)
+    };
+  }).filter(Boolean);
+}
+
 const limit = (val: number) => ({ type: 'limit', value: val });
 const orderBy = (field: string, direction: string = 'asc') => ({ type: 'orderBy', field, direction });
 const where = (field: string, op: string, value: any) => ({ type: 'where', field, op, value });
@@ -1941,7 +1990,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           attachments: safeNormalizeAttachments(r?.attachments),
           receipts: safeNormalizeReceipts(r?.receipts),
           approvalHistory: safeNormalizeApprovalHistory(r?.approvalHistory || r?.approval_history),
-          comments: r?.comments || [],
+          comments: safeNormalizeComments(r?.comments),
           notificationEmails: safeNormalizeNotificationEmails(r)
         } as Requisition;
       });
@@ -2679,7 +2728,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 disbursedAt: r?.disbursed_at || r?.disbursedAt || "",
                 rejectionReason: r?.rejection_reason || r?.rejectionReason || "",
                 approvalHistory: safeNormalizeApprovalHistory(r?.approval_history || r?.approvalHistory || []),
-                comments: r?.comments || [],
+                comments: safeNormalizeComments(r?.comments),
                 digitalSignature: r?.digital_signature || r?.digitalSignature || "",
                 payableTo: r?.payable_to || r?.payableTo || "",
                 recurrence: r?.recurrence || null,

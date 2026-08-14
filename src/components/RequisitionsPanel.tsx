@@ -89,6 +89,34 @@ function formatRelativeTime(timestamp?: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function getAvatarInitials(name: string): string {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "U";
+}
+
+function getAvatarBgColor(name: string): string {
+  const bgColors = [
+    "bg-indigo-600 text-white",
+    "bg-emerald-600 text-white",
+    "bg-amber-600 text-white",
+    "bg-rose-600 text-white",
+    "bg-sky-600 text-white",
+    "bg-purple-600 text-white",
+    "bg-teal-600 text-white"
+  ];
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return bgColors[Math.abs(hash) % bgColors.length];
+}
+
 // File extension pill helper
 function getFileTypeBadge(fileName: string) {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -3194,8 +3222,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
 
-  // WhatsApp Chat states
+  // Comments & Threaded Discussion states
   const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
+  const [inlineReplyCommentId, setInlineReplyCommentId] = useState<string | null>(null);
+  const [inlineReplyText, setInlineReplyText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
@@ -3214,7 +3244,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       const updatedComments = currentComments.map((c: any) => {
         if (c.id !== commentId) return c;
         const reactions = Array.isArray(c.reactions) ? [...c.reactions] : [];
-        const existingIdx = reactions.findIndex((r: any) => r.emoji === emoji && r.userId === currentUserId);
+        const existingIdx = reactions.findIndex((r: any) => r.emoji === emoji && (r.userId === currentUserId || r.userId === currentUser?.email));
 
         if (existingIdx >= 0) {
           reactions.splice(existingIdx, 1);
@@ -3318,14 +3348,19 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     });
   };
 
-  const handleAddComment = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmed = commentText.trim();
+  const handleAddComment = async (eOrCustomText?: React.FormEvent | string, customParent?: { id: string; authorName: string; text: string }) => {
+    if (eOrCustomText && typeof eOrCustomText !== "string" && typeof (eOrCustomText as any).preventDefault === "function") {
+      (eOrCustomText as React.FormEvent).preventDefault();
+    }
+
+    const textToSubmit = typeof eOrCustomText === "string" ? eOrCustomText : commentText;
+    const trimmed = textToSubmit.trim();
     if (!trimmed) return;
 
     // Resolve author name cleanly and consistently from user profile
-    const calculatedAuthorName = resolveSenderName(currentUser, users);
+    const calculatedAuthorName = resolveSenderName(currentUser, users) || currentUser?.name || currentUser?.email || "User";
     const authorPhoto = currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
+    const parent = customParent || replyingTo;
 
     const newComment = {
       id: `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -3333,10 +3368,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       authorName: calculatedAuthorName,
       authorEmail: currentUser?.email || "",
       authorRole: currentUser?.role || "USER",
+      authorAvatar: authorPhoto,
       authorPhotoURL: authorPhoto,
       text: trimmed,
       timestamp: new Date().toISOString(),
-      ...(replyingTo ? { replyTo: { id: replyingTo.id, authorName: replyingTo.authorName, text: replyingTo.text } } : {})
+      createdAt: new Date().toISOString(),
+      parentId: parent ? parent.id : null,
+      ...(parent ? { replyTo: { id: parent.id, authorName: parent.authorName, text: parent.text } } : {}),
+      reactions: []
     };
     
     const currentComments = Array.isArray(req.comments) ? req.comments : [];
@@ -3345,6 +3384,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     // Optimistically update local UI & reset form fields instantly (0ms delay)
     req.comments = updatedComments;
     setCommentText("");
+    setInlineReplyText("");
+    setInlineReplyCommentId(null);
     setMentionSearch(null);
     setMentionIndex(-1);
     setReplyingTo(null);
@@ -3693,7 +3734,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     
     timelineEvents.forEach((event, idx) => {
       text += `${idx + 1}. ${formatDate(event.timestamp)} - [${event.type}] ${event.title}\n`;
-      text += `   Operator: ${event.actorName}${event.role ? ` (${event.role})` : ""}\n`;
+      text += `   Requestor: ${event.actorName}${event.role ? ` (${event.role})` : ""}\n`;
       if (event.note) {
         text += `   Note: "${event.note}"\n`;
       }
@@ -3861,10 +3902,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       timeline.push({
         id: "legacy-l1",
         timestamp: req.approvedAtL1,
-        title: "L1 Compliance Clearance Granted",
-        subtitle: "First level verification & audit clearance",
+        title: "L1 Approval Granted",
+        subtitle: "First level approval completed",
         type: "L1_APPROVED",
-        actorName: "Compliance Verifier L1"
+        actorName: "Ministry L1 Approver"
       });
     }
 
@@ -3872,10 +3913,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       timeline.push({
         id: "legacy-l2",
         timestamp: req.approvedAtL2,
-        title: "L2 Keymaster Signing Certified",
-        subtitle: "Second level consensus consent",
+        title: "L2 Approval Granted",
+        subtitle: "Second level approval cleared",
         type: "L2_APPROVED",
-        actorName: "Keymaster L2 Leader"
+        actorName: "Ministry L2 Approver"
       });
     }
 
@@ -3886,7 +3927,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         title: "Requisition Funds Disbursed",
         subtitle: "Financial transaction settled and paid",
         type: "DISBURSED",
-        actorName: "Finance Auditor"
+        actorName: "STANDS Finance Office"
       });
     }
 
@@ -4543,16 +4584,16 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   {/* Comments Feed List */}
                   {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
                     const allComments = req.comments;
-                    const topLevelComments = allComments.filter((c: any) => !c.replyTo?.id);
+                    const topLevelComments = allComments.filter((c: any) => !c.parentId && !c.replyTo?.id);
 
                     return (
-                      <div className="space-y-4">
+                      <div className="space-y-3.5">
                         {topLevelComments.map((comment: any) => {
-                          const replies = allComments.filter((c: any) => c.replyTo?.id === comment.id);
+                          const replies = allComments.filter((c: any) => (c.parentId && c.parentId === comment.id) || (!c.parentId && c.replyTo?.id === comment.id));
 
-                          const isAuthor = comment.authorId === currentUser?.id || comment.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
+                          const isAuthor = comment.authorId === currentUser?.id || (comment.authorEmail && currentUser?.email && comment.authorEmail.toLowerCase() === currentUser.email.toLowerCase());
                           const canDelete = isAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
-                          const diffMs = Date.now() - new Date(comment.timestamp).getTime();
+                          const diffMs = Date.now() - new Date(comment.createdAt || comment.timestamp).getTime();
                           const canEdit = isAuthor && (diffMs / 60000 <= 15);
                           
                           const commentUser = users.find((u: any) => 
@@ -4564,58 +4605,64 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             {
                               id: comment.authorId,
                               email: comment.authorEmail,
-                              name: (isAuthor && currentUser?.name) ? currentUser.name : comment.authorName,
+                              name: comment.authorName,
                               role: comment.authorRole
                             },
                             users
                           ) || comment.authorName || comment.authorEmail || "User";
 
-                          const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
-                            ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
-                            : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
+                          const photoURL = comment.authorAvatar || comment.authorPhotoURL || (commentUser?.photoURL || (commentUser as any)?.avatarUrl) || (isAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
-                          const initials = displayName.charAt(0).toUpperCase();
                           const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
-
                           const reactionCounts = reactions.reduce((acc: any, r: any) => {
                             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                             return acc;
                           }, {});
 
+                          const thumbsCount = reactions.filter((r: any) => r.emoji === "👍").length;
+                          const hasUserLiked = reactions.some((r: any) => r.emoji === "👍" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                          const heartCount = reactions.filter((r: any) => r.emoji === "❤️").length;
+                          const hasUserHearted = reactions.some((r: any) => r.emoji === "❤️" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+
                           return (
-                            <div key={comment.id} className="bg-slate-50/90 dark:bg-slate-900/60 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs group relative">
+                            <div key={comment.id} className="bg-slate-50/90 dark:bg-slate-900/70 p-4 sm:p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5 shadow-2xs group relative transition-all">
                               {/* Comment Header */}
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-3">
                                   {photoURL ? (
                                     <img 
                                       src={photoURL} 
                                       alt={displayName} 
-                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs"
+                                      className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700/80 shrink-0 shadow-2xs"
                                       onError={handleImageError}
                                     />
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center shrink-0">
-                                      {initials}
+                                    <div className={`w-9 h-9 rounded-full ${getAvatarBgColor(displayName)} font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs`}>
+                                      {getAvatarInitials(displayName)}
                                     </div>
                                   )}
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight">
                                       {displayName}
                                     </span>
-                                    <span className="text-slate-400 text-xs font-normal">•</span>
-                                    <span className="text-xs text-slate-400 font-medium">
-                                      {formatRelativeTime(comment.timestamp)}
+                                    <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">•</span>
+                                    <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+                                      {formatRelativeTime(comment.createdAt || comment.timestamp)}
                                     </span>
                                     {comment.isEdited && (
                                       <span className="text-[10px] text-slate-400 italic">(edited)</span>
+                                    )}
+                                    {comment.authorRole && (
+                                      <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase font-bold">
+                                        {comment.authorRole}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
 
                                 {/* Actions / Menu */}
                                 {(canEdit || canDelete) && (
-                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                                  <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                                     {canEdit && (
                                       <button
                                         type="button"
@@ -4623,7 +4670,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                           setEditingCommentId(comment.id);
                                           setEditingCommentText(comment.text);
                                         }}
-                                        className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                                        className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                         title="Edit"
                                       >
                                         <Pencil size={13} />
@@ -4633,7 +4680,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                       <button
                                         type="button"
                                         onClick={() => handleDeleteComment(comment.id)}
-                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                        className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                                         title="Delete"
                                       >
                                         <Trash2 size={13} />
@@ -4645,11 +4692,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                               {/* Comment Body */}
                               {editingCommentId === comment.id ? (
-                                <div className="space-y-2 mt-2">
+                                <div className="pl-12 space-y-2 mt-2">
                                   <textarea
                                     value={editingCommentText}
                                     onChange={(e) => setEditingCommentText(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
                                     rows={2}
                                     autoFocus
                                   />
@@ -4660,28 +4707,30 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                         setEditingCommentId(null);
                                         setEditingCommentText("");
                                       }}
-                                      className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200"
+                                      className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                                     >
                                       Cancel
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleUpdateComment(comment.id, editingCommentText)}
-                                      className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700"
+                                      className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 cursor-pointer"
                                     >
                                       Save
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
-                                  {renderFormattedCommentText(comment.text)}
-                                </p>
+                                <div className="pl-12">
+                                  <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
+                                    {renderFormattedCommentText(comment.text)}
+                                  </p>
+                                </div>
                               )}
 
                               {/* Attached Files Box if files exist */}
                               {Array.isArray(req.attachments) && req.attachments.length > 0 && comment === topLevelComments[0] && (
-                                <div className="bg-slate-100/70 dark:bg-slate-800/50 p-3 rounded-2xl space-y-2">
+                                <div className="ml-12 bg-slate-100/70 dark:bg-slate-800/50 p-3 rounded-2xl space-y-2">
                                   <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
                                     {req.attachments.length} {req.attachments.length === 1 ? 'file attached' : 'files attached'}
                                   </span>
@@ -4709,80 +4758,157 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                 </div>
                               )}
 
-                              {/* Reactions & Reply Action Bar */}
-                              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                                {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => (
+                              {/* YouTube-style Reactions & Action Bar */}
+                              <div className="pl-12 pt-1 flex items-center gap-2 flex-wrap">
+                                {/* Thumbs Up Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReaction(comment.id, "👍")}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs",
+                                    hasUserLiked
+                                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 dark:bg-amber-500/20 font-bold"
+                                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80"
+                                  )}
+                                  title="React 👍"
+                                >
+                                  <span>👍</span>
+                                  {thumbsCount > 0 && <span className="text-[11px] font-bold">{thumbsCount}</span>}
+                                </button>
+
+                                {/* Heart Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleReaction(comment.id, "❤️")}
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs",
+                                    hasUserHearted
+                                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 dark:bg-rose-500/20 font-bold"
+                                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80"
+                                  )}
+                                  title="React ❤️"
+                                >
+                                  <span>❤️</span>
+                                  {heartCount > 0 && <span className="text-[11px] font-bold">{heartCount}</span>}
+                                </button>
+
+                                {/* Other Emoji Reactions */}
+                                {Object.entries(reactionCounts).filter(([emoji]) => emoji !== "👍" && emoji !== "❤️").map(([emoji, count]: [string, any]) => (
                                   <button
                                     key={emoji}
                                     type="button"
                                     onClick={() => handleToggleReaction(comment.id, emoji)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs font-medium"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs font-medium"
                                   >
                                     <span>{emoji}</span>
                                     <span className="font-bold text-[11px]">{count}</span>
                                   </button>
                                 ))}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "👍")}
-                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-500 transition-all cursor-pointer shadow-2xs"
-                                  title="React 👍"
-                                >
-                                  👍
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "❤️")}
-                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-500 transition-all cursor-pointer shadow-2xs"
-                                  title="React ❤️"
-                                >
-                                  ❤️
-                                </button>
-
+                                {/* Reply Button */}
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text });
-                                    if (commentTextareaRef.current) {
-                                      commentTextareaRef.current.focus();
+                                    if (inlineReplyCommentId === comment.id) {
+                                      setInlineReplyCommentId(null);
+                                      setInlineReplyText("");
+                                    } else {
+                                      setInlineReplyCommentId(comment.id);
+                                      setInlineReplyText("");
                                     }
                                   }}
-                                  className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors px-2.5 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                                 >
                                   <Reply size={13} />
                                   <span>Reply</span>
                                 </button>
                               </div>
 
-                              {/* Nested Replies Section with Left Connector Line */}
+                              {/* Inline Reply Composer Box */}
+                              {inlineReplyCommentId === comment.id && (
+                                <div className="pl-12 pt-2 animate-in fade-in duration-150">
+                                  <div className="flex gap-2.5 items-start bg-white dark:bg-slate-950 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-xs">
+                                    {currentUser?.photoURL || (currentUser as any)?.avatarUrl ? (
+                                      <img
+                                        src={currentUser?.photoURL || (currentUser as any)?.avatarUrl}
+                                        alt={resolveSenderName(currentUser, users) || "User"}
+                                        className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700 mt-0.5"
+                                        onError={handleImageError}
+                                      />
+                                    ) : (
+                                      <div className={`w-7 h-7 rounded-full ${getAvatarBgColor(resolveSenderName(currentUser, users) || "U")} text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5`}>
+                                        {getAvatarInitials(resolveSenderName(currentUser, users) || "U")}
+                                      </div>
+                                    )}
+                                    <div className="flex-1 space-y-2">
+                                      <textarea
+                                        value={inlineReplyText}
+                                        onChange={(e) => setInlineReplyText(e.target.value)}
+                                        placeholder={`Reply to ${displayName}...`}
+                                        rows={2}
+                                        autoFocus
+                                        className="w-full px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none"
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAddComment(inlineReplyText, { id: comment.id, authorName: displayName, text: comment.text });
+                                          }
+                                        }}
+                                      />
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setInlineReplyCommentId(null);
+                                            setInlineReplyText("");
+                                          }}
+                                          className="px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={!inlineReplyText.trim()}
+                                          onClick={() => handleAddComment(inlineReplyText, { id: comment.id, authorName: displayName, text: comment.text })}
+                                          className="px-3.5 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                        >
+                                          <Send size={11} />
+                                          <span>Reply</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Nested Replies Section with Vertical Left Connector */}
                               {replies.length > 0 && (
-                                <div className="pt-2 space-y-3">
+                                <div className="pt-2 space-y-2.5">
                                   {/* Replies Header Summary */}
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pl-1">
+                                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pl-12">
                                     <div className="flex -space-x-1.5 overflow-hidden">
                                       {replies.slice(0, 4).map((rep: any, idx: number) => {
                                         const repUser = users.find((u: any) => u.id === rep.authorId || u.email?.toLowerCase() === rep.authorEmail?.toLowerCase());
-                                        const pUrl = repUser?.photoURL || (repUser as any)?.avatarUrl || rep.authorPhotoURL || "";
+                                        const pUrl = rep.authorAvatar || rep.authorPhotoURL || (repUser?.photoURL || (repUser as any)?.avatarUrl) || "";
+                                        const repName = rep.authorName || repUser?.name || "U";
                                         return pUrl ? (
-                                          <img key={idx} src={pUrl} alt="" className="inline-block h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover" />
+                                          <img key={idx} src={pUrl} alt="" className="inline-block h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover" onError={handleImageError} />
                                         ) : (
-                                          <div key={idx} className="inline-flex h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 bg-indigo-100 text-indigo-700 font-bold text-[9px] items-center justify-center">
-                                            {(rep.authorName || 'U').charAt(0)}
+                                          <div key={idx} className={`inline-flex h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 ${getAvatarBgColor(repName)} font-bold text-[9px] items-center justify-center`}>
+                                            {getAvatarInitials(repName)}
                                           </div>
                                         );
                                       })}
                                     </div>
                                     <span>
-                                      {replies.length} {replies.length === 1 ? 'reply' : 'replies'} from {replies.map((r: any) => r.authorName.split(' ')[0]).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).slice(0, 3).join(', ')}
+                                      {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
                                     </span>
                                   </div>
 
                                   {/* Vertical Thread Connector Line */}
-                                  <div className="border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-3.5 space-y-3">
+                                  <div className="border-l-2 border-slate-200 dark:border-slate-800 ml-6 pl-4 space-y-2.5">
                                     {replies.map((reply: any) => {
-                                      const isReplyAuthor = reply.authorId === currentUser?.id || reply.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
+                                      const isReplyAuthor = reply.authorId === currentUser?.id || (reply.authorEmail && currentUser?.email && reply.authorEmail.toLowerCase() === currentUser.email.toLowerCase());
                                       const canDeleteReply = isReplyAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
                                       
                                       const replyUser = users.find((u: any) => 
@@ -4794,15 +4920,13 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                         {
                                           id: reply.authorId,
                                           email: reply.authorEmail,
-                                          name: (isReplyAuthor && currentUser?.name) ? currentUser.name : reply.authorName,
+                                          name: reply.authorName,
                                           role: reply.authorRole
                                         },
                                         users
                                       ) || reply.authorName || reply.authorEmail || "User";
 
-                                      const replyPhotoURL = (isReplyAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
-                                        ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
-                                        : (replyUser?.photoURL || (replyUser as any)?.avatarUrl || reply.authorPhotoURL || "");
+                                      const replyPhotoURL = reply.authorAvatar || reply.authorPhotoURL || (replyUser?.photoURL || (replyUser as any)?.avatarUrl) || (isReplyAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
                                       const replyReactions = Array.isArray(reply.reactions) ? reply.reactions : [];
                                       const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
@@ -4810,36 +4934,43 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                         return acc;
                                       }, {});
 
+                                      const replyThumbsCount = replyReactions.filter((r: any) => r.emoji === "👍").length;
+                                      const hasReplyUserLiked = replyReactions.some((r: any) => r.emoji === "👍" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                                      const replyHeartCount = replyReactions.filter((r: any) => r.emoji === "❤️").length;
+                                      const hasReplyUserHearted = replyReactions.some((r: any) => r.emoji === "❤️" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+
                                       return (
-                                        <div key={reply.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 space-y-2 text-xs relative group/reply shadow-2xs">
+                                        <div key={reply.id} className="bg-white dark:bg-slate-950 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800/80 space-y-2 text-xs relative group/reply shadow-2xs">
                                           <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2.5">
                                               {replyPhotoURL ? (
                                                 <img 
                                                   src={replyPhotoURL} 
                                                   alt={replyDisplayName} 
-                                                  className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0"
+                                                  className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
                                                   onError={handleImageError}
                                                 />
                                               ) : (
-                                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0">
-                                                  {replyDisplayName.charAt(0).toUpperCase()}
+                                                <div className={`w-8 h-8 rounded-full ${getAvatarBgColor(replyDisplayName)} font-bold text-[10px] flex items-center justify-center shrink-0`}>
+                                                  {getAvatarInitials(replyDisplayName)}
                                                 </div>
                                               )}
-                                              <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
-                                                {replyDisplayName}
-                                              </span>
-                                              <span className="text-slate-400 text-[10px]">•</span>
-                                              <span className="text-[11px] text-slate-400 font-medium">
-                                                {formatRelativeTime(reply.timestamp)}
-                                              </span>
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                                                  {replyDisplayName}
+                                                </span>
+                                                <span className="text-slate-400 dark:text-slate-500 text-[10px]">•</span>
+                                                <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                                                  {formatRelativeTime(reply.createdAt || reply.timestamp)}
+                                                </span>
+                                              </div>
                                             </div>
 
                                             {canDeleteReply && (
                                               <button
                                                 type="button"
                                                 onClick={() => handleDeleteComment(reply.id)}
-                                                className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover/reply:opacity-100 transition-opacity"
+                                                className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover/reply:opacity-100 transition-opacity cursor-pointer"
                                                 title="Delete reply"
                                               >
                                                 <Trash2 size={12} />
@@ -4847,32 +4978,55 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                             )}
                                           </div>
 
-                                          <p className="text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap pl-8">
-                                            {renderFormattedCommentText(reply.text)}
-                                          </p>
+                                          <div className="pl-10.5">
+                                            <p className="text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
+                                              {renderFormattedCommentText(reply.text)}
+                                            </p>
+                                          </div>
 
                                           {/* Reply Reactions */}
-                                          <div className="flex items-center gap-1.5 pl-8 pt-0.5">
-                                            {Object.entries(replyReactionCounts).map(([emoji, count]: [string, any]) => (
+                                          <div className="pl-10.5 pt-0.5 flex items-center gap-1.5 flex-wrap">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleReaction(reply.id, "👍")}
+                                              className={cn(
+                                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
+                                                hasReplyUserLiked
+                                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 dark:bg-amber-500/20 font-bold"
+                                                  : "bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent"
+                                              )}
+                                              title="React 👍"
+                                            >
+                                              <span>👍</span>
+                                              {replyThumbsCount > 0 && <span className="font-bold">{replyThumbsCount}</span>}
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => handleToggleReaction(reply.id, "❤️")}
+                                              className={cn(
+                                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
+                                                hasReplyUserHearted
+                                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 dark:bg-rose-500/20 font-bold"
+                                                  : "bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent"
+                                              )}
+                                              title="React ❤️"
+                                            >
+                                              <span>❤️</span>
+                                              {replyHeartCount > 0 && <span className="font-bold">{replyHeartCount}</span>}
+                                            </button>
+
+                                            {Object.entries(replyReactionCounts).filter(([emoji]) => emoji !== "👍" && emoji !== "❤️").map(([emoji, count]: [string, any]) => (
                                               <button
                                                 key={emoji}
                                                 type="button"
                                                 onClick={() => handleToggleReaction(reply.id, emoji)}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 font-medium border border-slate-200/60 dark:border-slate-700"
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-850 text-[10px] text-slate-700 dark:text-slate-300 font-medium border border-slate-200/60 dark:border-slate-700"
                                               >
                                                 <span>{emoji}</span>
                                                 <span className="font-bold">{count}</span>
                                               </button>
                                             ))}
-
-                                            <button
-                                              type="button"
-                                              onClick={() => handleToggleReaction(reply.id, "👍")}
-                                              className="inline-flex items-center justify-center p-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 text-slate-400 hover:text-amber-500"
-                                              title="React 👍"
-                                            >
-                                              👍
-                                            </button>
                                           </div>
                                         </div>
                                       );
@@ -5133,7 +5287,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     let methodLabel = "System authorization protocol";
                     let MethodIcon = Activity;
                     if (event.method === "CODE") {
-                      methodLabel = "Secure passcode verified";
+                      methodLabel = "L1 Approval successful";
                       MethodIcon = KeyRound;
                     } else if (event.method === "FINGERPRINT") {
                       methodLabel = "Biometric authenticated";
@@ -5193,7 +5347,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             "hover:border-slate-200"
                           )}>
                             <div className="flex items-center justify-between text-[9px] border-b border-slate-50 pb-1.5">
-                              <span className="font-medium text-slate-405">Operator:</span>
+                              <span className="font-medium text-slate-405">Requestor:</span>
                               <span className="font-extrabold text-slate-800">{event.actorName}</span>
                             </div>
 

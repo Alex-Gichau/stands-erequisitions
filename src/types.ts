@@ -77,16 +77,34 @@ export interface ApprovalNote {
   timestamp: string;
 }
 
+export interface CommentReaction {
+  thumbsUp?: string[];
+  heart?: boolean;
+  [key: string]: any;
+}
+
 export interface Comment {
   id: string;
   authorId: string;
   authorName: string;
   authorEmail: string;
-  authorRole: string;
-  authorPhotoURL?: string;
+  authorRole?: string;
+  authorAvatar?: string;
+  authorPhotoURL?: string; // backwards compatibility
   text: string;
-  timestamp: string;
+  timestamp?: string;      // backwards compatibility
+  createdAt?: string;      // ISO timestamp
+  parentId?: string | null;// For nested replies
+  replyTo?: {
+    id: string;
+    authorName: string;
+    text: string;
+  };
+  reactions?: any;
+  isEdited?: boolean;
 }
+
+export type RequisitionComment = Comment;
 
 export interface Requisition {
   id: string;

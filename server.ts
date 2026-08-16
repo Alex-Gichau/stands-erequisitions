@@ -825,7 +825,7 @@ function generateSlackFullReport(): string {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = parseInt(process.env.SERVER_PORT || "3000", 10);
 
   // Security / COOP Policy middleware for OAuth & Firebase Auth popups
   app.use((_req, res, next) => {

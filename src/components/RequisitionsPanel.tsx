@@ -284,25 +284,47 @@ export function resolveReactorNames(
   allUsers: any[] = [],
   currentLoggedInUser: any = null
 ): string[] {
+  const detailed = resolveDetailedReactors(reactionsList, allUsers, currentLoggedInUser, emoji);
+  return detailed.map(d => d.displayName);
+}
+
+export interface DetailedReactor {
+  id: string;
+  name: string; // Full Real Name, e.g. "John Mwangi"
+  firstName: string; // "John"
+  displayName: string; // "You" if current user, otherwise full name
+  shortDisplayName: string; // "You" if current user, otherwise first name
+  username?: string;
+  email?: string;
+  photoURL?: string;
+  emoji: string;
+  isCurrentUser: boolean;
+}
+
+export function resolveDetailedReactors(
+  reactionsList: any[],
+  allUsers: any[] = [],
+  currentLoggedInUser: any = null,
+  filterEmoji?: string
+): DetailedReactor[] {
   const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
-  const matching = sanitized.filter((r: any) => r && r.emoji === emoji);
+  const matching = filterEmoji ? sanitized.filter((r: any) => r && r.emoji === filterEmoji) : sanitized.filter((r: any) => r && r.emoji);
   if (matching.length === 0) return [];
-  
-  const userMap = buildUserLookupMap(allUsers);
-  const names: string[] = [];
 
   const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
   const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
-  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
   const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
+  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
 
-  matching.forEach((r: any) => {
+  const reactors: DetailedReactor[] = [];
+  const seenUserKeys = new Set<string>();
+
+  for (const r of matching) {
     const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
     const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
     const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
     const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
 
-    // 1. Explicitly check if this is the currently logged in user -> returns 'You'
     const isCurrent = Boolean(
       (rUserId === "u-current") ||
       (rUserId === "__current_user__") ||
@@ -310,93 +332,128 @@ export function resolveReactorNames(
         (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
         (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
         (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
-        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
+        (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined"].includes(curName) && rUserName.toLowerCase() === curName)
       ))
     );
 
     if (isCurrent) {
-      names.push("You");
-      return;
+      const userKey = "__current_user__";
+      if (!seenUserKeys.has(userKey)) {
+        seenUserKeys.add(userKey);
+        const myFullName = currentLoggedInUser?.name || (currentLoggedInUser as any)?.username || "You";
+        const myFirstName = myFullName.includes(" ") ? myFullName.split(" ")[0] : myFullName;
+        const myPhoto = currentLoggedInUser?.photoURL || (currentLoggedInUser as any)?.avatarUrl || r.avatarUrl || r.photoURL || "";
+        
+        reactors.unshift({
+          id: currentLoggedInUser?.id || "u-current",
+          name: myFullName,
+          firstName: myFirstName,
+          displayName: "You",
+          shortDisplayName: "You",
+          username: (currentLoggedInUser as any)?.username,
+          email: currentLoggedInUser?.email,
+          photoURL: myPhoto,
+          emoji: r.emoji,
+          isCurrentUser: true
+        });
+      }
+      continue;
     }
 
-    // 2. Lookup in user map by ID, email, or username
-    if (rUserId && userMap.has(rUserId)) {
-      const resolved = userMap.get(rUserId)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
-        names.push(resolved.trim());
-        return;
-      }
-    }
-    if (rUserEmail && userMap.has(rUserEmail)) {
-      const resolved = userMap.get(rUserEmail)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
-        names.push(resolved.trim());
-        return;
-      }
-    }
-    if (rEmail && userMap.has(rEmail)) {
-      const resolved = userMap.get(rEmail)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
-        names.push(resolved.trim());
-        return;
-      }
+    // Match in allUsers
+    const matchedUser = Array.isArray(allUsers) && allUsers.length > 0 ? allUsers.find((u: any) => {
+      if (!u) return false;
+      const uId = u.id ? String(u.id).trim().toLowerCase() : "";
+      const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
+      const uName = u.name ? String(u.name).trim().toLowerCase() : "";
+      const uUsername = u.username ? String(u.username).trim().toLowerCase() : "";
+
+      return (
+        (uId && (uId === rUserId || uId === rUserEmail || uId === rEmail)) ||
+        (uEmail && (uEmail === rUserId || uEmail === rUserEmail || uEmail === rEmail)) ||
+        (uUsername && (uUsername === rUserId || (rUserName && uUsername === rUserName.toLowerCase()))) ||
+        (uName && rUserName && uName === rUserName.toLowerCase())
+      );
+    }) : null;
+
+    let fullName = "";
+    let photoURL = r.avatarUrl || r.photoURL || "";
+    let userId = r.userId || "";
+    let userEmail = r.userEmail || r.email || "";
+    let username = "";
+
+    if (matchedUser) {
+      fullName = matchedUser.name || matchedUser.username || resolveSenderName(matchedUser, allUsers) || "";
+      photoURL = matchedUser.photoURL || (matchedUser as any)?.avatarUrl || photoURL;
+      userId = matchedUser.id || userId;
+      userEmail = matchedUser.email || userEmail;
+      username = matchedUser.username || "";
     }
 
-    // 3. Use stored userName if available and not generic
-    if (rUserName) {
-      const isGeneric = [
-        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "undefined", "null"
-      ].includes(rUserName.toLowerCase());
-
+    if (!fullName && rUserName) {
+      const isGeneric = ["user", "anon", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(rUserName.toLowerCase());
       if (!isGeneric) {
         if (rUserName.includes("@")) {
           const parsed = resolveSenderName({ email: rUserName }, allUsers);
-          if (parsed && !["User", "Someone", "Parish Member"].includes(parsed)) {
-            names.push(parsed);
-            return;
-          }
-          const prefix = rUserName.split("@")[0].replace(/[._-]/g, " ");
-          names.push(prefix.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
-          return;
+          fullName = parsed && !["User", "Someone", "Parish Member"].includes(parsed)
+            ? parsed
+            : rUserName.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
         } else {
-          names.push(rUserName);
-          return;
+          fullName = rUserName;
         }
       }
     }
 
-    // 4. Try parsing from email field or userId if it's an email
-    const emailToParse = rUserEmail || rEmail || (rUserId.includes("@") ? rUserId : "");
-    if (emailToParse && emailToParse.includes("@")) {
-      const parsed = resolveSenderName({ email: emailToParse }, allUsers);
-      if (parsed && !["User", "Someone", "Parish Member"].includes(parsed)) {
-        names.push(parsed);
-        return;
-      }
-      const prefix = emailToParse.split("@")[0].replace(/[._-]/g, " ");
-      if (prefix) {
-        names.push(prefix.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
-        return;
-      }
+    if (!fullName && userEmail) {
+      const parsed = resolveSenderName({ email: userEmail }, allUsers);
+      fullName = parsed && !["User", "Someone", "Parish Member"].includes(parsed)
+        ? parsed
+        : userEmail.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     }
 
-    // 5. Check if rUserId is an identifiable name
-    if (rUserId && !["anon", "user", "anonymous", "someone", "unknown", "u-current", "undefined", "null"].includes(rUserId)) {
-      if (!rUserId.startsWith("u-") && !rUserId.startsWith("user-")) {
-        names.push(r.userId);
-        return;
-      }
+    if (!fullName) {
+      fullName = "Church Member";
     }
 
-    names.push("Church Member");
-  });
+    const firstName = fullName.includes(" ") ? fullName.split(" ")[0] : fullName;
+    const userKey = userId || userEmail || fullName;
 
-  // Ensure unique names and place "You" first if present
-  const uniqueNames = Array.from(new Set(names));
-  if (uniqueNames.includes("You")) {
-    return ["You", ...uniqueNames.filter(n => n !== "You")];
+    if (!seenUserKeys.has(userKey)) {
+      seenUserKeys.add(userKey);
+      reactors.push({
+        id: userId,
+        name: fullName,
+        firstName,
+        displayName: fullName,
+        shortDisplayName: firstName,
+        username,
+        email: userEmail,
+        photoURL,
+        emoji: r.emoji,
+        isCurrentUser: false
+      });
+    }
   }
-  return uniqueNames;
+
+  return reactors;
+}
+
+export function formatReactionSummaryText(reactors: DetailedReactor[]): string {
+  if (!reactors || reactors.length === 0) return "";
+  
+  const count = reactors.length;
+  if (count === 1) {
+    return `${reactors[0].displayName} reacted`;
+  }
+  if (count === 2) {
+    return `${reactors[0].displayName} and ${reactors[1].displayName} reacted`;
+  }
+  if (count === 3) {
+    return `${reactors[0].displayName}, ${reactors[1].displayName}, and 1 other reacted`;
+  }
+  
+  const others = count - 1;
+  return `${reactors[0].displayName} and ${others} others reacted`;
 }
 
 export function formatReactionTooltip(reactorNames: string[], emoji?: string): string {
@@ -3621,11 +3678,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           actionDescription = `Removed reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
         } else {
           // Either replacing old reaction with new emoji or adding new reaction
+          const userAvatar = currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
           const newReactionObj = { 
             emoji, 
             userId: currentUserId, 
             userEmail: currentUser?.email || "",
             userName: currentUserName,
+            avatarUrl: userAvatar,
+            photoURL: userAvatar,
             createdAt: new Date().toISOString()
           };
           newReactions = [...withoutUserReactions, newReactionObj];
@@ -5080,6 +5140,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           const photoURL = comment.authorAvatar || comment.authorPhotoURL || (commentUser?.photoURL || (commentUser as any)?.avatarUrl) || (isAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
                           const reactions = sanitizeCommentReactions(comment.reactions, currentUser, users);
+                          const detailedReactors = resolveDetailedReactors(reactions, users, currentUser);
+                          const reactionSummaryText = formatReactionSummaryText(detailedReactors);
+
                           const reactionCounts = reactions.reduce((acc: any, r: any) => {
                             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                             return acc;
@@ -5235,123 +5298,185 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                               )}
 
                               {/* Reactions & Action Bar */}
-                              <div className="pl-12 pt-1 flex items-center gap-2 flex-wrap relative">
-                                {/* Active reactions with count and tooltip */}
-                                {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => {
-                                  const hasReacted = hasUserReacted(reactions, emoji, currentUser, users);
-                                  const reactors = resolveReactorNames(reactions, emoji, users, currentUser);
-                                  const tooltipText = formatReactionTooltip(reactors, emoji);
-
-                                  return (
-                                    <div key={emoji} className="relative inline-flex group/reaction">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleToggleReaction(comment.id, emoji)}
-                                        className={cn(
-                                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs border",
-                                          hasReacted
-                                            ? "bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/80 font-bold ring-1 ring-indigo-500/20"
-                                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border-slate-200/80 dark:border-slate-700/80"
-                                        )}
-                                        title={tooltipText}
-                                      >
-                                        <span className="text-sm leading-none">{emoji}</span>
-                                        <span className="text-[11px] font-bold">{count}</span>
-                                      </button>
-
-                                      {/* Hover Tooltip showing user names */}
-                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/reaction:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-[11px] font-medium rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-700/60 animate-in fade-in zoom-in-95 duration-100">
-                                        <span className="text-xs">{emoji}</span>
-                                        <span>{tooltipText}</span>
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800" />
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-
-                                {/* Quick 👍 shortcut if not yet in reaction counts */}
-                                {thumbsCount === 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleReaction(comment.id, "👍")}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
-                                    title="React with 👍"
-                                  >
-                                    <span className="text-sm leading-none">👍</span>
-                                  </button>
-                                )}
-
-                                {/* Quick ❤️ shortcut if not yet in reaction counts */}
-                                {heartCount === 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleReaction(comment.id, "❤️")}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
-                                    title="React with ❤️"
-                                  >
-                                    <span className="text-sm leading-none">❤️</span>
-                                  </button>
-                                )}
-
-                                {/* Add Reaction Button & Expanded Emoji Picker Popover */}
-                                <div className="relative inline-flex">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveReactionPickerCommentId(activeReactionPickerCommentId === comment.id ? null : comment.id);
-                                    }}
-                                    className={cn(
-                                      "p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent",
-                                      activeReactionPickerCommentId === comment.id && "bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
-                                    )}
-                                    title="Add reaction"
-                                  >
-                                    <SmilePlus size={15} />
-                                  </button>
-
-                                  {/* Floating Reaction Picker Popover */}
-                                  {activeReactionPickerCommentId === comment.id && (
-                                    <div
-                                      ref={reactionPickerRef}
-                                      className="absolute bottom-full left-0 mb-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95 duration-150"
-                                    >
-                                      {COMMENT_REACTION_OPTIONS.map(({ emoji, label }) => (
-                                        <button
-                                          key={emoji}
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleToggleReaction(comment.id, emoji);
-                                            setActiveReactionPickerCommentId(null);
-                                          }}
-                                          className="p-1.5 text-base hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-transform hover:scale-125 active:scale-95 cursor-pointer relative group/emojipick"
-                                          title={label}
+                              <div className="pl-12 pt-1 flex flex-col gap-1.5">
+                                {/* Visual Reactor Avatars & Inline Text Summary */}
+                                {detailedReactors.length > 0 && (
+                                  <div className="flex items-center gap-2 py-0.5 group/summary relative">
+                                    {/* Stacked avatars of users who reacted */}
+                                    <div className="flex items-center -space-x-1.5 shrink-0">
+                                      {detailedReactors.slice(0, 4).map((reactor, idx) => (
+                                        <div 
+                                          key={reactor.id || reactor.name + idx} 
+                                          className="relative inline-block transition-transform hover:scale-110 hover:z-20"
+                                          title={`${reactor.displayName} (${reactor.emoji})`}
                                         >
-                                          <span>{emoji}</span>
-                                        </button>
+                                          {reactor.photoURL ? (
+                                            <img
+                                              src={reactor.photoURL}
+                                              alt={reactor.displayName}
+                                              className="w-5 h-5 rounded-full object-cover ring-2 ring-white dark:ring-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                                              onError={handleImageError}
+                                            />
+                                          ) : (
+                                            <div className={`w-5 h-5 rounded-full ${getAvatarBgColor(reactor.displayName)} ring-2 ring-white dark:ring-slate-900 font-bold text-[8px] flex items-center justify-center text-slate-800 dark:text-slate-200 shadow-2xs`}>
+                                              {getAvatarInitials(reactor.displayName)}
+                                            </div>
+                                          )}
+                                          <span className="absolute -bottom-1 -right-1 text-[9px] leading-none select-none drop-shadow-2xs">
+                                            {reactor.emoji}
+                                          </span>
+                                        </div>
                                       ))}
                                     </div>
-                                  )}
-                                </div>
 
-                                {/* Reply Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (inlineReplyCommentId === comment.id) {
-                                      setInlineReplyCommentId(null);
-                                      setInlineReplyText("");
-                                    } else {
-                                      setInlineReplyCommentId(comment.id);
-                                      setInlineReplyText("");
-                                    }
-                                  }}
-                                  className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors px-2.5 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                                >
-                                  <Reply size={13} />
-                                  <span>Reply</span>
-                                </button>
+                                    {/* Inline text to show "John and 10 others reacted" */}
+                                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                                      {reactionSummaryText}
+                                    </span>
+
+                                    {/* Hover list of all reactors with user names and profile pictures */}
+                                    <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/summary:flex flex-col gap-1 p-2.5 bg-slate-900/95 dark:bg-slate-900 text-white rounded-xl shadow-xl pointer-events-none z-50 border border-slate-700/60 min-w-[170px] animate-in fade-in zoom-in-95 duration-100">
+                                      <div className="text-[10px] uppercase font-bold text-slate-400 border-b border-slate-700/60 pb-1 mb-0.5">
+                                        Reactions ({detailedReactors.length})
+                                      </div>
+                                      {detailedReactors.map((r, i) => (
+                                        <div key={r.id || r.name + i} className="flex items-center justify-between gap-2 text-xs">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            {r.photoURL ? (
+                                              <img src={r.photoURL} alt={r.displayName} className="w-4 h-4 rounded-full object-cover shrink-0" onError={handleImageError} />
+                                            ) : (
+                                              <div className={`w-4 h-4 rounded-full ${getAvatarBgColor(r.displayName)} text-[8px] font-bold flex items-center justify-center shrink-0`}>
+                                                {getAvatarInitials(r.displayName)}
+                                              </div>
+                                            )}
+                                            <span className="truncate font-medium text-[11px]">{r.displayName}</span>
+                                            {r.username && <span className="text-[10px] text-slate-400">@{r.username}</span>}
+                                          </div>
+                                          <span className="text-xs shrink-0">{r.emoji}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-2 flex-wrap relative">
+                                  {/* Active reactions with count and tooltip */}
+                                  {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => {
+                                    const hasReacted = hasUserReacted(reactions, emoji, currentUser, users);
+                                    const reactors = resolveReactorNames(reactions, emoji, users, currentUser);
+                                    const tooltipText = formatReactionTooltip(reactors, emoji);
+
+                                    return (
+                                      <div key={emoji} className="relative inline-flex group/reaction">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleReaction(comment.id, emoji)}
+                                          className={cn(
+                                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs border",
+                                            hasReacted
+                                              ? "bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/80 font-bold ring-1 ring-indigo-500/20"
+                                              : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border-slate-200/80 dark:border-slate-700/80"
+                                          )}
+                                          title={tooltipText}
+                                        >
+                                          <span className="text-sm leading-none">{emoji}</span>
+                                          <span className="text-[11px] font-bold">{count}</span>
+                                        </button>
+
+                                        {/* Hover Tooltip showing user names */}
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/reaction:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-[11px] font-medium rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-700/60 animate-in fade-in zoom-in-95 duration-100">
+                                          <span className="text-xs">{emoji}</span>
+                                          <span>{tooltipText}</span>
+                                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800" />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+
+                                  {/* Quick 👍 shortcut if not yet in reaction counts */}
+                                  {thumbsCount === 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleReaction(comment.id, "👍")}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
+                                      title="React with 👍"
+                                    >
+                                      <span className="text-sm leading-none">👍</span>
+                                    </button>
+                                  )}
+
+                                  {/* Quick ❤️ shortcut if not yet in reaction counts */}
+                                  {heartCount === 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleReaction(comment.id, "❤️")}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
+                                      title="React with ❤️"
+                                    >
+                                      <span className="text-sm leading-none">❤️</span>
+                                    </button>
+                                  )}
+
+                                  {/* Add Reaction Button & Expanded Emoji Picker Popover */}
+                                  <div className="relative inline-flex">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveReactionPickerCommentId(activeReactionPickerCommentId === comment.id ? null : comment.id);
+                                      }}
+                                      className={cn(
+                                        "p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent",
+                                        activeReactionPickerCommentId === comment.id && "bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+                                      )}
+                                      title="Add reaction"
+                                    >
+                                      <SmilePlus size={15} />
+                                    </button>
+
+                                    {/* Floating Reaction Picker Popover */}
+                                    {activeReactionPickerCommentId === comment.id && (
+                                      <div
+                                        ref={reactionPickerRef}
+                                        className="absolute bottom-full left-0 mb-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95 duration-150"
+                                      >
+                                        {COMMENT_REACTION_OPTIONS.map(({ emoji, label }) => (
+                                          <button
+                                            key={emoji}
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleReaction(comment.id, emoji);
+                                              setActiveReactionPickerCommentId(null);
+                                            }}
+                                            className="p-1.5 text-base hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-transform hover:scale-125 active:scale-95 cursor-pointer relative group/emojipick"
+                                            title={label}
+                                          >
+                                            <span>{emoji}</span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Reply Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (inlineReplyCommentId === comment.id) {
+                                        setInlineReplyCommentId(null);
+                                        setInlineReplyText("");
+                                      } else {
+                                        setInlineReplyCommentId(comment.id);
+                                        setInlineReplyText("");
+                                      }
+                                    }}
+                                    className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors px-2.5 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                  >
+                                    <Reply size={13} />
+                                    <span>Reply</span>
+                                  </button>
+                                </div>
                               </div>
 
                               {/* Inline Reply Composer Box */}
@@ -5463,6 +5588,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                       const replyPhotoURL = reply.authorAvatar || reply.authorPhotoURL || (replyUser?.photoURL || (replyUser as any)?.avatarUrl) || (isReplyAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
                                       const replyReactions = sanitizeCommentReactions(reply.reactions, currentUser, users);
+                                      const replyDetailedReactors = resolveDetailedReactors(replyReactions, users, currentUser);
+                                      const replyReactionSummaryText = formatReactionSummaryText(replyDetailedReactors);
                                       const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
                                         acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                                         return acc;
@@ -5519,7 +5646,67 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                           </div>
 
                                           {/* Reply Reactions */}
-                                          <div className="pl-10.5 pt-0.5 flex items-center gap-1.5 flex-wrap relative">
+                                          <div className="pl-10.5 pt-0.5 flex flex-col gap-1">
+                                            {/* Visual Reactor Avatars & Inline Text Summary for Reply */}
+                                            {replyDetailedReactors.length > 0 && (
+                                              <div className="flex items-center gap-1.5 py-0.5 group/replysummary relative">
+                                                {/* Stacked avatars */}
+                                                <div className="flex items-center -space-x-1 shrink-0">
+                                                  {replyDetailedReactors.slice(0, 3).map((reactor, idx) => (
+                                                    <div 
+                                                      key={reactor.id || reactor.name + idx} 
+                                                      className="relative inline-block transition-transform hover:scale-110 hover:z-20"
+                                                      title={`${reactor.displayName} (${reactor.emoji})`}
+                                                    >
+                                                      {reactor.photoURL ? (
+                                                        <img
+                                                          src={reactor.photoURL}
+                                                          alt={reactor.displayName}
+                                                          className="w-4.5 h-4.5 rounded-full object-cover ring-2 ring-white dark:ring-slate-950 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                                                          onError={handleImageError}
+                                                        />
+                                                      ) : (
+                                                        <div className={`w-4.5 h-4.5 rounded-full ${getAvatarBgColor(reactor.displayName)} ring-2 ring-white dark:ring-slate-950 font-bold text-[7px] flex items-center justify-center text-slate-800 dark:text-slate-200 shadow-2xs`}>
+                                                          {getAvatarInitials(reactor.displayName)}
+                                                        </div>
+                                                      )}
+                                                      <span className="absolute -bottom-1 -right-1 text-[8px] leading-none select-none drop-shadow-2xs">
+                                                        {reactor.emoji}
+                                                      </span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+
+                                                {/* Inline summary text for reply */}
+                                                <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300">
+                                                  {replyReactionSummaryText}
+                                                </span>
+
+                                                {/* Hover tooltip with names and photos */}
+                                                <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/replysummary:flex flex-col gap-1 p-2 bg-slate-900/95 dark:bg-slate-900 text-white rounded-xl shadow-xl pointer-events-none z-50 border border-slate-700/60 min-w-[150px] animate-in fade-in zoom-in-95 duration-100">
+                                                  <div className="text-[9px] uppercase font-bold text-slate-400 border-b border-slate-700/60 pb-1 mb-0.5">
+                                                    Reactions ({replyDetailedReactors.length})
+                                                  </div>
+                                                  {replyDetailedReactors.map((r, i) => (
+                                                    <div key={r.id || r.name + i} className="flex items-center justify-between gap-1.5 text-[11px]">
+                                                      <div className="flex items-center gap-1 min-w-0">
+                                                        {r.photoURL ? (
+                                                          <img src={r.photoURL} alt={r.displayName} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" onError={handleImageError} />
+                                                        ) : (
+                                                          <div className={`w-3.5 h-3.5 rounded-full ${getAvatarBgColor(r.displayName)} text-[7px] font-bold flex items-center justify-center shrink-0`}>
+                                                            {getAvatarInitials(r.displayName)}
+                                                          </div>
+                                                        )}
+                                                        <span className="truncate font-medium text-[10px]">{r.displayName}</span>
+                                                      </div>
+                                                      <span className="text-xs shrink-0">{r.emoji}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            <div className="flex items-center gap-1.5 flex-wrap relative">
                                             {/* Active reactions with count and tooltip */}
                                             {Object.entries(replyReactionCounts).map(([emoji, count]: [string, any]) => {
                                               const hasReacted = hasUserReacted(replyReactions, emoji, currentUser, users);
@@ -5620,8 +5807,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                             </div>
                                           </div>
                                         </div>
-                                      );
-                                    })}
+                                      </div>
+                                    );
+                                  })}
                                   </div>
                                 </div>
                               )}

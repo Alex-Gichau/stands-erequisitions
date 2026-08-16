@@ -149,6 +149,24 @@ export const COMMENT_REACTION_OPTIONS = [
   { emoji: "💡", label: "Idea" },
 ];
 
+export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(allUsers)) return map;
+
+  allUsers.forEach((u: any) => {
+    if (!u) return;
+    const resolvedName = u.name || u.username || resolveSenderName(u, allUsers) || (u.email ? u.email.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "");
+    if (!resolvedName) return;
+
+    if (u.id) map.set(String(u.id).trim().toLowerCase(), resolvedName);
+    if (u._id) map.set(String(u._id).trim().toLowerCase(), resolvedName);
+    if (u.email) map.set(String(u.email).trim().toLowerCase(), resolvedName);
+    if (u.username) map.set(String(u.username).trim().toLowerCase(), resolvedName);
+  });
+
+  return map;
+}
+
 export function sanitizeCommentReactions(
   rawReactions: any,
   currentUser: any = null,
@@ -270,12 +288,13 @@ export function resolveReactorNames(
   const matching = sanitized.filter((r: any) => r && r.emoji === emoji);
   if (matching.length === 0) return [];
   
+  const userMap = buildUserLookupMap(allUsers);
   const names: string[] = [];
 
   const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
   const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
   const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
-  const curUsername = currentLoggedInUser?.username ? String(currentLoggedInUser.username).trim().toLowerCase() : "";
+  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
 
   matching.forEach((r: any) => {
     const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
@@ -283,9 +302,10 @@ export function resolveReactorNames(
     const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
     const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
 
-    // 1. Is this the currently logged in user?
+    // 1. Explicitly check if this is the currently logged in user -> returns 'You'
     const isCurrent = Boolean(
       (rUserId === "u-current") ||
+      (rUserId === "__current_user__") ||
       (currentLoggedInUser && (
         (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
         (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
@@ -299,24 +319,23 @@ export function resolveReactorNames(
       return;
     }
 
-    // 2. Try to match in active Users directory (by ID, email, username, or name)
-    const matchedUser = Array.isArray(allUsers) && allUsers.length > 0 ? allUsers.find((u: any) => {
-      if (!u) return false;
-      const uId = u.id ? String(u.id).trim().toLowerCase() : "";
-      const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
-      const uName = u.name ? String(u.name).trim().toLowerCase() : "";
-      const uUsername = u.username ? String(u.username).trim().toLowerCase() : "";
-
-      return (
-        (uId && (uId === rUserId || uId === rUserEmail || uId === rEmail)) ||
-        (uEmail && (uEmail === rUserId || uEmail === rUserEmail || uEmail === rEmail)) ||
-        (uUsername && (uUsername === rUserId || (rUserName && uUsername === rUserName.toLowerCase()))) ||
-        (uName && rUserName && uName === rUserName.toLowerCase())
-      );
-    }) : null;
-
-    if (matchedUser) {
-      const resolved = matchedUser.name || matchedUser.username || resolveSenderName(matchedUser, allUsers) || matchedUser.email;
+    // 2. Lookup in user map by ID, email, or username
+    if (rUserId && userMap.has(rUserId)) {
+      const resolved = userMap.get(rUserId)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
+        names.push(resolved.trim());
+        return;
+      }
+    }
+    if (rUserEmail && userMap.has(rUserEmail)) {
+      const resolved = userMap.get(rUserEmail)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
+        names.push(resolved.trim());
+        return;
+      }
+    }
+    if (rEmail && userMap.has(rEmail)) {
+      const resolved = userMap.get(rEmail)!;
       if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
         names.push(resolved.trim());
         return;
@@ -3517,6 +3536,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [editingCommentText, setEditingCommentText] = useState("");
 
   // Comments & Threaded Discussion states
+  const [optimisticComments, setOptimisticComments] = useState<any[] | null>(null);
+
+  // Synchronize optimisticComments whenever req.comments or req.id changes from source
+  useEffect(() => {
+    setOptimisticComments(null);
+  }, [req.comments, req.id]);
+
+  const effectiveComments = React.useMemo(() => {
+    return optimisticComments ?? (Array.isArray(req.comments) ? req.comments : []);
+  }, [optimisticComments, req.comments]);
+
   const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
   const [inlineReplyCommentId, setInlineReplyCommentId] = useState<string | null>(null);
   const [inlineReplyText, setInlineReplyText] = useState("");
@@ -3549,16 +3579,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [req.id]);
 
-  const togglingCommentReactionsRef = useRef<Set<string>>(new Set());
-
-  const handleToggleReaction = async (commentId: string, emoji: string) => {
-    if (togglingCommentReactionsRef.current.has(commentId)) {
-      return; // prevent rapid double clicks from creating duplicate reactions
-    }
-    togglingCommentReactionsRef.current.add(commentId);
-
+  const handleToggleReaction = (commentId: string, emoji: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const currentUserId = currentUser?.id || currentUser?.email || "anon";
       const currentUserName = currentUser?.name || (currentUser as any)?.username || resolveSenderName(currentUser, users) || currentUser?.email || "User";
 
@@ -3567,59 +3590,135 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       const curUsername = (currentUser as any)?.username ? String((currentUser as any).username).trim().toLowerCase() : "";
       const curName = currentUser?.name ? String(currentUser.name).trim().toLowerCase() : "";
 
-      const updatedComments = currentComments.map((c: any) => {
-        if (c.id !== commentId) return c;
+      const isUserReaction = (r: any) => {
+        if (!r) return false;
+        if (r.userId === "u-current" || r.userId === "__current_user__") return true;
+        const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+        const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+        const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+        const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+        return Boolean(
+          (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
+          (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
+          (curUsername && (rUid === curUsername || rUname === curUsername)) ||
+          (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined"].includes(curName) && rUname === curName)
+        );
+      };
+
+      const processReactionsUpdate = (item: any, targetId: string) => {
         // First sanitize all existing reactions to ensure at most 1 reaction per unique user
-        const sanitized = sanitizeCommentReactions(c.reactions, currentUser, users);
-
-        const isUserReaction = (r: any) => {
-          if (!r) return false;
-          if (r.userId === "u-current") return true;
-          const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
-          const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
-          const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
-          const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
-
-          return Boolean(
-            (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
-            (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
-            (curUsername && (rUid === curUsername || rUname === curUsername)) ||
-            (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined"].includes(curName) && rUname === curName)
-          );
-        };
-
+        const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
         const existingReaction = sanitized.find(isUserReaction);
         const withoutUserReactions = sanitized.filter(r => !isUserReaction(r));
 
         let newReactions: any[];
+        let actionDescription: string;
 
         if (existingReaction && existingReaction.emoji === emoji) {
           // If clicked the exact same emoji they already placed, toggle it OFF (remove reaction)
           newReactions = withoutUserReactions;
+          actionDescription = `Removed reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
         } else {
           // Either replacing old reaction with new emoji or adding new reaction
-          newReactions = [
-            ...withoutUserReactions,
-            { 
-              emoji, 
-              userId: currentUserId, 
-              userEmail: currentUser?.email || "",
-              userName: currentUserName,
-              createdAt: new Date().toISOString()
-            }
-          ];
+          const newReactionObj = { 
+            emoji, 
+            userId: currentUserId, 
+            userEmail: currentUser?.email || "",
+            userName: currentUserName,
+            createdAt: new Date().toISOString()
+          };
+          newReactions = [...withoutUserReactions, newReactionObj];
+          actionDescription = existingReaction 
+            ? `Replaced reaction from ${existingReaction.emoji} to ${emoji} for user ${currentUserName} (${currentUserId})`
+            : `Added reaction ${emoji} for user ${currentUserName} (${currentUserId})`;
         }
 
-        return { ...c, reactions: newReactions };
+        // Calculate updated counts and array of reacted user IDs
+        const reactionCounts: Record<string, number> = {};
+        const reactedUserIds: string[] = [];
+        newReactions.forEach((r: any) => {
+          if (r && r.emoji) {
+            reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+            const uid = r.userId || r.userEmail;
+            if (uid && !reactedUserIds.includes(uid)) {
+              reactedUserIds.push(uid);
+            }
+          }
+        });
+
+        const reactionSummary = {
+          counts: reactionCounts,
+          userIds: reactedUserIds,
+          total: newReactions.length
+        };
+
+        console.log(`[Reaction State Transition: Target ${targetId}]`, {
+          action: actionDescription,
+          targetId,
+          user: { id: currentUserId, name: currentUserName, email: currentUser?.email },
+          previousReactionsCount: sanitized.length,
+          previousReactions: sanitized,
+          newReactionsCount: newReactions.length,
+          newReactions,
+          reactionCounts,
+          reactedUserIds,
+          reactionSummary
+        });
+
+        return {
+          ...item,
+          reactions: newReactions,
+          reactionCounts,
+          reactedUserIds,
+          reactionSummary
+        };
+      };
+
+      const updatedComments = currentComments.map((c: any) => {
+        if (c.id === commentId) {
+          return processReactionsUpdate(c, commentId);
+        }
+
+        // Check if comment has nested replies
+        if (Array.isArray(c.replies) && c.replies.some((r: any) => r.id === commentId)) {
+          const updatedReplies = c.replies.map((reply: any) => {
+            if (reply.id === commentId) {
+              return processReactionsUpdate(reply, commentId);
+            }
+            return reply;
+          });
+          return {
+            ...c,
+            replies: updatedReplies
+          };
+        }
+
+        return c;
       });
 
-      await updateRequisition(req.id, { comments: updatedComments });
+      // 1. Instantaneous optimistic update in UI (0ms latency)
+      setOptimisticComments(updatedComments);
+
+      console.log(`[Reaction State Transition: Sending API Payload]`, {
+        requisitionId: req.id,
+        targetCommentId: commentId,
+        emoji,
+        totalComments: updatedComments.length
+      });
+
+      // 2. Dispatch background persistence
+      updateRequisition(req.id, { comments: updatedComments }).then(() => {
+        console.log(`[Reaction State Transition: Successfully Persisted]`, {
+          requisitionId: req.id,
+          targetCommentId: commentId
+        });
+      }).catch((err) => {
+        console.error("Failed to persist reaction:", err);
+        setOptimisticComments(null); // Rollback on persistence error
+      });
     } catch (err) {
       console.error("Failed to toggle reaction:", err);
-    } finally {
-      setTimeout(() => {
-        togglingCommentReactionsRef.current.delete(commentId);
-      }, 100);
     }
   };
 
@@ -3743,10 +3842,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       reactions: []
     };
     
-    const currentComments = Array.isArray(req.comments) ? req.comments : [];
+    const currentComments = effectiveComments;
     const updatedComments = [...currentComments, newComment];
 
     // Optimistically update local UI & reset form fields instantly
+    setOptimisticComments(updatedComments);
     setCommentText("");
     setInlineReplyText("");
     setInlineReplyCommentId(null);
@@ -3849,13 +3949,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     const trimmed = newText.trim();
     if (!trimmed) return;
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.map(c => 
         c.id === commentId ? { ...c, text: trimmed, isEdited: true, editedAt: new Date().toISOString() } : c
       );
-      await updateRequisition(req.id, { comments: updatedComments });
+      setOptimisticComments(updatedComments);
       setEditingCommentId(null);
       setEditingCommentText("");
+      await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
         severity: "LOW",
@@ -3864,6 +3965,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to update comment:", err);
+      setOptimisticComments(null);
       triggerToast({
         type: "SECURITY_UPDATE",
         severity: "HIGH",
@@ -3875,8 +3977,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
   const handleDeleteComment = async (commentId: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.filter(c => c.id !== commentId);
+      setOptimisticComments(updatedComments);
       await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
@@ -3886,6 +3989,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to delete comment:", err);
+      setOptimisticComments(null);
     }
   };
 
@@ -4938,14 +5042,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <MessageSquare size={14} className="text-indigo-500" />
-                    <span>Comments ({Array.isArray(req.comments) ? req.comments.length : 0})</span>
+                    <span>Comments ({effectiveComments.length})</span>
                   </h4>
                 </div>
                 
                 <div className="space-y-4">
                   {/* Comments Feed List */}
-                  {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
-                    const allComments = req.comments;
+                  {effectiveComments.length > 0 ? (() => {
+                    const allComments = effectiveComments;
                     const topLevelComments = allComments.filter((c: any) => !c.parentId && !c.replyTo?.id);
 
                     return (

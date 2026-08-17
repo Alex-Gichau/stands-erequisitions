@@ -2686,22 +2686,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           lastDbEtagRef.current = etagHeader;
         }
 
-        const contentType = response.headers.get("content-type");
-        if (contentType && !contentType.includes("application/json")) {
-          console.warn("[DB Sync] Received non-JSON response from /api/db-all, skipping parse.");
-          return;
-        }
-
         let dbData: any = null;
         try {
-          const rawText = await response.text();
-          if (!rawText || rawText.trim().startsWith("<")) {
-            console.warn("[DB Sync] HTML payload returned instead of JSON, skipping parse.");
-            return;
-          }
-          dbData = JSON.parse(rawText);
+          dbData = await response.json();
         } catch (jsonErr) {
-          console.warn("[DB Sync] Non-JSON payload received from backend, skipping cycle:", jsonErr);
+          console.error("[DB Sync] Malformed JSON received from backend:", jsonErr);
           return;
         }
 

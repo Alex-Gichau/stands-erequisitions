@@ -1739,19 +1739,20 @@ async function startServer() {
         }
         const camelBody = toCamelCase(body);
         const item = await Model.findOneAndUpdate(
-          { $or: [{ id }, { uid: id }] },
+          { id },
           { $set: camelBody },
-          { upsert: true, returnDocument: 'after' }
+          { returnDocument: 'after' }
         );
+        if (!item) {
+          return res.status(404).json({ error: "Document not found" });
+        }
       } else {
         const list = readJsonCollection(collection);
-        const idx = list.findIndex((item: any) => item.id === id || item.uid === id || item._id === id || item.document_id === id);
+        const idx = list.findIndex((item: any) => item.id === id);
         if (idx === -1) {
-          const payload = { ...body, id, document_id: id };
-          list.push(payload);
-        } else {
-          list[idx] = { ...list[idx], ...body, id: list[idx].id || id };
+          return res.status(404).json({ error: "Document not found" });
         }
+        list[idx] = { ...list[idx], ...body };
         writeJsonCollection(collection, list);
       }
       res.json({ success: true });
@@ -4975,7 +4976,7 @@ async function startServer() {
 
 
 
-  app.post("/api/backup-all-to-drive", express.json({ limit: "50mb" }), async (req, res) => {
+  app.post("/api/backup-all-to-drive", async (req, res) => {
     try {
       const requisitions = req.body?.requisitions || readJsonCollection("requisitions") || [];
       const users = req.body?.users || readJsonCollection("users") || [];
@@ -5954,11 +5955,6 @@ async function startServer() {
       return res.status(404).type("application/javascript").send("// Script or service worker not found");
     }
     res.status(404).json({ error: "Attachment not found on disk or storage provider." });
-  });
-
-  // Catch-all for undefined /api routes so they never return HTML from Vite / SPA fallback
-  app.all("/api/*", (req, res) => {
-    res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
   });
 
   // Vite middleware for development

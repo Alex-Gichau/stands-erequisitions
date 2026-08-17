@@ -6261,5 +6261,3 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       </div>
     );
   };
-
-export default RequisitionsPanel;

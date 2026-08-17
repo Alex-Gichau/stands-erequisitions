@@ -135,15 +135,18 @@ function getFileTypeBadge(fileName: string) {
   return { bg: 'bg-slate-600 text-white', label: 'FILE', iconColor: 'text-slate-600' };
 }
 
-// Curated Slack-style Comment Reaction options
+// Expanded Comment Reaction options
 export const COMMENT_REACTION_OPTIONS = [
   { emoji: "👍", label: "Thumbs Up" },
+  { emoji: "👎", label: "Dislike" },
   { emoji: "❤️", label: "Heart" },
   { emoji: "🎉", label: "Celebration" },
-  { emoji: "👀", label: "Eyes" },
+  { emoji: "😢", label: "Sad / Crying" },
   { emoji: "🚀", label: "Rocket" },
+  { emoji: "👀", label: "Eyes" },
+  { emoji: "🔥", label: "Fire" },
+  { emoji: "👏", label: "Applause" },
   { emoji: "💡", label: "Idea" },
-  { emoji: "🙏", label: "Prayer / Thanks" },
 ];
 
 export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
@@ -171,77 +174,27 @@ export function sanitizeCommentReactions(
 ): any[] {
   if (!rawReactions) return [];
 
-  let rawList: any[] = [];
+  let list: any[] = [];
   if (typeof rawReactions === "string") {
     try {
       const parsed = JSON.parse(rawReactions);
-      rawList = Array.isArray(parsed) ? parsed : (typeof parsed === "object" ? [parsed] : []);
+      list = Array.isArray(parsed) ? parsed : (typeof parsed === "object" ? Object.entries(parsed).flatMap(([emoji, val]: [string, any]) => {
+        if (Array.isArray(val)) return val.map(u => ({ emoji, userId: typeof u === 'string' ? u : u?.userId || 'anon' }));
+        return [];
+      }) : []);
     } catch (e) {
-      rawList = [];
+      list = [];
     }
   } else if (Array.isArray(rawReactions)) {
-    rawList = rawReactions;
+    list = rawReactions;
   } else if (typeof rawReactions === "object") {
-    rawList = [rawReactions];
+    list = Object.entries(rawReactions).flatMap(([emoji, val]: [string, any]) => {
+      if (Array.isArray(val)) return val.map(u => ({ emoji, userId: typeof u === 'string' ? u : u?.userId || 'anon' }));
+      return [];
+    });
   }
 
-  if (!Array.isArray(rawList) || rawList.length === 0) return [];
-
-  // Normalize all incoming reaction formats into flat list of individual { emoji, userId, ... } records
-  const list: any[] = [];
-  for (const item of rawList) {
-    if (!item) continue;
-    if (typeof item === "string") {
-      // Legacy single emoji string
-      list.push({ emoji: item, userId: "anon" });
-    } else if (typeof item === "object") {
-      if (item.emoji && Array.isArray(item.userIds)) {
-        // Schema { emoji: string, userIds: string[] }
-        item.userIds.forEach((uid: any) => {
-          if (uid) list.push({ emoji: item.emoji, userId: typeof uid === "string" ? uid : (uid.id || uid.userId || "anon"), userEmail: uid.email || "", userName: uid.name || "" });
-        });
-      } else if (item.emoji) {
-        // Schema { emoji: string, userId: string, ... }
-        list.push(item);
-      } else {
-        // Dictionary format { "👍": ["u1", "u2"], "❤️": ["u3"] } or legacy { thumbsUp: [...] }
-        Object.entries(item).forEach(([key, val]: [string, any]) => {
-          let emoji = key;
-          if (key === "thumbsUp" || key === "thumbs_up") emoji = "👍";
-          if (key === "heart") emoji = "❤️";
-          if (key === "celebration" || key === "party") emoji = "🎉";
-          if (key === "eyes") emoji = "👀";
-          if (key === "rocket") emoji = "🚀";
-          if (key === "idea") emoji = "💡";
-          if (key === "pray" || key === "prayer" || key === "thanks") emoji = "🙏";
-
-          if (Array.isArray(val)) {
-            val.forEach((u: any) => {
-              list.push({
-                emoji,
-                userId: typeof u === "string" ? u : (u?.id || u?.userId || "anon"),
-                userEmail: u?.email || u?.userEmail || "",
-                userName: u?.name || u?.userName || ""
-              });
-            });
-          } else if (typeof val === "boolean" && val) {
-            list.push({ emoji, userId: "anon" });
-          } else if (val && typeof val === "object" && Array.isArray(val.userIds)) {
-            val.userIds.forEach((u: any) => {
-              list.push({
-                emoji,
-                userId: typeof u === "string" ? u : (u?.id || u?.userId || "anon"),
-                userEmail: u?.email || u?.userEmail || "",
-                userName: u?.name || u?.userName || ""
-              });
-            });
-          }
-        });
-      }
-    }
-  }
-
-  if (list.length === 0) return [];
+  if (!Array.isArray(list) || list.length === 0) return [];
 
   const curId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : "";
   const curEmail = currentUser?.email ? String(currentUser.email).trim().toLowerCase() : "";
@@ -250,7 +203,7 @@ export function sanitizeCommentReactions(
 
   const isFromCurrentUser = (r: any) => {
     if (!r) return false;
-    if (r.userId === "u-current" || r.userId === "__current_user__") return true;
+    if (r.userId === "u-current") return true;
 
     const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
     const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
@@ -271,8 +224,8 @@ export function sanitizeCommentReactions(
     if (!r || !r.emoji) continue;
 
     if (isFromCurrentUser(r)) {
-      // Key by current user + emoji to prevent duplicate reaction records per emoji
-      userReactionMap.set(`__current_user__:${r.emoji}`, {
+      // Exactly 1 reaction allowed per user: keep latest
+      userReactionMap.set("__current_user__", {
         ...r,
         userId: currentUser?.id || currentUser?.email || "u-current",
         userEmail: currentUser?.email || "",
@@ -316,10 +269,10 @@ export function sanitizeCommentReactions(
     } else if (rUname && !["anon", "user", "someone", "parish member", "church member", "anonymous", "undefined"].includes(rUname)) {
       userKey = `name_${rUname}`;
     } else {
-      userKey = `anon_user_${Math.random().toString(36).substring(2, 6)}`;
+      userKey = `anon_user`;
     }
 
-    userReactionMap.set(`${userKey}:${r.emoji}`, resolvedReaction);
+    userReactionMap.set(userKey, resolvedReaction);
   }
 
   return Array.from(userReactionMap.values());
@@ -460,14 +413,14 @@ export function formatReactionTooltip(reactorNames: string[], emoji?: string): s
     return `${reactorNames[0]}, ${reactorNames[1]}, and ${reactorNames[2]} reacted`;
   }
 
-  // 4 or more reactors: Slack / GitHub style
+  // 4 or more reactors: Facebook style e.g. "John Doe and 14 others reacted" or "You, John Doe, and 14 others reacted"
   if (reactorNames[0] === "You") {
     const others = count - 2;
     return `You, ${reactorNames[1]}, and ${others} other${others === 1 ? '' : 's'} reacted`;
   }
 
-  const others = count - 2;
-  return `${reactorNames[0]}, ${reactorNames[1]}, and ${others} other${others === 1 ? '' : 's'} reacted`;
+  const others = count - 1;
+  return `${reactorNames[0]} and ${others} other${others === 1 ? '' : 's'} reacted`;
 }
 
 export function hasUserReacted(reactionsList: any[], emoji: string, user: any, allUsers: any[] = []): boolean {
@@ -3654,19 +3607,20 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       };
 
       const processReactionsUpdate = (item: any, targetId: string) => {
-        // First sanitize all existing reactions
+        // First sanitize all existing reactions to ensure at most 1 reaction per unique user
         const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
-        const userHasThisEmoji = sanitized.some(r => r.emoji === emoji && isUserReaction(r));
+        const existingReaction = sanitized.find(isUserReaction);
+        const withoutUserReactions = sanitized.filter(r => !isUserReaction(r));
 
         let newReactions: any[];
         let actionDescription: string;
 
-        if (userHasThisEmoji) {
+        if (existingReaction && existingReaction.emoji === emoji) {
           // If clicked the exact same emoji they already placed, toggle it OFF (remove reaction)
-          newReactions = sanitized.filter(r => !(r.emoji === emoji && isUserReaction(r)));
+          newReactions = withoutUserReactions;
           actionDescription = `Removed reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
         } else {
-          // Add new emoji reaction for this user while preserving other distinct reactions
+          // Either replacing old reaction with new emoji or adding new reaction
           const newReactionObj = { 
             emoji, 
             userId: currentUserId, 
@@ -3674,8 +3628,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             userName: currentUserName,
             createdAt: new Date().toISOString()
           };
-          newReactions = [...sanitized.filter(r => !(r.emoji === emoji && isUserReaction(r))), newReactionObj];
-          actionDescription = `Added reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
+          newReactions = [...withoutUserReactions, newReactionObj];
+          actionDescription = existingReaction 
+            ? `Replaced reaction from ${existingReaction.emoji} to ${emoji} for user ${currentUserName} (${currentUserId})`
+            : `Added reaction ${emoji} for user ${currentUserName} (${currentUserId})`;
         }
 
         // Calculate updated counts and array of reacted user IDs

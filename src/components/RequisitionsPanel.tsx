@@ -134,6 +134,366 @@ function getFileTypeBadge(fileName: string) {
   }
   return { bg: 'bg-slate-600 text-white', label: 'FILE', iconColor: 'text-slate-600' };
 }
+
+// Curated Slack-style Comment Reaction options
+export const COMMENT_REACTION_OPTIONS = [
+  { emoji: "👍", label: "Thumbs Up" },
+  { emoji: "❤️", label: "Heart" },
+  { emoji: "🎉", label: "Celebration" },
+  { emoji: "👀", label: "Eyes" },
+  { emoji: "🚀", label: "Rocket" },
+  { emoji: "💡", label: "Idea" },
+  { emoji: "🙏", label: "Prayer / Thanks" },
+];
+
+export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(allUsers)) return map;
+
+  allUsers.forEach((u: any) => {
+    if (!u) return;
+    const resolvedName = u.name || u.username || resolveSenderName(u, allUsers) || (u.email ? u.email.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "");
+    if (!resolvedName) return;
+
+    if (u.id) map.set(String(u.id).trim().toLowerCase(), resolvedName);
+    if (u._id) map.set(String(u._id).trim().toLowerCase(), resolvedName);
+    if (u.email) map.set(String(u.email).trim().toLowerCase(), resolvedName);
+    if (u.username) map.set(String(u.username).trim().toLowerCase(), resolvedName);
+  });
+
+  return map;
+}
+
+export function sanitizeCommentReactions(
+  rawReactions: any,
+  currentUser: any = null,
+  allUsers: any[] = []
+): any[] {
+  if (!rawReactions) return [];
+
+  let rawList: any[] = [];
+  if (typeof rawReactions === "string") {
+    try {
+      const parsed = JSON.parse(rawReactions);
+      rawList = Array.isArray(parsed) ? parsed : (typeof parsed === "object" ? [parsed] : []);
+    } catch (e) {
+      rawList = [];
+    }
+  } else if (Array.isArray(rawReactions)) {
+    rawList = rawReactions;
+  } else if (typeof rawReactions === "object") {
+    rawList = [rawReactions];
+  }
+
+  if (!Array.isArray(rawList) || rawList.length === 0) return [];
+
+  // Normalize all incoming reaction formats into flat list of individual { emoji, userId, ... } records
+  const list: any[] = [];
+  for (const item of rawList) {
+    if (!item) continue;
+    if (typeof item === "string") {
+      // Legacy single emoji string
+      list.push({ emoji: item, userId: "anon" });
+    } else if (typeof item === "object") {
+      if (item.emoji && Array.isArray(item.userIds)) {
+        // Schema { emoji: string, userIds: string[] }
+        item.userIds.forEach((uid: any) => {
+          if (uid) list.push({ emoji: item.emoji, userId: typeof uid === "string" ? uid : (uid.id || uid.userId || "anon"), userEmail: uid.email || "", userName: uid.name || "" });
+        });
+      } else if (item.emoji) {
+        // Schema { emoji: string, userId: string, ... }
+        list.push(item);
+      } else {
+        // Dictionary format { "👍": ["u1", "u2"], "❤️": ["u3"] } or legacy { thumbsUp: [...] }
+        Object.entries(item).forEach(([key, val]: [string, any]) => {
+          let emoji = key;
+          if (key === "thumbsUp" || key === "thumbs_up") emoji = "👍";
+          if (key === "heart") emoji = "❤️";
+          if (key === "celebration" || key === "party") emoji = "🎉";
+          if (key === "eyes") emoji = "👀";
+          if (key === "rocket") emoji = "🚀";
+          if (key === "idea") emoji = "💡";
+          if (key === "pray" || key === "prayer" || key === "thanks") emoji = "🙏";
+
+          if (Array.isArray(val)) {
+            val.forEach((u: any) => {
+              list.push({
+                emoji,
+                userId: typeof u === "string" ? u : (u?.id || u?.userId || "anon"),
+                userEmail: u?.email || u?.userEmail || "",
+                userName: u?.name || u?.userName || ""
+              });
+            });
+          } else if (typeof val === "boolean" && val) {
+            list.push({ emoji, userId: "anon" });
+          } else if (val && typeof val === "object" && Array.isArray(val.userIds)) {
+            val.userIds.forEach((u: any) => {
+              list.push({
+                emoji,
+                userId: typeof u === "string" ? u : (u?.id || u?.userId || "anon"),
+                userEmail: u?.email || u?.userEmail || "",
+                userName: u?.name || u?.userName || ""
+              });
+            });
+          }
+        });
+      }
+    }
+  }
+
+  if (list.length === 0) return [];
+
+  const curId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : "";
+  const curEmail = currentUser?.email ? String(currentUser.email).trim().toLowerCase() : "";
+  const curUsername = currentUser?.username ? String(currentUser.username).trim().toLowerCase() : "";
+  const curName = currentUser?.name ? String(currentUser.name).trim().toLowerCase() : "";
+
+  const isFromCurrentUser = (r: any) => {
+    if (!r) return false;
+    if (r.userId === "u-current" || r.userId === "__current_user__") return true;
+
+    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+    if (curId && (rUid === curId || rUemail === curId || rEmail === curId)) return true;
+    if (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) return true;
+    if (curUsername && (rUid === curUsername || rUname === curUsername)) return true;
+    if (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined"].includes(curName) && rUname === curName) return true;
+
+    return false;
+  };
+
+  const userReactionMap = new Map<string, any>();
+
+  for (const r of list) {
+    if (!r || !r.emoji) continue;
+
+    if (isFromCurrentUser(r)) {
+      // Key by current user + emoji to prevent duplicate reaction records per emoji
+      userReactionMap.set(`__current_user__:${r.emoji}`, {
+        ...r,
+        userId: currentUser?.id || currentUser?.email || "u-current",
+        userEmail: currentUser?.email || "",
+        userName: currentUser?.name || currentUser?.username || "You"
+      });
+      continue;
+    }
+
+    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+    const matchedUser = Array.isArray(allUsers) && allUsers.length > 0 ? allUsers.find((u: any) => {
+      if (!u) return false;
+      const uId = u.id ? String(u.id).trim().toLowerCase() : "";
+      const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
+      const uName = u.name ? String(u.name).trim().toLowerCase() : "";
+      const uUsername = u.username ? String(u.username).trim().toLowerCase() : "";
+
+      return (
+        (uId && (uId === rUid || uId === rUemail || uId === rEmail)) ||
+        (uEmail && (uEmail === rUid || uEmail === rUemail || uEmail === rEmail)) ||
+        (uUsername && (uUsername === rUid || (rUname && uUsername === rUname))) ||
+        (uName && rUname && uName === rUname)
+      );
+    }) : null;
+
+    let userKey: string;
+    let resolvedReaction = { ...r };
+
+    if (matchedUser) {
+      userKey = `user_${matchedUser.id || matchedUser.email}`;
+      resolvedReaction.userId = matchedUser.id;
+      resolvedReaction.userEmail = matchedUser.email;
+      resolvedReaction.userName = matchedUser.name || matchedUser.username || matchedUser.email;
+    } else if (rUemail || rEmail) {
+      userKey = `email_${rUemail || rEmail}`;
+    } else if (rUid && !rUid.startsWith("u-") && !rUid.startsWith("anon") && rUid !== "user") {
+      userKey = `id_${rUid}`;
+    } else if (rUname && !["anon", "user", "someone", "parish member", "church member", "anonymous", "undefined"].includes(rUname)) {
+      userKey = `name_${rUname}`;
+    } else {
+      userKey = `anon_user_${Math.random().toString(36).substring(2, 6)}`;
+    }
+
+    userReactionMap.set(`${userKey}:${r.emoji}`, resolvedReaction);
+  }
+
+  return Array.from(userReactionMap.values());
+}
+
+export function resolveReactorNames(
+  reactionsList: any[],
+  emoji: string,
+  allUsers: any[] = [],
+  currentLoggedInUser: any = null
+): string[] {
+  const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
+  const matching = sanitized.filter((r: any) => r && r.emoji === emoji);
+  if (matching.length === 0) return [];
+  
+  const userMap = buildUserLookupMap(allUsers);
+  const names: string[] = [];
+
+  const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
+  const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
+  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
+  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
+
+  matching.forEach((r: any) => {
+    const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+
+    // 1. Explicitly check if this is the currently logged in user -> returns 'You'
+    const isCurrent = Boolean(
+      (rUserId === "u-current") ||
+      (rUserId === "__current_user__") ||
+      (currentLoggedInUser && (
+        (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
+        (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
+        (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
+        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
+      ))
+    );
+
+    if (isCurrent) {
+      names.push("You");
+      return;
+    }
+
+    // 2. Lookup in user map by ID, email, or username
+    if (rUserId && userMap.has(rUserId)) {
+      const resolved = userMap.get(rUserId)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
+        names.push(resolved.trim());
+        return;
+      }
+    }
+    if (rUserEmail && userMap.has(rUserEmail)) {
+      const resolved = userMap.get(rUserEmail)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
+        names.push(resolved.trim());
+        return;
+      }
+    }
+    if (rEmail && userMap.has(rEmail)) {
+      const resolved = userMap.get(rEmail)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member"].includes(resolved.trim())) {
+        names.push(resolved.trim());
+        return;
+      }
+    }
+
+    // 3. Use stored userName if available and not generic
+    if (rUserName) {
+      const isGeneric = [
+        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "undefined", "null"
+      ].includes(rUserName.toLowerCase());
+
+      if (!isGeneric) {
+        if (rUserName.includes("@")) {
+          const parsed = resolveSenderName({ email: rUserName }, allUsers);
+          if (parsed && !["User", "Someone", "Parish Member"].includes(parsed)) {
+            names.push(parsed);
+            return;
+          }
+          const prefix = rUserName.split("@")[0].replace(/[._-]/g, " ");
+          names.push(prefix.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+          return;
+        } else {
+          names.push(rUserName);
+          return;
+        }
+      }
+    }
+
+    // 4. Try parsing from email field or userId if it's an email
+    const emailToParse = rUserEmail || rEmail || (rUserId.includes("@") ? rUserId : "");
+    if (emailToParse && emailToParse.includes("@")) {
+      const parsed = resolveSenderName({ email: emailToParse }, allUsers);
+      if (parsed && !["User", "Someone", "Parish Member"].includes(parsed)) {
+        names.push(parsed);
+        return;
+      }
+      const prefix = emailToParse.split("@")[0].replace(/[._-]/g, " ");
+      if (prefix) {
+        names.push(prefix.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+        return;
+      }
+    }
+
+    // 5. Check if rUserId is an identifiable name
+    if (rUserId && !["anon", "user", "anonymous", "someone", "unknown", "u-current", "undefined", "null"].includes(rUserId)) {
+      if (!rUserId.startsWith("u-") && !rUserId.startsWith("user-")) {
+        names.push(r.userId);
+        return;
+      }
+    }
+
+    names.push("Church Member");
+  });
+
+  // Ensure unique names and place "You" first if present
+  const uniqueNames = Array.from(new Set(names));
+  if (uniqueNames.includes("You")) {
+    return ["You", ...uniqueNames.filter(n => n !== "You")];
+  }
+  return uniqueNames;
+}
+
+export function formatReactionTooltip(reactorNames: string[], emoji?: string): string {
+  if (!reactorNames || reactorNames.length === 0) return `${emoji || ''} Reaction`.trim();
+
+  const count = reactorNames.length;
+  if (count === 1) {
+    return `${reactorNames[0]} reacted`;
+  }
+  if (count === 2) {
+    return `${reactorNames[0]} and ${reactorNames[1]} reacted`;
+  }
+  if (count === 3) {
+    return `${reactorNames[0]}, ${reactorNames[1]}, and ${reactorNames[2]} reacted`;
+  }
+
+  // 4 or more reactors: Slack / GitHub style
+  if (reactorNames[0] === "You") {
+    const others = count - 2;
+    return `You, ${reactorNames[1]}, and ${others} other${others === 1 ? '' : 's'} reacted`;
+  }
+
+  const others = count - 2;
+  return `${reactorNames[0]}, ${reactorNames[1]}, and ${others} other${others === 1 ? '' : 's'} reacted`;
+}
+
+export function hasUserReacted(reactionsList: any[], emoji: string, user: any, allUsers: any[] = []): boolean {
+  if (!Array.isArray(reactionsList) || !user) return false;
+  const sanitized = sanitizeCommentReactions(reactionsList, user, allUsers);
+  const curId = user.id ? String(user.id).trim().toLowerCase() : "";
+  const curEmail = user.email ? String(user.email).trim().toLowerCase() : "";
+  const curUsername = user.username ? String(user.username).trim().toLowerCase() : "";
+  const curName = user.name ? String(user.name).trim().toLowerCase() : "";
+
+  return sanitized.some((r: any) => {
+    if (!r || r.emoji !== emoji) return false;
+    if (r.userId === "u-current") return true;
+    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+    return (
+      (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
+      (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
+      (curUsername && (rUid === curUsername || rUname === curUsername)) ||
+      (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUname === curName)
+    );
+  });
+}
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
 import { compressImageFile } from "../lib/imageCompression";
@@ -3223,14 +3583,40 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [editingCommentText, setEditingCommentText] = useState("");
 
   // Comments & Threaded Discussion states
+  const [optimisticComments, setOptimisticComments] = useState<any[] | null>(null);
+
+  // Synchronize optimisticComments whenever req.comments or req.id changes from source
+  useEffect(() => {
+    setOptimisticComments(null);
+  }, [req.comments, req.id]);
+
+  const effectiveComments = React.useMemo(() => {
+    return optimisticComments ?? (Array.isArray(req.comments) ? req.comments : []);
+  }, [optimisticComments, req.comments]);
+
   const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
   const [inlineReplyCommentId, setInlineReplyCommentId] = useState<string | null>(null);
   const [inlineReplyText, setInlineReplyText] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [activeReactionPickerCommentId, setActiveReactionPickerCommentId] = useState<string | null>(null);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const modalScrollRef = useRef<HTMLDivElement>(null);
+
+  // Close emoji reaction picker popover on outside click
+  useEffect(() => {
+    const handleReactionOutsideClick = (event: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(event.target as Node)) {
+        setActiveReactionPickerCommentId(null);
+      }
+    };
+    if (activeReactionPickerCommentId) {
+      document.addEventListener("mousedown", handleReactionOutsideClick);
+      return () => document.removeEventListener("mousedown", handleReactionOutsideClick);
+    }
+  }, [activeReactionPickerCommentId]);
 
   // Ensure requisition detail page/modal always displays starting from the top
   useEffect(() => {
@@ -3240,27 +3626,141 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [req.id]);
 
-  const handleToggleReaction = async (commentId: string, emoji: string) => {
+  const handleToggleReaction = (commentId: string, emoji: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
-      const currentUserId = currentUser?.id || "anon";
-      const currentUserName = currentUser?.name || "User";
+      const currentComments = effectiveComments;
+      const currentUserId = currentUser?.id || currentUser?.email || "anon";
+      const currentUserName = currentUser?.name || (currentUser as any)?.username || resolveSenderName(currentUser, users) || currentUser?.email || "User";
 
-      const updatedComments = currentComments.map((c: any) => {
-        if (c.id !== commentId) return c;
-        const reactions = Array.isArray(c.reactions) ? [...c.reactions] : [];
-        const existingIdx = reactions.findIndex((r: any) => r.emoji === emoji && (r.userId === currentUserId || r.userId === currentUser?.email));
+      const curId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : "";
+      const curEmail = currentUser?.email ? String(currentUser.email).trim().toLowerCase() : "";
+      const curUsername = (currentUser as any)?.username ? String((currentUser as any).username).trim().toLowerCase() : "";
+      const curName = currentUser?.name ? String(currentUser.name).trim().toLowerCase() : "";
 
-        if (existingIdx >= 0) {
-          reactions.splice(existingIdx, 1);
+      const isUserReaction = (r: any) => {
+        if (!r) return false;
+        if (r.userId === "u-current" || r.userId === "__current_user__") return true;
+        const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+        const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+        const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+        const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+        return Boolean(
+          (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
+          (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
+          (curUsername && (rUid === curUsername || rUname === curUsername)) ||
+          (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined"].includes(curName) && rUname === curName)
+        );
+      };
+
+      const processReactionsUpdate = (item: any, targetId: string) => {
+        // First sanitize all existing reactions
+        const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
+        const userHasThisEmoji = sanitized.some(r => r.emoji === emoji && isUserReaction(r));
+
+        let newReactions: any[];
+        let actionDescription: string;
+
+        if (userHasThisEmoji) {
+          // If clicked the exact same emoji they already placed, toggle it OFF (remove reaction)
+          newReactions = sanitized.filter(r => !(r.emoji === emoji && isUserReaction(r)));
+          actionDescription = `Removed reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
         } else {
-          reactions.push({ emoji, userId: currentUserId, userName: currentUserName });
+          // Add new emoji reaction for this user while preserving other distinct reactions
+          const newReactionObj = { 
+            emoji, 
+            userId: currentUserId, 
+            userEmail: currentUser?.email || "",
+            userName: currentUserName,
+            createdAt: new Date().toISOString()
+          };
+          newReactions = [...sanitized.filter(r => !(r.emoji === emoji && isUserReaction(r))), newReactionObj];
+          actionDescription = `Added reaction (${emoji}) for user ${currentUserName} (${currentUserId})`;
         }
 
-        return { ...c, reactions };
+        // Calculate updated counts and array of reacted user IDs
+        const reactionCounts: Record<string, number> = {};
+        const reactedUserIds: string[] = [];
+        newReactions.forEach((r: any) => {
+          if (r && r.emoji) {
+            reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+            const uid = r.userId || r.userEmail;
+            if (uid && !reactedUserIds.includes(uid)) {
+              reactedUserIds.push(uid);
+            }
+          }
+        });
+
+        const reactionSummary = {
+          counts: reactionCounts,
+          userIds: reactedUserIds,
+          total: newReactions.length
+        };
+
+        console.log(`[Reaction State Transition: Target ${targetId}]`, {
+          action: actionDescription,
+          targetId,
+          user: { id: currentUserId, name: currentUserName, email: currentUser?.email },
+          previousReactionsCount: sanitized.length,
+          previousReactions: sanitized,
+          newReactionsCount: newReactions.length,
+          newReactions,
+          reactionCounts,
+          reactedUserIds,
+          reactionSummary
+        });
+
+        return {
+          ...item,
+          reactions: newReactions,
+          reactionCounts,
+          reactedUserIds,
+          reactionSummary
+        };
+      };
+
+      const updatedComments = currentComments.map((c: any) => {
+        if (c.id === commentId) {
+          return processReactionsUpdate(c, commentId);
+        }
+
+        // Check if comment has nested replies
+        if (Array.isArray(c.replies) && c.replies.some((r: any) => r.id === commentId)) {
+          const updatedReplies = c.replies.map((reply: any) => {
+            if (reply.id === commentId) {
+              return processReactionsUpdate(reply, commentId);
+            }
+            return reply;
+          });
+          return {
+            ...c,
+            replies: updatedReplies
+          };
+        }
+
+        return c;
       });
 
-      await updateRequisition(req.id, { comments: updatedComments });
+      // 1. Instantaneous optimistic update in UI (0ms latency)
+      setOptimisticComments(updatedComments);
+
+      console.log(`[Reaction State Transition: Sending API Payload]`, {
+        requisitionId: req.id,
+        targetCommentId: commentId,
+        emoji,
+        totalComments: updatedComments.length
+      });
+
+      // 2. Dispatch background persistence
+      updateRequisition(req.id, { comments: updatedComments }).then(() => {
+        console.log(`[Reaction State Transition: Successfully Persisted]`, {
+          requisitionId: req.id,
+          targetCommentId: commentId
+        });
+      }).catch((err) => {
+        console.error("Failed to persist reaction:", err);
+        setOptimisticComments(null); // Rollback on persistence error
+      });
     } catch (err) {
       console.error("Failed to toggle reaction:", err);
     }
@@ -3357,9 +3857,13 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       (eOrCustomText as React.FormEvent).preventDefault();
     }
 
+    if (isSubmittingComment) return;
+
     const textToSubmit = typeof eOrCustomText === "string" ? eOrCustomText : commentText;
     const trimmed = textToSubmit.trim();
     if (!trimmed) return;
+
+    setIsSubmittingComment(true);
 
     // Resolve author name cleanly and consistently from user profile
     const calculatedAuthorName = resolveSenderName(currentUser, users) || currentUser?.name || currentUser?.email || "User";
@@ -3382,10 +3886,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       reactions: []
     };
     
-    const currentComments = Array.isArray(req.comments) ? req.comments : [];
+    const currentComments = effectiveComments;
     const updatedComments = [...currentComments, newComment];
 
-    // Optimistically update local UI & reset form fields instantly (0ms delay)
+    // Optimistically update local UI & reset form fields instantly
+    setOptimisticComments(updatedComments);
     setCommentText("");
     setInlineReplyText("");
     setInlineReplyCommentId(null);
@@ -3393,110 +3898,109 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     setMentionIndex(-1);
     setReplyingTo(null);
     setShowEmojiPicker(false);
-    setIsSubmittingComment(false);
 
-    // Execute database save & notifications in background task
-    (async () => {
-      try {
-        await updateRequisition(req.id, { comments: updatedComments });
+    try {
+      await updateRequisition(req.id, { comments: updatedComments });
 
-        const authorEmail = currentUser?.email?.toLowerCase() || "";
-        const authorId = currentUser?.id || "";
+      const authorEmail = currentUser?.email?.toLowerCase() || "";
+      const authorId = currentUser?.id || "";
 
-        const mentionedUsers = users.filter(user => {
-          if (user.id === authorId || user.email?.toLowerCase() === authorEmail) return false;
-          
-          const nameMention = `@${user.name.toLowerCase()}`;
-          const emailMention = `@${user.email?.toLowerCase()}`;
-          const cleanText = trimmed.toLowerCase();
-          
-          return cleanText.includes(nameMention) || (user.email && cleanText.includes(emailMention));
-        });
-
-        for (const u of mentionedUsers) {
-          addAlert({
-            type: "SYSTEM_INFO",
-            severity: "MEDIUM",
-            message: `${calculatedAuthorName} mentioned you in a comment on Requisition "${req.title}" (ID: ${req.id}): "${trimmed.length > 55 ? trimmed.substring(0, 55) + '...' : trimmed}"`,
-            targetUserId: u.id
-          }).catch(() => {});
-
-          if (u.email) {
-            sendEmailNotification(
-              req,
-              "Comment Mention",
-              `"${trimmed}"`,
-              calculatedAuthorName,
-              u.email,
-              u.name
-            ).catch(err => console.error("Failed to send mention email to", u.email, err));
-          }
-        }
-
-        let requesterEmail = req.requesterEmail;
-        let requesterName = req.requesterName;
-        if (!requesterEmail) {
-          const rUser = users.find(usr => usr.id === req.requesterId || usr.name === req.requesterName);
-          if (rUser) {
-            requesterEmail = rUser.email;
-            requesterName = rUser.name;
-          }
-        }
-
-        const receiversMap = new Map<string, string>();
+      const mentionedUsers = users.filter(user => {
+        if (user.id === authorId || user.email?.toLowerCase() === authorEmail) return false;
         
-        if (
-          requesterEmail && 
-          requesterEmail.toLowerCase() !== authorEmail && 
-          !mentionedUsers.some(mu => mu.email?.toLowerCase() === requesterEmail?.toLowerCase())
-        ) {
-          receiversMap.set(requesterEmail.toLowerCase(), requesterName || "Requester");
-        }
+        const nameMention = `@${user.name.toLowerCase()}`;
+        const emailMention = `@${user.email?.toLowerCase()}`;
+        const cleanText = trimmed.toLowerCase();
+        
+        return cleanText.includes(nameMention) || (user.email && cleanText.includes(emailMention));
+      });
 
-        const notificationEmailsList = req.notificationEmails || (req as any).notification_emails || [];
-        if (Array.isArray(notificationEmailsList)) {
-          notificationEmailsList.forEach(emailStr => {
-            if (emailStr && typeof emailStr === "string") {
-              const cleanEmail = emailStr.trim().toLowerCase();
-              if (
-                cleanEmail && 
-                cleanEmail !== authorEmail && 
-                !mentionedUsers.some(mu => mu.email?.toLowerCase() === cleanEmail)
-              ) {
-                const matchedUser = users.find(usr => usr.email?.toLowerCase() === cleanEmail);
-                receiversMap.set(cleanEmail, matchedUser?.name || "Subscriber");
-              }
-            }
-          });
-        }
+      for (const u of mentionedUsers) {
+        addAlert({
+          type: "SYSTEM_INFO",
+          severity: "MEDIUM",
+          message: `${calculatedAuthorName} mentioned you in a comment on Requisition "${req.title}" (ID: ${req.id}): "${trimmed.length > 55 ? trimmed.substring(0, 55) + '...' : trimmed}"`,
+          targetUserId: u.id
+        }).catch(() => {});
 
-        for (const [recEmail, recName] of receiversMap.entries()) {
+        if (u.email) {
           sendEmailNotification(
             req,
-            "New Comment Thread Activity",
+            "Comment Mention",
             `"${trimmed}"`,
             calculatedAuthorName,
-            recEmail,
-            recName
-          ).catch(err => console.error("Failed to send comment update email to", recEmail, err));
+            u.email,
+            u.name
+          ).catch(err => console.error("Failed to send mention email to", u.email, err));
         }
-      } catch (err) {
-        console.error("Failed to persist comment in background:", err);
       }
-    })();
+
+      let requesterEmail = req.requesterEmail;
+      let requesterName = req.requesterName;
+      if (!requesterEmail) {
+        const rUser = users.find(usr => usr.id === req.requesterId || usr.name === req.requesterName);
+        if (rUser) {
+          requesterEmail = rUser.email;
+          requesterName = rUser.name;
+        }
+      }
+
+      const receiversMap = new Map<string, string>();
+      
+      if (
+        requesterEmail && 
+        requesterEmail.toLowerCase() !== authorEmail && 
+        !mentionedUsers.some(mu => mu.email?.toLowerCase() === requesterEmail?.toLowerCase())
+      ) {
+        receiversMap.set(requesterEmail.toLowerCase(), requesterName || "Requester");
+      }
+
+      const notificationEmailsList = req.notificationEmails || (req as any).notification_emails || [];
+      if (Array.isArray(notificationEmailsList)) {
+        notificationEmailsList.forEach(emailStr => {
+          if (emailStr && typeof emailStr === "string") {
+            const cleanEmail = emailStr.trim().toLowerCase();
+            if (
+              cleanEmail && 
+              cleanEmail !== authorEmail && 
+              !mentionedUsers.some(mu => mu.email?.toLowerCase() === cleanEmail)
+            ) {
+              const matchedUser = users.find(usr => usr.email?.toLowerCase() === cleanEmail);
+              receiversMap.set(cleanEmail, matchedUser?.name || "Subscriber");
+            }
+          }
+        });
+      }
+
+      for (const [recEmail, recName] of receiversMap.entries()) {
+        sendEmailNotification(
+          req,
+          "New Comment Thread Activity",
+          `"${trimmed}"`,
+          calculatedAuthorName,
+          recEmail,
+          recName
+        ).catch(err => console.error("Failed to send comment update email to", recEmail, err));
+      }
+    } catch (err) {
+      console.error("Failed to persist comment:", err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   const handleUpdateComment = async (commentId: string, newText: string) => {
     const trimmed = newText.trim();
     if (!trimmed) return;
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.map(c => 
         c.id === commentId ? { ...c, text: trimmed, isEdited: true, editedAt: new Date().toISOString() } : c
       );
-      await updateRequisition(req.id, { comments: updatedComments });
+      setOptimisticComments(updatedComments);
       setEditingCommentId(null);
       setEditingCommentText("");
+      await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
         severity: "LOW",
@@ -3505,6 +4009,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to update comment:", err);
+      setOptimisticComments(null);
       triggerToast({
         type: "SECURITY_UPDATE",
         severity: "HIGH",
@@ -3516,8 +4021,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
   const handleDeleteComment = async (commentId: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.filter(c => c.id !== commentId);
+      setOptimisticComments(updatedComments);
       await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
@@ -3527,6 +4033,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to delete comment:", err);
+      setOptimisticComments(null);
     }
   };
 
@@ -4579,14 +5086,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <MessageSquare size={14} className="text-indigo-500" />
-                    <span>Comments ({Array.isArray(req.comments) ? req.comments.length : 0})</span>
+                    <span>Comments ({effectiveComments.length})</span>
                   </h4>
                 </div>
                 
                 <div className="space-y-4">
                   {/* Comments Feed List */}
-                  {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
-                    const allComments = req.comments;
+                  {effectiveComments.length > 0 ? (() => {
+                    const allComments = effectiveComments;
                     const topLevelComments = allComments.filter((c: any) => !c.parentId && !c.replyTo?.id);
 
                     return (
@@ -4616,16 +5123,16 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                           const photoURL = comment.authorAvatar || comment.authorPhotoURL || (commentUser?.photoURL || (commentUser as any)?.avatarUrl) || (isAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
-                          const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
+                          const reactions = sanitizeCommentReactions(comment.reactions, currentUser, users);
                           const reactionCounts = reactions.reduce((acc: any, r: any) => {
                             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                             return acc;
                           }, {});
 
                           const thumbsCount = reactions.filter((r: any) => r.emoji === "👍").length;
-                          const hasUserLiked = reactions.some((r: any) => r.emoji === "👍" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                          const hasUserLiked = hasUserReacted(reactions, "👍", currentUser, users);
                           const heartCount = reactions.filter((r: any) => r.emoji === "❤️").length;
-                          const hasUserHearted = reactions.some((r: any) => r.emoji === "❤️" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                          const hasUserHearted = hasUserReacted(reactions, "❤️", currentUser, users);
 
                           return (
                             <div key={comment.id} className="bg-slate-50/90 dark:bg-slate-900/70 p-4 sm:p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5 shadow-2xs group relative transition-all">
@@ -4699,7 +5206,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                   <textarea
                                     value={editingCommentText}
                                     onChange={(e) => setEditingCommentText(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        setEditingCommentId(null);
+                                        setEditingCommentText("");
+                                      } else if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleUpdateComment(comment.id, editingCommentText);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 resize-none"
                                     rows={2}
                                     autoFocus
                                   />
@@ -4761,52 +5278,106 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                 </div>
                               )}
 
-                              {/* YouTube-style Reactions & Action Bar */}
-                              <div className="pl-12 pt-1 flex items-center gap-2 flex-wrap">
-                                {/* Thumbs Up Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "👍")}
-                                  className={cn(
-                                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs",
-                                    hasUserLiked
-                                      ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 dark:bg-amber-500/20 font-bold"
-                                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80"
-                                  )}
-                                  title="React 👍"
-                                >
-                                  <span>👍</span>
-                                  {thumbsCount > 0 && <span className="text-[11px] font-bold">{thumbsCount}</span>}
-                                </button>
+                              {/* Reactions & Action Bar */}
+                              <div className="pl-12 pt-1 flex items-center gap-2 flex-wrap relative">
+                                {/* Active reactions with count and tooltip */}
+                                {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => {
+                                  const hasReacted = hasUserReacted(reactions, emoji, currentUser, users);
+                                  const reactors = resolveReactorNames(reactions, emoji, users, currentUser);
+                                  const tooltipText = formatReactionTooltip(reactors, emoji);
 
-                                {/* Heart Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "❤️")}
-                                  className={cn(
-                                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs",
-                                    hasUserHearted
-                                      ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 dark:bg-rose-500/20 font-bold"
-                                      : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80"
-                                  )}
-                                  title="React ❤️"
-                                >
-                                  <span>❤️</span>
-                                  {heartCount > 0 && <span className="text-[11px] font-bold">{heartCount}</span>}
-                                </button>
+                                  return (
+                                    <div key={emoji} className="relative inline-flex group/reaction">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleReaction(comment.id, emoji)}
+                                        className={cn(
+                                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs border",
+                                          hasReacted
+                                            ? "bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/80 font-bold ring-1 ring-indigo-500/20"
+                                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border-slate-200/80 dark:border-slate-700/80"
+                                        )}
+                                        title={tooltipText}
+                                      >
+                                        <span className="text-sm leading-none">{emoji}</span>
+                                        <span className="text-[11px] font-bold">{count}</span>
+                                      </button>
 
-                                {/* Other Emoji Reactions */}
-                                {Object.entries(reactionCounts).filter(([emoji]) => emoji !== "👍" && emoji !== "❤️").map(([emoji, count]: [string, any]) => (
+                                      {/* Hover Tooltip showing user names */}
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/reaction:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-[11px] font-medium rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-700/60 animate-in fade-in zoom-in-95 duration-100">
+                                        <span className="text-xs">{emoji}</span>
+                                        <span>{tooltipText}</span>
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800" />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Quick 👍 shortcut if not yet in reaction counts */}
+                                {thumbsCount === 0 && (
                                   <button
-                                    key={emoji}
                                     type="button"
-                                    onClick={() => handleToggleReaction(comment.id, emoji)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs font-medium"
+                                    onClick={() => handleToggleReaction(comment.id, "👍")}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
+                                    title="React with 👍"
                                   >
-                                    <span>{emoji}</span>
-                                    <span className="font-bold text-[11px]">{count}</span>
+                                    <span className="text-sm leading-none">👍</span>
                                   </button>
-                                ))}
+                                )}
+
+                                {/* Quick ❤️ shortcut if not yet in reaction counts */}
+                                {heartCount === 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleReaction(comment.id, "❤️")}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 transition-all cursor-pointer shadow-2xs"
+                                    title="React with ❤️"
+                                  >
+                                    <span className="text-sm leading-none">❤️</span>
+                                  </button>
+                                )}
+
+                                {/* Add Reaction Button & Expanded Emoji Picker Popover */}
+                                <div className="relative inline-flex">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveReactionPickerCommentId(activeReactionPickerCommentId === comment.id ? null : comment.id);
+                                    }}
+                                    className={cn(
+                                      "p-1.5 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent",
+                                      activeReactionPickerCommentId === comment.id && "bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+                                    )}
+                                    title="Add reaction"
+                                  >
+                                    <SmilePlus size={15} />
+                                  </button>
+
+                                  {/* Floating Reaction Picker Popover */}
+                                  {activeReactionPickerCommentId === comment.id && (
+                                    <div
+                                      ref={reactionPickerRef}
+                                      className="absolute bottom-full left-0 mb-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95 duration-150"
+                                    >
+                                      {COMMENT_REACTION_OPTIONS.map(({ emoji, label }) => (
+                                        <button
+                                          key={emoji}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleReaction(comment.id, emoji);
+                                            setActiveReactionPickerCommentId(null);
+                                          }}
+                                          className="p-1.5 text-base hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-transform hover:scale-125 active:scale-95 cursor-pointer relative group/emojipick"
+                                          title={label}
+                                        >
+                                          <span>{emoji}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
 
                                 {/* Reply Button */}
                                 <button
@@ -4871,11 +5442,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                         </button>
                                         <button
                                           type="button"
-                                          disabled={!inlineReplyText.trim()}
+                                          disabled={!inlineReplyText.trim() || isSubmittingComment}
                                           onClick={() => handleAddComment(inlineReplyText, { id: comment.id, authorName: displayName, text: comment.text })}
                                           className="px-3.5 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
                                         >
-                                          <Send size={11} />
+                                          {isSubmittingComment ? (
+                                            <Loader2 size={11} className="animate-spin" />
+                                          ) : (
+                                            <Send size={11} />
+                                          )}
                                           <span>Reply</span>
                                         </button>
                                       </div>
@@ -4931,16 +5506,16 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                                       const replyPhotoURL = reply.authorAvatar || reply.authorPhotoURL || (replyUser?.photoURL || (replyUser as any)?.avatarUrl) || (isReplyAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
-                                      const replyReactions = Array.isArray(reply.reactions) ? reply.reactions : [];
+                                      const replyReactions = sanitizeCommentReactions(reply.reactions, currentUser, users);
                                       const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
                                         acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                                         return acc;
                                       }, {});
 
                                       const replyThumbsCount = replyReactions.filter((r: any) => r.emoji === "👍").length;
-                                      const hasReplyUserLiked = replyReactions.some((r: any) => r.emoji === "👍" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                                      const hasReplyUserLiked = hasUserReacted(replyReactions, "👍", currentUser, users);
                                       const replyHeartCount = replyReactions.filter((r: any) => r.emoji === "❤️").length;
-                                      const hasReplyUserHearted = replyReactions.some((r: any) => r.emoji === "❤️" && (r.userId === currentUser?.id || r.userId === currentUser?.email));
+                                      const hasReplyUserHearted = hasUserReacted(replyReactions, "❤️", currentUser, users);
 
                                       return (
                                         <div key={reply.id} className="bg-white dark:bg-slate-950 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800/80 space-y-2 text-xs relative group/reply shadow-2xs">
@@ -4988,48 +5563,105 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                           </div>
 
                                           {/* Reply Reactions */}
-                                          <div className="pl-10.5 pt-0.5 flex items-center gap-1.5 flex-wrap">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleToggleReaction(reply.id, "👍")}
-                                              className={cn(
-                                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
-                                                hasReplyUserLiked
-                                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 dark:bg-amber-500/20 font-bold"
-                                                  : "bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent"
-                                              )}
-                                              title="React 👍"
-                                            >
-                                              <span>👍</span>
-                                              {replyThumbsCount > 0 && <span className="font-bold">{replyThumbsCount}</span>}
-                                            </button>
+                                          <div className="pl-10.5 pt-0.5 flex items-center gap-1.5 flex-wrap relative">
+                                            {/* Active reactions with count and tooltip */}
+                                            {Object.entries(replyReactionCounts).map(([emoji, count]: [string, any]) => {
+                                              const hasReacted = hasUserReacted(replyReactions, emoji, currentUser, users);
+                                              const reactors = resolveReactorNames(replyReactions, emoji, users, currentUser);
+                                              const tooltipText = formatReactionTooltip(reactors, emoji);
 
-                                            <button
-                                              type="button"
-                                              onClick={() => handleToggleReaction(reply.id, "❤️")}
-                                              className={cn(
-                                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
-                                                hasReplyUserHearted
-                                                  ? "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 dark:bg-rose-500/20 font-bold"
-                                                  : "bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent"
-                                              )}
-                                              title="React ❤️"
-                                            >
-                                              <span>❤️</span>
-                                              {replyHeartCount > 0 && <span className="font-bold">{replyHeartCount}</span>}
-                                            </button>
+                                              return (
+                                                <div key={emoji} className="relative inline-flex group/replyreaction">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleToggleReaction(reply.id, emoji)}
+                                                    className={cn(
+                                                      "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer shadow-2xs border",
+                                                      hasReacted
+                                                        ? "bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/80 font-bold ring-1 ring-indigo-500/20"
+                                                        : "bg-slate-100 dark:bg-slate-850 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border-slate-200/60 dark:border-slate-700"
+                                                    )}
+                                                    title={tooltipText}
+                                                  >
+                                                    <span className="text-xs leading-none">{emoji}</span>
+                                                    <span className="text-[10px] font-bold">{count}</span>
+                                                  </button>
 
-                                            {Object.entries(replyReactionCounts).filter(([emoji]) => emoji !== "👍" && emoji !== "❤️").map(([emoji, count]: [string, any]) => (
+                                                  {/* Hover Tooltip showing user names */}
+                                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/replyreaction:flex items-center gap-1.5 px-2.5 py-1 bg-slate-900/95 dark:bg-slate-800 text-white text-[10px] font-medium rounded-lg shadow-xl pointer-events-none whitespace-nowrap z-50 border border-slate-700/60 animate-in fade-in zoom-in-95 duration-100">
+                                                    <span className="text-xs">{emoji}</span>
+                                                    <span>{tooltipText}</span>
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-slate-900/95 dark:border-t-slate-800" />
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+
+                                            {/* Quick 👍 shortcut if not yet in reaction counts */}
+                                            {replyThumbsCount === 0 && (
                                               <button
-                                                key={emoji}
                                                 type="button"
-                                                onClick={() => handleToggleReaction(reply.id, emoji)}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-850 text-[10px] text-slate-700 dark:text-slate-300 font-medium border border-slate-200/60 dark:border-slate-700"
+                                                onClick={() => handleToggleReaction(reply.id, "👍")}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent transition-all cursor-pointer"
+                                                title="React with 👍"
                                               >
-                                                <span>{emoji}</span>
-                                                <span className="font-bold">{count}</span>
+                                                <span className="text-xs leading-none">👍</span>
                                               </button>
-                                            ))}
+                                            )}
+
+                                            {/* Quick ❤️ shortcut if not yet in reaction counts */}
+                                            {replyHeartCount === 0 && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleToggleReaction(reply.id, "❤️")}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-850 text-slate-500 dark:text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800 border border-transparent transition-all cursor-pointer"
+                                                title="React with ❤️"
+                                              >
+                                                <span className="text-xs leading-none">❤️</span>
+                                              </button>
+                                            )}
+
+                                            {/* Add Reaction Button & Expanded Emoji Picker Popover for Reply */}
+                                            <div className="relative inline-flex">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setActiveReactionPickerCommentId(activeReactionPickerCommentId === reply.id ? null : reply.id);
+                                                }}
+                                                className={cn(
+                                                  "p-1 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent",
+                                                  activeReactionPickerCommentId === reply.id && "bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800"
+                                                )}
+                                                title="Add reaction"
+                                              >
+                                                <SmilePlus size={13} />
+                                              </button>
+
+                                              {/* Floating Reaction Picker Popover */}
+                                              {activeReactionPickerCommentId === reply.id && (
+                                                <div
+                                                  ref={reactionPickerRef}
+                                                  className="absolute bottom-full left-0 mb-1.5 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex items-center gap-1 z-50 animate-in fade-in zoom-in-95 duration-150"
+                                                >
+                                                  {COMMENT_REACTION_OPTIONS.map(({ emoji, label }) => (
+                                                    <button
+                                                      key={emoji}
+                                                      type="button"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleReaction(reply.id, emoji);
+                                                        setActiveReactionPickerCommentId(null);
+                                                      }}
+                                                      className="p-1 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-transform hover:scale-125 active:scale-95 cursor-pointer relative"
+                                                      title={label}
+                                                    >
+                                                      <span>{emoji}</span>
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
                                         </div>
                                       );
@@ -5079,7 +5711,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     {/* Emoji Quick Picker Bar */}
                     {showEmojiPicker && (
                       <div className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg flex items-center gap-1 flex-wrap z-30">
-                        {["👍", "❤️", "😊", "🙏", "👏", "👀", "🔥", "🎉", "💡", "✅", "💯", "⭐"].map((emoji) => (
+                        {["👍", "👎", "❤️", "🎉", "😢", "🚀", "👀", "🔥", "👏", "💡", "😊", "🙏", "✅", "💯", "⭐"].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -5673,3 +6305,5 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       </div>
     );
   };
+
+export default RequisitionsPanel;

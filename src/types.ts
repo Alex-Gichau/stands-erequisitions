@@ -78,8 +78,12 @@ export interface ApprovalNote {
 }
 
 export interface CommentReaction {
-  thumbsUp?: string[];
-  heart?: boolean;
+  emoji: string;
+  userIds?: string[];
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  createdAt?: string;
   [key: string]: any;
 }
 
@@ -100,7 +104,15 @@ export interface Comment {
     authorName: string;
     text: string;
   };
-  reactions?: any;
+  reactions?: CommentReaction[] | Record<string, any>;
+  reactionCounts?: Record<string, number>;
+  reactedUserIds?: string[];
+  reactionSummary?: {
+    counts: Record<string, number>;
+    userIds: string[];
+    total: number;
+  };
+  replies?: Comment[];
   isEdited?: boolean;
 }
 

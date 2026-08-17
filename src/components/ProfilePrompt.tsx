@@ -102,7 +102,7 @@ export const ProfilePrompt: React.FC<ProfilePromptProps> = ({ user, onComplete }
                   </div>
                   <h2 className="text-2xl font-black text-foreground uppercase tracking-tight">Complete Your Profile</h2>
                   <p className="text-muted text-sm leading-relaxed max-w-sm mx-auto">
-                    Welcome back, <span className="text-primary font-bold">{user.name}</span>! Would you like to update your password or personal details?
+                    Welcome back, <span className="text-primary font-bold">{user.name}</span>! Would you like to update your security or add more personal details?
                   </p>
                 </div>
 
@@ -115,8 +115,8 @@ export const ProfilePrompt: React.FC<ProfilePromptProps> = ({ user, onComplete }
                       <Lock size={20} />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-black text-foreground/80 text-[11px] uppercase tracking-widest mb-0.5">Setup your password</h3>
-                      <p className="text-[10px] text-muted font-medium tracking-tight">Add your password.</p>
+                      <h3 className="font-black text-foreground/80 text-[11px] uppercase tracking-widest mb-0.5">Security Hub</h3>
+                      <p className="text-[10px] text-muted font-medium tracking-tight">Change or reinforce your password security.</p>
                     </div>
                     <ChevronRight size={16} className="text-muted/50" />
                   </button>
@@ -129,7 +129,7 @@ export const ProfilePrompt: React.FC<ProfilePromptProps> = ({ user, onComplete }
                       <MessageSquare size={20} />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-black text-foreground/80 text-[11px] uppercase tracking-widest mb-0.5">Personal Details</h3>
+                      <h3 className="font-black text-foreground/80 text-[11px] uppercase tracking-widest mb-0.5">Identity & Metadata</h3>
                       <p className="text-[10px] text-muted font-medium tracking-tight">Add contact details and department information.</p>
                     </div>
                     <ChevronRight size={16} className="text-muted/50" />

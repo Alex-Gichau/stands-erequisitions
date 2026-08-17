@@ -187,20 +187,6 @@ export const databaseService = {
     });
   },
 
-  async patchRequisition(id: string, updates: Partial<Requisition>): Promise<void> {
-    const payload: any = {};
-    if (updates.comments !== undefined) payload.comments = updates.comments;
-    if (updates.notificationEmails !== undefined) {
-      payload.notification_emails = updates.notificationEmails;
-      payload.notificationEmails = updates.notificationEmails;
-    }
-    if (updates.requiresMoreInfo !== undefined) payload.requires_more_info = updates.requiresMoreInfo;
-    if (updates.flaggedForAudit !== undefined) payload.flagged_for_audit = updates.flaggedForAudit;
-    if (updates.additionalInfo !== undefined) payload.additional_info = updates.additionalInfo;
-    payload.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/requisitions/${id}`, "PATCH", payload);
-  },
-
   async deleteRequisition(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting requisition from MongoDB: ${id}`);
     await apiCall(`/api/db/requisitions/${id}`, "DELETE");

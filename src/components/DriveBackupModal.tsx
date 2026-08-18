@@ -142,15 +142,15 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <motion.div 
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-white rounded-3xl max-w-2xl w-full border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
-        <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+        <div className="p-6 bg-slate-900 dark:bg-slate-950 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-600/20 rounded-2xl border border-blue-400/20 backdrop-blur-md">
               <Cloud className="text-blue-400" size={24} />
@@ -176,34 +176,34 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
         {/* Content Body */}
         <div className="p-6 space-y-6 overflow-y-auto">
           {/* Automated Schedule Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50/60 border border-blue-200/80 p-5 rounded-2xl space-y-3">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50/60 dark:from-blue-950/30 dark:to-indigo-950/20 border border-blue-200/80 dark:border-blue-800/50 p-5 rounded-2xl space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Clock className="text-blue-600" size={18} />
-                <span className="text-xs font-black uppercase tracking-wider text-blue-950">
+                <Clock className="text-blue-600 dark:text-blue-400" size={18} />
+                <span className="text-xs font-black uppercase tracking-wider text-blue-950 dark:text-blue-200">
                   Automated Schedule: Every {BACKUP_INTERVAL_HOURS} Hours
                 </span>
               </div>
-              <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase tracking-widest rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
+              <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[9px] font-black uppercase tracking-widest rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-ping" />
                 ACTIVE
               </span>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Full database snapshots (Requisitions, Users, Church Groups, Ledger Books, System Settings, Audit Logs, and Calendar Events) are scheduled to automatically backup to Google Drive under <strong className="text-slate-800">{BACKUP_TARGET_EMAIL}</strong> every {BACKUP_INTERVAL_HOURS} hours.
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Full database snapshots (Requisitions, Users, Church Groups, Ledger Books, System Settings, Audit Logs, and Calendar Events) are scheduled to automatically backup to Google Drive under <strong className="text-slate-800 dark:text-white">{BACKUP_TARGET_EMAIL}</strong> every {BACKUP_INTERVAL_HOURS} hours.
             </p>
 
-            <div className="grid grid-cols-2 gap-3 pt-2 text-[11px] font-mono border-t border-blue-200/60">
+            <div className="grid grid-cols-2 gap-3 pt-2 text-[11px] font-mono border-t border-blue-200/60 dark:border-blue-800/40">
               <div>
                 <span className="text-slate-400 uppercase text-[9px] block">Last Successful Backup</span>
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-slate-800 dark:text-slate-200">
                   {lastBackup ? new Date(lastBackup).toLocaleString() : "None recorded"}
                 </span>
               </div>
               <div>
                 <span className="text-slate-400 uppercase text-[9px] block">Next Scheduled Backup</span>
-                <span className="font-bold text-blue-700">{nextBackupTime}</span>
+                <span className="font-bold text-blue-700 dark:text-blue-400">{nextBackupTime}</span>
               </div>
             </div>
           </div>
@@ -230,7 +230,7 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
 
             <button
               onClick={handleDownloadLocal}
-              className="w-full sm:w-auto px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-200"
+              className="w-full sm:w-auto px-5 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-700"
             >
               <Download size={16} />
               <span>Download JSON</span>
@@ -238,27 +238,27 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
           </div>
 
           {statusMessage && (
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 flex items-center gap-2">
-              <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+            <div className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <ShieldCheck size={16} className="text-blue-600 dark:text-blue-400 shrink-0" />
               <span>{statusMessage}</span>
             </div>
           )}
 
           {/* Backup Logs */}
           <div className="space-y-3 pt-2">
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
-              <FileText size={15} className="text-slate-500" />
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <FileText size={15} className="text-slate-500 dark:text-slate-400" />
               <span>Recent Backup History</span>
             </h4>
 
             {backupLogs.length === 0 ? (
-              <p className="text-xs italic text-slate-400 p-4 bg-slate-50 rounded-xl text-center">
+              <p className="text-xs italic text-slate-400 p-4 bg-slate-50 dark:bg-slate-950/40 rounded-xl text-center border border-slate-100 dark:border-slate-800/50">
                 No backup logs generated yet. Click "Trigger Drive Backup Now" to run an initial backup.
               </p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {backupLogs.map((log) => (
-                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                  <div key={log.id} className="p-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {log.status === "SUCCESS" ? (
@@ -266,13 +266,13 @@ export const DriveBackupModal: React.FC<DriveBackupModalProps> = ({ isOpen, onCl
                         ) : (
                           <AlertCircle size={14} className="text-rose-500" />
                         )}
-                        <span className="font-bold text-slate-800">{log.fileName}</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{log.fileName}</span>
                       </div>
                       <span className="text-[10px] font-mono text-slate-400">
                         {new Date(log.timestamp).toLocaleString()}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-500 pl-5">{log.message}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">{log.message}</p>
                   </div>
                 ))}
               </div>

@@ -25,11 +25,12 @@ import { ProductTour } from "./components/ProductTour";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { BugReportModal } from "./components/BugReportModal";
 import { ContactFinanceModal } from "./components/ContactFinanceModal";
+import { SplashPage } from "./components/SplashPage";
 import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
 import { PanelSkeletonFallback } from "./components/PanelSkeletonFallback";
 import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearAllRecentSearchTerms } from "./lib/searchHistory";
 import { databaseService } from "./lib/databaseService";
-import { UserRole, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
+import { UserRole, RequisitionStatus, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
 
 function lazyWithRetry<T extends React.ComponentType<any>>(
   factory: () => Promise<{ default: T }>
@@ -379,6 +380,32 @@ function AppContent() {
     setSuccess("");
   }, []);
 
+  // Standard best-practice pre-fetch: As soon as login page loads, warm up and fetch all dashboard data
+  useEffect(() => {
+    const prefetchDashboardData = async () => {
+      try {
+        const res = await fetch("/api/db-all");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === "object") {
+            if (data.system_settings) {
+              localStorage.setItem("stands_cache_system_settings", JSON.stringify(data.system_settings));
+            }
+            if (data.church_groups) {
+              localStorage.setItem("stands_cache_church_groups", JSON.stringify(data.church_groups));
+            }
+            if (data.requisitions) {
+              localStorage.setItem("stands_cache_reqs_global", JSON.stringify(data.requisitions));
+            }
+          }
+        }
+      } catch (err) {
+        // Silently handle background prefetch warmup
+      }
+    };
+    prefetchDashboardData();
+  }, []);
+
   useEffect(() => {
     const inviteStr = sessionStorage.getItem("requisition_invite");
     if (inviteStr) {
@@ -389,6 +416,8 @@ function AppContent() {
     }
   }, []);
 
+  const [showSplash, setShowSplash] = useState(false);
+  const hasShownSplashRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showReportReminder, setShowReportReminder] = useState(true);
@@ -403,6 +432,7 @@ function AppContent() {
   const {
     currentUser,
     login,
+    loginWithGoogleCredential,
     loginWithEmail,
     signupWithEmail,
     logout,
@@ -550,15 +580,21 @@ function AppContent() {
 
   const hasRedirectedRef = useRef(false);
 
-  // Redirect to dashboard upon successful login
+  // Redirect to dashboard upon successful login and trigger splash intro
   useEffect(() => {
     if (currentUser) {
       if (!hasRedirectedRef.current) {
         setCurrentView("dashboard");
         hasRedirectedRef.current = true;
       }
+      if (!hasShownSplashRef.current) {
+        setShowSplash(true);
+        hasShownSplashRef.current = true;
+      }
     } else {
       hasRedirectedRef.current = false;
+      hasShownSplashRef.current = false;
+      setShowSplash(false);
     }
   }, [currentUser]);
 
@@ -1096,6 +1132,63 @@ function AppContent() {
     }
   };
 
+  // Google One Tap automatic prompt integration
+  useEffect(() => {
+    if (currentUser || authLoading) return;
+
+    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "2730554389-7e5g00q2q208gq7k2b1ks50811e51b14.apps.googleusercontent.com";
+
+    const initGoogleOneTap = () => {
+      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
+        try {
+          (window as any).google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response: any) => {
+              if (response?.credential) {
+                setIsSubmitting(true);
+                setError("");
+                try {
+                  await loginWithGoogleCredential(response.credential);
+                } catch (err: any) {
+                  console.warn("Google One Tap callback notice:", err);
+                  setError(err?.message || "Google One Tap sign-in failed.");
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          (window as any).google.accounts.id.prompt((notification: any) => {
+            if (notification.isNotDisplayed?.()) {
+              console.log("[Google One Tap] Prompt not displayed:", notification.getNotDisplayedReason?.());
+            } else if (notification.isSkippedMoment?.()) {
+              console.log("[Google One Tap] Prompt skipped:", notification.getSkippedReason?.());
+            } else if (notification.isDismissedMoment?.()) {
+              console.log("[Google One Tap] Prompt dismissed:", notification.getDismissedReason?.());
+            }
+          });
+        } catch (e) {
+          console.warn("[Google One Tap] Setup error:", e);
+        }
+      }
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initGoogleOneTap();
+    } else {
+      const timer = setInterval(() => {
+        if ((window as any).google?.accounts?.id) {
+          initGoogleOneTap();
+          clearInterval(timer);
+        }
+      }, 500);
+      return () => clearInterval(timer);
+    }
+  }, [currentUser, authLoading, loginWithGoogleCredential]);
+
   if (window.opener && window.opener !== window) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center">
@@ -1414,6 +1507,17 @@ function AppContent() {
     );
   }
 
+  // Animated Splash Screen after login
+  if (showSplash) {
+    return (
+      <SplashPage
+        darkMode={darkMode}
+        isDataReady={!loading && !authLoading}
+        onComplete={() => setShowSplash(false)}
+      />
+    );
+  }
+
   if (loading || !systemSettings?.currentFiscalYear) {
     return (
       <div className={cn(
@@ -1633,6 +1737,47 @@ function AppContent() {
   }
 
   const renderView = () => {
+    if (deletedReqId) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 max-w-md mx-auto text-center space-y-6 animate-in fade-in duration-300 select-none">
+          <div className="w-20 h-20 rounded-3xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 dark:text-rose-400 border border-rose-100 dark:border-rose-900/40 flex items-center justify-center shadow-md shadow-rose-500/10">
+            <Trash2 size={36} className="stroke-[1.75]" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+              Requisition is Deleted
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium max-w-sm mx-auto">
+              This requisition <span className="font-mono font-bold text-slate-700 dark:text-slate-300">#{deletedReqId}</span> has been deleted and is no longer available in the system.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                // Remove reqId parameter from URL without page reload
+                const url = new URL(window.location.href);
+                url.searchParams.delete("reqId");
+                url.searchParams.delete("requisitionId");
+                url.searchParams.delete("id");
+                window.history.replaceState({}, document.title, url.toString());
+
+                // Reset state parameters and direct recovery to dashboard
+                setDeletedReqId(null);
+                setTargetReqId(null);
+                setCurrentView("dashboard");
+              }}
+              className="px-8 py-3 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 mx-auto"
+            >
+              <ArrowLeft size={16} />
+              <span>Return to Dashboard</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (accessDeniedReq) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 max-w-2xl mx-auto text-center space-y-8 animate-in fade-in duration-300">

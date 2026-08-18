@@ -56,6 +56,7 @@ export enum RequisitionStatus {
   DISBURSED = "DISBURSED",
   REJECTED = "REJECTED",
   CANCELLED = "CANCELLED",
+  DELETED = "DELETED",
 }
 
 export enum RecurrenceType {

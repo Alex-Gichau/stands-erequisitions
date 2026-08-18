@@ -961,30 +961,30 @@ const Dashboard: React.FC<{
                 <Activity size={18} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Quick Actions</h2>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Requisitions Calendar</h2>
                 <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">Control & submission center</p>
               </div>
             </div>
             
             <p className="text-xs text-slate-500 leading-relaxed font-sans">
-              Initiate new financial requests, check active submission timelines, and monitor cut-offs to ensure timely fund disbursements.
+              Check requisition submissions and monitor disbursement dates from one calendar. Create events and timelines for various church financial events. 
             </p>
 
             {/* Quick Tips or Guidelines */}
             <div className="bg-slate-50 border border-slate-150 rounded-xl p-3.5 space-y-2.5">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 font-mono block">Submission Checklist:</span>
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 font-mono block">What you can see :</span>
               <ul className="space-y-2 text-[10px] text-slate-600 font-sans">
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>Ensure physical receipts/invoices are scanned & attached</span>
+                  <span>When requisitions were submitted and approved</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>Verify correct budget category & church group mapping</span>
+                  <span>When funds were disbursed</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>Verify remaining group budget allocation holds sufficient funds</span>
+                  <span>Financial Reporting and events added by the Finance Team</span>
                 </li>
               </ul>
             </div>
@@ -1009,8 +1009,8 @@ const Dashboard: React.FC<{
                 <CalendarRange size={18} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Submission & Expiry Calendar</h2>
-                <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">Upcoming Requisition Deadlines & Cut-off Dates</p>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Requisitions & Disbursements Calendar</h2>
+                <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">TRACKING REQUISITIONS PROGRESS BY DATE</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">

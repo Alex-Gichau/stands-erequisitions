@@ -5937,6 +5937,456 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // END-OF-DAY DAILY USER LOGIN & AUDIT TRAIL SLACK SUMMARY SERVICE
+  // =========================================================================
+  const DAILY_LOGIN_CONFIG_FILE = path.join(getBaseDataDir(), "daily_login_slack_config.json");
+
+  interface DailyLoginSlackConfig {
+    enabled: boolean;
+    lastSentDate: string; // YYYY-MM-DD (EAT)
+    lastSentTimestamp: string;
+    scheduledHour: number; // 23 (11 PM EAT)
+    scheduledMinute: number; // 45
+  }
+
+  const getDailyLoginSlackConfig = (): DailyLoginSlackConfig => {
+    const defaults: DailyLoginSlackConfig = {
+      enabled: true,
+      lastSentDate: "",
+      lastSentTimestamp: "",
+      scheduledHour: 23,
+      scheduledMinute: 45
+    };
+    try {
+      if (fs.existsSync(DAILY_LOGIN_CONFIG_FILE)) {
+        const raw = fs.readFileSync(DAILY_LOGIN_CONFIG_FILE, "utf-8");
+        return { ...defaults, ...JSON.parse(raw) };
+      }
+    } catch (e) {
+      console.warn("Failed to load daily login slack config:", e);
+    }
+    return defaults;
+  };
+
+  const saveDailyLoginSlackConfig = (config: DailyLoginSlackConfig) => {
+    try {
+      fs.writeFileSync(DAILY_LOGIN_CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Failed to write daily login slack config:", e);
+    }
+  };
+
+  const getTodayDateEAT = (): string => {
+    try {
+      const now = new Date();
+      // Formats as YYYY-MM-DD in Africa/Nairobi
+      return now.toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi" });
+    } catch (e) {
+      return new Date().toISOString().split("T")[0];
+    }
+  };
+
+  const formatTimeEAT = (isoOrDate: string | Date): string => {
+    try {
+      const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
+      return d.toLocaleTimeString("en-GB", { timeZone: "Africa/Nairobi", hour: "2-digit", minute: "2-digit" });
+    } catch (e) {
+      return "N/A";
+    }
+  };
+
+  const aggregateDailyLoginAndAuditSummary = (targetDateStr?: string) => {
+    const todayDate = targetDateStr || getTodayDateEAT();
+    const allActivities = restoreActivities();
+    const usersMap = new Map<string, {
+      userId: string;
+      email: string;
+      name: string;
+      role: string;
+      group: string;
+      loginCount: number;
+      firstLoginTime: string;
+      lastLoginTime: string;
+      authProviders: Set<string>;
+      actions: Array<{ action: string; details: string; timestamp: string; metadata?: any }>;
+    }>();
+
+    let totalLogins = 0;
+    let totalActions = 0;
+    let totalRequisitionsCreated = 0;
+    let totalRequisitionsApprovedL1 = 0;
+    let totalRequisitionsApprovedL2 = 0;
+    let totalDisbursements = 0;
+    let totalDisbursedAmount = 0;
+
+    // Filter activities for the given date (EAT)
+    for (const act of allActivities) {
+      if (!act.timestamp) continue;
+      let actDate = "";
+      try {
+        actDate = new Date(act.timestamp).toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi" });
+      } catch {
+        actDate = (act.timestamp || "").split("T")[0];
+      }
+
+      if (actDate !== todayDate) continue;
+
+      totalActions++;
+      const actionName = (act.action || "").toUpperCase();
+      const performedByRaw = act.performedBy || "System User";
+      const metadata = act.metadata || {};
+
+      // Extract user identifiers
+      const email = (metadata.email || act.metadata?.userEmail || "").trim().toLowerCase() ||
+                    (act.details?.match(/[\w.-]+@[\w.-]+\.\w+/) ? act.details.match(/[\w.-]+@[\w.-]+\.\w+/)?.[0].toLowerCase() : "") ||
+                    performedByRaw.toLowerCase();
+      
+      const userKey = email || performedByRaw;
+      const userName = metadata.name || performedByRaw.split("(")[0].trim() || (email ? email.split("@")[0] : "User");
+      const userRole = metadata.role || (performedByRaw.includes("(") ? performedByRaw.split("(")[1].replace(")", "").trim() : "CHURCH_GROUP");
+      const userGroup = metadata.group || metadata.groupId || "General Ministry";
+      const userId = metadata.userId || metadata.uid || "N/A";
+
+      if (!usersMap.has(userKey)) {
+        usersMap.set(userKey, {
+          userId,
+          email,
+          name: userName,
+          role: userRole,
+          group: userGroup,
+          loginCount: 0,
+          firstLoginTime: "",
+          lastLoginTime: "",
+          authProviders: new Set<string>(),
+          actions: []
+        });
+      }
+
+      const userRecord = usersMap.get(userKey)!;
+
+      // Track Login events
+      if (actionName.includes("LOGIN") || actionName.includes("SIGN_IN") || actionName === "USER_LOGIN") {
+        totalLogins++;
+        userRecord.loginCount++;
+        const timeStr = formatTimeEAT(act.timestamp);
+        if (!userRecord.firstLoginTime) userRecord.firstLoginTime = timeStr;
+        userRecord.lastLoginTime = timeStr;
+        if (metadata.authProvider) userRecord.authProviders.add(metadata.authProvider);
+      } else {
+        // Track non-login mutating actions
+        userRecord.actions.push({
+          action: act.action,
+          details: act.details,
+          timestamp: act.timestamp,
+          metadata: act.metadata
+        });
+      }
+
+      // Aggregate high-level stats
+      if (actionName.includes("REQUISITION_CREATED") || actionName.includes("REQUISITION_SUBMITTED") || actionName === "CREATE_REQUISITION") {
+        totalRequisitionsCreated++;
+      } else if (actionName.includes("APPROVED_L1") || actionName === "REQUISITION_APPROVED_L1") {
+        totalRequisitionsApprovedL1++;
+      } else if (actionName.includes("APPROVED_L2") || actionName === "REQUISITION_APPROVED_L2") {
+        totalRequisitionsApprovedL2++;
+      } else if (actionName.includes("DISBURSED") || actionName.includes("DISBURSEMENT") || actionName === "FUNDS_DISBURSED") {
+        totalDisbursements++;
+        if (metadata.amount) {
+          totalDisbursedAmount += Number(metadata.amount) || 0;
+        }
+      }
+    }
+
+    const activeUsersList = Array.from(usersMap.values()).map(u => ({
+      userId: u.userId,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      group: u.group,
+      loginCount: u.loginCount || 1,
+      firstLoginTime: u.firstLoginTime || "Earlier today",
+      lastLoginTime: u.lastLoginTime || "Recent",
+      authProviders: Array.from(u.authProviders).join(", ") || "Standard Auth",
+      totalActions: u.actions.length,
+      actionHighlights: summarizeUserAuditActions(u.actions)
+    }));
+
+    return {
+      date: todayDate,
+      generatedAt: new Date().toISOString(),
+      generatedAtEAT: formatTimeEAT(new Date()),
+      totalActiveUsers: activeUsersList.length,
+      totalLogins,
+      totalAuditEvents: totalActions,
+      stats: {
+        totalRequisitionsCreated,
+        totalRequisitionsApprovedL1,
+        totalRequisitionsApprovedL2,
+        totalDisbursements,
+        totalDisbursedAmount
+      },
+      users: activeUsersList
+    };
+  };
+
+  const summarizeUserAuditActions = (actions: Array<{ action: string; details: string; timestamp: string; metadata?: any }>): string[] => {
+    if (!actions || actions.length === 0) {
+      return ["• Logged in and accessed portal dashboard (view-only session)"];
+    }
+
+    const highlights: string[] = [];
+    const grouped = new Map<string, number>();
+
+    for (const a of actions) {
+      const act = a.action.toUpperCase();
+      let key = a.details || a.action;
+      if (act.includes("APPROVED_L1")) key = `Approved Level 1 clearance on requisition: ${a.metadata?.title || a.details || ''}`;
+      else if (act.includes("APPROVED_L2")) key = `Approved Level 2 budget allocation on requisition: ${a.metadata?.title || a.details || ''}`;
+      else if (act.includes("DISBURSED")) key = `Disbursed funds: ${a.metadata?.title || a.details || ''} (KES ${(a.metadata?.amount || 0).toLocaleString()})`;
+      else if (act.includes("REQUISITION_CREATED") || act.includes("SUBMITTED")) key = `Submitted requisition: ${a.metadata?.title || a.details || ''}`;
+      else if (act.includes("COMMENT")) key = `Added feedback / comment to requisition: ${a.metadata?.title || a.details || ''}`;
+      else if (act.includes("REJECTED")) key = `Returned / rejected requisition: ${a.metadata?.title || a.details || ''}`;
+      else if (act.includes("SETTINGS")) key = `Updated system settings / permissions`;
+      else if (act.includes("BUDGET")) key = `Adjusted budget allocations for ${a.metadata?.groupId || 'ministry'}`;
+      
+      grouped.set(key, (grouped.get(key) || 0) + 1);
+    }
+
+    for (const [desc, count] of grouped.entries()) {
+      const countStr = count > 1 ? ` (x${count})` : "";
+      highlights.push(`• ${desc.replace(/\s+/g, " ").trim()}${countStr}`);
+      if (highlights.length >= 8) {
+        highlights.push(`• ... and ${actions.length - highlights.length} more actions logged in audit trail`);
+        break;
+      }
+    }
+
+    return highlights;
+  };
+
+  const buildSlackDailyLoginSummaryPayload = (summary: ReturnType<typeof aggregateDailyLoginAndAuditSummary>) => {
+    const dateFormatted = summary.date;
+    const blocks: any[] = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: `📊 Daily User Logins & Audit Summary (${dateFormatted})`,
+          emoji: true
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*📅 Date (EAT):*\n\`${dateFormatted}\` at \`${summary.generatedAtEAT} EAT\``
+          },
+          {
+            type: "mrkdwn",
+            text: `*👥 Active Users Today:*\n*${summary.totalActiveUsers}* users (${summary.totalLogins} login sessions)`
+          }
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*📝 Audit Events Logged:*\n*${summary.totalAuditEvents}* total system operations`
+          },
+          {
+            type: "mrkdwn",
+            text: `*💰 Settlements / Disbursements:*\n*${summary.stats.totalDisbursements}* vouchers (KES ${summary.stats.totalDisbursedAmount.toLocaleString()})`
+          }
+        ]
+      },
+      { type: "divider" }
+    ];
+
+    if (summary.users.length === 0) {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `_No user logins or mutating actions were recorded for ${dateFormatted}._`
+        }
+      });
+    } else {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*👤 Detailed User Activity & Audit Breakdown:*`
+        }
+      });
+
+      for (const u of summary.users.slice(0, 15)) {
+        const auditText = u.actionHighlights.slice(0, 4).join("\n");
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*${u.name}* (\`${u.role}\` — _${u.group}_)\n📧 \`${u.email || 'N/A'}\` • *${u.loginCount} session(s)* [${u.firstLoginTime} - ${u.lastLoginTime}]\n${auditText}`
+          }
+        });
+      }
+
+      if (summary.users.length > 15) {
+        blocks.push({
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `_... and ${summary.users.length - 15} additional users who accessed the system today._`
+            }
+          ]
+        });
+      }
+    }
+
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `🔒 *PCEA St. Andrew's eRequisitions* • Daily Security & Financial Governance Audit • Target: \`#system-logs\``
+        }
+      ]
+    });
+
+    return {
+      channel: "#system-logs",
+      username: "STANDS Daily Audit Bot",
+      icon_emoji: ":bar_chart:",
+      attachments: [
+        {
+          color: summary.totalActiveUsers > 0 ? "#2563eb" : "#64748b",
+          blocks
+        }
+      ]
+    };
+  };
+
+  const executeDailyLoginSummaryDispatch = async (targetDate?: string) => {
+    const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+    const summary = aggregateDailyLoginAndAuditSummary(targetDate);
+    const slackPayload = buildSlackDailyLoginSummaryPayload(summary);
+
+    console.log(`[Daily Login Slack Summary] Generated payload for ${summary.date}: ${summary.totalActiveUsers} users active.`);
+
+    if (!webhookUrl) {
+      console.warn("[Daily Login Slack Summary] SLACK_WEBHOOK_URL not set in environment. Simulated dispatch successfully.");
+      return { success: true, simulated: true, summary, payload: slackPayload };
+    }
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(slackPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Slack webhook responded with status code ${response.status}`);
+      }
+
+      console.log(`[Daily Login Slack Summary] Successfully dispatched daily summary for ${summary.date} to Slack.`);
+      return { success: true, simulated: false, summary, payload: slackPayload };
+    } catch (error: any) {
+      console.error("[Daily Login Slack Summary] Failed to deliver payload to Slack:", error);
+      throw error;
+    }
+  };
+
+  // POST /api/slack/send-daily-login-summary
+  app.post("/api/slack/send-daily-login-summary", async (req, res) => {
+    try {
+      const targetDate = req.body?.date;
+      const result = await executeDailyLoginSummaryDispatch(targetDate);
+      const config = getDailyLoginSlackConfig();
+      config.lastSentDate = result.summary.date;
+      config.lastSentTimestamp = new Date().toISOString();
+      saveDailyLoginSlackConfig(config);
+
+      res.json({
+        success: true,
+        simulated: result.simulated,
+        date: result.summary.date,
+        totalActiveUsers: result.summary.totalActiveUsers,
+        totalAuditEvents: result.summary.totalAuditEvents,
+        summary: result.summary
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to dispatch daily login Slack summary", message: error.message });
+    }
+  });
+
+  // GET /api/slack/daily-login-summary-status
+  app.get("/api/slack/daily-login-summary-status", (req, res) => {
+    try {
+      const config = getDailyLoginSlackConfig();
+      const todayDate = getTodayDateEAT();
+      const currentSummary = aggregateDailyLoginAndAuditSummary(todayDate);
+
+      res.json({
+        enabled: config.enabled,
+        todayDate,
+        lastSentDate: config.lastSentDate,
+        lastSentTimestamp: config.lastSentTimestamp,
+        isSentToday: config.lastSentDate === todayDate,
+        summaryPreview: currentSummary
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch daily login summary status", message: error.message });
+    }
+  });
+
+  // Automated End-Of-Day Scheduled Dispatch Runner (Checks every 15 minutes)
+  setInterval(async () => {
+    try {
+      const config = getDailyLoginSlackConfig();
+      if (!config.enabled) return;
+
+      const now = new Date();
+      const todayDate = getTodayDateEAT();
+      
+      // Get current hour in Nairobi (EAT)
+      let currentHourEAT = 0;
+      let currentMinuteEAT = 0;
+      try {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Africa/Nairobi",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false
+        }).formatToParts(now);
+        currentHourEAT = parseInt(parts.find(p => p.type === "hour")?.value || "0", 10);
+        currentMinuteEAT = parseInt(parts.find(p => p.type === "minute")?.value || "0", 10);
+      } catch {
+        currentHourEAT = (now.getUTCHours() + 3) % 24;
+        currentMinuteEAT = now.getUTCMinutes();
+      }
+
+      // If it's at or after scheduled hour (e.g. 23:30 / 11:30 PM EAT) and not sent today
+      if (
+        (currentHourEAT > config.scheduledHour || (currentHourEAT === config.scheduledHour && currentMinuteEAT >= config.scheduledMinute)) &&
+        config.lastSentDate !== todayDate
+      ) {
+        console.log(`[Daily Login Slack Scheduler] End-of-day trigger reached (${currentHourEAT}:${currentMinuteEAT} EAT). Dispatched for ${todayDate}...`);
+        await executeDailyLoginSummaryDispatch(todayDate);
+        config.lastSentDate = todayDate;
+        config.lastSentTimestamp = new Date().toISOString();
+        saveDailyLoginSlackConfig(config);
+        console.log("[Daily Login Slack Scheduler] Completed automated dispatch.");
+      }
+    } catch (e) {
+      console.error("[Daily Login Slack Scheduler Error]:", e);
+    }
+  }, 15 * 60 * 1000);
+
   // Run automated 5-day 04:00 AM Health check every 15 minutes
   setInterval(async () => {
     try {

@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ReceiptTemplateGenerator } from "./ReceiptTemplateGenerator";
 import { printSystemLogs } from "../utils/exportUtils";
 import { BudgetCircularGauges } from "./BudgetCircularGauges";
+import { RecentCommentsAndReactionsFeed } from "./RecentCommentsAndReactionsFeed";
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { NewRequisitionForm } from "./NewRequisitionForm";
 
@@ -850,6 +851,9 @@ const Dashboard: React.FC<{
         activeYear={fiscalSummary.activeYear}
         status={systemSettings?.fiscalYearStatus}
       />
+
+      {/* Role-Based Recent Comments & Reactions Feed (Social Tweet-Style Activity Cards) */}
+      <RecentCommentsAndReactionsFeed onViewChange={onViewChange} />
 
       {/* Scoped Budget Banner for assigned ministries */}
       {assignedMinistries.length > 0 && (

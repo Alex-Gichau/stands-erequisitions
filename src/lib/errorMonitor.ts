@@ -44,7 +44,8 @@ export function initErrorMonitor() {
 
     try {
       const response = await originalFetch.apply(this, args);
-      if (!response.ok) {
+      // Status 304 is Not Modified (Cache Hit) and not a failure
+      if (!response.ok && response.status !== 304 && response.status !== 301 && response.status !== 302) {
         const cloned = response.clone();
         let errBody = "";
         try {
@@ -56,7 +57,14 @@ export function initErrorMonitor() {
         const formattedError = `[API Failure ${response.status}] ${method.toUpperCase()} ${url} - ${errBody || response.statusText}`;
 
         // Avoid logging or dispatching recursion for Slack notification, health checks, or rate limits
-        if (!url.includes("/api/notify-slack") && !url.includes("favicon") && !url.includes("ws://") && !url.includes("wss://")) {
+        const isExcludedUrl = url.includes("/api/notify-slack") || 
+                              url.includes("favicon") || 
+                              url.includes("ws://") || 
+                              url.includes("wss://") ||
+                              url.includes("securetoken.googleapis.com") ||
+                              url.includes("identitytoolkit.googleapis.com");
+
+        if (!isExcludedUrl) {
           if (response.status === 429) {
             console.warn(`[API Rate Limit 429] ${method.toUpperCase()} ${url}: backing off.`);
           } else {
@@ -69,9 +77,11 @@ export function initErrorMonitor() {
       }
       return response;
     } catch (err: any) {
-      const formattedError = `[API Network Error] ${method.toUpperCase()} ${url} - ${err?.message || err}`;
-      if (!url.includes("/api/notify-slack")) {
-        originalConsoleError(formattedError);
+      const isExcludedUrl = url.includes("/api/notify-slack") || 
+                            url.includes("securetoken.googleapis.com") || 
+                            url.includes("identitytoolkit.googleapis.com");
+      if (!isExcludedUrl) {
+        console.warn(`[API Network Warning] ${method.toUpperCase()} ${url} - ${err?.message || err}`);
       }
       throw err;
     }

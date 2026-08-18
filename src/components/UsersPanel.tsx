@@ -105,6 +105,30 @@ export const UsersPanel: React.FC = () => {
     return counts;
   }, [users]);
 
+  // Real-time active online users calculation (last seen timestamp is right now / < 3 mins)
+  const onlineUsers = React.useMemo(() => {
+    const now = new Date().getTime();
+    return users.filter((u) => {
+      // Current logged in user is online right now
+      if (currentUser && u.id === currentUser.id) return true;
+
+      // Check last seen timestamp (online = last seen is right now within 3 minutes)
+      if (u.lastSeen) {
+        const lastSeenTime = new Date(u.lastSeen).getTime();
+        if (!isNaN(lastSeenTime) && (now - lastSeenTime) < 3 * 60 * 1000) {
+          return true;
+        }
+      }
+
+      // Fallback for user marked online without lastSeen timestamp
+      if (u.isOnline && !u.lastSeen) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [users, currentUser]);
+
   // Calculate users per affiliated group
   const groupCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
@@ -485,16 +509,38 @@ export const UsersPanel: React.FC = () => {
             activeTab === "users" ? "bg-white dark:bg-slate-900 text-primary dark:text-blue-400 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span>User Directory</span>
-            <div className="flex items-center gap-1">
-              <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full text-[9px]">
-                {users.length}
-              </span>
-              <span className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1" title="Online Users">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                {users.filter(u => u.isOnline).length}
-              </span>
+            
+            {/* Overlapping Avatars Indicator of Realtime Online Users with Green Pulsing Last Seen Dot */}
+            <div className="flex items-center gap-1.5 pl-1" title={`${onlineUsers.length} real-time active users currently using the system`}>
+              <div className="flex items-center -space-x-2 overflow-hidden py-0.5">
+                {onlineUsers.slice(0, 4).map((onlineUser) => (
+                  <div 
+                    key={onlineUser.id} 
+                    className="relative inline-block transition-transform hover:z-20 hover:scale-110"
+                    title={`${onlineUser.name} (${onlineUser.role ? onlineUser.role.replace(/_/g, " ") : "Member"}) • Online now`}
+                  >
+                    <div className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-slate-900 overflow-hidden shadow-2xs flex items-center justify-center bg-gradient-to-tr from-indigo-500 to-sky-400 text-white font-black text-[9px] uppercase">
+                      {onlineUser.photoURL ? (
+                        <img src={onlineUser.photoURL} alt={onlineUser.name} className="w-full h-full object-cover" />
+                      ) : (
+                        onlineUser.name.charAt(0)
+                      )}
+                    </div>
+                  </div>
+                ))}
+                
+              </div>
+
+              {/* Real-time Online Users Count Pill with Green Pulsing Dot */}
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 rounded-full border border-emerald-200/80 dark:border-emerald-800/80 text-[9px] font-bold tracking-tight shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>{onlineUsers.length}</span>
+              </div>
             </div>
           </div>
         </button>

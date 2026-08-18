@@ -25,9 +25,21 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[GlobalErrorBoundary] Uncaught React Error:", error, errorInfo);
     this.setState({ errorInfo });
+
+    // If dynamic module loading failed due to container reload, attempt automatic retry once
+    const isModuleError = error?.message?.includes("Failed to fetch dynamically imported module") ||
+                          error?.message?.includes("Importing a module script failed");
+    if (isModuleError) {
+      const hasReloaded = sessionStorage.getItem("chunk_reload_attempt");
+      if (!hasReloaded) {
+        sessionStorage.setItem("chunk_reload_attempt", "true");
+        window.location.reload();
+      }
+    }
   }
 
   public handleReset = () => {
+    sessionStorage.removeItem("chunk_reload_attempt");
     this.setState({ hasError: false, error: null, errorInfo: null });
   };
 

@@ -31,22 +31,42 @@ import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearA
 import { databaseService } from "./lib/databaseService";
 import { UserRole, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
 
-// Route-based & Panel Code Splitting (React.lazy)
-const RequisitionsPanel = lazy(() => import("./components/RequisitionsPanel").then(m => ({ default: m.RequisitionsPanel })));
-const ApprovalsPanel = lazy(() => import("./components/ApprovalsPanel").then(m => ({ default: m.ApprovalsPanel })));
-const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
-const UsersPanel = lazy(() => import("./components/UsersPanel").then(m => ({ default: m.UsersPanel })));
-const ReportsPanel = lazy(() => import("./components/ReportsPanel").then(m => ({ default: m.ReportsPanel })));
-const FinanceLedgerPanel = lazy(() => import("./components/FinanceLedgerPanel").then(m => ({ default: m.FinanceLedgerPanel })));
-const AccessControlPanel = lazy(() => import("./components/AccessControlPanel").then(m => ({ default: m.AccessControlPanel })));
-const VendorsPanel = lazy(() => import("./components/VendorsPanel").then(m => ({ default: m.VendorsPanel })));
-const AuditLogsPanel = lazy(() => import("./components/AuditLogsPanel").then(m => ({ default: m.AuditLogsPanel })));
-const HelpPanel = lazy(() => import("./components/HelpPanel").then(m => ({ default: m.HelpPanel })));
-const TransactionsPanel = lazy(() => import("./components/TransactionsPanel"));
-const ReceiptTemplateGenerator = lazy(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (error) {
+      console.warn("[LazyLoad] Dynamic import failed, retrying...", error);
+      await new Promise(resolve => setTimeout(resolve, 350));
+      try {
+        return await factory();
+      } catch (retryError) {
+        console.error("[LazyLoad] Retry failed:", retryError);
+        throw retryError;
+      }
+    }
+  });
+}
+
+// Route-based & Panel Code Splitting (React.lazy with retry resilience)
+const RequisitionsPanel = lazyWithRetry(() => import("./components/RequisitionsPanel").then(m => ({ default: m.RequisitionsPanel || m.default })));
+const ApprovalsPanel = lazyWithRetry(() => import("./components/ApprovalsPanel").then(m => ({ default: m.ApprovalsPanel })));
+const SettingsPanel = lazyWithRetry(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
+const UsersPanel = lazyWithRetry(() => import("./components/UsersPanel").then(m => ({ default: m.UsersPanel })));
+const ReportsPanel = lazyWithRetry(() => import("./components/ReportsPanel").then(m => ({ default: m.ReportsPanel })));
+const FinanceLedgerPanel = lazyWithRetry(() => import("./components/FinanceLedgerPanel").then(m => ({ default: m.FinanceLedgerPanel })));
+const AccessControlPanel = lazyWithRetry(() => import("./components/AccessControlPanel").then(m => ({ default: m.AccessControlPanel })));
+const VendorsPanel = lazyWithRetry(() => import("./components/VendorsPanel").then(m => ({ default: m.VendorsPanel })));
+const AuditLogsPanel = lazyWithRetry(() => import("./components/AuditLogsPanel").then(m => ({ default: m.AuditLogsPanel })));
+const HelpPanel = lazyWithRetry(() => import("./components/HelpPanel").then(m => ({ default: m.HelpPanel })));
+const TransactionsPanel = lazyWithRetry(() => import("./components/TransactionsPanel").then(m => ({ default: m.default || (m as any).TransactionsPanel })));
+const ReceiptTemplateGenerator = lazyWithRetry(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
 import {
   Bell,
   ArrowRight,
+  ArrowLeft,
   LogOut,
   AlertCircle,
   Search,
@@ -378,6 +398,7 @@ function AppContent() {
   // Deep linking and direct sharing states
   const [targetReqId, setTargetReqId] = useState<string | null>(null);
   const [checkingAccess, setCheckingAccess] = useState(false);
+  const [deletedReqId, setDeletedReqId] = useState<string | null>(null);
   const [accessDeniedReq, setAccessDeniedReq] = useState<{ id: string; title?: string; groupName?: string } | null>(null);
   const {
     currentUser,
@@ -601,13 +622,10 @@ function AppContent() {
           return;
         }
 
-        // If requisition is truly not found anywhere
-        if (!reqData) {
-          setAccessDeniedReq({
-            id: targetReqId,
-            title: "Requisition Not Found",
-            groupName: "Unknown / Deleted"
-          });
+        // If requisition is truly not found anywhere or marked as DELETED
+        if (!reqData || reqData.status === RequisitionStatus.DELETED || (reqData as any).isDeleted || (reqData.status as any) === "DELETED") {
+          setDeletedReqId(targetReqId);
+          setAccessDeniedReq(null);
           setCheckingAccess(false);
           return;
         }

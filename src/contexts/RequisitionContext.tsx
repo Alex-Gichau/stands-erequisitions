@@ -350,6 +350,91 @@ export function safeNormalizeApprovalHistory(history: any): any[] {
   return [];
 }
 
+export function safeNormalizeComments(comments: any): any[] {
+  if (!comments) return [];
+  let parsed = comments;
+  if (typeof comments === 'string') {
+    const trimmed = comments.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        return [];
+      }
+    } else {
+      return [];
+    }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((c: any) => {
+    if (typeof c === 'string') {
+      try {
+        c = JSON.parse(c);
+      } catch (e) {
+        return null;
+      }
+    }
+    if (!c || typeof c !== 'object') return null;
+    const authorAvatar = c.authorAvatar || c.author_avatar || c.authorPhotoURL || c.author_photo_url || "";
+    const authorName = c.authorName || c.author_name || c.authorEmail || c.author_email || "User";
+    const authorEmail = c.authorEmail || c.author_email || "";
+    const authorRole = c.authorRole || c.author_role || "USER";
+    const createdAt = c.createdAt || c.created_at || c.timestamp || new Date().toISOString();
+    
+    // Normalize nested replies recursively if present
+    const rawReplies = Array.isArray(c.replies) ? c.replies : [];
+    const normalizedReplies = rawReplies.map((r: any) => {
+      if (!r || typeof r !== 'object') return null;
+      const rAvatar = r.authorAvatar || r.author_avatar || r.authorPhotoURL || r.author_photo_url || "";
+      const rName = r.authorName || r.author_name || r.authorEmail || r.author_email || "User";
+      const rEmail = r.authorEmail || r.author_email || "";
+      const rCreatedAt = r.createdAt || r.created_at || r.timestamp || new Date().toISOString();
+      return {
+        id: r.id || `reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        authorId: r.authorId || r.author_id || "anonymous",
+        authorName: rName,
+        authorEmail: rEmail,
+        authorRole: r.authorRole || r.author_role || "USER",
+        authorAvatar: rAvatar,
+        authorPhotoURL: rAvatar,
+        text: r.text || "",
+        timestamp: rCreatedAt,
+        createdAt: rCreatedAt,
+        parentId: r.parentId || c.id,
+        replyTo: r.replyTo,
+        reactions: r.reactions || [],
+        reactionCounts: r.reactionCounts || {},
+        reactedUserIds: r.reactedUserIds || [],
+        reactionSummary: r.reactionSummary,
+        attachments: Array.isArray(r.attachments) ? r.attachments : [],
+        isEdited: Boolean(r.isEdited || r.is_edited)
+      };
+    }).filter(Boolean);
+
+    return {
+      id: c.id || `comment_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      authorId: c.authorId || c.author_id || "anonymous",
+      authorName,
+      authorEmail,
+      authorRole,
+      authorAvatar,
+      authorPhotoURL: authorAvatar,
+      text: c.text || "",
+      timestamp: createdAt,
+      createdAt,
+      parentId: c.parentId !== undefined ? c.parentId : (c.parent_id !== undefined ? c.parent_id : (c.replyTo?.id || null)),
+      replyTo: c.replyTo || (c.parent_id ? { id: c.parent_id, authorName: c.parent_author_name || "User", text: "" } : undefined),
+      reactions: c.reactions || [],
+      reactionCounts: c.reactionCounts || {},
+      reactedUserIds: c.reactedUserIds || [],
+      reactionSummary: c.reactionSummary,
+      replies: normalizedReplies,
+      attachments: Array.isArray(c.attachments) ? c.attachments : [],
+      isEdited: Boolean(c.isEdited || c.is_edited)
+    };
+  }).filter(Boolean);
+}
+
 const limit = (val: number) => ({ type: 'limit', value: val });
 const orderBy = (field: string, direction: string = 'asc') => ({ type: 'orderBy', field, direction });
 const where = (field: string, op: string, value: any) => ({ type: 'where', field, op, value });
@@ -1941,7 +2026,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           attachments: safeNormalizeAttachments(r?.attachments),
           receipts: safeNormalizeReceipts(r?.receipts),
           approvalHistory: safeNormalizeApprovalHistory(r?.approvalHistory || r?.approval_history),
-          comments: r?.comments || [],
+          comments: safeNormalizeComments(r?.comments),
           notificationEmails: safeNormalizeNotificationEmails(r)
         } as Requisition;
       });
@@ -2637,11 +2722,22 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           lastDbEtagRef.current = etagHeader;
         }
 
+        const contentType = response.headers.get("content-type");
+        if (contentType && !contentType.includes("application/json")) {
+          console.warn("[DB Sync] Received non-JSON response from /api/db-all, skipping parse.");
+          return;
+        }
+
         let dbData: any = null;
         try {
-          dbData = await response.json();
+          const rawText = await response.text();
+          if (!rawText || rawText.trim().startsWith("<")) {
+            console.warn("[DB Sync] HTML payload returned instead of JSON, skipping parse.");
+            return;
+          }
+          dbData = JSON.parse(rawText);
         } catch (jsonErr) {
-          console.error("[DB Sync] Malformed JSON received from backend:", jsonErr);
+          console.warn("[DB Sync] Non-JSON payload received from backend, skipping cycle:", jsonErr);
           return;
         }
 
@@ -2679,7 +2775,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 disbursedAt: r?.disbursed_at || r?.disbursedAt || "",
                 rejectionReason: r?.rejection_reason || r?.rejectionReason || "",
                 approvalHistory: safeNormalizeApprovalHistory(r?.approval_history || r?.approvalHistory || []),
-                comments: r?.comments || [],
+                comments: safeNormalizeComments(r?.comments),
                 digitalSignature: r?.digital_signature || r?.digitalSignature || "",
                 payableTo: r?.payable_to || r?.payableTo || "",
                 recurrence: r?.recurrence || null,
@@ -4240,16 +4336,54 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [requisitions, setRequisitions, addSystemLog, syncProjectAmounts, sendEmailNotification, currentUser, withDbLoading]);
 
   const updateRequisition = useCallback(async (id: string, updates: Partial<Requisition>) => {
+    if (!navigator.onLine) {
+      throw new Error("Offline Mode: You are offline. All financial data is in read-only mode, and modifications are currently locked.");
+    }
+
+    if (systemSettings?.fiscalYearStatus === "ARCHIVED") {
+      throw new Error("This fiscal year is ARCHIVED. Editing requisitions is blocked.");
+    }
+
+    const isLightweightUpdate = Object.keys(updates).every(k => 
+      k === "comments" || 
+      k === "notificationEmails" || 
+      k === "notification_emails" || 
+      k === "requiresMoreInfo" || 
+      k === "additionalInfo" || 
+      k === "flaggedForAudit"
+    );
+
+    // Fast-path for comments and metadata updates (0ms UI lag, lightweight PATCH)
+    if (isLightweightUpdate) {
+      let updatedReq: Requisition | undefined;
+      setRequisitions(prev => {
+        const currentReq = prev.find(r => r.id === id);
+        if (currentReq) {
+          const cleanedUpdates = {
+            ...updates,
+            updatedAt: new Date().toISOString(),
+            flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
+          };
+          updatedReq = { ...currentReq, ...cleanedUpdates };
+          return prev.map(r => r.id === id ? updatedReq! : r);
+        }
+        return prev;
+      });
+
+      try {
+        await databaseService.patchRequisition(id, updates);
+        if (!skipFirestore && db) {
+          const reqRef = doc(db, "requisitions", id);
+          await updateDoc(reqRef, cleanFirestoreData(updates)).catch(() => {});
+        }
+      } catch (err) {
+        console.error("[updateRequisition Lightweight Patch Error]:", err);
+      }
+      return;
+    }
+
     return withDbLoading("Saving requisition changes...", async () => {
-      if (!navigator.onLine) {
-        throw new Error("Offline Mode: You are offline. All financial data is in read-only mode, and modifications are currently locked.");
-      }
-
-      if (systemSettings?.fiscalYearStatus === "ARCHIVED") {
-        throw new Error("This fiscal year is ARCHIVED. Editing requisitions is blocked.");
-      }
-
-    if (isFirestoreQuotaExceeded()) {
+      if (isFirestoreQuotaExceeded()) {
       console.log("[Quota Fallback] Firestore limits exceeded. Executing updateRequisition offline fallback.");
       const currentReq = requisitions.find(r => r.id === id);
       if (!currentReq) return;

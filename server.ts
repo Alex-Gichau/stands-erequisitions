@@ -38,7 +38,9 @@ const fileMappings: { [key: string]: string } = {
   "forecast": "forecast_export.json",
   "permissions": "permissions_export.json",
   "church_groups": "church_groups.json",
-  "supplementary_budgets": "supplementary_budgets.json"
+  "supplementary_budgets": "supplementary_budgets.json",
+  "user_reaction_histories": "user_reaction_histories.json",
+  "user_reaction_history": "user_reaction_histories.json"
 };
 
 // Helper function to resolve paths from environment variables relative to process.cwd() or absolute path
@@ -825,7 +827,7 @@ function generateSlackFullReport(): string {
 
 async function startServer() {
   const app = express();
-  const PORT = parseInt(process.env.SERVER_PORT || "3000", 10);
+  const PORT = 3000;
 
   // Security / COOP Policy middleware for OAuth & Firebase Auth popups
   app.use((_req, res, next) => {
@@ -1444,7 +1446,8 @@ async function startServer() {
   const collectionsList = [
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
-    "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings"
+    "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
+    "user_reaction_histories"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -1465,7 +1468,9 @@ async function startServer() {
     "ledger_books": models.LedgerBook,
     "supplementary_budgets": models.SupplementaryBudget,
     "vendors": models.Vendor,
-    "settings": (models as any).Settings
+    "settings": (models as any).Settings,
+    "user_reaction_histories": (models as any).UserReactionHistory,
+    "user_reaction_history": (models as any).UserReactionHistory
   };
 
   // Bulk get (load all 15 datasets at once)
@@ -1739,20 +1744,19 @@ async function startServer() {
         }
         const camelBody = toCamelCase(body);
         const item = await Model.findOneAndUpdate(
-          { id },
+          { $or: [{ id }, { uid: id }] },
           { $set: camelBody },
-          { returnDocument: 'after' }
+          { upsert: true, returnDocument: 'after' }
         );
-        if (!item) {
-          return res.status(404).json({ error: "Document not found" });
-        }
       } else {
         const list = readJsonCollection(collection);
-        const idx = list.findIndex((item: any) => item.id === id);
+        const idx = list.findIndex((item: any) => item.id === id || item.uid === id || item._id === id || item.document_id === id);
         if (idx === -1) {
-          return res.status(404).json({ error: "Document not found" });
+          const payload = { ...body, id, document_id: id };
+          list.push(payload);
+        } else {
+          list[idx] = { ...list[idx], ...body, id: list[idx].id || id };
         }
-        list[idx] = { ...list[idx], ...body };
         writeJsonCollection(collection, list);
       }
       res.json({ success: true });
@@ -1953,7 +1957,7 @@ async function startServer() {
     const n4 = getNodeConfig("DISBURSED", s4State);
 
     const t2Title = s2State === "returned" ? "RETURNED" : "L1 APPROVED";
-    const t2Sub = s2State === "returned" ? "REVISION REQ" : "LEADER VERIFY";
+    const t2Sub = s2State === "returned" ? "REVISION REQ" : "FIRST LEVEL APPROVAL";
 
     return `
       <div style="background-color: #0b0f19; border-radius: 12px; padding: 22px 12px 18px 12px; margin: 20px 0; border: 1px solid #1e293b; box-shadow: inset 0 1px 2px rgba(255,255,255,0.05);">
@@ -2045,7 +2049,7 @@ async function startServer() {
             <!-- Label 1 -->
             <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
               <div style="font-size: 10px; font-weight: 800; color: ${n1.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">SUBMITTED</div>
-              <div style="font-size: 8px; font-weight: 700; color: ${n1.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">ENTRY LOGGED</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n1.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">SENT FOR APPROVAL</div>
             </td>
 
             <!-- Label 2 -->
@@ -2057,7 +2061,7 @@ async function startServer() {
             <!-- Label 3 -->
             <td style="text-align: center; vertical-align: top; width: 25%; padding: 0 2px;">
               <div style="font-size: 10px; font-weight: 800; color: ${n3.titleColor}; text-transform: uppercase; letter-spacing: 0.3px; line-height: 1.2;">L2 APPROVED</div>
-              <div style="font-size: 8px; font-weight: 700; color: ${n3.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">BOARD CONSENT</div>
+              <div style="font-size: 8px; font-weight: 700; color: ${n3.subColor}; text-transform: uppercase; letter-spacing: 0.2px; margin-top: 3px;">SECOND LEVEL</div>
             </td>
 
             <!-- Label 4 -->
@@ -4976,7 +4980,7 @@ async function startServer() {
 
 
 
-  app.post("/api/backup-all-to-drive", async (req, res) => {
+  app.post("/api/backup-all-to-drive", express.json({ limit: "50mb" }), async (req, res) => {
     try {
       const requisitions = req.body?.requisitions || readJsonCollection("requisitions") || [];
       const users = req.body?.users || readJsonCollection("users") || [];
@@ -5955,6 +5959,11 @@ async function startServer() {
       return res.status(404).type("application/javascript").send("// Script or service worker not found");
     }
     res.status(404).json({ error: "Attachment not found on disk or storage provider." });
+  });
+
+  // Catch-all for undefined /api routes so they never return HTML from Vite / SPA fallback
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
   });
 
   // Vite middleware for development

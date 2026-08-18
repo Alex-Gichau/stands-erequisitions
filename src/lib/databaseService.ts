@@ -187,6 +187,20 @@ export const databaseService = {
     });
   },
 
+  async patchRequisition(id: string, updates: Partial<Requisition>): Promise<void> {
+    const payload: any = {};
+    if (updates.comments !== undefined) payload.comments = updates.comments;
+    if (updates.notificationEmails !== undefined) {
+      payload.notification_emails = updates.notificationEmails;
+      payload.notificationEmails = updates.notificationEmails;
+    }
+    if (updates.requiresMoreInfo !== undefined) payload.requires_more_info = updates.requiresMoreInfo;
+    if (updates.flaggedForAudit !== undefined) payload.flagged_for_audit = updates.flaggedForAudit;
+    if (updates.additionalInfo !== undefined) payload.additional_info = updates.additionalInfo;
+    payload.updated_at = new Date().toISOString();
+    await apiCall(`/api/db/requisitions/${id}`, "PATCH", payload);
+  },
+
   async deleteRequisition(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting requisition from MongoDB: ${id}`);
     await apiCall(`/api/db/requisitions/${id}`, "DELETE");
@@ -215,6 +229,33 @@ export const databaseService = {
   async clearAllPrototypeData(): Promise<{success: boolean, error?: string}> {
     console.log("[DatabaseService] clearAllPrototypeData not implemented yet");
     return { success: true };
+  },
+
+  async saveReactionHistory(history: {
+    id: string;
+    requisitionId: string;
+    commentId: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    emoji: string;
+    action: string;
+    timestamp?: string;
+    previousEmoji?: string | null;
+  }): Promise<void> {
+    console.log(`[DatabaseService] Persisting reaction history record to MongoDB: ${history.id} (${history.action} ${history.emoji})`);
+    await apiCall(`/api/db/user_reaction_histories/${history.id}`, "POST", {
+      id: history.id,
+      requisition_id: history.requisitionId,
+      comment_id: history.commentId,
+      user_id: history.userId,
+      user_name: history.userName,
+      user_email: history.userEmail,
+      emoji: history.emoji,
+      action: history.action,
+      timestamp: history.timestamp || new Date().toISOString(),
+      previous_emoji: history.previousEmoji || null
+    });
   },
 
   async migrateFirestoreToSupabase(setProgress?: any): Promise<{success: boolean, error?: string}> {

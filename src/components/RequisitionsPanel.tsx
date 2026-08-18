@@ -66,8 +66,36 @@ import {
   MoreHorizontal,
   Heart,
   ThumbsUp,
-  CornerDownRight
+  ThumbsDown,
+  CornerDownRight,
+  Bell,
+  Bold,
+  Italic,
+  List,
+  ListOrdered
 } from "lucide-react";
+import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentFormatUtils";
+import { motion, AnimatePresence } from "motion/react";
+import * as XLSX from "xlsx";
+import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
+import { RequisitionStatus, UserRole, Requisition, CommentReaction, Comment } from "../types";
+import { compressImageFile } from "../lib/imageCompression";
+import { databaseService } from "../lib/databaseService";
+import { 
+  formatCurrency, 
+  formatDate, 
+  cn, 
+  getDaysSinceSubmission, 
+  formatRequisitionAge, 
+  isFinalStage, 
+  normalizeAttachmentUrl, 
+  getAttachmentFileName, 
+  getAbsoluteAttachmentUrl, 
+  handleImageError, 
+  resolveSenderName, 
+  getNamedImagePlaceholder 
+} from "../lib/utils";
+import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
 
 // Relative time formatting helper (e.g., "1h ago", "2m ago", "just now")
 function formatRelativeTime(timestamp?: string): string {
@@ -89,30 +117,976 @@ function formatRelativeTime(timestamp?: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-// File extension pill helper
+function getAvatarInitials(name: string): string {
+  if (!name) return "U";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "U";
+}
+
+function getAvatarBgColor(name: string): string {
+  const bgColors = [
+    "bg-indigo-600 text-white",
+    "bg-emerald-600 text-white",
+    "bg-amber-600 text-white",
+    "bg-rose-600 text-white",
+    "bg-sky-600 text-white",
+    "bg-purple-600 text-white",
+    "bg-teal-600 text-white"
+  ];
+  let hash = 0;
+  for (let i = 0; i < (name || "").length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return bgColors[Math.abs(hash) % bgColors.length];
+}
+
+// File extension pill helper with precise branded styling matching reference designs
 function getFileTypeBadge(fileName: string) {
   const ext = fileName.split('.').pop()?.toLowerCase() || '';
   if (['ppt', 'pptx'].includes(ext)) {
-    return { bg: 'bg-amber-500 text-white', label: 'P', iconColor: 'text-amber-600' };
+    return { bg: 'bg-[#E34426] text-white', label: 'P', iconColor: 'text-[#E34426]' };
   }
   if (['xls', 'xlsx', 'csv'].includes(ext)) {
-    return { bg: 'bg-emerald-600 text-white', label: 'X', iconColor: 'text-emerald-600' };
+    return { bg: 'bg-[#107C41] text-white', label: 'X', iconColor: 'text-[#107C41]' };
   }
   if (['pdf'].includes(ext)) {
-    return { bg: 'bg-rose-600 text-white', label: 'PDF', iconColor: 'text-rose-600' };
+    return { bg: 'bg-[#D83B01] text-white', label: 'PDF', iconColor: 'text-[#D83B01]' };
   }
   if (['doc', 'docx'].includes(ext)) {
-    return { bg: 'bg-blue-600 text-white', label: 'W', iconColor: 'text-blue-600' };
+    return { bg: 'bg-[#2B579A] text-white', label: 'W', iconColor: 'text-[#2B579A]' };
+  }
+  if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) {
+    return { bg: 'bg-indigo-600 text-white', label: 'IMG', iconColor: 'text-indigo-600' };
   }
   return { bg: 'bg-slate-600 text-white', label: 'FILE', iconColor: 'text-slate-600' };
 }
-import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
-import { RequisitionStatus, UserRole, Requisition } from "../types";
-import { compressImageFile } from "../lib/imageCompression";
-import { formatCurrency, formatDate, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage, normalizeAttachmentUrl, getAttachmentFileName, getAbsoluteAttachmentUrl, handleImageError, resolveSenderName, getNamedImagePlaceholder } from "../lib/utils";
-import { motion, AnimatePresence } from "motion/react";
-import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
-import * as XLSX from "xlsx";
+
+// Threaded replies summary formatter (e.g., "5 replies from Dom, Alice, Matt, and others")
+export function formatRepliesSummary(replies: any[], users: any[] = []): { count: number; text: string; authors: { name: string; avatar: string }[] } {
+  const count = replies.length;
+  if (count === 0) return { count: 0, text: "", authors: [] };
+
+  const authors: { name: string; avatar: string }[] = [];
+  const seen = new Set<string>();
+
+  for (const r of replies) {
+    const userObj = users.find((u: any) => 
+      (u.id && r.authorId && u.id === r.authorId) || 
+      (u.email && r.authorEmail && u.email.toLowerCase() === r.authorEmail.toLowerCase())
+    );
+    const resolvedName = resolveSenderName(
+      { id: r.authorId, email: r.authorEmail, name: r.authorName, role: r.authorRole },
+      users
+    ) || r.authorName || (r.authorEmail ? r.authorEmail.split("@")[0] : "User");
+
+    const avatar = r.authorAvatar || r.authorPhotoURL || (userObj?.photoURL || (userObj as any)?.avatarUrl) || "";
+    const key = resolvedName.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      authors.push({ name: resolvedName, avatar });
+    }
+  }
+
+  const names = authors.map(a => a.name);
+  const firstNames = authors.map(a => a.name.split(" ")[0]);
+  let summaryText = "";
+
+  if (count === 1) {
+    summaryText = `1 reply from ${names[0]}`;
+  } else if (names.length === 1) {
+    summaryText = `${count} replies from ${names[0]}`;
+  } else if (names.length === 2) {
+    summaryText = `${count} replies from ${firstNames[0]} and ${firstNames[1]}`;
+  } else if (names.length === 3) {
+    summaryText = `${count} replies from ${firstNames[0]}, ${firstNames[1]}, and ${firstNames[2]}`;
+  } else {
+    summaryText = `${count} replies from ${firstNames[0]}, ${firstNames[1]}, ${firstNames[2]}, and others`;
+  }
+
+  return {
+    count,
+    text: summaryText,
+    authors
+  };
+}
+
+// Restricted Reactions Palette: Thumbs Up and Thumbs Down Only
+export const REACTION_OPTIONS = [
+  { emoji: "👍", label: "Thumbs Up" },
+  { emoji: "👎", label: "Thumbs Down" },
+];
+
+export const ALLOWED_REACTION_EMOJIS = ["👍", "👎"];
+
+// Compatibility aliases
+export const WHATSAPP_QUICK_REACTION_OPTIONS = REACTION_OPTIONS;
+export const WHATSAPP_EXTENDED_REACTION_OPTIONS: { emoji: string; label: string }[] = [];
+export const COMMENT_REACTION_OPTIONS = REACTION_OPTIONS;
+
+export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(allUsers)) return map;
+
+  allUsers.forEach((u: any) => {
+    if (!u) return;
+    const resolvedName = u.name || u.displayName || u.username || resolveSenderName(u, allUsers) || (u.email ? u.email.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "");
+    if (!resolvedName) return;
+
+    if (u.id) map.set(String(u.id).trim().toLowerCase(), resolvedName);
+    if (u.uid) map.set(String(u.uid).trim().toLowerCase(), resolvedName);
+    if (u._id) map.set(String(u._id).trim().toLowerCase(), resolvedName);
+    if (u.email) map.set(String(u.email).trim().toLowerCase(), resolvedName);
+    if (u.username) map.set(String(u.username).trim().toLowerCase(), resolvedName);
+  });
+
+  return map;
+}
+
+/**
+ * Requisition Ownership Discussion Row:
+ * Renders small overlapping profile photos of people who commented on the requisition
+ * and members receiving email/system updates directly on the table row under ownership.
+ */
+export const RequisitionOwnershipDiscussionRow: React.FC<{
+  req: Requisition;
+  users: any[];
+}> = ({ req, users }) => {
+  const hasComments = Array.isArray(req.comments) && req.comments.length > 0;
+  if (!hasComments) return null;
+
+  // Gather commenters & subscribers
+  const participantsMap = new Map<string, {
+    id: string;
+    name: string;
+    avatar?: string;
+    label: string;
+    role?: string;
+  }>();
+
+  // 1. Commenters & Reply Authors
+  req.comments.forEach((c: any) => {
+    if (!c) return;
+    const authorUser = (users || []).find((u: any) =>
+      (u.id && c.authorId && u.id === c.authorId) ||
+      (u.email && c.authorEmail && u.email.toLowerCase() === c.authorEmail.toLowerCase())
+    );
+    const resolvedName = resolveSenderName(
+      { id: c.authorId, email: c.authorEmail, name: c.authorName, role: c.authorRole },
+      users || []
+    ) || c.authorName || (c.authorEmail ? c.authorEmail.split("@")[0] : "Commenter");
+
+    const avatar = c.authorAvatar || c.authorPhotoURL || authorUser?.photoURL || (authorUser as any)?.avatarUrl || "";
+    const key = (c.authorEmail || c.authorId || resolvedName).toLowerCase().trim();
+
+    participantsMap.set(key, {
+      id: key,
+      name: resolvedName,
+      avatar,
+      label: "Commented",
+      role: c.authorRole || authorUser?.role
+    });
+
+    // Check replies
+    if (Array.isArray(c.replies)) {
+      c.replies.forEach((r: any) => {
+        if (!r) return;
+        const rUser = (users || []).find((u: any) =>
+          (u.id && r.authorId && u.id === r.authorId) ||
+          (u.email && r.authorEmail && u.email.toLowerCase() === r.authorEmail.toLowerCase())
+        );
+        const rName = resolveSenderName(
+          { id: r.authorId, email: r.authorEmail, name: r.authorName, role: r.authorRole },
+          users || []
+        ) || r.authorName || (r.authorEmail ? r.authorEmail.split("@")[0] : "Commenter");
+        const rAvatar = r.authorAvatar || r.authorPhotoURL || rUser?.photoURL || (rUser as any)?.avatarUrl || "";
+        const rKey = (r.authorEmail || r.authorId || rName).toLowerCase().trim();
+
+        if (!participantsMap.has(rKey)) {
+          participantsMap.set(rKey, {
+            id: rKey,
+            name: rName,
+            avatar: rAvatar,
+            label: "Commented",
+            role: r.authorRole || rUser?.role
+          });
+        }
+      });
+    }
+  });
+
+  // 2. Members receiving updates (notificationEmails)
+  const notificationEmailsList = Array.isArray(req.notificationEmails) 
+    ? req.notificationEmails 
+    : (Array.isArray((req as any).notification_emails) ? (req as any).notification_emails : []);
+
+  notificationEmailsList.forEach((emailStr: string) => {
+    if (!emailStr || typeof emailStr !== "string") return;
+    const cleanEmail = emailStr.trim();
+    if (!cleanEmail) return;
+
+    const matchedUser = (users || []).find((u: any) =>
+      u.email && u.email.toLowerCase() === cleanEmail.toLowerCase()
+    );
+
+    const key = cleanEmail.toLowerCase();
+    const resolvedName = matchedUser?.name || matchedUser?.displayName || cleanEmail.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    const avatar = matchedUser?.photoURL || (matchedUser as any)?.avatarUrl || "";
+
+    if (participantsMap.has(key)) {
+      const existing = participantsMap.get(key)!;
+      existing.label = "Commented & Subscribed";
+      if (!existing.avatar && avatar) existing.avatar = avatar;
+    } else {
+      participantsMap.set(key, {
+        id: key,
+        name: resolvedName,
+        avatar,
+        label: "Receiving updates",
+        role: matchedUser?.role
+      });
+    }
+  });
+
+  // 3. User Reactions & Most Recent Reaction Log per User
+  const userReactionLogMap = new Map<string, {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    emoji: string;
+    timestamp: string;
+  }>();
+
+  req.comments.forEach((c: any) => {
+    if (!c) return;
+    const processItemReactions = (item: any) => {
+      if (Array.isArray(item?.reactions)) {
+        item.reactions.forEach((r: any) => {
+          if (!r) return;
+          const userKey = (r.userEmail || r.userId || r.userName || "").toLowerCase().trim();
+          if (!userKey) return;
+          const resolvedName = resolveSenderName(
+            { id: r.userId, email: r.userEmail, name: r.userName },
+            users || []
+          ) || r.userName || (r.userEmail ? r.userEmail.split("@")[0] : "User");
+
+          const timeVal = r.timestamp || item.timestamp || req.updatedAt || new Date().toISOString();
+
+          if (!userReactionLogMap.has(userKey) || new Date(timeVal).getTime() > new Date(userReactionLogMap.get(userKey)!.timestamp).getTime()) {
+            userReactionLogMap.set(userKey, {
+              userId: r.userId || userKey,
+              userName: resolvedName,
+              userEmail: r.userEmail || "",
+              emoji: r.emoji,
+              timestamp: timeVal
+            });
+          }
+        });
+      }
+    };
+
+    processItemReactions(c);
+    if (Array.isArray(c.replies)) {
+      c.replies.forEach((rep: any) => processItemReactions(rep));
+    }
+  });
+
+  const userReactionsList = Array.from(userReactionLogMap.values());
+
+  const participantList = Array.from(participantsMap.values());
+  if (participantList.length === 0 && userReactionsList.length === 0) return null;
+
+  const totalCommentCount = req.comments.reduce((acc: number, c: any) => acc + 1 + (Array.isArray(c.replies) ? c.replies.length : 0), 0);
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1 pt-1 flex-wrap">
+      {/* Overlapping profile photos */}
+      {participantList.length > 0 && (
+        <div className="flex -space-x-1.5 overflow-hidden items-center shrink-0">
+          {participantList.slice(0, 3).map((p, idx) => (
+            <div 
+              key={idx} 
+              className="relative inline-block shrink-0 group/avatar cursor-pointer" 
+              title={`${p.name} (${p.label})`}
+            >
+              {p.avatar ? (
+                <img
+                  src={p.avatar}
+                  alt={p.name}
+                  className="w-4.5 h-4.5 min-w-[18px] min-h-[18px] max-w-[18px] max-h-[18px] rounded-full object-cover ring-1.5 ring-white dark:ring-slate-900 shadow-2xs"
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className={cn(
+                  "w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full ring-1.5 ring-white dark:ring-slate-900 font-bold text-[7.5px] flex items-center justify-center shadow-2xs",
+                  getAvatarBgColor(p.name)
+                )}>
+                  {getAvatarInitials(p.name)}
+                </div>
+              )}
+            </div>
+          ))}
+          {participantList.length > 3 && (
+            <div 
+              className="w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-1.5 ring-white dark:ring-slate-900 font-bold text-[7px] flex items-center justify-center shrink-0 shadow-2xs"
+              title={`${participantList.length - 3} more: ${participantList.slice(3).map(p => p.name).join(", ")}`}
+            >
+              +{participantList.length - 3}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Small thread indicator & subscriber count */}
+      {totalCommentCount > 0 && (
+        <div 
+          className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md shrink-0"
+          title={`${totalCommentCount} comments in discussion • ${notificationEmailsList.length} member${notificationEmailsList.length === 1 ? "" : "s"} receiving updates`}
+        >
+          <MessageSquare size={8.5} className="text-indigo-500 shrink-0" />
+          <span>{totalCommentCount}</span>
+          {notificationEmailsList.length > 0 && (
+            <span className="text-slate-400 dark:text-slate-500 font-normal">
+              • <Bell size={8} className="inline text-amber-500 -mt-0.5" /> {notificationEmailsList.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Most Recent Reaction Log per user */}
+      {userReactionsList.length > 0 && (
+        <div 
+          className="inline-flex items-center gap-1 text-[8px] font-bold text-slate-700 dark:text-slate-300 bg-blue-50/90 dark:bg-blue-950/60 border border-blue-200/80 dark:border-blue-800/60 px-1.5 py-0.5 rounded-md shrink-0 shadow-2xs"
+          title={userReactionsList.map(r => `${r.emoji} ${r.userName} reacted (${formatRelativeTime(r.timestamp)})`).join(" • ")}
+        >
+          <span className="text-blue-600 dark:text-blue-400 font-black uppercase text-[7px] tracking-wider mr-0.5">Most Recent:</span>
+          {userReactionsList.slice(0, 2).map((r, idx) => (
+            <span key={idx} className="inline-flex items-center gap-0.5">
+              <span>{r.emoji}</span>
+              <span className="text-slate-800 dark:text-slate-200 font-bold">{r.userName.split(" ")[0]}</span>
+              <span className="text-slate-400 dark:text-slate-500 font-mono text-[7px]">({formatRelativeTime(r.timestamp)})</span>
+              {idx < Math.min(userReactionsList.length, 2) - 1 && <span className="text-slate-300 dark:text-slate-600 font-bold ml-0.5">•</span>}
+            </span>
+          ))}
+          {userReactionsList.length > 2 && (
+            <span className="text-blue-600 dark:text-blue-400 font-bold text-[7.5px]">+{userReactionsList.length - 2}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export function isUserReactionMatch(
+  r: any,
+  user: any,
+  allUsers: any[] = []
+): boolean {
+  if (!r || !user) return false;
+  if (r.userId === "u-current" || r.userId === "__current_user__") return true;
+
+  const curId = user.id ? String(user.id).trim().toLowerCase() : "";
+  const curUid = user.uid ? String(user.uid).trim().toLowerCase() : "";
+  const curEmail = user.email ? String(user.email).trim().toLowerCase() : "";
+  const curUsername = (user as any)?.username ? String((user as any).username).trim().toLowerCase() : "";
+  const curName = user.name ? String(user.name).trim().toLowerCase() : "";
+
+  const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+  const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+  const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+  const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+  if (curId && (rUid === curId || rUemail === curId || rEmail === curId)) return true;
+  if (curUid && (rUid === curUid || rUemail === curUid || rEmail === curUid)) return true;
+  if (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) return true;
+  if (curUsername && (rUid === curUsername || rUname === curUsername)) return true;
+  if (curName && !["user", "anon", "someone", "parish member", "anonymous", "undefined", "null"].includes(curName) && rUname === curName) return true;
+
+  return false;
+}
+
+export function sanitizeCommentReactions(
+  rawReactions: any,
+  currentUser: any = null,
+  allUsers: any[] = []
+): any[] {
+  if (!rawReactions) return [];
+
+  let rawList: any[] = [];
+  if (typeof rawReactions === "string") {
+    try {
+      const parsed = JSON.parse(rawReactions);
+      rawList = Array.isArray(parsed) ? parsed : (typeof parsed === "object" ? [parsed] : []);
+    } catch (e) {
+      rawList = [];
+    }
+  } else if (Array.isArray(rawReactions)) {
+    rawList = rawReactions;
+  } else if (typeof rawReactions === "object") {
+    rawList = [rawReactions];
+  }
+
+  if (!Array.isArray(rawList) || rawList.length === 0) return [];
+
+  const userMap = buildUserLookupMap(allUsers);
+
+  // Normalize all incoming reaction formats into flat list of individual { emoji, userId, userName, ... } records
+  const list: any[] = [];
+  for (const item of rawList) {
+    if (!item) continue;
+    if (typeof item === "string") {
+      // Legacy single emoji string: normalize to 👍 or 👎
+      let emoji = item;
+      if (emoji !== "👍" && emoji !== "👎") {
+        emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
+      }
+      list.push({ emoji, userId: "anon", userName: "" });
+    } else if (typeof item === "object") {
+      if (item.emoji && Array.isArray(item.userIds)) {
+        // Schema { emoji: string, userIds: string[] }
+        let emoji = item.emoji;
+        if (emoji !== "👍" && emoji !== "👎") {
+          emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
+        }
+        item.userIds.forEach((uid: any) => {
+          if (uid) {
+            const resolvedUid = typeof uid === "string" ? uid : (uid.id || uid.uid || uid.userId || "anon");
+            const resolvedEmail = typeof uid === "object" ? uid.email || "" : "";
+            const directName = typeof uid === "object" ? uid.name || uid.userName || "" : "";
+            const lookupName = userMap.get(String(resolvedUid).toLowerCase()) || (resolvedEmail ? userMap.get(String(resolvedEmail).toLowerCase()) : "") || directName;
+            list.push({
+              emoji,
+              userId: resolvedUid,
+              userEmail: resolvedEmail,
+              userName: lookupName || directName || ""
+            });
+          }
+        });
+      } else if (item.emoji) {
+        // Schema { emoji: string, userId: string, ... }
+        let emoji = item.emoji;
+        if (emoji !== "👍" && emoji !== "👎") {
+          emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
+        }
+        const rUid = item.userId ? String(item.userId).trim().toLowerCase() : "";
+        const rUemail = item.userEmail ? String(item.userEmail).trim().toLowerCase() : "";
+        const lookupName = (rUid && userMap.get(rUid)) || (rUemail && userMap.get(rUemail)) || item.userName || item.name || "";
+        list.push({
+          ...item,
+          emoji,
+          userName: lookupName || item.userName || item.name || ""
+        });
+      } else {
+        // Dictionary format { "👍": ["u1", "u2"], "👎": ["u3"] } or legacy { thumbsUp: [...] }
+        Object.entries(item).forEach(([key, val]: [string, any]) => {
+          let emoji = key;
+          if (key === "thumbsUp" || key === "thumbs_up" || key === "like" || key === "heart" || key === "celebration" || key === "party") emoji = "👍";
+          else if (key === "thumbsDown" || key === "thumbs_down" || key === "dislike") emoji = "👎";
+          else if (emoji !== "👍" && emoji !== "👎") emoji = "👍";
+
+          if (Array.isArray(val)) {
+            val.forEach((u: any) => {
+              const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
+              const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
+              const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
+              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName;
+              list.push({
+                emoji,
+                userId: uId,
+                userEmail: uEmail,
+                userName: lookupName || directName || ""
+              });
+            });
+          } else if (typeof val === "boolean" && val) {
+            list.push({ emoji, userId: "anon", userName: "" });
+          } else if (val && typeof val === "object" && Array.isArray(val.userIds)) {
+            val.userIds.forEach((u: any) => {
+              const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
+              const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
+              const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
+              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName;
+              list.push({
+                emoji,
+                userId: uId,
+                userEmail: uEmail,
+                userName: lookupName || directName || ""
+              });
+            });
+          }
+        });
+      }
+    }
+  }
+
+  if (list.length === 0) return [];
+
+  // Enforce STRICTLY ONE REACTION PER USER
+  const userReactionMap = new Map<string, any>();
+
+  for (const r of list) {
+    if (!r || !r.emoji) continue;
+
+    if (currentUser && isUserReactionMatch(r, currentUser, allUsers)) {
+      userReactionMap.set("__current_user__", {
+        ...r,
+        userId: currentUser?.id || currentUser?.uid || currentUser?.email || "u-current",
+        userEmail: currentUser?.email || "",
+        userName: currentUser?.name || currentUser?.displayName || (currentUser as any)?.username || "You"
+      });
+      continue;
+    }
+
+    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+    const matchedUser = Array.isArray(allUsers) && allUsers.length > 0 ? allUsers.find((u: any) => {
+      if (!u) return false;
+      const uId = u.id ? String(u.id).trim().toLowerCase() : "";
+      const uUid = u.uid ? String(u.uid).trim().toLowerCase() : "";
+      const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
+      const uName = u.name ? String(u.name).trim().toLowerCase() : "";
+      const uUsername = u.username ? String(u.username).trim().toLowerCase() : "";
+
+      return (
+        (uId && (uId === rUid || uId === rUemail || uId === rEmail)) ||
+        (uUid && (uUid === rUid || uUid === rUemail || uUid === rEmail)) ||
+        (uEmail && (uEmail === rUid || uEmail === rUemail || uEmail === rEmail)) ||
+        (uUsername && (uUsername === rUid || (rUname && uUsername === rUname))) ||
+        (uName && rUname && uName === rUname)
+      );
+    }) : null;
+
+    let userKey: string;
+    let resolvedReaction = { ...r };
+
+    if (matchedUser) {
+      userKey = `user_${matchedUser.id || matchedUser.uid || matchedUser.email}`;
+      resolvedReaction.userId = matchedUser.id || matchedUser.uid;
+      resolvedReaction.userEmail = matchedUser.email;
+      resolvedReaction.userName = matchedUser.name || matchedUser.displayName || matchedUser.username || matchedUser.email;
+    } else if (rUemail || rEmail) {
+      userKey = `email_${rUemail || rEmail}`;
+      if (!resolvedReaction.userName) {
+        const prefix = (rUemail || rEmail).split("@")[0].replace(/[._-]/g, " ");
+        resolvedReaction.userName = prefix.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      }
+    } else if (rUid && !rUid.startsWith("u-") && !rUid.startsWith("anon") && rUid !== "user") {
+      userKey = `id_${rUid}`;
+    } else if (rUname && !["anon", "user", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(rUname)) {
+      userKey = `name_${rUname}`;
+    } else {
+      userKey = `anon_user_${Math.random().toString(36).substring(2, 6)}`;
+    }
+
+    // Key strictly by userKey so each user has strictly at most ONE reaction emoji per comment/reply
+    userReactionMap.set(userKey, resolvedReaction);
+  }
+
+  return Array.from(userReactionMap.values());
+}
+
+/**
+ * Dedicated Pure Logic Handler for Reactions:
+ * Enforces strictly ONE reaction per user per comment or reply.
+ * 
+ * Rules:
+ * 1. Checks if the current user has a previous reaction on the target item.
+ * 2. If the user clicks the SAME emoji (e.g. has 👍 and clicks 👍 again):
+ *    -> Deletes the reaction (toggles OFF).
+ * 3. If the user clicks a DIFFERENT emoji (e.g. has 👍 and clicks 👎, or has 👎 and clicks 👍):
+ *    -> Deletes the previous reaction and adds the new reaction in a single atomic update.
+ * 4. If the user has NO previous reaction:
+ *    -> Adds the new reaction.
+ */
+export function handleReactionLogic({
+  item,
+  targetEmoji,
+  currentUser,
+  users = []
+}: {
+  item: any;
+  targetEmoji: string;
+  currentUser: any;
+  users?: any[];
+}): {
+  updatedItem: any;
+  action: "ADDED" | "REMOVED" | "SWITCHED";
+  previousEmoji?: string;
+  newReactions: any[];
+} {
+  const currentUserId = currentUser?.id || currentUser?.uid || currentUser?.email || "anon";
+  const currentUserName = currentUser?.name || (currentUser as any)?.displayName || (currentUser as any)?.username || resolveSenderName(currentUser, users) || currentUser?.email || "User";
+
+  // 1. Sanitize all current reactions (deduplicating to at most 1 reaction per user)
+  const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
+
+  // 2. Check if current user has a previous reaction
+  const previousReaction = sanitized.find((r: any) => isUserReactionMatch(r, currentUser, users));
+  const hasPreviousReaction = Boolean(previousReaction);
+  const isSameEmoji = previousReaction?.emoji === targetEmoji;
+
+  let newReactions: any[];
+  let action: "ADDED" | "REMOVED" | "SWITCHED";
+  let previousEmoji: string | undefined = previousReaction?.emoji;
+
+  if (hasPreviousReaction && isSameEmoji) {
+    // Current user clicked the exact same emoji: delete reaction (toggle OFF)
+    newReactions = sanitized.filter((r: any) => !isUserReactionMatch(r, currentUser, users));
+    action = "REMOVED";
+  } else if (hasPreviousReaction && !isSameEmoji) {
+    // Current user has a previous reaction and clicked a different emoji:
+    // Delete previous reaction and add new reaction to switch vote instantly
+    const newReactionObj = {
+      emoji: targetEmoji,
+      userId: currentUserId,
+      userEmail: currentUser?.email || "",
+      userName: currentUserName,
+      createdAt: new Date().toISOString()
+    };
+    newReactions = [
+      ...sanitized.filter((r: any) => !isUserReactionMatch(r, currentUser, users)),
+      newReactionObj
+    ];
+    action = "SWITCHED";
+  } else {
+    // Current user does not have a previous reaction: add new reaction
+    const newReactionObj = {
+      emoji: targetEmoji,
+      userId: currentUserId,
+      userEmail: currentUser?.email || "",
+      userName: currentUserName,
+      createdAt: new Date().toISOString()
+    };
+    newReactions = [...sanitized, newReactionObj];
+    action = "ADDED";
+  }
+
+  // 3. Compute recalculated reaction counts, user IDs list, and summary
+  const reactionCounts: Record<string, number> = {};
+  const reactedUserIds: string[] = [];
+  newReactions.forEach((r: any) => {
+    if (r && r.emoji) {
+      reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
+      const uid = r.userId || r.userEmail;
+      if (uid && !reactedUserIds.includes(uid)) {
+        reactedUserIds.push(uid);
+      }
+    }
+  });
+
+  const reactionSummary = {
+    counts: reactionCounts,
+    userIds: reactedUserIds,
+    total: newReactions.length
+  };
+
+  const updatedItem = {
+    ...item,
+    reactions: newReactions,
+    reactionCounts,
+    reactedUserIds,
+    reactionSummary
+  };
+
+  return {
+    updatedItem,
+    action,
+    previousEmoji,
+    newReactions
+  };
+}
+
+export function extractUserFirstName(user: any): string {
+  if (!user) return "";
+  if (typeof user === "string") {
+    const trimmed = user.trim();
+    if (!trimmed) return "";
+    if (trimmed.includes("@")) {
+      const emailPrefix = trimmed.split("@")[0].replace(/[._-]/g, " ").trim();
+      const first = emailPrefix.split(" ")[0];
+      return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : trimmed;
+    }
+    const first = trimmed.split(" ")[0];
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : trimmed;
+  }
+  const nameCandidate = user.name || user.displayName || user.username || "";
+  if (nameCandidate && typeof nameCandidate === "string" && nameCandidate.trim()) {
+    const first = nameCandidate.trim().split(" ")[0];
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : "";
+  }
+  if (user.email && typeof user.email === "string" && user.email.includes("@")) {
+    const emailPrefix = user.email.split("@")[0].replace(/[._-]/g, " ").trim();
+    const first = emailPrefix.split(" ")[0];
+    return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "";
+  }
+  return "";
+}
+
+export function extractUserDisplayName(user: any): string {
+  if (!user) return "";
+  if (typeof user === "string") {
+    const trimmed = user.trim();
+    if (!trimmed) return "";
+    if (trimmed.includes("@")) {
+      const emailPrefix = trimmed.split("@")[0].replace(/[._-]/g, " ").trim();
+      return emailPrefix.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+    return trimmed.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  const nameCandidate = user.name || user.displayName || user.username || "";
+  if (nameCandidate && typeof nameCandidate === "string" && nameCandidate.trim()) {
+    return nameCandidate.trim().split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  }
+  if (user.email && typeof user.email === "string" && user.email.includes("@")) {
+    const emailPrefix = user.email.split("@")[0].replace(/[._-]/g, " ").trim();
+    return emailPrefix.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+  }
+  return "";
+}
+
+export function resolveReactorNames(
+  reactionsList: any[],
+  emoji: string,
+  allUsers: any[] = [],
+  currentLoggedInUser: any = null
+): string[] {
+  const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
+  const matching = sanitized.filter((r: any) => r && r.emoji === emoji);
+  if (matching.length === 0) return [];
+  
+  const userMap = buildUserLookupMap(allUsers);
+  const names: string[] = [];
+
+  const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
+  const curUid = currentLoggedInUser?.uid ? String(currentLoggedInUser.uid).trim().toLowerCase() : "";
+  const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
+  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
+  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
+
+  matching.forEach((r: any) => {
+    const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+
+    // 1. Explicitly check if this is the currently logged in user -> returns their FirstName e.g. "John"
+    const isCurrent = Boolean(
+      (rUserId === "u-current") ||
+      (rUserId === "__current_user__") ||
+      (currentLoggedInUser && (
+        (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
+        (curUid && (rUserId === curUid || rUserEmail === curUid || rEmail === curUid)) ||
+        (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
+        (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
+        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
+      ))
+    );
+
+    if (isCurrent) {
+      const myFirstName = extractUserFirstName(currentLoggedInUser) || extractUserFirstName(rUserName) || "You";
+      names.push(myFirstName);
+      return;
+    }
+
+    // 2. Lookup in user map by ID, UID, email, or username
+    if (rUserId && userMap.has(rUserId)) {
+      const resolved = userMap.get(rUserId)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
+        const first = extractUserFirstName(resolved) || resolved.trim();
+        names.push(first);
+        return;
+      }
+    }
+    if (rUserEmail && userMap.has(rUserEmail)) {
+      const resolved = userMap.get(rUserEmail)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
+        const first = extractUserFirstName(resolved) || resolved.trim();
+        names.push(first);
+        return;
+      }
+    }
+    if (rEmail && userMap.has(rEmail)) {
+      const resolved = userMap.get(rEmail)!;
+      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
+        const first = extractUserFirstName(resolved) || resolved.trim();
+        names.push(first);
+        return;
+      }
+    }
+
+    // 3. Use stored and persisted userName if available
+    if (rUserName && rUserName.trim().length > 0) {
+      const isGeneric = [
+        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "church member", "undefined", "null"
+      ].includes(rUserName.toLowerCase().trim());
+
+      if (!isGeneric) {
+        const first = extractUserFirstName(rUserName);
+        if (first) {
+          names.push(first);
+          return;
+        }
+      }
+    }
+
+    // 4. Derive from email address
+    const emailToParse = rUserEmail || rEmail || (rUserId.includes("@") ? rUserId : "");
+    if (emailToParse && emailToParse.includes("@")) {
+      const first = extractUserFirstName(emailToParse);
+      if (first) {
+        names.push(first);
+        return;
+      }
+    }
+
+    // 5. Look in allUsers array for partial match
+    if (rUserId && Array.isArray(allUsers) && allUsers.length > 0) {
+      const matched = allUsers.find(u => 
+        u && (
+          (u.id && String(u.id).toLowerCase() === rUserId) ||
+          (u.uid && String(u.uid).toLowerCase() === rUserId) ||
+          (u.email && String(u.email).toLowerCase() === rUserId)
+        )
+      );
+      if (matched) {
+        const first = extractUserFirstName(matched);
+        if (first) {
+          names.push(first);
+          return;
+        }
+      }
+    }
+
+    // 6. Last resort: formatted user identity
+    if (rUserId && !["anon", "user", "undefined", "null"].includes(rUserId)) {
+      names.push(rUserId.length > 10 ? `User ${rUserId.slice(0, 4)}` : rUserId);
+    } else {
+      names.push("Someone");
+    }
+  });
+
+  // Ensure unique names
+  const uniqueNames = Array.from(new Set(names));
+  return uniqueNames;
+}
+
+export function formatReactionTooltip(reactorNames: string[], emoji?: string): string {
+  if (!reactorNames || reactorNames.length === 0) return '';
+
+  const count = reactorNames.length;
+  if (count === 1) {
+    return `${reactorNames[0]} reacted`;
+  }
+  if (count === 2) {
+    return `${reactorNames[0]}, ${reactorNames[1]} reacted`;
+  }
+  if (count === 3) {
+    return `${reactorNames[0]}, ${reactorNames[1]}, ${reactorNames[2]} reacted`;
+  }
+
+  const others = count - 2;
+  return `${reactorNames[0]}, ${reactorNames[1]} and ${others} other${others === 1 ? '' : 's'} reacted`;
+}
+
+export function resolveReactorsProfiles(
+  reactionsList: any[],
+  allUsers: any[] = [],
+  currentLoggedInUser: any = null
+): Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean }> {
+  const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
+  if (!sanitized || sanitized.length === 0) return [];
+
+  const userMap = buildUserLookupMap(allUsers);
+  const profiles: Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean }> = [];
+  const seen = new Set<string>();
+
+  const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
+  const curUid = currentLoggedInUser?.uid ? String(currentLoggedInUser.uid).trim().toLowerCase() : "";
+  const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
+  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
+  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
+
+  sanitized.forEach((r: any) => {
+    if (!r || !r.emoji) return;
+    const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+
+    const isCurrent = Boolean(
+      (rUserId === "u-current") ||
+      (rUserId === "__current_user__") ||
+      (currentLoggedInUser && (
+        (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
+        (curUid && (rUserId === curUid || rUserEmail === curUid || rEmail === curUid)) ||
+        (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
+        (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
+        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
+      ))
+    );
+
+    const userObj = Array.isArray(allUsers) ? allUsers.find((u: any) =>
+      u && (
+        (u.id && r.userId && String(u.id).toLowerCase() === rUserId) ||
+        (u.email && (rUserEmail || rEmail) && String(u.email).toLowerCase() === (rUserEmail || rEmail))
+      )
+    ) : null;
+
+    const resolvedName = isCurrent
+      ? (extractUserDisplayName(currentLoggedInUser) || "You")
+      : (extractUserDisplayName(userObj) || r.userName || extractUserDisplayName(rUserEmail) || "Member");
+
+    const avatar = isCurrent
+      ? (currentLoggedInUser?.photoURL || (currentLoggedInUser as any)?.avatarUrl)
+      : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.userAvatar || r.userPhotoURL);
+
+    const key = isCurrent ? "current_user" : (userObj?.id || r.userId || r.userEmail || resolvedName);
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      profiles.push({
+        id: key,
+        name: resolvedName,
+        avatar,
+        emoji: r.emoji,
+        isCurrent
+      });
+    }
+  });
+
+  return profiles;
+}
+
+export function hasUserReacted(reactionsList: any[], emoji: string, user: any, allUsers: any[] = []): boolean {
+  if (!Array.isArray(reactionsList) || !user) return false;
+  const sanitized = sanitizeCommentReactions(reactionsList, user, allUsers);
+  const curId = user.id ? String(user.id).trim().toLowerCase() : "";
+  const curEmail = user.email ? String(user.email).trim().toLowerCase() : "";
+  const curUsername = user.username ? String(user.username).trim().toLowerCase() : "";
+  const curName = user.name ? String(user.name).trim().toLowerCase() : "";
+
+  return sanitized.some((r: any) => {
+    if (!r || r.emoji !== emoji) return false;
+    if (r.userId === "u-current") return true;
+    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
+
+    return (
+      (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
+      (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
+      (curUsername && (rUid === curUsername || rUname === curUsername)) ||
+      (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUname === curName)
+    );
+  });
+}
 
 // Robust, zero-crash AttachmentViewer replacing external DocViewer
 const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) => {
@@ -1204,6 +2178,7 @@ export const RequisitionsPanel: React.FC = () => {
     projects,
     deleteRequisition, 
     currentUser, 
+    users,
     globalSearchTerm, 
     setGlobalSearchTerm,
     searchFilter,
@@ -2078,6 +3053,7 @@ export const RequisitionsPanel: React.FC = () => {
                           <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
                             {req.groupName}
                           </span>
+                          <RequisitionOwnershipDiscussionRow req={req} users={users} />
                         </div>
                       </td>
                       <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
@@ -2248,6 +3224,7 @@ export const RequisitionsPanel: React.FC = () => {
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
+                      <RequisitionOwnershipDiscussionRow req={req} users={users} />
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <span className="font-mono font-black text-slate-900 text-sm">
@@ -2443,6 +3420,7 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
                           {req.groupName}
                         </span>
+                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
                       </div>
                     </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
@@ -2559,6 +3537,7 @@ export const RequisitionsPanel: React.FC = () => {
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
+                      <RequisitionOwnershipDiscussionRow req={req} users={users} />
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <span className="font-mono font-black text-slate-900 text-sm">
@@ -2732,6 +3711,7 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
                           {req.groupName}
                         </span>
+                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
                       </div>
                     </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
@@ -2848,6 +3828,7 @@ export const RequisitionsPanel: React.FC = () => {
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
+                      <RequisitionOwnershipDiscussionRow req={req} users={users} />
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <span className="font-mono font-black text-slate-900 text-sm">
@@ -3194,41 +4175,143 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
 
-  // WhatsApp Chat states
-  const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const commentsEndRef = useRef<HTMLDivElement>(null);
+  // Comments & Threaded Discussion states
+  const [optimisticComments, setOptimisticComments] = useState<any[] | null>(null);
 
+  // Synchronize optimisticComments whenever req.comments or req.id changes from source
   useEffect(() => {
-    if (commentsEndRef.current) {
-      commentsEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [req.comments?.length]);
+    setOptimisticComments(null);
+  }, [req.comments, req.id]);
 
-  const handleToggleReaction = async (commentId: string, emoji: string) => {
+  const effectiveComments = React.useMemo(() => {
+    return optimisticComments ?? (Array.isArray(req.comments) ? req.comments : []);
+  }, [optimisticComments, req.comments]);
+
+  const [replyingTo, setReplyingTo] = useState<{ id: string; authorName: string; text: string } | null>(null);
+  const [inlineReplyCommentId, setInlineReplyCommentId] = useState<string | null>(null);
+  const [inlineReplyText, setInlineReplyText] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [copiedCommentId, setCopiedCommentId] = useState<string | null>(null);
+  const [reactionDetailModalData, setReactionDetailModalData] = useState<{
+    commentId: string;
+    reactions: any[];
+    isReply?: boolean;
+  } | null>(null);
+  const [reactionModalActiveTab, setReactionModalActiveTab] = useState<string>("ALL");
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const modalScrollRef = useRef<HTMLDivElement>(null);
+
+  // Ensure requisition detail page/modal always displays starting from the top
+  useEffect(() => {
+    if (leftPanelRef.current) leftPanelRef.current.scrollTop = 0;
+    if (rightPanelRef.current) rightPanelRef.current.scrollTop = 0;
+    if (modalScrollRef.current) modalScrollRef.current.scrollTop = 0;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [req.id]);
+
+  const pendingReactionMapRef = useRef<Record<string, boolean>>({});
+
+  const handleToggleReaction = (commentId: string, emoji: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
-      const currentUserId = currentUser?.id || "anon";
-      const currentUserName = currentUser?.name || "User";
+      if (pendingReactionMapRef.current[commentId]) {
+        console.log(`[Reaction Throttle] Click ignored: reaction update already in progress for comment ${commentId}`);
+        return;
+      }
+      pendingReactionMapRef.current[commentId] = true;
+
+      const currentComments = effectiveComments;
+      let loggedActionResult: { action: string; previousEmoji?: string } = { action: 'TOGGLED' };
+
+      const processReactionsUpdate = (item: any, targetId: string) => {
+        // Execute pure logic handler
+        const result = handleReactionLogic({
+          item,
+          targetEmoji: emoji,
+          currentUser,
+          users
+        });
+
+        loggedActionResult = { action: result.action, previousEmoji: result.previousEmoji };
+
+        console.log(`[Reaction State Transition: Target ${targetId}]`, {
+          action: result.action,
+          targetId,
+          user: { id: currentUser?.id, name: currentUser?.name, email: currentUser?.email },
+          previousEmoji: result.previousEmoji,
+          newEmoji: emoji,
+          reactionsCount: result.newReactions.length,
+          reactions: result.newReactions,
+          reactionCounts: result.updatedItem.reactionCounts
+        });
+
+        return result.updatedItem;
+      };
 
       const updatedComments = currentComments.map((c: any) => {
-        if (c.id !== commentId) return c;
-        const reactions = Array.isArray(c.reactions) ? [...c.reactions] : [];
-        const existingIdx = reactions.findIndex((r: any) => r.emoji === emoji && r.userId === currentUserId);
-
-        if (existingIdx >= 0) {
-          reactions.splice(existingIdx, 1);
-        } else {
-          reactions.push({ emoji, userId: currentUserId, userName: currentUserName });
+        if (c.id === commentId) {
+          return processReactionsUpdate(c, commentId);
         }
 
-        return { ...c, reactions };
+        // Check if comment has nested replies
+        if (Array.isArray(c.replies) && c.replies.some((r: any) => r.id === commentId)) {
+          const updatedReplies = c.replies.map((reply: any) => {
+            if (reply.id === commentId) {
+              return processReactionsUpdate(reply, commentId);
+            }
+            return reply;
+          });
+          return {
+            ...c,
+            replies: updatedReplies
+          };
+        }
+
+        return c;
       });
 
-      req.comments = updatedComments;
-      await updateRequisition(req.id, { comments: updatedComments });
+      // 1. Instantaneous optimistic update in UI (0ms latency)
+      setOptimisticComments(updatedComments);
+
+      console.log(`[Reaction State Transition: Persisting to Database]`, {
+        requisitionId: req.id,
+        targetCommentId: commentId,
+        emoji,
+        totalComments: updatedComments.length
+      });
+
+      // 2. Dispatch background persistence to Requisition
+      updateRequisition(req.id, { comments: updatedComments }).then(() => {
+        console.log(`[Reaction State Transition: Successfully Persisted to Database]`, {
+          requisitionId: req.id,
+          targetCommentId: commentId
+        });
+
+        // 3. Persist reaction history record to MongoDB user_reaction_histories collection
+        const historyId = `rh_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        databaseService.saveReactionHistory({
+          id: historyId,
+          requisitionId: req.id,
+          commentId,
+          userId: currentUser?.id || "anonymous",
+          userName: resolveSenderName(currentUser, users) || currentUser?.name || currentUser?.email || "User",
+          userEmail: currentUser?.email || "",
+          emoji,
+          action: loggedActionResult.action,
+          timestamp: new Date().toISOString(),
+          previousEmoji: loggedActionResult.previousEmoji || null
+        }).catch(err => console.error("[Reaction History DB Log Failed]", err));
+
+      }).catch(err => {
+        console.error(`[Reaction State Transition: Database Persistence Failed]`, err);
+        setOptimisticComments(null); // Rollback on persistence error
+      }).finally(() => {
+        pendingReactionMapRef.current[commentId] = false;
+      });
     } catch (err) {
-      console.error("Failed to toggle reaction:", err);
+      console.error(`[Reaction State Transition: Failed]`, err);
+      pendingReactionMapRef.current[commentId] = false;
     }
   };
 
@@ -3298,34 +4381,23 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     }
   };
 
-  const renderFormattedCommentText = (text: string) => {
-    if (!text) return null;
-    const mentionRegex = /(@[A-Za-z0-9._-]+(?:\s+[A-Za-z0-9._-]+)?)/g;
-    const parts = text.split(mentionRegex);
+  const handleAddComment = async (eOrCustomText?: React.FormEvent | string, customParent?: { id: string; authorName: string; text: string }) => {
+    if (eOrCustomText && typeof eOrCustomText !== "string" && typeof (eOrCustomText as any).preventDefault === "function") {
+      (eOrCustomText as React.FormEvent).preventDefault();
+    }
 
-    return parts.map((part, index) => {
-      if (part.startsWith("@")) {
-        return (
-          <span
-            key={index}
-            className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-100/90 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] border border-indigo-200/60 dark:border-indigo-800/60 mx-0.5 shadow-2xs"
-          >
-            {part}
-          </span>
-        );
-      }
-      return <React.Fragment key={index}>{part}</React.Fragment>;
-    });
-  };
+    if (isSubmittingComment) return;
 
-  const handleAddComment = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const trimmed = commentText.trim();
+    const textToSubmit = typeof eOrCustomText === "string" ? eOrCustomText : commentText;
+    const trimmed = textToSubmit.trim();
     if (!trimmed) return;
 
+    setIsSubmittingComment(true);
+
     // Resolve author name cleanly and consistently from user profile
-    const calculatedAuthorName = resolveSenderName(currentUser, users);
+    const calculatedAuthorName = resolveSenderName(currentUser, users) || currentUser?.name || currentUser?.email || "User";
     const authorPhoto = currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
+    const parent = customParent || replyingTo;
 
     const newComment = {
       id: `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
@@ -3333,126 +4405,131 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       authorName: calculatedAuthorName,
       authorEmail: currentUser?.email || "",
       authorRole: currentUser?.role || "USER",
+      authorAvatar: authorPhoto,
       authorPhotoURL: authorPhoto,
       text: trimmed,
       timestamp: new Date().toISOString(),
-      ...(replyingTo ? { replyTo: { id: replyingTo.id, authorName: replyingTo.authorName, text: replyingTo.text } } : {})
+      createdAt: new Date().toISOString(),
+      parentId: parent ? parent.id : null,
+      ...(parent ? { replyTo: { id: parent.id, authorName: parent.authorName, text: parent.text } } : {}),
+      reactions: []
     };
     
-    const currentComments = Array.isArray(req.comments) ? req.comments : [];
+    const currentComments = effectiveComments;
     const updatedComments = [...currentComments, newComment];
 
-    // Optimistically update local UI & reset form fields instantly (0ms delay)
-    req.comments = updatedComments;
+    // Optimistically update local UI & reset form fields instantly
+    setOptimisticComments(updatedComments);
     setCommentText("");
+    setInlineReplyText("");
+    setInlineReplyCommentId(null);
     setMentionSearch(null);
     setMentionIndex(-1);
     setReplyingTo(null);
     setShowEmojiPicker(false);
-    setIsSubmittingComment(false);
 
-    // Execute database save & notifications in background task
-    (async () => {
-      try {
-        await updateRequisition(req.id, { comments: updatedComments });
+    try {
+      await updateRequisition(req.id, { comments: updatedComments });
 
-        const authorEmail = currentUser?.email?.toLowerCase() || "";
-        const authorId = currentUser?.id || "";
+      const authorEmail = currentUser?.email?.toLowerCase() || "";
+      const authorId = currentUser?.id || "";
 
-        const mentionedUsers = users.filter(user => {
-          if (user.id === authorId || user.email?.toLowerCase() === authorEmail) return false;
-          
-          const nameMention = `@${user.name.toLowerCase()}`;
-          const emailMention = `@${user.email?.toLowerCase()}`;
-          const cleanText = trimmed.toLowerCase();
-          
-          return cleanText.includes(nameMention) || (user.email && cleanText.includes(emailMention));
-        });
-
-        for (const u of mentionedUsers) {
-          addAlert({
-            type: "SYSTEM_INFO",
-            severity: "MEDIUM",
-            message: `${calculatedAuthorName} mentioned you in a comment on Requisition "${req.title}" (ID: ${req.id}): "${trimmed.length > 55 ? trimmed.substring(0, 55) + '...' : trimmed}"`,
-            targetUserId: u.id
-          }).catch(() => {});
-
-          if (u.email) {
-            sendEmailNotification(
-              req,
-              "Comment Mention",
-              `"${trimmed}"`,
-              calculatedAuthorName,
-              u.email,
-              u.name
-            ).catch(err => console.error("Failed to send mention email to", u.email, err));
-          }
-        }
-
-        let requesterEmail = req.requesterEmail;
-        let requesterName = req.requesterName;
-        if (!requesterEmail) {
-          const rUser = users.find(usr => usr.id === req.requesterId || usr.name === req.requesterName);
-          if (rUser) {
-            requesterEmail = rUser.email;
-            requesterName = rUser.name;
-          }
-        }
-
-        const receiversMap = new Map<string, string>();
+      const mentionedUsers = users.filter(user => {
+        if (user.id === authorId || user.email?.toLowerCase() === authorEmail) return false;
         
-        if (
-          requesterEmail && 
-          requesterEmail.toLowerCase() !== authorEmail && 
-          !mentionedUsers.some(mu => mu.email?.toLowerCase() === requesterEmail?.toLowerCase())
-        ) {
-          receiversMap.set(requesterEmail.toLowerCase(), requesterName || "Requester");
-        }
+        const nameMention = `@${user.name.toLowerCase()}`;
+        const emailMention = `@${user.email?.toLowerCase()}`;
+        const cleanText = trimmed.toLowerCase();
+        
+        return cleanText.includes(nameMention) || (user.email && cleanText.includes(emailMention));
+      });
 
-        const notificationEmailsList = req.notificationEmails || (req as any).notification_emails || [];
-        if (Array.isArray(notificationEmailsList)) {
-          notificationEmailsList.forEach(emailStr => {
-            if (emailStr && typeof emailStr === "string") {
-              const cleanEmail = emailStr.trim().toLowerCase();
-              if (
-                cleanEmail && 
-                cleanEmail !== authorEmail && 
-                !mentionedUsers.some(mu => mu.email?.toLowerCase() === cleanEmail)
-              ) {
-                const matchedUser = users.find(usr => usr.email?.toLowerCase() === cleanEmail);
-                receiversMap.set(cleanEmail, matchedUser?.name || "Subscriber");
-              }
-            }
-          });
-        }
+      for (const u of mentionedUsers) {
+        addAlert({
+          type: "SYSTEM_INFO",
+          severity: "MEDIUM",
+          message: `${calculatedAuthorName} mentioned you in a comment on Requisition "${req.title}" (ID: ${req.id}): "${trimmed.length > 55 ? trimmed.substring(0, 55) + '...' : trimmed}"`,
+          targetUserId: u.id
+        }).catch(() => {});
 
-        for (const [recEmail, recName] of receiversMap.entries()) {
+        if (u.email) {
           sendEmailNotification(
             req,
-            "New Comment Thread Activity",
+            "Comment Mention",
             `"${trimmed}"`,
             calculatedAuthorName,
-            recEmail,
-            recName
-          ).catch(err => console.error("Failed to send comment update email to", recEmail, err));
+            u.email,
+            u.name
+          ).catch(err => console.error("Failed to send mention email to", u.email, err));
         }
-      } catch (err) {
-        console.error("Failed to persist comment in background:", err);
       }
-    })();
+
+      let requesterEmail = req.requesterEmail;
+      let requesterName = req.requesterName;
+      if (!requesterEmail) {
+        const rUser = users.find(usr => usr.id === req.requesterId || usr.name === req.requesterName);
+        if (rUser) {
+          requesterEmail = rUser.email;
+          requesterName = rUser.name;
+        }
+      }
+
+      const receiversMap = new Map<string, string>();
+      
+      if (
+        requesterEmail && 
+        requesterEmail.toLowerCase() !== authorEmail && 
+        !mentionedUsers.some(mu => mu.email?.toLowerCase() === requesterEmail?.toLowerCase())
+      ) {
+        receiversMap.set(requesterEmail.toLowerCase(), requesterName || "Requester");
+      }
+
+      const notificationEmailsList = req.notificationEmails || (req as any).notification_emails || [];
+      if (Array.isArray(notificationEmailsList)) {
+        notificationEmailsList.forEach(emailStr => {
+          if (emailStr && typeof emailStr === "string") {
+            const cleanEmail = emailStr.trim().toLowerCase();
+            if (
+              cleanEmail && 
+              cleanEmail !== authorEmail && 
+              !mentionedUsers.some(mu => mu.email?.toLowerCase() === cleanEmail)
+            ) {
+              const matchedUser = users.find(usr => usr.email?.toLowerCase() === cleanEmail);
+              receiversMap.set(cleanEmail, matchedUser?.name || "Subscriber");
+            }
+          }
+        });
+      }
+
+      for (const [recEmail, recName] of receiversMap.entries()) {
+        sendEmailNotification(
+          req,
+          "New Comment Thread Activity",
+          `"${trimmed}"`,
+          calculatedAuthorName,
+          recEmail,
+          recName
+        ).catch(err => console.error("Failed to send comment update email to", recEmail, err));
+      }
+    } catch (err) {
+      console.error("Failed to persist comment:", err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   const handleUpdateComment = async (commentId: string, newText: string) => {
     const trimmed = newText.trim();
     if (!trimmed) return;
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.map(c => 
         c.id === commentId ? { ...c, text: trimmed, isEdited: true, editedAt: new Date().toISOString() } : c
       );
-      await updateRequisition(req.id, { comments: updatedComments });
+      setOptimisticComments(updatedComments);
       setEditingCommentId(null);
       setEditingCommentText("");
+      await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
         severity: "LOW",
@@ -3461,6 +4538,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to update comment:", err);
+      setOptimisticComments(null);
       triggerToast({
         type: "SECURITY_UPDATE",
         severity: "HIGH",
@@ -3472,8 +4550,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
   const handleDeleteComment = async (commentId: string) => {
     try {
-      const currentComments = Array.isArray(req.comments) ? req.comments : [];
+      const currentComments = effectiveComments;
       const updatedComments = currentComments.filter(c => c.id !== commentId);
+      setOptimisticComments(updatedComments);
       await updateRequisition(req.id, { comments: updatedComments });
       triggerToast({
         type: "SYSTEM_INFO",
@@ -3483,6 +4562,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       });
     } catch (err) {
       console.error("Failed to delete comment:", err);
+      setOptimisticComments(null);
     }
   };
 
@@ -3797,7 +4877,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       id: "submission",
       timestamp: req.submittedAt,
       title: "Requisition Created",
-      subtitle: "Entry logged into the ledger system",
+      subtitle: "Requisition Submitted for approval",
       type: "CREATED",
       actorName: req.requesterName,
       role: "Church Group 代表 (General Rep)"
@@ -4016,19 +5096,19 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             const steps = [
               {
                 title: "Submitted",
-                desc: "Entry logged",
+                desc: "Submitted for approval",
                 icon: User,
                 status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming"
               },
               {
                 title: "L1 Approved",
-                desc: "Leader Verify",
+                desc: "First Level Approval",
                 icon: ShieldCheck,
                 status: isRejected && req.rejectionReason?.includes("L1") ? "rejected" : (currentStep > 1 ? "completed" : currentStep === 1 ? "active" : "upcoming")
               },
               {
                 title: "L2 Approved",
-                desc: "Board Consent",
+                desc: "Second Level Approval",
                 icon: ShieldCheck,
                 status: isEscalated ? "escalated" : (isRejected && !req.rejectionReason?.includes("L1") ? "rejected" : (currentStep > 2 ? "completed" : currentStep === 2 ? "active" : "upcoming"))
               },
@@ -4130,9 +5210,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             );
           })()}
 
-          <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3 overflow-y-auto lg:overflow-hidden">
+          <div ref={modalScrollRef} className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3 overflow-y-auto lg:overflow-hidden">
             {/* Left Content */}
-            <div className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            <div ref={leftPanelRef} className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
               <section className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-[0.2em]">Requisition Description</h4>
@@ -4530,29 +5610,29 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 )}
               </section>
 
-              {/* Discussion & Comments Thread (Fresh Clean Card Layout) */}
+              {/* Discussion & Comments Thread (WhatsApp Channel Style Reference Design) */}
               <section className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                     <MessageSquare size={14} className="text-indigo-500" />
-                    <span>Comments ({Array.isArray(req.comments) ? req.comments.length : 0})</span>
+                    <span>Comments ({effectiveComments.length})</span>
                   </h4>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {/* Comments Feed List */}
-                  {Array.isArray(req.comments) && req.comments.length > 0 ? (() => {
-                    const allComments = req.comments;
-                    const topLevelComments = allComments.filter((c: any) => !c.replyTo?.id);
+                  {effectiveComments.length > 0 ? (() => {
+                    const allComments = effectiveComments;
+                    const topLevelComments = allComments.filter((c: any) => !c.parentId && !c.replyTo?.id);
 
                     return (
                       <div className="space-y-4">
                         {topLevelComments.map((comment: any) => {
-                          const replies = allComments.filter((c: any) => c.replyTo?.id === comment.id);
+                          const replies = allComments.filter((c: any) => (c.parentId && c.parentId === comment.id) || (!c.parentId && c.replyTo?.id === comment.id));
 
-                          const isAuthor = comment.authorId === currentUser?.id || comment.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
+                          const isAuthor = comment.authorId === currentUser?.id || (comment.authorEmail && currentUser?.email && comment.authorEmail.toLowerCase() === currentUser.email.toLowerCase());
                           const canDelete = isAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
-                          const diffMs = Date.now() - new Date(comment.timestamp).getTime();
+                          const diffMs = Date.now() - new Date(comment.createdAt || comment.timestamp).getTime();
                           const canEdit = isAuthor && (diffMs / 60000 <= 15);
                           
                           const commentUser = users.find((u: any) => 
@@ -4564,93 +5644,141 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             {
                               id: comment.authorId,
                               email: comment.authorEmail,
-                              name: (isAuthor && currentUser?.name) ? currentUser.name : comment.authorName,
+                              name: comment.authorName,
                               role: comment.authorRole
                             },
                             users
                           ) || comment.authorName || comment.authorEmail || "User";
 
-                          const photoURL = (isAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
-                            ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
-                            : (commentUser?.photoURL || (commentUser as any)?.avatarUrl || comment.authorPhotoURL || "");
+                          const photoURL = comment.authorAvatar || comment.authorPhotoURL || (commentUser?.photoURL || (commentUser as any)?.avatarUrl) || (isAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
 
-                          const initials = displayName.charAt(0).toUpperCase();
-                          const reactions = Array.isArray(comment.reactions) ? comment.reactions : [];
-
+                          const reactions = sanitizeCommentReactions(comment.reactions, currentUser, users);
                           const reactionCounts = reactions.reduce((acc: any, r: any) => {
                             acc[r.emoji] = (acc[r.emoji] || 0) + 1;
                             return acc;
                           }, {});
 
+                          // Attachments for this comment or requisition
+                          const commentAttachments = Array.isArray(comment.attachments) && comment.attachments.length > 0
+                            ? comment.attachments
+                            : (comment === topLevelComments[0] && Array.isArray(req.attachments) && req.attachments.length > 0 ? req.attachments : []);
+
                           return (
-                            <div key={comment.id} className="bg-slate-50/90 dark:bg-slate-900/60 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs group relative">
-                              {/* Comment Header */}
+                            <div key={comment.id} className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 relative transition-all group">
+                              {/* Top-Level Comment Header */}
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-3">
                                   {photoURL ? (
                                     <img 
                                       src={photoURL} 
                                       alt={displayName} 
-                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs"
+                                      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700/80 shrink-0 shadow-2xs"
                                       onError={handleImageError}
                                     />
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center shrink-0">
-                                      {initials}
+                                    <div className={`w-10 h-10 rounded-full ${getAvatarBgColor(displayName)} font-bold text-xs flex items-center justify-center text-white shrink-0 shadow-2xs`}>
+                                      {getAvatarInitials(displayName)}
                                     </div>
                                   )}
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-tight">
                                       {displayName}
                                     </span>
-                                    <span className="text-slate-400 text-xs font-normal">•</span>
-                                    <span className="text-xs text-slate-400 font-medium">
-                                      {formatRelativeTime(comment.timestamp)}
+                                    <span className="text-slate-300 dark:text-slate-600 text-xs font-normal">•</span>
+                                    <span className="text-xs text-slate-400 dark:text-slate-500 font-normal">
+                                      {formatRelativeTime(comment.createdAt || comment.timestamp)}
                                     </span>
                                     {comment.isEdited && (
                                       <span className="text-[10px] text-slate-400 italic">(edited)</span>
                                     )}
+                                    {comment.authorRole && (
+                                      <span className="text-[8px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase font-bold">
+                                        {comment.authorRole}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
 
-                                {/* Actions / Menu */}
-                                {(canEdit || canDelete) && (
-                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                                    {canEdit && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEditingCommentId(comment.id);
-                                          setEditingCommentText(comment.text);
-                                        }}
-                                        className="p-1 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800"
-                                        title="Edit"
-                                      >
-                                        <Pencil size={13} />
-                                      </button>
+                                {/* Top Right Comment Actions */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {/* Quick Copy Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(comment.text);
+                                      setCopiedCommentId(comment.id);
+                                      setTimeout(() => setCopiedCommentId(null), 2000);
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    title="Copy comment text"
+                                  >
+                                    {copiedCommentId === comment.id ? (
+                                      <Check size={14} className="text-emerald-500" />
+                                    ) : (
+                                      <Copy size={14} />
                                     )}
-                                    {canDelete && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeleteComment(comment.id)}
-                                        className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                                        title="Delete"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                                  </button>
+
+                                  {/* Quick Reply Button */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setInlineReplyCommentId(inlineReplyCommentId === comment.id ? null : comment.id);
+                                      setInlineReplyText("");
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                    title="Reply to thread"
+                                  >
+                                    <Reply size={14} />
+                                  </button>
+
+                                  {/* Edit Button (Author within 15 mins) */}
+                                  {canEdit && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingCommentId(comment.id);
+                                        setEditingCommentText(comment.text);
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                                      title="Edit comment"
+                                    >
+                                      <Pencil size={14} />
+                                    </button>
+                                  )}
+
+                                  {/* Delete Button (Author or Admin) */}
+                                  {canDelete && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(comment.id)}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                      title="Delete comment"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Comment Body */}
                               {editingCommentId === comment.id ? (
-                                <div className="space-y-2 mt-2">
+                                <div className="space-y-2">
                                   <textarea
                                     value={editingCommentText}
                                     onChange={(e) => setEditingCommentText(e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                    rows={2}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        setEditingCommentId(null);
+                                        setEditingCommentText("");
+                                      } else if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleUpdateComment(comment.id, editingCommentText);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 resize-none"
+                                    rows={3}
                                     autoFocus
                                   />
                                   <div className="flex items-center gap-2 justify-end">
@@ -4660,33 +5788,35 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                         setEditingCommentId(null);
                                         setEditingCommentText("");
                                       }}
-                                      className="px-3 py-1 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200"
+                                      className="px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                                     >
                                       Cancel
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleUpdateComment(comment.id, editingCommentText)}
-                                      className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700"
+                                      className="px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 cursor-pointer"
                                     >
                                       Save
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
-                                  {renderFormattedCommentText(comment.text)}
-                                </p>
+                                <div>
+                                  <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap font-normal">
+                                    {renderFormattedCommentText(comment.text)}
+                                  </div>
+                                </div>
                               )}
 
-                              {/* Attached Files Box if files exist */}
-                              {Array.isArray(req.attachments) && req.attachments.length > 0 && comment === topLevelComments[0] && (
-                                <div className="bg-slate-100/70 dark:bg-slate-800/50 p-3 rounded-2xl space-y-2">
-                                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
-                                    {req.attachments.length} {req.attachments.length === 1 ? 'file attached' : 'files attached'}
+                              {/* Attached Files Section */}
+                              {commentAttachments.length > 0 && (
+                                <div className="bg-[#F2F4F8] dark:bg-slate-800/60 p-3.5 rounded-2xl space-y-2.5">
+                                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">
+                                    {commentAttachments.length} {commentAttachments.length === 1 ? 'file' : 'files'}
                                   </span>
                                   <div className="flex flex-wrap gap-2">
-                                    {req.attachments.slice(0, 3).map((att: any, idx: number) => {
+                                    {commentAttachments.map((att: any, idx: number) => {
                                       const attUrl = typeof att === 'string' ? att : (att?.url || '');
                                       const fileName = getAttachmentFileName(attUrl);
                                       const badge = getFileTypeBadge(fileName);
@@ -4696,12 +5826,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                           href={getAbsoluteAttachmentUrl(attUrl)}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 hover:shadow-xs transition-all"
+                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer group/att"
                                         >
-                                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${badge.bg}`}>
+                                          <span className={`w-4 h-4 rounded text-[9px] font-black flex items-center justify-center ${badge.bg} shadow-2xs shrink-0`}>
                                             {badge.label}
                                           </span>
-                                          <span className="truncate max-w-[140px]">{fileName}</span>
+                                          <span className="truncate max-w-[200px] sm:max-w-[260px] group-hover/att:text-indigo-600 transition-colors">
+                                            {fileName}
+                                          </span>
                                         </a>
                                       );
                                     })}
@@ -4709,177 +5841,416 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                                 </div>
                               )}
 
-                              {/* Reactions & Reply Action Bar */}
-                              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                                {Object.entries(reactionCounts).map(([emoji, count]: [string, any]) => (
-                                  <button
-                                    key={emoji}
-                                    type="button"
-                                    onClick={() => handleToggleReaction(comment.id, emoji)}
-                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs font-medium"
-                                  >
-                                    <span>{emoji}</span>
-                                    <span className="font-bold text-[11px]">{count}</span>
-                                  </button>
-                                ))}
+                              {/* Thumbs Up & Thumbs Down Reactions and Action Bar */}
+                              <div className="flex items-center gap-2 flex-wrap relative pt-1">
+                                {/* Dedicated Thumbs Up & Thumbs Down Buttons */}
+                                {REACTION_OPTIONS.map(({ emoji }) => {
+                                  const count = reactionCounts[emoji] || 0;
+                                  const hasReacted = hasUserReacted(reactions, emoji, currentUser, users);
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "👍")}
-                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-amber-500 transition-all cursor-pointer shadow-2xs"
-                                  title="React 👍"
-                                >
-                                  👍
-                                </button>
+                                  return (
+                                    <button
+                                      key={emoji}
+                                      type="button"
+                                      onClick={() => handleToggleReaction(comment.id, emoji)}
+                                      className={cn(
+                                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs border",
+                                        hasReacted
+                                          ? "bg-[#DDE9FD] text-[#1D4ED8] border-[#BFDBFE] dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700/80 font-bold ring-1 ring-blue-500/20"
+                                          : count > 0
+                                            ? "bg-white dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-700/80"
+                                            : "bg-slate-50/80 dark:bg-slate-900/60 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200/60 dark:border-slate-800 opacity-80 hover:opacity-100"
+                                      )}
+                                    >
+                                      <span className="text-sm leading-none">{emoji}</span>
+                                      {count > 0 && <span className="text-xs font-bold">{count}</span>}
+                                    </button>
+                                  );
+                                })}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleReaction(comment.id, "❤️")}
-                                  className="inline-flex items-center justify-center p-1.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-500 transition-all cursor-pointer shadow-2xs"
-                                  title="React ❤️"
-                                >
-                                  ❤️
-                                </button>
+                                {/* Overlapping Reactor Profiles next to reaction icons with names */}
+                                {reactions.length > 0 && (() => {
+                                  const reactorProfiles = resolveReactorsProfiles(reactions, users, currentUser);
+                                  const allReactors = resolveReactorNames(reactions, "👍", users, currentUser).concat(resolveReactorNames(reactions, "👎", users, currentUser));
+                                  const uniqueReactors = Array.from(new Set(allReactors.length > 0 ? allReactors : reactorProfiles.map(p => p.name)));
+                                  const namesSummary = formatReactionTooltip(uniqueReactors);
 
+                                  return (
+                                    <div className="inline-flex items-center ml-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setReactionDetailModalData({ commentId: comment.id, reactions, isReply: false });
+                                          setReactionModalActiveTab("ALL");
+                                        }}
+                                        className="inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                      >
+                                        <div className="inline-flex items-center -space-x-1.5">
+                                          {reactorProfiles.slice(0, 4).map((p, pIdx) => (
+                                            <div
+                                              key={p.id || pIdx}
+                                              className="relative inline-block shrink-0"
+                                            >
+                                              {p.avatar ? (
+                                                <img
+                                                  src={p.avatar}
+                                                  alt={p.name}
+                                                  className="w-5 h-5 min-w-[20px] min-h-[20px] max-w-[20px] max-h-[20px] rounded-full object-cover ring-2 ring-white dark:ring-slate-900 shadow-2xs"
+                                                  onError={handleImageError}
+                                                />
+                                              ) : (
+                                                <div
+                                                  className={cn(
+                                                    "w-5 h-5 min-w-[20px] min-h-[20px] rounded-full ring-2 ring-white dark:ring-slate-900 font-bold text-[8.5px] flex items-center justify-center text-white shadow-2xs",
+                                                    getAvatarBgColor(p.name)
+                                                  )}
+                                                >
+                                                  {getAvatarInitials(p.name)}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {reactorProfiles.length > 4 && (
+                                            <div
+                                              className="w-5 h-5 min-w-[20px] min-h-[20px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-2 ring-white dark:ring-slate-900 font-bold text-[8px] flex items-center justify-center shrink-0 shadow-2xs"
+                                            >
+                                              +{reactorProfiles.length - 4}
+                                            </div>
+                                          )}
+                                        </div>
+                                        {namesSummary && (
+                                          <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                                            {namesSummary}
+                                          </span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })()}
+
+                                {/* Inline Reply Trigger Button */}
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setReplyingTo({ id: comment.id, authorName: displayName, text: comment.text });
-                                    if (commentTextareaRef.current) {
-                                      commentTextareaRef.current.focus();
-                                    }
+                                    setInlineReplyCommentId(inlineReplyCommentId === comment.id ? null : comment.id);
+                                    setInlineReplyText("");
                                   }}
-                                  className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  className="ml-auto inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors px-2.5 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                                 >
                                   <Reply size={13} />
                                   <span>Reply</span>
                                 </button>
                               </div>
 
-                              {/* Nested Replies Section with Left Connector Line */}
-                              {replies.length > 0 && (
-                                <div className="pt-2 space-y-3">
-                                  {/* Replies Header Summary */}
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium pl-1">
-                                    <div className="flex -space-x-1.5 overflow-hidden">
-                                      {replies.slice(0, 4).map((rep: any, idx: number) => {
-                                        const repUser = users.find((u: any) => u.id === rep.authorId || u.email?.toLowerCase() === rep.authorEmail?.toLowerCase());
-                                        const pUrl = repUser?.photoURL || (repUser as any)?.avatarUrl || rep.authorPhotoURL || "";
-                                        return pUrl ? (
-                                          <img key={idx} src={pUrl} alt="" className="inline-block h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover" />
-                                        ) : (
-                                          <div key={idx} className="inline-flex h-5 w-5 rounded-full ring-2 ring-white dark:ring-slate-900 bg-indigo-100 text-indigo-700 font-bold text-[9px] items-center justify-center">
-                                            {(rep.authorName || 'U').charAt(0)}
+                              {/* Inline Reply Composer Box */}
+                              {inlineReplyCommentId === comment.id && (
+                                <div className="pt-2 animate-in fade-in duration-150">
+                                  <div className="flex gap-2.5 items-start bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-2xs">
+                                    {currentUser?.photoURL || (currentUser as any)?.avatarUrl ? (
+                                      <img
+                                        src={currentUser?.photoURL || (currentUser as any)?.avatarUrl}
+                                        alt={resolveSenderName(currentUser, users) || "User"}
+                                        className="w-8 h-8 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700 mt-0.5 shadow-2xs"
+                                        onError={handleImageError}
+                                      />
+                                    ) : (
+                                      <div className={`w-8 h-8 rounded-full ${getAvatarBgColor(resolveSenderName(currentUser, users) || "U")} text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs`}>
+                                        {getAvatarInitials(resolveSenderName(currentUser, users) || "U")}
+                                      </div>
+                                    )}
+                                    <div className="flex-1 space-y-2">
+                                      <textarea
+                                        value={inlineReplyText}
+                                        onChange={(e) => setInlineReplyText(e.target.value)}
+                                        placeholder={`Reply to ${displayName}...`}
+                                        rows={2}
+                                        maxLength={1000}
+                                        autoFocus
+                                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none"
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            if (inlineReplyText.trim() && inlineReplyText.length <= 1000) {
+                                              handleAddComment(inlineReplyText, { id: comment.id, authorName: displayName, text: comment.text });
+                                            }
+                                          }
+                                        }}
+                                      />
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className={cn(
+                                          "text-[10px] font-mono font-medium transition-colors select-none",
+                                          inlineReplyText.length >= 1000
+                                            ? "text-rose-600 dark:text-rose-400 font-bold"
+                                            : inlineReplyText.length >= 800
+                                            ? "text-amber-600 dark:text-amber-400 font-semibold"
+                                            : "text-slate-400 dark:text-slate-500"
+                                        )}>
+                                          {inlineReplyText.length}/1000
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setInlineReplyCommentId(null);
+                                              setInlineReplyText("");
+                                            }}
+                                            className="px-3 py-1 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800 cursor-pointer"
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={!inlineReplyText.trim() || inlineReplyText.length > 1000 || isSubmittingComment}
+                                            onClick={() => handleAddComment(inlineReplyText, { id: comment.id, authorName: displayName, text: comment.text })}
+                                            className="px-3.5 py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 rounded-xl transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                                          >
+                                            {isSubmittingComment ? (
+                                              <Loader2 size={11} className="animate-spin" />
+                                            ) : (
+                                              <Send size={11} />
+                                            )}
+                                            <span>Reply</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Nested Replies Section with Curved Branch Connector */}
+                              {replies.length > 0 && (() => {
+                                const summary = formatRepliesSummary(replies, users);
+
+                                return (
+                                  <div className="pt-2 space-y-3">
+                                    {/* Replies Header Summary with Overlapping Avatars */}
+                                    <div className="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 font-medium pl-1">
+                                      <div className="flex -space-x-2 overflow-hidden items-center">
+                                        {summary.authors.slice(0, 4).map((author, idx) => (
+                                          author.avatar ? (
+                                            <img
+                                              key={idx}
+                                              src={author.avatar}
+                                              alt={author.name}
+                                              className="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 object-cover shadow-2xs"
+                                              onError={handleImageError}
+                                            />
+                                          ) : (
+                                            <div
+                                              key={idx}
+                                              className={`inline-flex h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 ${getAvatarBgColor(author.name)} font-bold text-[10px] items-center justify-center text-white shadow-2xs`}
+                                            >
+                                              {getAvatarInitials(author.name)}
+                                            </div>
+                                          )
+                                        ))}
+                                      </div>
+                                      <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs">
+                                        {summary.text}
+                                      </span>
+                                    </div>
+
+                                    {/* Nested Replies with Smooth Curved Connectors */}
+                                    <div className="relative pl-6 sm:pl-8 space-y-3 pt-1">
+                                      {replies.map((reply: any, idx: number) => {
+                                        const isReplyAuthor = reply.authorId === currentUser?.id || (reply.authorEmail && currentUser?.email && reply.authorEmail.toLowerCase() === currentUser.email.toLowerCase());
+                                        const canDeleteReply = isReplyAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
+                                        
+                                        const replyUser = users.find((u: any) => 
+                                          (u.id && reply.authorId && u.id === reply.authorId) || 
+                                          (u.email && reply.authorEmail && u.email.toLowerCase() === reply.authorEmail.toLowerCase())
+                                        );
+
+                                        const replyDisplayName = resolveSenderName(
+                                          {
+                                            id: reply.authorId,
+                                            email: reply.authorEmail,
+                                            name: reply.authorName,
+                                            role: reply.authorRole
+                                          },
+                                          users
+                                        ) || reply.authorName || reply.authorEmail || "User";
+
+                                        const replyPhotoURL = reply.authorAvatar || reply.authorPhotoURL || (replyUser?.photoURL || (replyUser as any)?.avatarUrl) || (isReplyAuthor ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) : "");
+
+                                        const replyReactions = sanitizeCommentReactions(reply.reactions, currentUser, users);
+                                        const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
+                                          acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+                                          return acc;
+                                        }, {});
+
+                                        return (
+                                          <div key={reply.id} className="relative group/reply">
+                                            {/* Curved connector branching in from left tree rail */}
+                                            <div className="absolute -left-4 sm:-left-5 top-4 w-4 sm:w-5 h-5 border-l-2 border-b-2 border-slate-200 dark:border-slate-700/80 rounded-bl-xl pointer-events-none" />
+                                            {idx < replies.length - 1 && (
+                                              <div className="absolute -left-4 sm:-left-5 top-9 bottom-0 border-l-2 border-slate-200 dark:border-slate-700/80 pointer-events-none" />
+                                            )}
+
+                                            {/* Reply Card Container */}
+                                            <div className="bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-2xs space-y-2 relative">
+                                              {/* Reply Header */}
+                                              <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2.5">
+                                                  {replyPhotoURL ? (
+                                                    <img 
+                                                      src={replyPhotoURL} 
+                                                      alt={replyDisplayName} 
+                                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 shadow-2xs"
+                                                      onError={handleImageError}
+                                                    />
+                                                  ) : (
+                                                    <div className={`w-8 h-8 rounded-full ${getAvatarBgColor(replyDisplayName)} font-bold text-[10px] flex items-center justify-center text-white shrink-0 shadow-2xs`}>
+                                                      {getAvatarInitials(replyDisplayName)}
+                                                    </div>
+                                                  )}
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                                      {replyDisplayName}
+                                                    </span>
+                                                    <span className="text-slate-300 dark:text-slate-600 text-xs font-normal">•</span>
+                                                    <span className="text-xs text-slate-400 dark:text-slate-500 font-normal">
+                                                      {formatRelativeTime(reply.createdAt || reply.timestamp)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+
+                                                {/* Reply Actions */}
+                                                <div className="flex items-center gap-1">
+                                                  {/* Copy Reply Text */}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      navigator.clipboard.writeText(reply.text);
+                                                      setCopiedCommentId(reply.id);
+                                                      setTimeout(() => setCopiedCommentId(null), 2000);
+                                                    }}
+                                                    className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                                                    title="Copy reply text"
+                                                  >
+                                                    {copiedCommentId === reply.id ? (
+                                                      <Check size={13} className="text-emerald-500" />
+                                                    ) : (
+                                                      <Copy size={13} />
+                                                    )}
+                                                  </button>
+
+                                                  {canDeleteReply && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleDeleteComment(reply.id)}
+                                                      className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover/reply:opacity-100 transition-opacity cursor-pointer"
+                                                      title="Delete reply"
+                                                    >
+                                                      <Trash2 size={13} />
+                                                    </button>
+                                                  )}
+                                                </div>
+                                              </div>
+
+                                              {/* Reply Body Text */}
+                                              <div>
+                                                <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap font-normal">
+                                                  {renderFormattedCommentText(reply.text)}
+                                                </div>
+                                              </div>
+
+                                              {/* Restricted 👍 and 👎 Reactions for Reply */}
+                                              <div className="flex items-center gap-1.5 flex-wrap relative pt-0.5">
+                                                {/* Dedicated Thumbs Up & Thumbs Down Buttons for Reply */}
+                                                {REACTION_OPTIONS.map(({ emoji }) => {
+                                                  const count = replyReactionCounts[emoji] || 0;
+                                                  const hasReacted = hasUserReacted(replyReactions, emoji, currentUser, users);
+
+                                                  return (
+                                                    <button
+                                                      key={emoji}
+                                                      type="button"
+                                                      onClick={() => handleToggleReaction(reply.id, emoji)}
+                                                      className={cn(
+                                                        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs border",
+                                                        hasReacted
+                                                          ? "bg-[#DDE9FD] text-[#1D4ED8] border-[#BFDBFE] dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700/80 font-bold ring-1 ring-blue-500/20"
+                                                          : count > 0
+                                                            ? "bg-slate-100 dark:bg-slate-850 text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 border-slate-200/60 dark:border-slate-700"
+                                                            : "bg-slate-50/80 dark:bg-slate-900/60 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200/60 dark:border-slate-800 opacity-80 hover:opacity-100"
+                                                      )}
+                                                    >
+                                                      <span className="text-xs leading-none">{emoji}</span>
+                                                      {count > 0 && <span className="text-[11px] font-bold">{count}</span>}
+                                                    </button>
+                                                  );
+                                                })}
+
+                                                {/* Overlapping Reactor Profiles for reply with names */}
+                                                {replyReactions.length > 0 && (() => {
+                                                  const reactorProfiles = resolveReactorsProfiles(replyReactions, users, currentUser);
+                                                  const allReactors = resolveReactorNames(replyReactions, "👍", users, currentUser).concat(resolveReactorNames(replyReactions, "👎", users, currentUser));
+                                                  const uniqueReactors = Array.from(new Set(allReactors.length > 0 ? allReactors : reactorProfiles.map(p => p.name)));
+                                                  const namesSummary = formatReactionTooltip(uniqueReactors);
+
+                                                  return (
+                                                    <div className="inline-flex items-center ml-0.5">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setReactionDetailModalData({ commentId: reply.id, reactions: replyReactions, isReply: true });
+                                                          setReactionModalActiveTab("ALL");
+                                                        }}
+                                                        className="inline-flex items-center gap-1 py-0.5 px-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                                      >
+                                                        <div className="inline-flex items-center -space-x-1.5">
+                                                          {reactorProfiles.slice(0, 4).map((p, pIdx) => (
+                                                            <div
+                                                              key={p.id || pIdx}
+                                                              className="relative inline-block shrink-0"
+                                                            >
+                                                              {p.avatar ? (
+                                                                <img
+                                                                  src={p.avatar}
+                                                                  alt={p.name}
+                                                                  className="w-4 h-4 min-w-[16px] min-h-[16px] max-w-[16px] max-h-[16px] rounded-full object-cover ring-2 ring-white dark:ring-slate-900 shadow-2xs"
+                                                                  onError={handleImageError}
+                                                                />
+                                                              ) : (
+                                                                <div
+                                                                  className={cn(
+                                                                    "w-4 h-4 min-w-[16px] min-h-[16px] rounded-full ring-2 ring-white dark:ring-slate-900 font-bold text-[7.5px] flex items-center justify-center text-white shadow-2xs",
+                                                                    getAvatarBgColor(p.name)
+                                                                  )}
+                                                                >
+                                                                  {getAvatarInitials(p.name)}
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          ))}
+                                                          {reactorProfiles.length > 4 && (
+                                                            <div
+                                                              className="w-4 h-4 min-w-[16px] min-h-[16px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-2 ring-white dark:ring-slate-900 font-bold text-[7.5px] flex items-center justify-center shrink-0 shadow-2xs"
+                                                            >
+                                                              +{reactorProfiles.length - 4}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                        {namesSummary && (
+                                                          <span className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                                                            {namesSummary}
+                                                          </span>
+                                                        )}
+                                                      </button>
+                                                    </div>
+                                                  );
+                                                })()}
+                                              </div>
+                                            </div>
                                           </div>
                                         );
                                       })}
                                     </div>
-                                    <span>
-                                      {replies.length} {replies.length === 1 ? 'reply' : 'replies'} from {replies.map((r: any) => r.authorName.split(' ')[0]).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).slice(0, 3).join(', ')}
-                                    </span>
                                   </div>
-
-                                  {/* Vertical Thread Connector Line */}
-                                  <div className="border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-3.5 space-y-3">
-                                    {replies.map((reply: any) => {
-                                      const isReplyAuthor = reply.authorId === currentUser?.id || reply.authorEmail?.toLowerCase() === currentUser?.email?.toLowerCase();
-                                      const canDeleteReply = isReplyAuthor || currentUser?.role === "ADMIN" || currentUser?.role === "SUPER_ADMIN";
-                                      
-                                      const replyUser = users.find((u: any) => 
-                                        (u.id && reply.authorId && u.id === reply.authorId) || 
-                                        (u.email && reply.authorEmail && u.email.toLowerCase() === reply.authorEmail.toLowerCase())
-                                      );
-
-                                      const replyDisplayName = resolveSenderName(
-                                        {
-                                          id: reply.authorId,
-                                          email: reply.authorEmail,
-                                          name: (isReplyAuthor && currentUser?.name) ? currentUser.name : reply.authorName,
-                                          role: reply.authorRole
-                                        },
-                                        users
-                                      ) || reply.authorName || reply.authorEmail || "User";
-
-                                      const replyPhotoURL = (isReplyAuthor && (currentUser?.photoURL || (currentUser as any)?.avatarUrl))
-                                        ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl)
-                                        : (replyUser?.photoURL || (replyUser as any)?.avatarUrl || reply.authorPhotoURL || "");
-
-                                      const replyReactions = Array.isArray(reply.reactions) ? reply.reactions : [];
-                                      const replyReactionCounts = replyReactions.reduce((acc: any, r: any) => {
-                                        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
-                                        return acc;
-                                      }, {});
-
-                                      return (
-                                        <div key={reply.id} className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800 space-y-2 text-xs relative group/reply shadow-2xs">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                              {replyPhotoURL ? (
-                                                <img 
-                                                  src={replyPhotoURL} 
-                                                  alt={replyDisplayName} 
-                                                  className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0"
-                                                  onError={handleImageError}
-                                                />
-                                              ) : (
-                                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 font-bold text-[10px] flex items-center justify-center shrink-0">
-                                                  {replyDisplayName.charAt(0).toUpperCase()}
-                                                </div>
-                                              )}
-                                              <span className="font-bold text-slate-900 dark:text-slate-100 text-xs">
-                                                {replyDisplayName}
-                                              </span>
-                                              <span className="text-slate-400 text-[10px]">•</span>
-                                              <span className="text-[11px] text-slate-400 font-medium">
-                                                {formatRelativeTime(reply.timestamp)}
-                                              </span>
-                                            </div>
-
-                                            {canDeleteReply && (
-                                              <button
-                                                type="button"
-                                                onClick={() => handleDeleteComment(reply.id)}
-                                                className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover/reply:opacity-100 transition-opacity"
-                                                title="Delete reply"
-                                              >
-                                                <Trash2 size={12} />
-                                              </button>
-                                            )}
-                                          </div>
-
-                                          <p className="text-slate-800 dark:text-slate-200 leading-relaxed break-words whitespace-pre-wrap pl-8">
-                                            {renderFormattedCommentText(reply.text)}
-                                          </p>
-
-                                          {/* Reply Reactions */}
-                                          <div className="flex items-center gap-1.5 pl-8 pt-0.5">
-                                            {Object.entries(replyReactionCounts).map(([emoji, count]: [string, any]) => (
-                                              <button
-                                                key={emoji}
-                                                type="button"
-                                                onClick={() => handleToggleReaction(reply.id, emoji)}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 font-medium border border-slate-200/60 dark:border-slate-700"
-                                              >
-                                                <span>{emoji}</span>
-                                                <span className="font-bold">{count}</span>
-                                              </button>
-                                            ))}
-
-                                            <button
-                                              type="button"
-                                              onClick={() => handleToggleReaction(reply.id, "👍")}
-                                              className="inline-flex items-center justify-center p-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 text-slate-400 hover:text-amber-500"
-                                              title="React 👍"
-                                            >
-                                              👍
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           );
                         })}
@@ -4922,7 +6293,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     {/* Emoji Quick Picker Bar */}
                     {showEmojiPicker && (
                       <div className="p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg flex items-center gap-1 flex-wrap z-30">
-                        {["👍", "❤️", "😊", "🙏", "👏", "👀", "🔥", "🎉", "💡", "✅", "💯", "⭐"].map((emoji) => (
+                        {["👍", "👎", "❤️", "🎉", "😢", "🚀", "👀", "🔥", "👏", "💡", "😊", "🙏", "✅", "💯", "⭐"].map((emoji) => (
                           <button
                             key={emoji}
                             type="button"
@@ -4995,6 +6366,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       onChange={handleCommentTextareaChange}
                       placeholder={replyingTo ? `Replying to ${replyingTo.authorName}...` : "Write a comment or use @name to tag team members..."}
                       rows={2}
+                      maxLength={1000}
                       className="w-full px-3 py-2 text-xs bg-transparent border-0 focus:outline-none resize-none text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:ring-0 min-h-[48px]"
                       onKeyDown={(e) => {
                         if (e.key === "Escape" && mentionSearch !== null) {
@@ -5003,7 +6375,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           setMentionIndex(-1);
                         } else if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          handleAddComment();
+                          if (commentText.trim() && commentText.length <= 1000) {
+                            handleAddComment();
+                          }
                         }
                       }}
                     />
@@ -5011,29 +6385,84 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     {/* Bottom Controls Bar */}
                     <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800/80 pt-2 px-1">
                       <div className="flex items-center gap-1">
+                        {/* Markdown Formatting Toolbar */}
+                        <div className="flex items-center gap-0.5 border-r border-slate-200 dark:border-slate-700/80 pr-1.5 mr-0.5">
+                          <button
+                            type="button"
+                            onClick={() => applyTextFormatting(commentTextareaRef.current, commentText, setCommentText, "bold")}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Bold (**text**)"
+                          >
+                            <Bold size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyTextFormatting(commentTextareaRef.current, commentText, setCommentText, "italic")}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Italic (*text*)"
+                          >
+                            <Italic size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyTextFormatting(commentTextareaRef.current, commentText, setCommentText, "bullet")}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Bullet List (- item)"
+                          >
+                            <List size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyTextFormatting(commentTextareaRef.current, commentText, setCommentText, "number")}
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Numbered List (1. item)"
+                          >
+                            <ListOrdered size={14} />
+                          </button>
+                        </div>
+
                         <button
                           type="button"
                           onClick={() => setShowEmojiPicker(prev => !prev)}
-                          className="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-amber-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                           title="Add Emoji"
                         >
                           <Smile size={16} />
                         </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAddComment()}
-                        disabled={!commentText.trim() || isSubmittingComment}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                      >
-                        {isSubmittingComment ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <Send size={13} />
-                        )}
-                        <span>{replyingTo ? "Post Reply" : "Post Comment"}</span>
-                      </button>
+                      <div className="flex items-center gap-2.5">
+                        {/* Character limit counter with typing feedback */}
+                        <div
+                          className={cn(
+                            "text-[10px] font-mono font-medium transition-all px-2 py-0.5 rounded-md select-none",
+                            commentText.length >= 1000
+                              ? "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 font-bold"
+                              : commentText.length >= 800
+                              ? "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 font-semibold"
+                              : "text-slate-400 dark:text-slate-500"
+                          )}
+                          title={`${1000 - commentText.length} characters remaining`}
+                        >
+                          <span>{commentText.length}</span>
+                          <span className="text-slate-300 dark:text-slate-600">/</span>
+                          <span>1000</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAddComment()}
+                          disabled={!commentText.trim() || commentText.length > 1000 || isSubmittingComment}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          {isSubmittingComment ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Send size={13} />
+                          )}
+                          <span>{replyingTo ? "Post Reply" : "Post Comment"}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5092,7 +6521,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             </div>
 
             {/* Right Sidebar - History & Status */}
-            <div className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 uppercase tracking-widest">History & Audit Timeline</h4>
@@ -5502,6 +6931,189 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               onClose={() => setIsCameraOpen(false)} 
             />
           )}
+
+          {/* Reactions Info Breakdown Modal */}
+          {reactionDetailModalData && (() => {
+            const allModalReactions = sanitizeCommentReactions(reactionDetailModalData.reactions, currentUser, users);
+            const distinctEmojis = Array.from(new Set(allModalReactions.map((r: any) => r.emoji))).filter(Boolean);
+            
+            const filteredReactions = reactionModalActiveTab === "ALL" 
+              ? allModalReactions 
+              : allModalReactions.filter((r: any) => r.emoji === reactionModalActiveTab);
+
+            return (
+              <div 
+                className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150"
+                onClick={() => setReactionDetailModalData(null)}
+              >
+                <div 
+                  className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-xs" />
+                      <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
+                        Reactions
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 text-xs font-bold font-mono">
+                        {allModalReactions.length}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReactionDetailModalData(null)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Tab Filters */}
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800/80 overflow-x-auto no-scrollbar bg-slate-50/70 dark:bg-slate-950/40">
+                    <button
+                      type="button"
+                      onClick={() => setReactionModalActiveTab("ALL")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5",
+                        reactionModalActiveTab === "ALL"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700"
+                      )}
+                    >
+                      <span>All</span>
+                      <span className="opacity-90 font-mono">{allModalReactions.length}</span>
+                    </button>
+
+                    {distinctEmojis.map((emoji: string) => {
+                      const count = allModalReactions.filter((r: any) => r.emoji === emoji).length;
+                      const isSelected = reactionModalActiveTab === emoji;
+
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setReactionModalActiveTab(emoji)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5",
+                            isSelected
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700"
+                          )}
+                        >
+                          <span className="text-sm">{emoji}</span>
+                          <span className="opacity-90 font-mono">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Reactor List */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2.5 divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredReactions.length === 0 ? (
+                      <div className="py-8 text-center text-slate-400 text-xs font-medium">
+                        No reactions found
+                      </div>
+                    ) : (
+                      filteredReactions.map((r: any, idx: number) => {
+                        const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
+                        const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
+                        const isCurrent = Boolean(
+                          rUid === "u-current" || 
+                          rUid === "__current_user__" || 
+                          (currentUser?.id && rUid === String(currentUser.id).toLowerCase()) ||
+                          (currentUser?.email && (rUemail === String(currentUser.email).toLowerCase() || rUid === String(currentUser.email).toLowerCase()))
+                        );
+
+                        const resolvedName = resolveSenderName({ id: r.userId, email: r.userEmail, name: r.userName }, users) || r.userName || (r.userEmail ? r.userEmail.split("@")[0] : "Church Member");
+                        const userObj = users.find((u: any) => 
+                          (u.id && r.userId && u.id === r.userId) || 
+                          (u.email && r.userEmail && u.email.toLowerCase() === r.userEmail.toLowerCase())
+                        );
+                        const avatar = isCurrent 
+                          ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) 
+                          : (userObj?.photoURL || (userObj as any)?.avatarUrl);
+
+                        return (
+                          <div key={idx} className={cn("flex items-center justify-between gap-3 pt-2.5 first:pt-0", idx > 0 && "pt-2.5")}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              {avatar ? (
+                                <img 
+                                  src={avatar} 
+                                  alt={resolvedName} 
+                                  className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0" 
+                                  onError={handleImageError}
+                                />
+                              ) : (
+                                <div className={`w-9 h-9 rounded-full ${getAvatarBgColor(resolvedName)} font-bold text-xs flex items-center justify-center text-white shrink-0 shadow-2xs`}>
+                                  {getAvatarInitials(resolvedName)}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                    {resolvedName}
+                                  </span>
+                                  {isCurrent && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 truncate">
+                                  {userObj?.role || userObj?.department || r.userEmail || "Parish Member"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-2xl leading-none">{r.emoji}</span>
+                              {isCurrent && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleToggleReaction(reactionDetailModalData.commentId, r.emoji);
+                                    const updated = allModalReactions.filter((mr: any) => !(mr.emoji === r.emoji && isCurrent));
+                                    if (updated.length === 0) {
+                                      setReactionDetailModalData(null);
+                                    } else {
+                                      setReactionDetailModalData({
+                                        ...reactionDetailModalData,
+                                        reactions: updated
+                                      });
+                                    }
+                                  }}
+                                  className="text-[11px] font-bold text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:underline cursor-pointer ml-1"
+                                  title="Remove your reaction"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-950/60 flex items-center justify-between text-xs text-slate-400">
+                    <span className="text-blue-600 dark:text-blue-400 font-semibold text-[11px] flex items-center gap-1">
+                      <span>Restricted Reactions</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setReactionDetailModalData(null)}
+                      className="px-4 py-1.5 font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-xs"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </AnimatePresence>
       </motion.div>
     );
@@ -5516,3 +7128,5 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       </div>
     );
   };
+
+export default RequisitionsPanel;

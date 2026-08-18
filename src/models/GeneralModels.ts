@@ -288,3 +288,34 @@ const SettingsSchema = new Schema<ISettings>({
   fiscalYearStatus: { type: String, default: 'OPEN' },
 }, { strict: false });
 export const Settings = mongoose.models.Settings || mongoose.model<ISettings>('Settings', SettingsSchema, 'settings');
+
+// 14. UserReactionHistory
+export interface IUserReactionHistory extends Document {
+  id: string;
+  requisitionId: string;
+  commentId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  emoji: string;
+  action: 'ADDED' | 'REMOVED' | 'TOGGLED';
+  timestamp: Date;
+  previousEmoji?: string;
+  metadata?: any;
+}
+
+const UserReactionHistorySchema = new Schema<IUserReactionHistory>({
+  id: { type: String, required: true, index: true },
+  requisitionId: { type: String, required: true, index: true },
+  commentId: { type: String, required: true, index: true },
+  userId: { type: String, required: true, index: true },
+  userName: { type: String, required: true },
+  userEmail: { type: String, required: true },
+  emoji: { type: String, required: true },
+  action: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now, index: true },
+  previousEmoji: { type: String },
+  metadata: { type: Schema.Types.Mixed },
+}, { strict: false });
+
+export const UserReactionHistory = mongoose.models.UserReactionHistory || mongoose.model<IUserReactionHistory>('UserReactionHistory', UserReactionHistorySchema, 'user_reaction_histories');

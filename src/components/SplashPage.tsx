@@ -81,7 +81,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
   darkMode = true,
   onComplete,
   isDataReady = true,
-  durationMs = 2000,
+  durationMs = 3500,
 }) => {
   const [progress, setProgress] = useState(0);
   const startTimeRef = useRef<number | null>(null);
@@ -97,8 +97,8 @@ export const SplashPage: React.FC<SplashPageProps> = ({
       const elapsed = timestamp - startTimeRef.current;
       const targetPercent = Math.min(100, (elapsed / durationMs) * 100);
 
-      if (!isDataReady && targetPercent >= 95) {
-        setProgress(95);
+      if (!isDataReady && targetPercent >= 96) {
+        setProgress(96);
       } else {
         setProgress(targetPercent);
       }
@@ -124,18 +124,18 @@ export const SplashPage: React.FC<SplashPageProps> = ({
       onCompleteCalledRef.current = true;
       const timer = setTimeout(() => {
         onComplete?.();
-      }, 150);
+      }, 180);
       return () => clearTimeout(timer);
     }
   }, [progress, isDataReady, onComplete]);
 
-  // Generate a steady matrix of finance icons for the background grid
-  const gridCells = Array.from({ length: 48 }, (_, i) => {
+  // Generate a distinct, visible matrix of finance icon tiles
+  const gridCells = Array.from({ length: 64 }, (_, i) => {
     const IconComponent = FINANCE_ICONS[i % FINANCE_ICONS.length];
     return {
-      id: `splash-bg-cell-${i}`,
+      id: `splash-icon-cell-${i}`,
       Icon: IconComponent,
-      delay: (i % 8) * 0.03 + Math.floor(i / 8) * 0.04
+      delay: (i % 8) * 0.02 + Math.floor(i / 8) * 0.025
     };
   });
 
@@ -144,67 +144,65 @@ export const SplashPage: React.FC<SplashPageProps> = ({
       <motion.div
         id="stands-splash-screen"
         initial={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.35, ease: "easeInOut" }}
-        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-colors duration-300 select-none overflow-hidden ${
+        exit={{ opacity: 0, scale: 1.02 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center select-none overflow-hidden ${
           darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
         }`}
       >
-        {/* Background Grid Patterns of Finance Icons */}
+        {/* High-Visibility Finance Icon Background Grid */}
         <div 
           className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center"
           aria-hidden="true"
         >
-          <div className="w-[140vw] h-[140vh] grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3 sm:gap-4 p-4 transform -rotate-6 scale-105 opacity-80">
-            {gridCells.map(({ id, Icon, delay }, idx) => (
+          <div className="w-[150vw] h-[150vh] grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-3.5 sm:gap-4.5 p-6 transform -rotate-6 scale-105">
+            {gridCells.map(({ id, Icon, delay }) => (
               <motion.div
                 key={id}
-                initial={{ opacity: 0, scale: 0.8 }}
+                initial={{ opacity: 0, scale: 0.85 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: delay * 0.4, duration: 0.6 }}
-                className={`flex items-center justify-center p-3.5 sm:p-4 rounded-2xl border transition-colors ${
+                transition={{ delay: delay * 0.3, duration: 0.5, ease: "easeOut" }}
+                className={`flex items-center justify-center p-3.5 sm:p-4 rounded-xl border transition-colors ${
                   darkMode
-                    ? "bg-slate-900/30 border-slate-800/40 text-slate-500/25"
-                    : "bg-white/40 border-slate-200/60 text-slate-400/30 shadow-xs"
+                    ? "bg-slate-900/60 border-slate-800/80 text-slate-400/50 shadow-xs"
+                    : "bg-white/80 border-slate-200/90 text-slate-500/60 shadow-xs"
                 }`}
               >
-                <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.5]" />
+                <Icon className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
               </motion.div>
             ))}
           </div>
 
-          {/* Radial Gradient Vignette so the center branding remains crisp and high-contrast */}
+          {/* Balanced Radial Vignette ensuring rich grid visibility while keeping center brand legible */}
           <div 
             className={`absolute inset-0 pointer-events-none ${
               darkMode
-                ? "bg-[radial-gradient(ellipse_at_center,rgba(2,6,23,0.85)_0%,rgba(2,6,23,0.5)_45%,rgba(2,6,23,0.92)_100%)]"
-                : "bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.88)_0%,rgba(248,250,252,0.5)_45%,rgba(248,250,252,0.94)_100%)]"
+                ? "bg-[radial-gradient(ellipse_at_center,rgba(2,6,23,0.65)_0%,rgba(2,6,23,0.4)_40%,rgba(2,6,23,0.85)_100%)]"
+                : "bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.72)_0%,rgba(248,250,252,0.45)_40%,rgba(248,250,252,0.9)_100%)]"
             }`}
           />
         </div>
 
         {/* Foreground Content */}
         <div className="relative z-10 flex flex-col items-center justify-center max-w-sm w-full px-8 text-center">
-          {/* Animated Logo Intro */}
+          {/* Smooth Logo Entrance */}
           <motion.div
-            initial={{ scale: 0.7, opacity: 0, y: 16 }}
+            initial={{ scale: 0.75, opacity: 0, y: 18 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{
-              type: "spring",
-              stiffness: 220,
-              damping: 20,
-              duration: 0.7,
+              duration: 0.75,
+              ease: [0.16, 1, 0.3, 1],
             }}
             className={`w-24 h-24 rounded-3xl p-3.5 mb-6 flex items-center justify-center shadow-2xl transition-all ${
               darkMode
-                ? "bg-slate-900/90 border border-slate-800 shadow-sky-950/20"
-                : "bg-white border border-slate-200 shadow-slate-300/40"
+                ? "bg-slate-900/95 border border-slate-800 shadow-black/50"
+                : "bg-white border border-slate-200 shadow-slate-300/60"
             }`}
           >
             <img
               src="/pcea.svg"
               alt="PCEA Logo"
-              className="w-full h-full object-contain"
+              className="w-full h-full object-contain drop-shadow-sm"
               referrerPolicy="no-referrer"
             />
           </motion.div>
@@ -213,7 +211,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
+            transition={{ delay: 0.18, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="mb-8"
           >
             <h1
@@ -225,20 +223,22 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             </h1>
           </motion.div>
 
-          {/* 2-Second Progress Bar */}
+          {/* Boxy Progress Bar without rounded corners */}
           <motion.div
             initial={{ opacity: 0, width: "80%" }}
             animate={{ opacity: 1, width: "100%" }}
-            transition={{ delay: 0.25, duration: 0.3 }}
+            transition={{ delay: 0.25, duration: 0.4, ease: "easeOut" }}
             className="w-full max-w-[240px]"
           >
             <div
-              className={`w-full h-2 rounded-full overflow-hidden transition-colors ${
-                darkMode ? "bg-slate-800" : "bg-slate-200"
+              className={`w-full h-2 rounded-none overflow-hidden transition-colors border ${
+                darkMode
+                  ? "bg-slate-900 border-slate-800"
+                  : "bg-slate-200 border-slate-300"
               }`}
             >
               <div
-                className="h-full bg-blue-600 rounded-full transition-all duration-75 ease-linear"
+                className="h-full bg-blue-600 rounded-none transition-[width] duration-100 ease-linear"
                 style={{ width: `${progress}%` }}
               />
             </div>

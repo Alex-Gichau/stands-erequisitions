@@ -563,7 +563,6 @@ interface RequisitionContextType {
   biometricEnrolled: boolean;
   enrollBiometric: (enabled?: boolean) => void;
   login: () => Promise<void>;
-  loginWithGoogleCredential: (credentialString: string) => Promise<any>;
   loginWithEmail: (email: string, pass: string) => Promise<void>;
   signupWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   logout: (options?: { forceDirect?: boolean }) => Promise<void>;
@@ -3270,41 +3269,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const loginWithGoogleCredential = async (credentialString: string) => {
-    try {
-      const { GoogleAuthProvider, signInWithCredential } = await import("firebase/auth");
-      const credential = GoogleAuthProvider.credential(credentialString);
-      const result = await signInWithCredential(auth, credential);
-      if (result.user) {
-        const email = result.user.email?.toLowerCase() || "";
-        await dispatchLoginSlackAlert(email, "Google One Tap", result.user.uid);
-      }
-      return result;
-    } catch (error: any) {
-      console.warn("Google One Tap Firebase Sign-in notice, applying direct profile link fallback:", error);
-      try {
-        const parts = credentialString.split('.');
-        if (parts.length >= 2) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-          const email = payload.email?.toLowerCase() || "";
-          const uid = payload.sub || `google-${Date.now()}`;
-          const name = payload.name || email.split('@')[0];
-          
-          await fetch("/api/auth/link-profile", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ uid, email, name })
-          }).catch(() => {});
-
-          await dispatchLoginSlackAlert(email, "Google One Tap", uid).catch(() => {});
-        }
-      } catch (decodeErr) {
-        console.warn("Failed decoding One Tap credential:", decodeErr);
-      }
-      throw error;
-    }
-  };
-
   const loginWithEmail = async (email: string, pass: string) => {
     try {
       email = email.trim().toLowerCase();
@@ -5046,7 +5010,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       biometricEnrolled,
       enrollBiometric,
       login,
-      loginWithGoogleCredential,
       loginWithEmail,
       signupWithEmail,
       logout,

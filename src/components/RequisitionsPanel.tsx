@@ -29,6 +29,7 @@ import {
   FileText,
   FileSpreadsheet,
   ChevronDown,
+  ChevronUp,
   Users,
   Flag,
   TrendingUp,
@@ -96,6 +97,11 @@ import {
   getNamedImagePlaceholder 
 } from "../lib/utils";
 import { PdfThumbnailPreview, preloadPdfThumbnail } from "./PdfThumbnailPreview";
+import { 
+  useUnreadCommentsTracker, 
+  markRequisitionCommentsAsRead, 
+  getRequisitionUnreadCommentInfo 
+} from "../utils/unreadCommentTracker";
 
 // Relative time formatting helper (e.g., "1h ago", "2m ago", "just now")
 function formatRelativeTime(timestamp?: string): string {
@@ -255,9 +261,15 @@ export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
 export const RequisitionOwnershipDiscussionRow: React.FC<{
   req: Requisition;
   users: any[];
-}> = ({ req, users }) => {
+  currentUser?: any;
+}> = ({ req, users, currentUser: propUser }) => {
+  const { currentUser: ctxUser } = useRequisitions();
+  const currentUser = propUser || ctxUser;
   const hasComments = Array.isArray(req.comments) && req.comments.length > 0;
   if (!hasComments) return null;
+
+  // Real-time unread comments status
+  const unreadInfo = getRequisitionUnreadCommentInfo(req, currentUser, users);
 
   // Gather commenters & subscribers
   const participantsMap = new Map<string, {
@@ -441,13 +453,33 @@ export const RequisitionOwnershipDiscussionRow: React.FC<{
         </div>
       )}
 
+      {/* Real-time Unread Comments Flag */}
+      {unreadInfo.hasUnread && (
+        <div 
+          className="inline-flex items-center gap-1 text-[7.5px] md:text-[8px] font-black text-white bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 px-2 py-0.5 rounded-full shadow-xs shrink-0 animate-pulse border border-rose-400/40"
+          title={`${unreadInfo.unreadCount} unread comment${unreadInfo.unreadCount === 1 ? "" : "s"}${unreadInfo.unreadAuthors.length > 0 ? ` from ${unreadInfo.unreadAuthors.join(", ")}` : ""}`}
+        >
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+          </span>
+          <MessageSquare size={8.5} className="fill-current shrink-0" />
+          <span>{unreadInfo.unreadCount} NEW</span>
+        </div>
+      )}
+
       {/* Small thread indicator & subscriber count */}
       {totalCommentCount > 0 && (
         <div 
-          className="inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80 px-1.5 py-0.5 rounded-md shrink-0"
-          title={`${totalCommentCount} comments in discussion • ${notificationEmailsList.length} member${notificationEmailsList.length === 1 ? "" : "s"} receiving updates`}
+          className={cn(
+            "inline-flex items-center gap-1 text-[8px] px-1.5 py-0.5 rounded-md shrink-0 transition-colors",
+            unreadInfo.hasUnread
+              ? "font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-800/60"
+              : "font-semibold text-slate-500 dark:text-slate-400 bg-slate-100/80 dark:bg-slate-800/80"
+          )}
+          title={`${totalCommentCount} comments in discussion${unreadInfo.hasUnread ? ` (${unreadInfo.unreadCount} unread)` : ""} • ${notificationEmailsList.length} member${notificationEmailsList.length === 1 ? "" : "s"} receiving updates`}
         >
-          <MessageSquare size={8.5} className="text-indigo-500 shrink-0" />
+          <MessageSquare size={8.5} className={cn("shrink-0", unreadInfo.hasUnread ? "text-rose-500 fill-rose-500" : "text-indigo-500")} />
           <span>{totalCommentCount}</span>
           {notificationEmailsList.length > 0 && (
             <span className="text-slate-400 dark:text-slate-500 font-normal">
@@ -1819,34 +1851,40 @@ const DocumentPreviewModal = ({
   }, [requesterName, requesterEmail, submittedAt, approvalHistory]);
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 md:p-3 bg-slate-950/90 backdrop-blur-md">
+    <div 
+      className="fixed inset-0 z-[120] pointer-events-none flex items-center justify-end p-0 transition-all overflow-hidden"
+    >
       <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
+        initial={{ x: "100%", opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
         className={cn(
-          "bg-slate-900 w-full h-full shadow-2xl overflow-hidden border border-slate-800 flex flex-col relative text-slate-100 transition-all duration-300",
+          "bg-white dark:bg-slate-900 h-full shadow-2xl overflow-hidden border-l border-slate-200 dark:border-slate-800 flex flex-col relative text-slate-900 dark:text-slate-100 transition-all duration-300 pointer-events-auto",
           isFullscreen 
-            ? "fixed inset-0 z-[200] rounded-none max-w-none max-h-none p-0" 
-            : "max-w-[98vw] max-h-[96vh] md:rounded-3xl"
+            ? "fixed inset-0 z-[200] rounded-none w-full max-w-none max-h-none p-0" 
+            : "w-full sm:w-[480px] md:w-[540px] lg:w-[600px] xl:w-[660px] max-w-[90vw]"
         )}
       >
         {/* Header bar */}
-        <div className="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4 select-none shrink-0 z-20">
+        <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 select-none shrink-0 z-20">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20 shrink-0">
+            <div className="w-9 h-9 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
               <FileText size={18} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] bg-indigo-950 text-indigo-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase border border-indigo-800/40">
+                <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black px-2 py-0.5 rounded-full font-mono uppercase border border-emerald-200 dark:border-emerald-800/40 flex items-center gap-1">
+                  <Eye size={10} /> SIDE PREVIEW
+                </span>
+                <span className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase border border-indigo-200 dark:border-indigo-800/40">
                   {reqId ? `#${reqId}` : "REQUISITION ATTACHMENT"}
                 </span>
-                <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase">
+                <span className="text-[9px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase">
                   FILE {activeDocIndex + 1} OF {attachments.length}
                 </span>
               </div>
-              <h3 className="text-xs md:text-sm font-bold text-slate-100 truncate mt-0.5">
+              <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate mt-0.5">
                 {currentDoc?.fileName || title}
               </h3>
             </div>
@@ -1859,14 +1897,14 @@ const DocumentPreviewModal = ({
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
                 showDetailsPanel 
                   ? "bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-950" 
-                  : "bg-slate-850 border-slate-750 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  : "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
               }`}
               title="Toggle Requester & Approvers Details Panel"
             >
               <Users size={15} />
               <span className="hidden sm:inline">Details & Members</span>
               {membersInvolved.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-slate-900 font-mono">
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] bg-slate-200 dark:bg-slate-900 font-mono">
                   {membersInvolved.length}
                 </span>
               )}
@@ -1886,7 +1924,7 @@ const DocumentPreviewModal = ({
                   link.rel = "noopener noreferrer";
                   link.click();
                 }}
-                className="p-2 bg-slate-850 border border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-colors cursor-pointer"
+                className="p-2 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors cursor-pointer"
                 title="Download Document"
               >
                 <Download size={16} />
@@ -1896,7 +1934,7 @@ const DocumentPreviewModal = ({
             {/* Fullscreen */}
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-2 bg-slate-850 border border-slate-750 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl transition-colors cursor-pointer hidden md:flex"
+              className="p-2 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl transition-colors cursor-pointer hidden md:flex"
               title={isFullscreen ? "Exit Fullscreen" : "Maximize Modal"}
             >
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -1905,7 +1943,7 @@ const DocumentPreviewModal = ({
             {/* Close */}
             <button
               onClick={onClose}
-              className="p-2 bg-slate-850 border border-slate-750 hover:bg-rose-950/40 hover:border-rose-800 hover:text-rose-400 rounded-xl text-slate-300 transition-colors cursor-pointer"
+              className="p-2 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
               title="Close Modal"
             >
               <X size={16} />
@@ -1914,7 +1952,7 @@ const DocumentPreviewModal = ({
         </div>
 
         {/* Modal Main Area */}
-        <div className="flex-1 flex overflow-hidden relative bg-slate-950">
+        <div className="flex-1 flex overflow-hidden relative bg-slate-100/70 dark:bg-slate-950">
           {/* Main Document Area using react-doc-viewer */}
           <div className="flex-1 flex flex-col h-full overflow-hidden relative p-2 md:p-4">
             {/* File Selector Tabs if multiple attachments */}
@@ -1927,7 +1965,7 @@ const DocumentPreviewModal = ({
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 cursor-pointer transition-all flex items-center gap-1.5 border ${
                       idx === activeDocIndex
                         ? "bg-indigo-600 border-indigo-500 text-white font-bold shadow-md"
-                        : "bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-slate-200"
                     }`}
                   >
                     <FileText size={13} />
@@ -1938,7 +1976,7 @@ const DocumentPreviewModal = ({
             )}
 
             {/* Attachment preview container */}
-            <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/90 relative flex flex-col">
+            <div className="flex-1 w-full h-full rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 relative flex flex-col">
               <AttachmentViewer
                 uri={currentDoc?.uri || ""}
                 fileName={currentDoc?.fileName || "Attachment"}
@@ -1954,19 +1992,19 @@ const DocumentPreviewModal = ({
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 300, opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="w-full md:w-80 lg:w-96 bg-slate-900/95 border-l border-slate-800 flex flex-col h-full overflow-y-auto shrink-0 z-10 shadow-2xl"
+                className="w-full md:w-80 lg:w-96 bg-white/95 dark:bg-slate-900/95 border-l border-slate-200 dark:border-slate-800 flex flex-col h-full overflow-y-auto shrink-0 z-10 shadow-2xl"
               >
                 {/* Sidebar Title */}
-                <div className="p-4 border-b border-slate-800 bg-slate-950/60 sticky top-0 z-10 flex items-center justify-between">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-950/60 sticky top-0 z-10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Users size={16} className="text-indigo-400" />
-                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
+                    <Users size={16} className="text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider font-mono">
                       Requisition Members & Approvals
                     </h4>
                   </div>
                   <button
                     onClick={() => setShowDetailsPanel(false)}
-                    className="text-slate-500 hover:text-slate-300 p-1 md:hidden cursor-pointer"
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1 md:hidden cursor-pointer"
                   >
                     <X size={16} />
                   </button>
@@ -1974,25 +2012,25 @@ const DocumentPreviewModal = ({
 
                 <div className="p-4 space-y-6">
                   {/* Requisition Meta Summary Card */}
-                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+                  <div className="bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500 block font-bold">
+                        <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400 block font-bold">
                           Title
                         </span>
-                        <p className="text-xs font-bold text-slate-200 mt-0.5">{title}</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-200 mt-0.5">{title}</p>
                       </div>
                       {amountStr && (
                         <div className="text-right">
-                          <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-500 block font-bold">
+                          <span className="text-[9px] font-mono uppercase tracking-widest text-emerald-600 dark:text-emerald-500 block font-bold">
                             Amount
                           </span>
-                          <p className="text-xs font-black text-emerald-400 font-mono mt-0.5">{amountStr}</p>
+                          <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">{amountStr}</p>
                         </div>
                       )}
                     </div>
                     {requisition?.description && (
-                      <p className="text-[11px] text-slate-400 border-t border-slate-850 pt-2 leading-relaxed">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800 pt-2 leading-relaxed">
                         {requisition.description}
                       </p>
                     )}
@@ -2000,20 +2038,20 @@ const DocumentPreviewModal = ({
 
                   {/* Requester Details Card */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono block">
                       1. Requester Info
                     </span>
-                    <div className="bg-slate-950/80 border border-indigo-950/60 rounded-2xl p-3.5 flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 mt-0.5 font-bold">
+                    <div className="bg-slate-50 dark:bg-slate-950/80 border border-indigo-200 dark:border-indigo-950/60 rounded-2xl p-3.5 flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5 font-bold">
                         <User size={18} />
                       </div>
                       <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-xs font-bold text-slate-100 truncate">{requesterName}</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{requesterName}</p>
                         {requesterEmail && (
-                          <p className="text-[10px] text-slate-400 font-mono truncate">{requesterEmail}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{requesterEmail}</p>
                         )}
                         <div className="flex items-center gap-2 pt-1 flex-wrap text-[10px]">
-                          <span className="px-2 py-0.5 bg-slate-850 text-indigo-300 rounded-md font-medium border border-slate-800">
+                          <span className="px-2 py-0.5 bg-indigo-50 dark:bg-slate-850 text-indigo-700 dark:text-indigo-300 rounded-md font-medium border border-indigo-100 dark:border-slate-800">
                             {groupName}
                           </span>
                           {submittedAt && (
@@ -2028,27 +2066,27 @@ const DocumentPreviewModal = ({
 
                   {/* Approvers Clearance Cards */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono block">
                       2. Approvers Clearance Level
                     </span>
                     <div className="space-y-2.5">
                       {/* Level 1 Approver */}
                       <div className={`border rounded-2xl p-3.5 space-y-2 transition-all ${
-                        isL1Approved ? "bg-emerald-950/20 border-emerald-800/40" : "bg-slate-950/60 border-slate-800"
+                        isL1Approved ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800"
                       }`}>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase font-mono flex items-center gap-1">
-                            <ShieldCheck size={13} className={isL1Approved ? "text-emerald-400" : "text-slate-500"} />
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase font-mono flex items-center gap-1">
+                            <ShieldCheck size={13} className={isL1Approved ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
                             Level 1 (Group Leader)
                           </span>
                           <span className={`px-2 py-0.5 rounded text-[9px] font-black font-mono uppercase ${
-                            isL1Approved ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            isL1Approved ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" : "bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-500/20"
                           }`}>
                             {isL1Approved ? "Verified & Endorsed" : "Pending L1"}
                           </span>
                         </div>
                         <div className="text-xs space-y-0.5">
-                          <p className="font-semibold text-slate-200">
+                          <p className="font-semibold text-slate-900 dark:text-slate-200">
                             {l1Note?.approverName || (requisition?.approvedAtL1 ? "Level 1 Official" : "Presbytery Official")}
                           </p>
                           {requisition?.approvedAtL1 && (
@@ -2057,7 +2095,7 @@ const DocumentPreviewModal = ({
                             </p>
                           )}
                           {l1Note?.note && (
-                            <p className="text-[11px] text-slate-400 italic bg-slate-900/80 p-2 rounded-lg mt-1 border border-slate-800/60">
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-white dark:bg-slate-900/80 p-2 rounded-lg mt-1 border border-slate-200 dark:border-slate-800/60">
                               "{l1Note.note}"
                             </p>
                           )}
@@ -2066,21 +2104,21 @@ const DocumentPreviewModal = ({
 
                       {/* Level 2 Approver */}
                       <div className={`border rounded-2xl p-3.5 space-y-2 transition-all ${
-                        isL2Approved ? "bg-emerald-950/20 border-emerald-800/40" : "bg-slate-950/60 border-slate-800"
+                        isL2Approved ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40" : "bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800"
                       }`}>
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase font-mono flex items-center gap-1">
-                            <ShieldCheck size={13} className={isL2Approved ? "text-emerald-400" : "text-slate-500"} />
+                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase font-mono flex items-center gap-1">
+                            <ShieldCheck size={13} className={isL2Approved ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
                             Level 2 (Finance / Treasurer)
                           </span>
                           <span className={`px-2 py-0.5 rounded text-[9px] font-black font-mono uppercase ${
-                            isL2Approved ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            isL2Approved ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30" : "bg-amber-100 dark:bg-amber-500/10 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-500/20"
                           }`}>
                             {isL2Approved ? "Authorized for Payout" : "Pending L2"}
                           </span>
                         </div>
                         <div className="text-xs space-y-0.5">
-                          <p className="font-semibold text-slate-200">
+                          <p className="font-semibold text-slate-900 dark:text-slate-200">
                             {l2Note?.approverName || (requisition?.approvedAtL2 ? "Finance Treasurer" : "Finance Officer")}
                           </p>
                           {requisition?.approvedAtL2 && (
@@ -2089,7 +2127,7 @@ const DocumentPreviewModal = ({
                             </p>
                           )}
                           {l2Note?.note && (
-                            <p className="text-[11px] text-slate-400 italic bg-slate-900/80 p-2 rounded-lg mt-1 border border-slate-800/60">
+                            <p className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-white dark:bg-slate-900/80 p-2 rounded-lg mt-1 border border-slate-200 dark:border-slate-800/60">
                               "{l2Note.note}"
                             </p>
                           )}
@@ -2098,17 +2136,17 @@ const DocumentPreviewModal = ({
 
                       {/* Disbursing Status */}
                       {isDisbursed && (
-                        <div className="border bg-sky-950/20 border-sky-800/40 rounded-2xl p-3.5 space-y-1">
+                        <div className="border bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800/40 rounded-2xl p-3.5 space-y-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-sky-400 uppercase font-mono flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-sky-700 dark:text-sky-400 uppercase font-mono flex items-center gap-1">
                               <Coins size={13} />
                               Payout Settlement
                             </span>
-                            <span className="px-2 py-0.5 rounded text-[9px] font-black font-mono uppercase bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                            <span className="px-2 py-0.5 rounded text-[9px] font-black font-mono uppercase bg-sky-100 dark:bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-300 dark:border-sky-500/30">
                               Disbursed
                             </span>
                           </div>
-                          <p className="text-xs font-semibold text-slate-200">
+                          <p className="text-xs font-semibold text-slate-900 dark:text-slate-200">
                             {disburseNote?.approverName || "PCE St. Andrews Treasury"}
                           </p>
                           {requisition?.disbursedAt && (
@@ -2123,23 +2161,23 @@ const DocumentPreviewModal = ({
 
                   {/* Updated Members & Audit History */}
                   <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono block">
                       3. Involved Members & History Log ({membersInvolved.length})
                     </span>
                     <div className="space-y-2">
                       {membersInvolved.map((m, idx) => (
-                        <div key={`member-${idx}`} className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 flex items-start gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold text-xs shrink-0 mt-0.5">
+                        <div key={`member-${idx}`} className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800/80 rounded-xl p-3 flex items-start gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 font-bold text-xs shrink-0 mt-0.5">
                             {m.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-1">
-                              <p className="text-xs font-bold text-slate-200 truncate">{m.name}</p>
-                              <span className="text-[8px] font-mono px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded uppercase font-bold shrink-0">
+                              <p className="text-xs font-bold text-slate-900 dark:text-slate-200 truncate">{m.name}</p>
+                              <span className="text-[8px] font-mono px-1.5 py-0.2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 rounded uppercase font-bold shrink-0">
                                 {m.role}
                               </span>
                             </div>
-                            <p className="text-[10px] text-indigo-400 font-medium mt-0.5">{m.action}</p>
+                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium mt-0.5">{m.action}</p>
                             {m.timestamp && (
                               <p className="text-[9px] text-slate-500 font-mono mt-0.5">{m.timestamp}</p>
                             )}
@@ -2243,7 +2281,7 @@ export const RequisitionsPanel: React.FC = () => {
   const { selectedRequisition: viewingReq, setSelectedRequisition: setViewingReq } = useRequisitions();
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState<Requisition | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
-  const [filterPreset, setFilterPreset] = useState<"ALL" | "URGENT" | "FLAGGED" | "OVERDUE" | "L1_APPROVED">("ALL");
+  const [filterPreset, setFilterPreset] = useState<"ALL" | "URGENT" | "FLAGGED" | "OVERDUE" | "L1_APPROVED" | "UNREAD">("ALL");
   const [dateRangePreset, setDateRangePreset] = useState<"ALL" | "WEEK" | "MONTH" | "CUSTOM">("ALL");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
@@ -2305,6 +2343,15 @@ export const RequisitionsPanel: React.FC = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Unread comments tracker
+  const { 
+    getReqUnreadInfo, 
+    markAsRead, 
+    markAllAsRead, 
+    totalUnreadCount, 
+    requisitionsWithUnreadCount 
+  } = useUnreadCommentsTracker(requisitions, currentUser, users);
 
   const projectMap = useMemo(() => {
     const map = new Map<string, typeof projects[0]>();
@@ -2371,6 +2418,7 @@ export const RequisitionsPanel: React.FC = () => {
 
     const matchesPreset = () => {
       if (filterPreset === "ALL") return true;
+      if (filterPreset === "UNREAD") return getReqUnreadInfo(req).hasUnread;
       if (filterPreset === "FLAGGED") return req.flaggedForAudit === true;
       if (filterPreset === "L1_APPROVED") return req.status === RequisitionStatus.APPROVED_L1;
       if (filterPreset === "OVERDUE") {
@@ -2792,6 +2840,41 @@ export const RequisitionsPanel: React.FC = () => {
             <CheckCircle size={12} />
             L1 Approved
           </button>
+          <button
+            onClick={() => setFilterPreset("UNREAD")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-1.5",
+              filterPreset === "UNREAD" 
+                ? "bg-rose-600 text-white border-rose-600 shadow-sm" 
+                : totalUnreadCount > 0
+                  ? "bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 animate-pulse"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            <MessageSquare size={12} className={totalUnreadCount > 0 ? "fill-rose-500 text-rose-500" : ""} />
+            <span>Unread Threads</span>
+            {totalUnreadCount > 0 && (
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-black",
+                filterPreset === "UNREAD" ? "bg-white text-rose-700" : "bg-rose-600 text-white"
+              )}>
+                {totalUnreadCount}
+              </span>
+            )}
+          </button>
+          {requisitionsWithUnreadCount > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                markAllAsRead();
+              }}
+              title="Mark all discussion threads as read"
+              className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-dashed border-slate-300 dark:border-slate-700 hover:border-rose-300 transition-all flex items-center gap-1 cursor-pointer ml-auto sm:ml-0"
+            >
+              <Check size={11} className="text-rose-500" />
+              <span>Mark all read</span>
+            </button>
+          )}
         </div>
 
         <div className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3 md:gap-4">
@@ -3001,6 +3084,19 @@ export const RequisitionsPanel: React.FC = () => {
                       <td className="px-3 md:px-6 py-2.5 md:py-4">
                         <div className="flex flex-col min-w-0 max-w-full md:max-w-none space-y-1">
                           <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                            {getReqUnreadInfo(req).hasUnread && (
+                              <span 
+                                title={`${getReqUnreadInfo(req).unreadCount} unread comment${getReqUnreadInfo(req).unreadCount === 1 ? "" : "s"}${getReqUnreadInfo(req).unreadAuthors.length > 0 ? ` from ${getReqUnreadInfo(req).unreadAuthors.join(", ")}` : ""}`}
+                                className="inline-flex items-center gap-1 text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
+                              >
+                                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
+                                </span>
+                                <MessageSquare size={10} className="fill-rose-500 text-rose-600" />
+                                {getReqUnreadInfo(req).unreadCount} NEW
+                              </span>
+                            )}
                             <span className="font-bold text-slate-900 text-xs md:text-sm break-words leading-snug">
                               <HighlightText text={req.title} highlight={globalSearchTerm} />
                             </span>
@@ -3201,6 +3297,19 @@ export const RequisitionsPanel: React.FC = () => {
                           <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                             <Paperclip size={10} />
                             {req.attachments.length}
+                          </span>
+                        )}
+                        {getReqUnreadInfo(req).hasUnread && (
+                          <span 
+                            title={`${getReqUnreadInfo(req).unreadCount} unread comment(s)`}
+                            className="inline-flex items-center gap-1 text-[8px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
+                          >
+                            <span className="relative flex h-1.5 w-1.5 shrink-0">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
+                            </span>
+                            <MessageSquare size={9} className="fill-rose-500 text-rose-600" />
+                            {getReqUnreadInfo(req).unreadCount} NEW
                           </span>
                         )}
                       </div>
@@ -4152,8 +4261,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Mark comments as read when requisition detail is viewed
+  useEffect(() => {
+    if (req?.id && currentUser) {
+      markRequisitionCommentsAsRead(req.id, currentUser);
+    }
+  }, [req?.id, req?.comments?.length, currentUser]);
   const [loading, setLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [isTimelineMinimizedManually, setIsTimelineMinimizedManually] = useState<boolean | null>(null);
+  const isTimelineMinimized = isTimelineMinimizedManually !== null ? isTimelineMinimizedManually : (previewIndex !== null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false);
   const [showAssignConfirm, setShowAssignConfirm] = useState(false);
@@ -5021,9 +5139,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     }
   };
 
+  const isSidePreviewOpen = previewIndex !== null;
+
   const containerClass = isPage
-    ? "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-full shadow-sm flex flex-col min-h-[600px] select-text relative"
-    : "bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-4xl h-full md:h-[90vh] md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col max-w-full relative";
+    ? cn(
+        "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-full shadow-sm flex flex-col h-[calc(100vh-110px)] min-h-[500px] select-text relative overflow-hidden transition-all duration-300",
+        isSidePreviewOpen && "lg:pr-[500px] xl:pr-[580px]"
+      )
+    : cn(
+        "bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-4xl h-full md:h-[90vh] md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col max-w-full relative transition-all duration-300",
+        isSidePreviewOpen && "lg:max-w-2xl xl:max-w-3xl lg:-translate-x-28 xl:-translate-x-40"
+      );
 
   const mainContent = (
     <motion.div 
@@ -5033,7 +5159,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       className={containerClass}
     >
       <div className={cn(
-        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
+        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-white dark:bg-slate-900 gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
         isPage ? "rounded-t-2xl" : "rounded-t-none md:rounded-t-2xl"
       )}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
@@ -5075,7 +5201,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div ref={modalScrollRef} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
           {/* Top workflow progress timeline component */}
           {(() => {
             const isRejected = req.status === RequisitionStatus.REJECTED;
@@ -5210,9 +5336,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             );
           })()}
 
-          <div ref={modalScrollRef} className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3 overflow-y-auto lg:overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3">
             {/* Left Content */}
-            <div ref={leftPanelRef} className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            <div ref={leftPanelRef} className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 h-auto overflow-visible">
               <section className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-[0.2em]">Requisition Description</h4>
@@ -5222,28 +5348,30 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-8">
-                <section className="space-y-2">
-                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Requested Amount</h4>
-                  <div className="space-y-1">
-                    <p className="text-xl md:text-2xl font-bold text-slate-900 font-mono">{formatCurrency(req.amount)}</p>
-                    <p className="text-[9px] md:text-[11px] text-slate-500 italic font-medium">{req.amountWords}</p>
+              <div className="flex flex-wrap sm:grid sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1">
+                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Requested Amount</h4>
+                  <div className="space-y-1 min-w-0">
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono break-all">{formatCurrency(req.amount)}</p>
+                    <p className="text-[9px] md:text-[11px] text-slate-500 dark:text-slate-400 italic font-medium leading-relaxed">{req.amountWords}</p>
                   </div>
                 </section>
-                <section className="space-y-2">
-                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Individual Requestor</h4>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs md:text-base shrink-0">
+
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1">
+                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Individual Requestor</h4>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 text-primary font-bold text-xs md:text-base flex items-center justify-center shrink-0">
                       {req.requesterName.charAt(0)}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs md:text-sm font-bold text-slate-900 truncate">{req.requesterName}</p>
-                      <p className="text-[8px] md:text-[10px] text-slate-500 uppercase tracking-wider truncate">{req.groupName}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={req.requesterName}>{req.requesterName}</p>
+                      <p className="text-[8px] md:text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title={req.groupName}>{req.groupName}</p>
                     </div>
                   </div>
                 </section>
-                <section className="space-y-2">
-                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Vendor</h4>
+
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1 col-span-1 sm:col-span-2 xl:col-span-1">
+                  <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Vendor</h4>
                   {(() => {
                     const vendorName = req.payableTo || "";
                     if (!vendorName.trim()) {
@@ -5262,17 +5390,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     ).length;
 
                     return (
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 font-bold shrink-0">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-indigo-500/10 text-indigo-500 font-bold flex items-center justify-center shrink-0">
                           <Store size={16} className="md:w-5 md:h-5" />
                         </div>
-                        <div className="min-w-0 space-y-0.5 animate-in fade-in duration-200">
-                          <p className="text-xs md:text-sm font-bold text-slate-900 truncate" title={vendorName}>{vendorName}</p>
-                          <p className="text-[8px] md:text-[10px] text-slate-500 font-semibold truncate">
-                            Contact: <span className="font-extrabold text-slate-755">{vendorContact}</span>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <p className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={vendorName}>{vendorName}</p>
+                          <p className="text-[8px] md:text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+                            Contact: <span className="font-extrabold text-slate-700 dark:text-slate-300">{vendorContact}</span>
                           </p>
                           <div className="pt-0.5">
-                            <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 text-indigo-700/80 rounded font-black uppercase tracking-wider font-mono text-[7px] md:text-[8px] border border-indigo-100/30">
+                            <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-200/60 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 rounded font-black uppercase tracking-wider font-mono text-[7px] md:text-[8px]">
                               Appeared in {reqCount} {reqCount === 1 ? "requisition" : "requisitions"}
                             </span>
                           </div>
@@ -6523,15 +6651,49 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             {/* Right Sidebar - History & Status */}
             <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
               <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 uppercase tracking-widest">History & Audit Timeline</h4>
-                  <span className="text-[8px] font-mono font-bold bg-slate-200/50 text-slate-600 px-2 py-0.5 rounded-full uppercase tracking-wider">{getConsolidatedTimeline().length} events</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2">
+                  <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest shrink-0">
+                    History & Audit Timeline
+                  </h4>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                    <span className="text-[8px] font-mono font-bold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      {getConsolidatedTimeline().length} events
+                    </span>
+                    <button
+                      onClick={() => setIsTimelineMinimizedManually(!isTimelineMinimized)}
+                      className="px-2 py-0.5 bg-slate-200/60 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-300 transition-colors cursor-pointer flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider"
+                      title={isTimelineMinimized ? "Expand History Timeline" : "Minimize History Timeline"}
+                    >
+                      <span>{isTimelineMinimized ? "Expand" : "Collapse"}</span>
+                      {isTimelineMinimized ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+                    </button>
+                  </div>
                 </div>
-                <div className="space-y-6 relative ml-1">
-                  {/* Vertical Timeline Connector Line */}
-                  <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
-                  
-                  {getConsolidatedTimeline().map((event) => {
+
+                {isTimelineMinimized ? (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <History size={14} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">Timeline Minimized</p>
+                        <p className="text-[9px] text-slate-500 font-mono truncate">{getConsolidatedTimeline().length} audit records saved</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsTimelineMinimizedManually(false)}
+                      className="px-2.5 py-1 bg-indigo-50 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-slate-700 text-indigo-700 dark:text-slate-300 text-[10px] font-extrabold uppercase tracking-wider rounded-lg transition-colors shrink-0 cursor-pointer ml-auto"
+                    >
+                      View All
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-6 relative ml-1">
+                    {/* Vertical Timeline Connector Line */}
+                    <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
+                    
+                    {getConsolidatedTimeline().map((event) => {
                     let StepIcon = Activity;
                     let cardColor = "blue";
                     
@@ -6664,31 +6826,49 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     );
                   })}
                 </div>
+                )}
               </section>
 
-              <section className="pt-6 md:pt-8 border-t border-slate-200/60 space-y-4">
-                 <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Metadata</h4>
-                 <div className="space-y-3 md:space-y-4">
-                    <div className="flex items-center justify-between text-[10px] md:text-xs">
-                      <span className="text-slate-500 flex items-center gap-1.5"><Users size={13} className="text-primary shrink-0" /> Church Group</span>
-                      <span className="font-extrabold text-slate-800 bg-slate-100 hover:bg-slate-200/80 px-2 py-0.5 rounded transition-all uppercase tracking-wider text-[9px] truncate max-w-[150px]">{req.groupName || "N/A"}</span>
+              <section className="pt-6 md:pt-8 border-t border-slate-200/60 dark:border-slate-800 space-y-3">
+                 <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Metadata</h4>
+                 <div className="space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] md:text-xs bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0 font-semibold">
+                        <Users size={13} className="text-primary shrink-0" /> Church Group
+                      </span>
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded uppercase tracking-wider text-[9px] truncate max-w-full ml-auto">
+                        {req.groupName || "N/A"}
+                      </span>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] md:text-xs">
-                      <span className="text-slate-500 flex items-center gap-1.5"><CalendarDays size={13} /> Submitted</span>
-                      <span className="font-bold text-slate-700">{formatDate(req.submittedAt)}</span>
+
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] md:text-xs bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0 font-semibold">
+                        <CalendarDays size={13} className="text-indigo-500 shrink-0" /> Submitted
+                      </span>
+                      <span className="font-bold text-slate-700 dark:text-slate-300 font-mono text-[10px] ml-auto">
+                        {formatDate(req.submittedAt)}
+                      </span>
                     </div>
+
                     {formatRequisitionAge(req.submittedAt || req.createdAt, req.status) && (
-                      <div className="flex items-center justify-between text-[10px] md:text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5"><Clock size={13} /> Days Old</span>
-                        <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] md:text-xs bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0 font-semibold">
+                          <Clock size={13} className="text-amber-500 shrink-0" /> Days Old
+                        </span>
+                        <span className="font-extrabold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md font-mono text-[9px] ml-auto">
                           {formatRequisitionAge(req.submittedAt || req.createdAt, req.status)}
                         </span>
                       </div>
                     )}
+
                     {req.recurrence && req.recurrence !== "NONE" && (
-                      <div className="flex items-center justify-between text-[10px] md:text-xs">
-                        <span className="text-slate-500 flex items-center gap-1.5"><Repeat size={13} /> Recurrence</span>
-                        <span className="font-black text-primary uppercase tracking-widest">{req.recurrence}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 text-[10px] md:text-xs bg-white dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0 font-semibold">
+                          <Repeat size={13} className="text-emerald-500 shrink-0" /> Recurrence
+                        </span>
+                        <span className="font-black text-primary uppercase tracking-widest text-[9px] ml-auto">
+                          {req.recurrence}
+                        </span>
                       </div>
                     )}
                  </div>
@@ -6697,7 +6877,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           </div>
         </div>
 
-        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end gap-3 w-full max-w-full">
+        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end gap-3 w-full max-w-full shrink-0 sticky bottom-0 z-40 shadow-xs">
           {/* More Options Dropdown */}
           <div ref={moreMenuRef} className="relative shrink-0">
             <button 

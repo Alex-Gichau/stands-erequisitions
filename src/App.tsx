@@ -432,7 +432,6 @@ function AppContent() {
   const {
     currentUser,
     login,
-    loginWithGoogleCredential,
     loginWithEmail,
     signupWithEmail,
     logout,
@@ -1132,63 +1131,6 @@ function AppContent() {
     }
   };
 
-  // Google One Tap automatic prompt integration
-  useEffect(() => {
-    if (currentUser || authLoading) return;
-
-    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || "2730554389-7e5g00q2q208gq7k2b1ks50811e51b14.apps.googleusercontent.com";
-
-    const initGoogleOneTap = () => {
-      if (typeof window !== "undefined" && (window as any).google?.accounts?.id) {
-        try {
-          (window as any).google.accounts.id.initialize({
-            client_id: clientId,
-            callback: async (response: any) => {
-              if (response?.credential) {
-                setIsSubmitting(true);
-                setError("");
-                try {
-                  await loginWithGoogleCredential(response.credential);
-                } catch (err: any) {
-                  console.warn("Google One Tap callback notice:", err);
-                  setError(err?.message || "Google One Tap sign-in failed.");
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: true,
-          });
-
-          (window as any).google.accounts.id.prompt((notification: any) => {
-            if (notification.isNotDisplayed?.()) {
-              console.log("[Google One Tap] Prompt not displayed:", notification.getNotDisplayedReason?.());
-            } else if (notification.isSkippedMoment?.()) {
-              console.log("[Google One Tap] Prompt skipped:", notification.getSkippedReason?.());
-            } else if (notification.isDismissedMoment?.()) {
-              console.log("[Google One Tap] Prompt dismissed:", notification.getDismissedReason?.());
-            }
-          });
-        } catch (e) {
-          console.warn("[Google One Tap] Setup error:", e);
-        }
-      }
-    };
-
-    if ((window as any).google?.accounts?.id) {
-      initGoogleOneTap();
-    } else {
-      const timer = setInterval(() => {
-        if ((window as any).google?.accounts?.id) {
-          initGoogleOneTap();
-          clearInterval(timer);
-        }
-      }, 500);
-      return () => clearInterval(timer);
-    }
-  }, [currentUser, authLoading, loginWithGoogleCredential]);
-
   if (window.opener && window.opener !== window) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center">
@@ -1325,7 +1267,7 @@ function AppContent() {
 
             <div className="relative flex items-center justify-center">
               <div className="absolute w-full border-t border-slate-800" />
-              <span className="relative px-4 bg-slate-900 text-slate-500 text-[9px] font-bold uppercase tracking-widest">Or Secure Email</span>
+              <span className="relative px-4 bg-slate-900 text-slate-500 text-[9px] font-bold uppercase tracking-widest">Or Login Via Email</span>
             </div>
 
             <form className="space-y-4" onSubmit={handleEmailAuth}>
@@ -1512,6 +1454,7 @@ function AppContent() {
     return (
       <SplashPage
         darkMode={darkMode}
+        durationMs={3500}
         isDataReady={!loading && !authLoading}
         onComplete={() => setShowSplash(false)}
       />

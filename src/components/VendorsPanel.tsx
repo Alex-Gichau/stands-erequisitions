@@ -659,7 +659,219 @@ export const VendorsPanel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 header-panel-alignment">
+    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 header-panel-alignment relative">
+      {/* Global Add / Edit Vendor Modal Dialog Overlay */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 flex items-center justify-center p-4 md:p-6 overflow-y-auto"
+            onClick={handleCancelForm}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="bg-white dark:bg-slate-900 border-2 border-slate-200/80 dark:border-slate-800 rounded-[2.5rem] shadow-2xl p-6 md:p-8 max-w-2xl w-full my-auto space-y-6 max-h-[90vh] overflow-y-auto text-slate-900 dark:text-slate-100 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Top Bar */}
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-4 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black">
+                    <Store size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs md:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      {editingVendorId ? "Edit Supplier Partner Record" : "Register Vendor Partner"}
+                    </h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                      STANDS Supplier Registry • Verified Master Index
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelForm}
+                  className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                  title="Close Modal"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSaveVendor} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Vendor Name */}
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
+                      🤝 Trade / Registered Vendor Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Acme Stationery Supply Ltd"
+                      className="w-full h-12 bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                  </div>
+
+                  {/* Offerings Category Multi-Select Dropdown */}
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
+                      🛍️ Select Products / Services Offered (Standardized Categories)
+                    </label>
+                    
+                    <div className="relative">
+                      {/* Dropdown Selector Header Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                        className="w-full bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-3 text-left flex items-center justify-between hover:border-primary/50 transition-all shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/10 cursor-pointer"
+                      >
+                        <div className="flex flex-wrap gap-1.5 items-center flex-1 pr-2 min-h-[32px]">
+                          {parseOfferings(offerings).length > 0 ? (
+                            parseOfferings(offerings).map((cat, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider"
+                              >
+                                {cat}
+                                <X
+                                  size={12}
+                                  className="cursor-pointer hover:text-rose-600 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const current = parseOfferings(offerings);
+                                    setOfferings(current.filter(x => x.toLowerCase() !== cat.toLowerCase()).join(", "));
+                                  }}
+                                />
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-slate-400 text-xs font-semibold">Click to open categories multiselect dropdown...</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 border-l border-slate-200 dark:border-slate-700 pl-3">
+                          <span className="text-[9px] font-black uppercase text-primary tracking-wider bg-primary/10 px-2.5 py-1 rounded-lg">
+                            {parseOfferings(offerings).length} Selected
+                          </span>
+                          <ChevronDown size={18} className={cn("text-slate-400 transition-transform duration-200", isCategoryDropdownOpen && "rotate-180")} />
+                        </div>
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {isCategoryDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 p-4 max-h-60 overflow-y-auto space-y-2">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                            <span>Standardized Product & Service Categories</span>
+                            <span className="text-primary font-mono">{VENDOR_SERVICE_CATEGORIES.length} Categories</span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                            {VENDOR_SERVICE_CATEGORIES.map((category) => {
+                              const currentCategories = parseOfferings(offerings);
+                              const isSelected = currentCategories.some(c => c.toLowerCase() === category.toLowerCase());
+                              return (
+                                <button
+                                  key={category}
+                                  type="button"
+                                  onClick={() => {
+                                    const current = parseOfferings(offerings);
+                                    if (isSelected) {
+                                      setOfferings(current.filter(x => x.toLowerCase() !== category.toLowerCase()).join(", "));
+                                    } else {
+                                      setOfferings([...current, category].join(", "));
+                                    }
+                                  }}
+                                  className={cn(
+                                    "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left border cursor-pointer",
+                                    isSelected
+                                      ? "bg-primary text-white border-primary shadow-sm"
+                                      : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                  )}
+                                >
+                                  <span className="truncate pr-1">{category}</span>
+                                  {isSelected && <Check size={14} className="stroke-[3] shrink-0" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1 pt-1">
+                      <input
+                        type="text"
+                        value={offerings}
+                        onChange={(e) => setOfferings(e.target.value)}
+                        placeholder="Or type custom products/services separated by commas..."
+                        className="w-full h-11 bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact Reference */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
+                      📞 Contact Reference (Phone/Email)
+                    </label>
+                    <input
+                      type="text"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="e.g. +254 712 345678 or sales@firm.com"
+                      className="w-full h-12 bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                  </div>
+
+                  {/* Physical Location */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
+                      📍 Business Operations / Physical Location
+                    </label>
+                    <input
+                      type="text"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Bishop Road, Nairobi"
+                      className="w-full h-12 bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer Controls */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={handleCancelForm}
+                    className="px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-8 py-3 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-primary/95 shadow-md shadow-primary/20 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Store size={16} />
+                    )}
+                    <span>{editingVendorId ? "Save Vendor Changes" : canEdit ? "Register Vendor Partner" : "Propose Vendor"}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sub-Tabs Selector */}
       <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl w-fit border border-slate-200/50">
         <button
@@ -706,16 +918,13 @@ export const VendorsPanel: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (showAddForm) {
-                    handleCancelForm();
-                  } else {
-                    setShowAddForm(true);
-                  }
+                  handleCancelForm();
+                  setShowAddForm(true);
                 }}
-                className="group flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-primary transition-all shadow-xl shadow-primary/20"
+                className="group flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-primary transition-all shadow-xl shadow-primary/20 cursor-pointer"
               >
-                {showAddForm ? <X size={14} /> : <PlusCircle size={14} className="group-hover:rotate-90 transition-transform duration-300" />}
-                {showAddForm ? "CANCEL" : "NEW VENDOR"}
+                <PlusCircle size={14} className="group-hover:rotate-90 transition-transform duration-300" />
+                <span>NEW VENDOR</span>
               </button>
             </div>
           </div>
@@ -783,194 +992,6 @@ export const VendorsPanel: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Slide-down Register Form */}
-          <AnimatePresence>
-            {showAddForm && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
-              >
-                <form 
-                  onSubmit={handleSaveVendor}
-                  className="bg-card rounded-[2rem] border border-border shadow-md p-6 md:p-8 space-y-6"
-                >
-                  <div className="border-b border-border/60 pb-3 flex justify-between items-center">
-                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary flex items-center gap-1.5">
-                      <CheckCircle2 size={14} />
-                      STANDS Supplier Registration Panel
-                    </h3>
-                    <span className="text-[9px] font-mono text-muted uppercase tracking-wider">Form_ID • DEV_STANDS</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Vendor Name */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                        🤝 Trade / Registered Vendor Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Acme Stationery Supply Ltd"
-                        className="input-field h-12 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
-                      />
-                    </div>
-
-                    {/* Offerings Category Multi-Select Dropdown */}
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                        🛍️ Select Products / Services Offered (Standardized Categories)
-                      </label>
-                      
-                      <div className="relative">
-                        {/* Dropdown Selector Header Trigger */}
-                        <button
-                          type="button"
-                          onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                          className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl p-3 text-left flex items-center justify-between hover:border-primary/50 transition-all shadow-sm focus:outline-none focus:ring-4 focus:ring-primary/10 cursor-pointer"
-                        >
-                          <div className="flex flex-wrap gap-1.5 items-center flex-1 pr-2 min-h-[32px]">
-                            {parseOfferings(offerings).length > 0 ? (
-                              parseOfferings(offerings).map((cat, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center gap-1.5 bg-primary/10 border border-primary/20 text-primary px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider"
-                                >
-                                  {cat}
-                                  <X
-                                    size={12}
-                                    className="cursor-pointer hover:text-rose-600 transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const current = parseOfferings(offerings);
-                                      setOfferings(current.filter(x => x.toLowerCase() !== cat.toLowerCase()).join(", "));
-                                    }}
-                                  />
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-slate-400 text-xs font-semibold">Click to open categories multiselect dropdown...</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 border-l border-slate-200 dark:border-slate-700 pl-3">
-                            <span className="text-[9px] font-black uppercase text-primary tracking-wider bg-primary/10 px-2.5 py-1 rounded-lg">
-                              {parseOfferings(offerings).length} Selected
-                            </span>
-                            <ChevronDown size={18} className={cn("text-slate-400 transition-transform duration-200", isCategoryDropdownOpen && "rotate-180")} />
-                          </div>
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {isCategoryDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 p-4 max-h-64 overflow-y-auto space-y-2">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                              <span>Standardized Product & Service Categories</span>
-                              <span className="text-primary font-mono">{VENDOR_SERVICE_CATEGORIES.length} Categories</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 pt-1">
-                              {VENDOR_SERVICE_CATEGORIES.map((category) => {
-                                const currentCategories = parseOfferings(offerings);
-                                const isSelected = currentCategories.some(c => c.toLowerCase() === category.toLowerCase());
-                                return (
-                                  <button
-                                    key={category}
-                                    type="button"
-                                    onClick={() => {
-                                      const current = parseOfferings(offerings);
-                                      if (isSelected) {
-                                        setOfferings(current.filter(x => x.toLowerCase() !== category.toLowerCase()).join(", "));
-                                      } else {
-                                        setOfferings([...current, category].join(", "));
-                                      }
-                                    }}
-                                    className={cn(
-                                      "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all text-left border cursor-pointer",
-                                      isSelected
-                                        ? "bg-primary text-white border-primary shadow-sm"
-                                        : "bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-100 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700"
-                                    )}
-                                  >
-                                    <span className="truncate pr-1">{category}</span>
-                                    {isSelected && <Check size={14} className="stroke-[3] shrink-0" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-1 pt-1">
-                        <input
-                          type="text"
-                          value={offerings}
-                          onChange={(e) => setOfferings(e.target.value)}
-                          placeholder="Or type custom products/services separated by commas..."
-                          className="input-field h-11 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
-                        />
-                        <p className="text-[9px] text-slate-500 font-medium ml-1">Current offerings string: {offerings || "No categories selected"}</p>
-                      </div>
-                    </div>
-
-                    {/* Contact Reference */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                        📞 Contact Reference (Phone/Email)
-                      </label>
-                      <input
-                        type="text"
-                        value={contact}
-                        onChange={(e) => setContact(e.target.value)}
-                        placeholder="e.g. +254 712 345678 or sales@firm.com"
-                        className="input-field h-12 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
-                      />
-                    </div>
-
-                    {/* Physical Location */}
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                        📍 Business Operations / Physical Location
-                      </label>
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        placeholder="e.g. Bishop Road, Nairobi"
-                        className="input-field h-12 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 text-xs md:text-sm font-semibold px-4 rounded-xl focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-3">
-                    <button
-                      type="button"
-                      onClick={handleCancelForm}
-                      className="px-6 py-3 bg-slate-150 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      DISCARD_RECORD
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="px-8 py-3 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 hover:bg-primary/95 shadow-md shadow-primary/20 transition-all disabled:opacity-50"
-                    >
-                      {isSubmitting ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Store size={16} />
-                      )}
-                      <span>{editingVendorId ? "UPDATE_RECORD" : canEdit ? "SUBMIT_RECORD_TO_LEDGER" : "PROPOSE_VENDOR"}</span>
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* Filters and Search */}
           <div className="bg-white/40 backdrop-blur-xl border-2 border-slate-100 rounded-[2.5rem] p-6 md:p-10 shadow-sm space-y-8">
@@ -1692,10 +1713,10 @@ export const VendorsPanel: React.FC = () => {
               </div>
               <button 
                 onClick={() => {
+                  handleCancelForm();
                   setShowAddForm(true);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-2 shadow-md shadow-primary/20 transition-all shrink-0 hover:scale-[1.02] active:scale-[0.98]"
+                className="px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-2 shadow-md shadow-primary/20 transition-all shrink-0 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               >
                 <PlusCircle size={15} />
                 <span>Add Vendor to List</span>
@@ -1725,14 +1746,13 @@ export const VendorsPanel: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1.5 items-start">
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-md text-[8px] font-extrabold uppercase tracking-widest border",
-                            v.isRegistered ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100 font-black"
-                          )}>
-                            {v.isRegistered ? "Verified Partner" : "Unlisted Payee"}
-                          </span>
-                          {!v.isRegistered && (
+                          {v.isRegistered ? (
+                            <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+                              Verified Partner
+                            </span>
+                          ) : (
                             <button
+                              type="button"
                               onClick={() => {
                                 setName(v.name);
                                 setEditingVendorId(null);
@@ -1740,18 +1760,18 @@ export const VendorsPanel: React.FC = () => {
                                 setLocation("");
                                 setOfferings(v.categories.join(", "));
                                 setShowAddForm(true);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
                                 triggerToast({
                                   type: "FINANCE_DISBURSEMENT",
                                   severity: "LOW",
-                                  message: `✍️ Pre-filled details for "${v.name}". Complete registration below.`,
+                                  message: `✍️ Pre-filled details for "${v.name}". Complete registration in modal.`,
                                   timestamp: new Date().toISOString()
                                 });
                               }}
-                              className="text-[9px] font-black uppercase text-blue-600 hover:text-blue-800 tracking-wider flex items-center gap-1 transition-colors mt-0.5 hover:underline focus:outline-none cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 transition-all flex items-center gap-1 cursor-pointer group/badge"
+                              title={`Click to register "${v.name}" in vendor directory`}
                             >
-                              <PlusCircle size={10} />
-                              Add Vendor to List
+                              <span>Unlisted Payee</span>
+                              <PlusCircle size={10} className="opacity-70 group-hover/badge:opacity-100 group-hover/badge:scale-110 transition-all text-rose-600" />
                             </button>
                           )}
                         </div>

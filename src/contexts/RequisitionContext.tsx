@@ -29,7 +29,8 @@ import {
   TransactionStatus,
   FiscalYear,
   CustomCalendarEvent,
-  BackgroundUploadTask
+  BackgroundUploadTask,
+  RequisitionInstallment
 } from "../types";
 import { getProjectRequisitions } from "../utils/budgetUtils";
 import { databaseService } from "../lib/databaseService";
@@ -569,6 +570,7 @@ interface RequisitionContextType {
   updateRequisition: (id: string, updates: Partial<Requisition>) => Promise<void>;
   sendEmailNotification: (req: Requisition, status: string, details?: string, approverName?: string, customRecipientEmail?: string, customRecipientName?: string) => Promise<void>;
   updateRequisitionStatus: (id: string, status: RequisitionStatus, decision: "APPROVE" | "REJECT" | "ESCALATE", note?: string, method?: any, rejectionReason?: string, approvalCode?: string) => Promise<void>;
+  disburseInstallment: (requisitionId: string, installmentId: string, details: { referenceNum: string; paymentMethod?: string; notes?: string; amount?: number }) => Promise<void>;
   uploadReceipts: (id: string, receipts: string[]) => Promise<void>;
   deleteRequisition: (id: string, reason?: string) => Promise<void>;
   markAlertAsRead: (id: string) => Promise<void>;
@@ -3754,6 +3756,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       projectReqs.forEach((req) => {
         if (req.status === RequisitionStatus.DISBURSED) {
           spentSum += req.amount;
+        } else if (req.status === RequisitionStatus.PARTIALLY_DISBURSED) {
+          spentSum += req.disbursedAmount || (req.installments?.filter(i => i.status === "DISBURSED").reduce((s, i) => s + (i.amount || 0), 0) || 0);
         }
         
         if ([
@@ -3761,6 +3765,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           RequisitionStatus.APPROVED_L1,
           RequisitionStatus.APPROVED_L2,
           RequisitionStatus.ESCALATED,
+          RequisitionStatus.PARTIALLY_DISBURSED,
           RequisitionStatus.DISBURSED
         ].includes(req.status)) {
           committedSum += req.amount;
@@ -4036,6 +4041,18 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       if (status === RequisitionStatus.DISBURSED) {
         updates.disbursedAt = new Date().toISOString();
+        updates.disbursedAmount = req.amount;
+        updates.remainingBalance = 0;
+
+        if (req.enableInstallments && req.installments && req.installments.length > 0) {
+          updates.installments = req.installments.map(inst => ({
+            ...inst,
+            status: "DISBURSED",
+            disbursedAt: inst.disbursedAt || updates.disbursedAt,
+            disbursedBy: inst.disbursedBy || currentUser?.id || "sys",
+            disbursedByName: inst.disbursedByName || currentUser?.name || "Finance Treasury"
+          }));
+        }
 
         // Auto-create transaction record for Web Transactions
         const txId = `tx-disb-${id}`;
@@ -4088,7 +4105,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
       
       // Fire-and-forget background operations
-      if (status === RequisitionStatus.APPROVED_L1 || status === RequisitionStatus.APPROVED_L2 || status === RequisitionStatus.DISBURSED || status === RequisitionStatus.REJECTED) {
+      if (status === RequisitionStatus.APPROVED_L1 || status === RequisitionStatus.APPROVED_L2 || status === RequisitionStatus.DISBURSED || status === RequisitionStatus.PARTIALLY_DISBURSED || status === RequisitionStatus.REJECTED) {
          sendEmailNotification(
            updatedReq, 
            status, 
@@ -4125,6 +4142,162 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     });
   }, [currentUser, addSystemLog, systemSettings, syncProjectAmounts, setRequisitions, withDbLoading]);
+
+  const disburseInstallment = useCallback(async (
+    requisitionId: string,
+    installmentId: string,
+    details: {
+      referenceNum: string;
+      paymentMethod?: string;
+      notes?: string;
+      amount?: number;
+    }
+  ) => {
+    return withDbLoading("Processing installment disbursement...", async () => {
+      if (!navigator.onLine) {
+        throw new Error("Offline Mode: You are offline. Cannot process installment disbursement.");
+      }
+
+      if (!canPerform('canDisburse')) {
+        throw new Error("Permission Denied: You do not possess Disbursement Authority.");
+      }
+
+      const activeYear = systemSettings.currentFiscalYear || 2026;
+      if (systemSettings.fiscalYearStatus === "CLOSED") {
+        throw new Error(`Forbidden: Financial books for the year ${activeYear} are CLOSED. No further disbursements can be processed.`);
+      }
+
+      const req = requisitions.find(r => r.id === requisitionId);
+      if (!req) throw new Error("Requisition not found in ledger.");
+
+      const installments = req.installments || [];
+      const instIndex = installments.findIndex(i => i.id === installmentId);
+      if (instIndex === -1) {
+        throw new Error("Target installment not found in requisition milestone schedule.");
+      }
+
+      const targetInst = installments[instIndex];
+      const disburseAmount = details.amount || targetInst.amount;
+      const now = new Date().toISOString();
+
+      const updatedInstallment: RequisitionInstallment = {
+        ...targetInst,
+        amount: disburseAmount,
+        status: "DISBURSED",
+        disbursedAt: now,
+        disbursedBy: currentUser?.id || "sys",
+        disbursedByName: currentUser?.name || "Finance Treasury",
+        disbursementReference: details.referenceNum,
+        paymentMethod: (details.paymentMethod as any) || "CHEQUE",
+        notes: details.notes || "",
+      };
+
+      const updatedInstallments = [...installments];
+      updatedInstallments[instIndex] = updatedInstallment;
+
+      // Calculate total disbursed amount
+      const totalDisbursed = updatedInstallments
+        .filter(i => i.status === "DISBURSED")
+        .reduce((sum, i) => sum + (i.amount || 0), 0);
+
+      const allPaid = updatedInstallments.length > 0 && updatedInstallments.every(i => i.status === "DISBURSED");
+      const remainingBalance = Math.max(0, req.amount - totalDisbursed);
+
+      const newStatus = allPaid ? RequisitionStatus.DISBURSED : RequisitionStatus.PARTIALLY_DISBURSED;
+
+      const historyAction: ApprovalNote = cleanFirestoreData({
+        id: `an-${Math.random().toString(36).substr(2, 9)}`,
+        approverId: currentUser?.id || "sys",
+        approverName: currentUser?.name || "Finance Treasury",
+        role: currentUser?.role || UserRole.FINANCE,
+        note: `Installment #${targetInst.installmentNumber} disbursed: KES ${disburseAmount.toLocaleString()} via ${details.paymentMethod || 'CHEQUE'} (Ref: ${details.referenceNum}). ${details.notes ? `Notes: ${details.notes}` : ''}`,
+        decision: "APPROVE",
+        method: "SIGNATURE",
+        timestamp: now,
+      });
+
+      const updates: Partial<Requisition> = {
+        installments: updatedInstallments,
+        disbursedAmount: totalDisbursed,
+        remainingBalance: remainingBalance,
+        status: newStatus,
+        updatedAt: now,
+        approvalHistory: [...(req.approvalHistory || []), historyAction],
+        ...(allPaid ? { disbursedAt: now } : {})
+      };
+
+      // Record financial Transaction for this installment
+      const txId = `tx-inst-${requisitionId}-${installmentId}`;
+      const transactionObj: Transaction = {
+        id: txId,
+        externalRef: details.referenceNum || `INST-${requisitionId.toUpperCase().replace(/^REQ-/, '')}-${targetInst.installmentNumber}`,
+        sourceSystem: "PCE St. Andrews Disbursed Treasury",
+        amount: disburseAmount,
+        type: TransactionType.DEBIT,
+        status: TransactionStatus.COMPLETED,
+        description: `Installment #${targetInst.installmentNumber}/${installments.length} Disbursement: ${req.title}${targetInst.description ? ` (${targetInst.description})` : ''}`,
+        category: req.groupName || "General Disbursed Fund",
+        timestamp: now,
+        performedBy: currentUser?.name || "Finance Treasury",
+        metadata: {
+          requisitionId: req.id,
+          installmentId: targetInst.id,
+          installmentNumber: targetInst.installmentNumber,
+          payableTo: req.payableTo,
+          groupId: req.groupId,
+          isRealDisbursed: true
+        }
+      };
+
+      // Optimistic updates
+      setTransactions(prev => [transactionObj, ...prev.filter(t => t.id !== txId)]);
+
+      const updatedReq: Requisition = {
+        ...req,
+        ...updates
+      };
+
+      setRequisitions(prev => prev.map(r => r.id === requisitionId ? updatedReq : r));
+
+      // Asynchronous database writes
+      if (!skipFirestore && db) {
+        setDoc(doc(db, "transactions", txId), cleanFirestoreData(transactionObj), { merge: true }).catch(() => {});
+        const reqRef = doc(db, "requisitions", requisitionId);
+        updateDoc(reqRef, cleanFirestoreData(updates)).catch(() => {});
+      }
+      await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
+
+      // Update Ledger book spentAmount incrementally
+      getDocs(query(collection(db, "ledger_books"), where("ministryName", "==", req.groupName))).then(ledgerQuerySnap => {
+        if (!ledgerQuerySnap.empty) {
+          const ledgerDoc = ledgerQuerySnap.docs[0];
+          updateDoc(ledgerDoc.ref, {
+            spentAmount: (ledgerDoc.data().spentAmount || 0) + disburseAmount
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+
+      // Logs & Notifications
+      addSystemLog("INSTALLMENT_DISBURSED", `Installment #${targetInst.installmentNumber} (KES ${disburseAmount.toLocaleString()}) disbursed for '${req.title}' via ${details.paymentMethod || 'CHEQUE'} (Ref: ${details.referenceNum})`, {
+        requisitionId,
+        installmentId,
+        amount: disburseAmount,
+        totalDisbursed,
+        remainingBalance
+      }).catch(() => {});
+
+      sendEmailNotification(
+        updatedReq,
+        newStatus,
+        `Installment #${targetInst.installmentNumber} of KES ${disburseAmount.toLocaleString()} has been disbursed. Remaining balance: KES ${remainingBalance.toLocaleString()}.`,
+        currentUser?.name || "Finance Official"
+      ).catch(() => {});
+
+      if (req.projectId) {
+        syncProjectAmounts(req.projectId).catch(() => {});
+      }
+    });
+  }, [requisitions, setRequisitions, currentUser, canPerform, systemSettings, addSystemLog, sendEmailNotification, syncProjectAmounts, withDbLoading]);
 
   const enrollBiometric = useCallback((enabled: boolean = true) => {
     setBiometricEnrolled(enabled);
@@ -4768,29 +4941,58 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     });
 
-    // Auto derive transactions for any DISBURSED requisition
-    requisitions.filter(r => r.status === RequisitionStatus.DISBURSED).forEach(req => {
-      const txId = `tx-disb-${req.id}`;
-      if (!seen.has(txId)) {
-        seen.add(txId);
-        txList.push({
-          id: txId,
-          externalRef: `MPESA-DISB-${req.id.toUpperCase().replace(/^REQ-/, '')}`,
-          sourceSystem: "PCE St. Andrews Disbursed Treasury",
-          amount: req.amount,
-          type: TransactionType.DEBIT,
-          status: TransactionStatus.COMPLETED,
-          description: `Disbursement: ${req.title}${req.payableTo ? ` (Payable to: ${req.payableTo})` : ''}`,
-          category: req.groupName || "General Disbursed Fund",
-          timestamp: req.disbursedAt || req.updatedAt || req.submittedAt || new Date().toISOString(),
-          performedBy: req.requesterName || "Finance Treasury",
-          metadata: {
-            requisitionId: req.id,
-            payableTo: req.payableTo,
-            groupId: req.groupId,
-            isRealDisbursed: true
+    // Auto derive transactions for any DISBURSED requisition or individual disbursed installments
+    requisitions.forEach(req => {
+      if (req.enableInstallments && req.installments && req.installments.length > 0) {
+        req.installments.filter(i => i.status === "DISBURSED").forEach(inst => {
+          const txId = `tx-inst-${req.id}-${inst.id}`;
+          if (!seen.has(txId)) {
+            seen.add(txId);
+            txList.push({
+              id: txId,
+              externalRef: inst.disbursementReference || `INST-${req.id.toUpperCase().replace(/^REQ-/, '')}-${inst.installmentNumber}`,
+              sourceSystem: "PCE St. Andrews Disbursed Treasury",
+              amount: inst.amount,
+              type: TransactionType.DEBIT,
+              status: TransactionStatus.COMPLETED,
+              description: `Installment #${inst.installmentNumber}/${req.installments?.length} Disbursement: ${req.title}${inst.description ? ` (${inst.description})` : ''}`,
+              category: req.groupName || "General Disbursed Fund",
+              timestamp: inst.disbursedAt || req.updatedAt || new Date().toISOString(),
+              performedBy: inst.disbursedByName || req.requesterName || "Finance Treasury",
+              metadata: {
+                requisitionId: req.id,
+                installmentId: inst.id,
+                installmentNumber: inst.installmentNumber,
+                payableTo: req.payableTo,
+                groupId: req.groupId,
+                isRealDisbursed: true
+              }
+            });
           }
         });
+      } else if (req.status === RequisitionStatus.DISBURSED) {
+        const txId = `tx-disb-${req.id}`;
+        if (!seen.has(txId)) {
+          seen.add(txId);
+          txList.push({
+            id: txId,
+            externalRef: `MPESA-DISB-${req.id.toUpperCase().replace(/^REQ-/, '')}`,
+            sourceSystem: "PCE St. Andrews Disbursed Treasury",
+            amount: req.amount,
+            type: TransactionType.DEBIT,
+            status: TransactionStatus.COMPLETED,
+            description: `Disbursement: ${req.title}${req.payableTo ? ` (Payable to: ${req.payableTo})` : ''}`,
+            category: req.groupName || "General Disbursed Fund",
+            timestamp: req.disbursedAt || req.updatedAt || req.submittedAt || new Date().toISOString(),
+            performedBy: req.requesterName || "Finance Treasury",
+            metadata: {
+              requisitionId: req.id,
+              payableTo: req.payableTo,
+              groupId: req.groupId,
+              isRealDisbursed: true
+            }
+          });
+        }
       }
     });
 
@@ -4838,6 +5040,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updateRequisition,
       sendEmailNotification,
       updateRequisitionStatus,
+      disburseInstallment,
       uploadReceipts,
       deleteRequisition,
       markAlertAsRead,

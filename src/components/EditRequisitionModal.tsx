@@ -40,8 +40,6 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
   const [recurrence, setRecurrence] = useState<RecurrenceType>(req.recurrence || RecurrenceType.NONE);
   const [selectedGroup, setSelectedGroup] = useState(req.groupName);
   const [projectId, setProjectId] = useState(req.projectId || "");
-  const [inProcurement, setInProcurement] = useState(req.inProcurement || false);
-  const [requiresMoreInfo, setRequiresMoreInfo] = useState(req.requiresMoreInfo || false);
   
   const [notificationEmails, setNotificationEmails] = useState<string[]>(
     Array.isArray(req.notificationEmails) ? req.notificationEmails : []
@@ -246,8 +244,6 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
         groupId: selectedGroup,
         groupName: selectedGroup,
         projectId: finalProjectId,
-        inProcurement,
-        requiresMoreInfo,
         attachments: combinedAttachments,
         notificationEmails: finalNotificationEmails,
         status: finalStatus
@@ -532,34 +528,6 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
               )}
             </div>
             
-            {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.FINANCE || currentUser?.role === UserRole.SUPER_ADMIN) && (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-150 space-y-4">
-                 <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-2">Workflow Status</h4>
-                 <div className="flex items-center justify-between gap-4">
-                   {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.SUPER_ADMIN) && (
-                     <label className="flex items-center gap-2 cursor-pointer">
-                       <input 
-                         type="checkbox"
-                         checked={inProcurement}
-                         onChange={(e) => setInProcurement(e.target.checked)}
-                         className="rounded text-primary focus:ring-primary h-4 w-4"
-                       />
-                       <span className="text-xs font-bold text-slate-700">In Procurement</span>
-                     </label>
-                   )}
-                   <label className="flex items-center gap-2 cursor-pointer">
-                     <input 
-                       type="checkbox"
-                       checked={requiresMoreInfo}
-                       onChange={(e) => setRequiresMoreInfo(e.target.checked)}
-                       className="rounded text-primary focus:ring-primary h-4 w-4"
-                     />
-                     <span className="text-xs font-bold text-slate-700">Requires More Info</span>
-                   </label>
-                 </div>
-              </div>
-            )}
-
             {/* Attachment Management Section */}
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-150 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
@@ -902,31 +870,7 @@ export const EditRequisitionModal: React.FC<EditRequisitionModalProps> = ({ req,
           )}
 
           {/* Action buttons */}
-          <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row gap-3 md:gap-4 justify-between items-center max-w-full overflow-hidden">
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-start overflow-x-auto max-w-full pb-1 sm:pb-0 scrollbar-none shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  const subject = `Requisition: ${title}`;
-                  const body = `Requisition Details:\n\nTitle: ${title}\nDescription: ${description}\nAmount: KES ${amount}`;
-                  window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                }}
-                className="px-3 sm:px-4 py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0"
-              >
-                Share Email
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const text = `Requisition: ${title}\nDescription: ${description}\nAmount: KES ${amount}`;
-                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-                }}
-                className="px-3 sm:px-4 py-2 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap shrink-0"
-              >
-                Share WhatsApp
-              </button>
-            </div>
-
+          <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col sm:flex-row gap-3 md:gap-4 justify-end items-center max-w-full overflow-hidden">
             <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end flex-wrap sm:flex-nowrap">
               <button
                 type="button"

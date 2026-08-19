@@ -969,7 +969,7 @@ export const VendorsPanel: React.FC = () => {
                 <div className="space-y-2">
                   <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
                     <Briefcase size={18} className="text-primary" />
-                    Strategic Partner Velocity
+                    Approved Vendors
                   </h3>
                   <p className="text-xs text-slate-400 leading-relaxed max-w-md font-medium">
                     Most utilized vendors across the financial ledger, prioritized by total requisition volume.

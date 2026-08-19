@@ -190,7 +190,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             initial={{ scale: 0.75, opacity: 0, y: 18 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{
-              duration: 0.75,
+              duration: 1.25,
               ease: [0.16, 1, 0.3, 1],
             }}
             className={`w-24 h-24 rounded-3xl p-3.5 mb-6 flex items-center justify-center shadow-2xl transition-all ${
@@ -221,9 +221,12 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             >
               STANDS FINANCE
             </h1>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1.5">
+              E-REQUISITIONS
+            </p>
           </motion.div>
 
-          {/* Boxy Progress Bar without rounded corners */}
+          {/* Elegant Rounded Progress Bar */}
           <motion.div
             initial={{ opacity: 0, width: "80%" }}
             animate={{ opacity: 1, width: "100%" }}
@@ -231,14 +234,14 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             className="w-full max-w-[240px]"
           >
             <div
-              className={`w-full h-2 rounded-none overflow-hidden transition-colors border ${
+              className={`w-full h-2 rounded-full overflow-hidden transition-colors border ${
                 darkMode
                   ? "bg-slate-900 border-slate-800"
                   : "bg-slate-200 border-slate-300"
               }`}
             >
               <div
-                className="h-full bg-blue-600 rounded-none transition-[width] duration-100 ease-linear"
+                className="h-full bg-blue-600 rounded-full transition-[width] duration-100 ease-linear"
                 style={{ width: `${progress}%` }}
               />
             </div>

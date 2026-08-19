@@ -982,7 +982,38 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
     <div class="section-title">Financial Allotment</div>
     <div class="amount-box">
       <div class="amount-val">${formatCurrency(req.amount)}</div>
-      <div class="amount-words">Sum of Kenayan Shillings: ${req.amountWords || 'As stated above'} only.</div>
+      <div class="amount-words">Sum of Kenyan Shillings: ${req.amountWords || 'As stated above'} only.</div>
+      ${req.enableInstallments && Array.isArray(req.installments) && req.installments.length > 0 ? `
+        <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed #cbd5e1; font-size: 11px;">
+          <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 6px; color: #475569; font-size: 9px; letter-spacing: 0.5px;">Phased Installment Schedule:</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <thead>
+              <tr style="color: #64748b; font-size: 8px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; text-align: left;">
+                <th style="padding: 4px;">#</th>
+                <th style="padding: 4px;">Milestone</th>
+                <th style="padding: 4px;">Due Date</th>
+                <th style="padding: 4px; text-align: right;">Amount (%)</th>
+                <th style="padding: 4px; text-center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${req.installments.map(inst => `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 5px 4px; font-weight: bold; font-family: monospace;">#${inst.installmentNumber}</td>
+                  <td style="padding: 5px 4px;">${inst.title}</td>
+                  <td style="padding: 5px 4px; font-family: monospace; font-size: 9px; color: #64748b;">${inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('en-GB') : 'On Demand'}</td>
+                  <td style="padding: 5px 4px; text-align: right; font-weight: bold; font-family: monospace;">${formatCurrency(inst.amount)} (${inst.percentage}%)</td>
+                  <td style="padding: 5px 4px; text-align: center;">
+                    <span style="display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold; text-transform: uppercase; background: ${inst.status === 'DISBURSED' ? '#dcfce7; color: #166534;' : '#fef3c7; color: #92400e;'}">
+                      ${inst.status === 'DISBURSED' ? `Paid (${inst.disbursementMethod || 'EFT'} #${inst.disbursementReference || 'OK'})` : 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
     </div>
 
     <div class="section-title">Digital Approval Audit Trail</div>

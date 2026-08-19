@@ -73,13 +73,17 @@ import {
   Bold,
   Italic,
   List,
-  ListOrdered
+  ListOrdered,
+  Layers,
+  Split,
+  Banknote,
+  CheckCircle2
 } from "lucide-react";
 import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentFormatUtils";
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from "xlsx";
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
-import { RequisitionStatus, UserRole, Requisition, CommentReaction, Comment } from "../types";
+import { RequisitionStatus, UserRole, Requisition, CommentReaction, Comment, RequisitionInstallment } from "../types";
 import { compressImageFile } from "../lib/imageCompression";
 import { databaseService } from "../lib/databaseService";
 import { 
@@ -2210,6 +2214,206 @@ const HighlightText = ({ text, highlight }: { text: string; highlight: string })
   );
 };
 
+export const RequisitionInstallmentScheduleBreakdown: React.FC<{ req: Requisition; compact?: boolean }> = ({ req, compact = false }) => {
+  const installments = req.installments || [];
+  if (installments.length === 0) return null;
+
+  const totalPlanned = installments.reduce((sum, i) => sum + (Number(i.amount) || 0), 0) || req.amount;
+  const paidAmount = installments.filter(i => i.status === "DISBURSED").reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  const remainingAmount = Math.max(0, totalPlanned - paidAmount);
+  const paidCount = installments.filter(i => i.status === "DISBURSED").length;
+  const totalCount = installments.length;
+  const pct = Math.round((paidAmount / (totalPlanned || 1)) * 100);
+  const isFullySettled = paidCount === totalCount;
+
+  if (compact) {
+    return (
+      <div className="space-y-2 text-xs">
+        <div className="flex items-center justify-between gap-1 text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <span>Milestone Breakdown</span>
+          <span className="font-mono text-emerald-600 dark:text-emerald-400">{paidCount}/{totalCount} Disbursed</span>
+        </div>
+        <div className="space-y-1.5 divide-y divide-slate-100 dark:divide-slate-800/80">
+          {installments.map((inst, idx) => {
+            const isDisbursed = inst.status === "DISBURSED";
+            const instPct = inst.percentage || Math.round(((Number(inst.amount) || 0) / (totalPlanned || 1)) * 100);
+
+            return (
+              <div key={inst.id || idx} className={cn("pt-1.5 first:pt-0 flex items-start justify-between gap-2", isDisbursed && "text-emerald-700 dark:text-emerald-300")}>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className={cn(
+                      "w-4 h-4 rounded-full flex items-center justify-center font-mono font-bold text-[8px] shrink-0 border",
+                      isDisbursed ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                    )}>
+                      {inst.installmentNumber || idx + 1}
+                    </span>
+                    <span className="font-bold text-[10px] text-slate-800 dark:text-slate-200 truncate">
+                      {inst.title || inst.description || `Installment #${inst.installmentNumber || idx + 1}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[8.5px] text-slate-400 dark:text-slate-500 font-mono">
+                    <span>Due: {inst.dueDate ? formatDate(inst.dueDate) : "On demand"}</span>
+                    {isDisbursed && inst.disbursementReference && (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">• Ref: {inst.disbursementReference}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="font-mono font-bold text-[10px] text-slate-900 dark:text-slate-100 block">
+                    {formatCurrency(inst.amount)}
+                  </span>
+                  <span className={cn(
+                    "inline-flex items-center gap-0.5 text-[7.5px] font-black uppercase px-1.5 py-0.2 rounded-full",
+                    isDisbursed ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+                  )}>
+                    {isDisbursed ? <Check size={7} className="stroke-[3]" /> : <Clock size={7} />}
+                    {isDisbursed ? "Paid" : "Pending"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 bg-white dark:bg-slate-900/90 rounded-2xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <div className={cn(
+            "p-2 rounded-xl border shrink-0",
+            isFullySettled 
+              ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800" 
+              : "bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-800"
+          )}>
+            <Layers size={16} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                Phased Installment Schedule
+              </h5>
+              <span className={cn(
+                "px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-widest font-mono",
+                isFullySettled 
+                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                  : "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800"
+              )}>
+                {paidCount} of {totalCount} Installments Disbursed ({pct}%)
+              </span>
+            </div>
+            <p className="text-[9.5px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+              Structured multi-milestone disbursement ledger for approved high-value requisition
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] font-mono shrink-0">
+          <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl font-bold">
+            Settled: {formatCurrency(paidAmount)}
+          </span>
+          <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl font-bold">
+            Remaining: {formatCurrency(remainingAmount)}
+          </span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/60">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="bg-slate-100/70 dark:bg-slate-900 text-[8.5px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+              <th className="px-3.5 py-2.5">Milestone #</th>
+              <th className="px-3.5 py-2.5">Phase Title / Description</th>
+              <th className="px-3.5 py-2.5 text-right">Planned Amount</th>
+              <th className="px-3.5 py-2.5">Scheduled Due Date</th>
+              <th className="px-3.5 py-2.5 text-center">Status</th>
+              <th className="px-3.5 py-2.5">Settlement Audit Trail</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800/80">
+            {installments.map((inst, idx) => {
+              const isDisbursed = inst.status === "DISBURSED";
+              const instPct = inst.percentage || Math.round(((Number(inst.amount) || 0) / (totalPlanned || 1)) * 100);
+
+              return (
+                <tr 
+                  key={inst.id || idx}
+                  className={cn(
+                    "transition-colors text-[11px]",
+                    isDisbursed ? "bg-emerald-50/40 dark:bg-emerald-950/20" : "hover:bg-white/70 dark:hover:bg-slate-900/40"
+                  )}
+                >
+                  <td className="px-3.5 py-2.5 font-mono font-bold text-slate-700 dark:text-slate-300">
+                    <span className={cn(
+                      "w-6 h-6 rounded-lg flex items-center justify-center font-mono font-bold text-[9px] shrink-0 border",
+                      isDisbursed 
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800" 
+                        : "bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                    )}>
+                      #{inst.installmentNumber || idx + 1}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2.5">
+                    <p className="font-bold text-slate-900 dark:text-slate-100">
+                      {inst.title || `Phase ${inst.installmentNumber || idx + 1}`}
+                    </p>
+                    {inst.description && inst.description !== inst.title && (
+                      <p className="text-[9.5px] text-slate-400 dark:text-slate-500 line-clamp-1 max-w-sm">{inst.description}</p>
+                    )}
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                    <span>{formatCurrency(inst.amount)}</span>
+                    <span className="text-[9px] font-normal text-slate-400 dark:text-slate-500 ml-1">({instPct}%)</span>
+                  </td>
+                  <td className="px-3.5 py-2.5 text-[10px] font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                    {inst.dueDate ? formatDate(inst.dueDate) : "On demand"}
+                  </td>
+                  <td className="px-3.5 py-2.5 text-center">
+                    <span className={cn(
+                      "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider",
+                      isDisbursed 
+                        ? "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                        : "bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                    )}>
+                      {isDisbursed ? <Check size={10} className="stroke-[3]" /> : <Clock size={10} />}
+                      {inst.status}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-2.5 text-[10px]">
+                    {isDisbursed ? (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-300">
+                          <span>{inst.paymentMethod || inst.disbursementMethod || "Cheque"}</span>
+                          {inst.disbursementReference && (
+                            <span className="font-mono text-[9px] bg-emerald-100/90 dark:bg-emerald-900/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-700">
+                              Ref: {inst.disbursementReference}
+                            </span>
+                          )}
+                        </div>
+                        {inst.disbursedAt && (
+                          <p className="text-[8.5px] font-mono text-slate-400 dark:text-slate-500">
+                            Disbursed {formatDate(inst.disbursedAt)} {inst.disbursedByName ? `by ${inst.disbursedByName}` : ""}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[9.5px] text-slate-400 dark:text-slate-500 italic">
+                        Pending finance voucher clearance
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 export const RequisitionsPanel: React.FC = () => {
   const { 
     requisitions, 
@@ -2338,6 +2542,22 @@ export const RequisitionsPanel: React.FC = () => {
   const [rejectedPage, setRejectedPage] = useState(1);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const ITEMS_PER_PAGE = 15;
+
+  // Track expanded installment payment breakdown schedules
+  const [expandedScheduleIds, setExpandedScheduleIds] = useState<Set<string>>(new Set());
+
+  const toggleScheduleExpand = (reqId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedScheduleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(reqId)) {
+        next.delete(reqId);
+      } else {
+        next.add(reqId);
+      }
+      return next;
+    });
+  };
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -3042,197 +3262,254 @@ export const RequisitionsPanel: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               <AnimatePresence mode="popLayout">
-                {activeItems.map((req, i) => {
+                {activeItems.flatMap((req, i) => {
                   const updateAge = now - new Date(req.updatedAt).getTime();
                   const isRecentlyApprovedOrDisbursed = (req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED) && updateAge < 8000;
                   const formattedAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status);
                   const compactAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status, { compact: true });
 
-                  return (
+                  const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+                  const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+                  const totalInstallments = hasInstallments ? req.installments!.length : 0;
+                  const isScheduleExpanded = expandedScheduleIds.has(req.id);
+                  const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+                  const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+                  const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+
+                  const mainRow = (
                     <motion.tr 
-                      key={req.id} 
-                      layout
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ 
-                        opacity: 1,
-                        y: 0,
-                        backgroundColor: isRecentlyApprovedOrDisbursed ? "rgba(16, 185, 129, 0.08)" : undefined
-                      }}
-                      exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                      transition={{ 
-                        opacity: { duration: 0.2 },
-                        layout: { type: "spring", stiffness: 300, damping: 30 },
-                        y: { type: "spring", stiffness: 300, damping: 30 }
-                      }}
-                      onClick={() => setViewingReq(req)}
-                      className={cn(
-                        "transition-colors group cursor-pointer border-l-2",
-                        selectedIds.has(req.id) ? "bg-primary/5 border-l-primary" :
-                        isRecentlyApprovedOrDisbursed
-                          ? "border-l-emerald-500 shadow-[inset_4px_0_0_0_#10b981]" 
-                          : "hover:bg-slate-50/80 border-l-transparent"
-                      )}
-                    >
-                      <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
-                        <input 
-                          type="checkbox" 
-                          className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
-                          checked={selectedIds.has(req.id)}
-                          onChange={() => toggleSelect(req.id)}
-                        />
-                      </td>
-                      <td className="px-3 md:px-6 py-2.5 md:py-4">
-                        <div className="flex flex-col min-w-0 max-w-full md:max-w-none space-y-1">
-                          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                            {getReqUnreadInfo(req).hasUnread && (
-                              <span 
-                                title={`${getReqUnreadInfo(req).unreadCount} unread comment${getReqUnreadInfo(req).unreadCount === 1 ? "" : "s"}${getReqUnreadInfo(req).unreadAuthors.length > 0 ? ` from ${getReqUnreadInfo(req).unreadAuthors.join(", ")}` : ""}`}
-                                className="inline-flex items-center gap-1 text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
-                              >
-                                <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
-                                </span>
-                                <MessageSquare size={10} className="fill-rose-500 text-rose-600" />
-                                {getReqUnreadInfo(req).unreadCount} NEW
-                              </span>
-                            )}
-                            <span className="font-bold text-slate-900 text-xs md:text-sm break-words leading-snug">
-                              <HighlightText text={req.title} highlight={globalSearchTerm} />
-                            </span>
-                            {compactAge && (
-                              <span className="text-[8px] md:text-[9px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                {compactAge}
-                              </span>
-                            )}
-                            {req.flaggedForAudit && (
-                              <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                <Flag size={11} className="text-rose-500 fill-rose-500" />
-                              </span>
-                            )}
-                            {req.inProcurement && (
-                              <span className="text-[8px] md:text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                PROCUREMENT
-                              </span>
-                            )}
-                            {req.requiresMoreInfo && (
-                              <span className="text-[8px] md:text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                INFO REQ
-                              </span>
-                            )}
-                            {req.recurrence && req.recurrence !== "NONE" && (
-                              <Repeat size={10} className="text-primary animate-pulse shrink-0" />
-                            )}
-                            {req.attachments && req.attachments.length > 0 && (
-                              <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                                <Paperclip size={10} />
-                                {req.attachments.length}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[8px] md:text-[10px]">
-                            <span className="font-mono text-slate-400 uppercase tracking-wider shrink-0">{req.id}</span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50/80 border border-indigo-200/50 text-indigo-700 rounded-md font-extrabold uppercase tracking-wider leading-none shrink-0">
-                              💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                            </span>
-                            <span className="inline-block lg:hidden text-slate-500 font-semibold truncate max-w-[140px]">
-                              • {req.requesterName}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
-                        <div className="flex flex-col">
-                          <span className="text-slate-900 font-bold text-[11px] md:text-xs">
-                            {req.requesterName}
-                          </span>
-                          <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
-                            {req.groupName}
-                          </span>
-                          <RequisitionOwnershipDiscussionRow req={req} users={users} />
-                        </div>
-                      </td>
-                      <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
-                        <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
-                      </td>
-                      <td className="px-3 md:px-6 py-2.5 md:py-4">
-                        <div className="flex justify-center">
-                          <span className={cn(
-                            "px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0",
-                            getStatusColor(req.status)
-                          )}>
-                            {req.status}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
-                        {formattedAge ? (
-                          <div className="flex items-center gap-1.5">
-                            <Clock size={11} className="text-slate-400" />
-                            <span className="text-[10px] md:text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                              {formattedAge}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-mono">-</span>
+                      key={req.id}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ 
+                          opacity: 1, 
+                          y: 0,
+                          backgroundColor: isRecentlyApprovedOrDisbursed ? "rgba(16, 185, 129, 0.08)" : undefined
+                        }}
+                        exit={{ opacity: 0, scale: 0.95, y: -15 }}
+                        transition={{ 
+                          opacity: { duration: 0.2 },
+                          layout: { type: "spring", stiffness: 300, damping: 30 },
+                          y: { type: "spring", stiffness: 300, damping: 30 }
+                        }}
+                        onClick={() => setViewingReq(req)}
+                        className={cn(
+                          "transition-colors group cursor-pointer border-l-2",
+                          selectedIds.has(req.id) ? "bg-primary/5 border-l-primary" : 
+                          isRecentlyApprovedOrDisbursed 
+                            ? "border-l-emerald-500 shadow-[inset_4px_0_0_0_#10b981]" 
+                            : "hover:bg-slate-50/80 border-l-transparent"
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingReq(req);
-                            }}
-                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopyShareLinkForReq(req);
-                            }}
-                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
-                            title="Copy Shareable Link"
-                          >
-                            <Share2 size={16} />
-                          </button>
-                          {/* Edit button: Drafts can be edited by requester or admin/super-admin, others only if admin, rejected can NEVER be edited */}
-                          {req.status !== RequisitionStatus.REJECTED && (
-                            canPerform('canDeleteRequisition') || 
-                            (req.status === RequisitionStatus.DRAFT && (req.requesterId === currentUser?.id || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN))
-                          ) && (
+                      >
+                        <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
+                            checked={selectedIds.has(req.id)}
+                            onChange={() => toggleSelect(req.id)}
+                          />
+                        </td>
+                        <td className="px-3 md:px-6 py-2.5 md:py-4">
+                          <div className="flex flex-col min-w-0 max-w-full md:max-w-none space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                              {getReqUnreadInfo(req).hasUnread && (
+                                <span 
+                                  title={`${getReqUnreadInfo(req).unreadCount} unread comment${getReqUnreadInfo(req).unreadCount === 1 ? "" : "s"}${getReqUnreadInfo(req).unreadAuthors.length > 0 ? ` from ${getReqUnreadInfo(req).unreadAuthors.join(", ")}` : ""}`}
+                                  className="inline-flex items-center gap-1 text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
+                                >
+                                  <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
+                                  </span>
+                                  <MessageSquare size={10} className="fill-rose-500 text-rose-600" />
+                                  {getReqUnreadInfo(req).unreadCount} NEW
+                                </span>
+                              )}
+                              <span className="font-bold text-slate-900 text-xs md:text-sm break-words leading-snug">
+                                <HighlightText text={req.title} highlight={globalSearchTerm} />
+                              </span>
+                              {compactAge && (
+                                <span className="text-[8px] md:text-[9px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                                  {compactAge}
+                                </span>
+                              )}
+                              {req.flaggedForAudit && (
+                                <span title="Flagged for Audit" className="inline-flex shrink-0">
+                                  <Flag size={11} className="text-rose-500 fill-rose-500" />
+                                </span>
+                              )}
+                              {req.inProcurement && (
+                                <span className="text-[8px] md:text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                                  PROCUREMENT
+                                </span>
+                              )}
+                              {req.requiresMoreInfo && (
+                                <span className="text-[8px] md:text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                                  INFO REQ
+                                </span>
+                              )}
+                              {req.recurrence && req.recurrence !== "NONE" && (
+                                <Repeat size={10} className="text-primary animate-pulse shrink-0" />
+                              )}
+                              {req.attachments && req.attachments.length > 0 && (
+                                <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                  <Paperclip size={10} />
+                                  {req.attachments.length}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[8px] md:text-[10px]">
+                              <span className="font-mono text-slate-400 uppercase tracking-wider shrink-0">{req.id}</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50/80 border border-indigo-200/50 text-indigo-700 rounded-md font-extrabold uppercase tracking-wider leading-none shrink-0">
+                                💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                              </span>
+                              <span className="inline-block lg:hidden text-slate-500 font-semibold truncate max-w-[140px]">
+                                • {req.requesterName}
+                              </span>
+                            </div>
+
+                            {/* Phased Installment Progress Badge & Toggle */}
+                            {hasInstallments && (
+                              <div className="mt-1 flex flex-wrap items-center gap-2 pt-0.5">
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-50/90 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 rounded-md text-[9px]">
+                                  <Layers size={11} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                                  <span className="font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono text-[8.5px]">
+                                    {paidInstallments}/{totalInstallments} Disbursed
+                                  </span>
+                                  <div className="w-14 sm:w-16 h-1.5 bg-purple-200/80 dark:bg-purple-900/60 rounded-full overflow-hidden shrink-0">
+                                    <div 
+                                      className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
+                                      style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-[8px] font-mono font-bold text-purple-700 dark:text-purple-300">
+                                    {installmentProgressPct}%
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleScheduleExpand(req.id, e)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-white hover:bg-purple-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-md text-[8.5px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                                >
+                                  <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
+                                  <span>{isScheduleExpanded ? "Hide Schedule" : "View Schedule"}</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
+                          <div className="flex flex-col">
+                            <span className="text-slate-900 font-bold text-[11px] md:text-xs">
+                              {req.requesterName}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
+                              {req.groupName}
+                            </span>
+                            <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                          </div>
+                        </td>
+                        <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
+                          <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                        </td>
+                        <td className="px-3 md:px-6 py-2.5 md:py-4">
+                          <div className="flex justify-center">
+                            <span className={cn(
+                              "px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0",
+                              getStatusColor(req.status)
+                            )}>
+                              {req.status}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
+                          {formattedAge ? (
+                            <div className="flex items-center gap-1.5">
+                              <Clock size={11} className="text-slate-400" />
+                              <span className="text-[10px] md:text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                {formattedAge}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-mono">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingReq(req);
+                                setViewingReq(req);
                               }}
-                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all"
-                              title="Edit Requisition"
+                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
+                              title="View Details"
                             >
-                              <Pencil size={15} />
+                              <Eye size={16} />
                             </button>
-                          )}
-                          {/* Delete button: only admins */}
-                          {canPerform('canDeleteRequisition') && (
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setRequisitionToDelete(req);
+                                handleCopyShareLinkForReq(req);
                               }}
-                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 transition-all"
-                              title="Delete Permanently"
+                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                              title="Copy Shareable Link"
                             >
-                              <Trash2 size={16} />
+                              <Share2 size={16} />
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
+                            {/* Edit button: Drafts can be edited by requester or admin/super-admin, others only if admin, rejected can NEVER be edited */}
+                            {req.status !== RequisitionStatus.REJECTED && (
+                              canPerform('canDeleteRequisition') || 
+                              (req.status === RequisitionStatus.DRAFT && (req.requesterId === currentUser?.id || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN))
+                            ) && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingReq(req);
+                                }}
+                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all"
+                                title="Edit Requisition"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                            )}
+                            {/* Delete button: only admins */}
+                            {canPerform('canDeleteRequisition') && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRequisitionToDelete(req);
+                                }}
+                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 transition-all"
+                                title="Delete Permanently"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+
+                    if (hasInstallments && isScheduleExpanded) {
+                      const expandedRow = (
+                        <motion.tr 
+                          key={`${req.id}-schedule-expanded`} 
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
+                        >
+                          <td colSpan={7} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
+                            <RequisitionInstallmentScheduleBreakdown req={req} />
+                          </td>
+                        </motion.tr>
+                      );
+                      return [mainRow, expandedRow];
+                    }
+
+                    return [mainRow];
+                  })}
               </AnimatePresence>
             </tbody>
             {activeList.length > 0 && (
@@ -3260,6 +3537,14 @@ export const RequisitionsPanel: React.FC = () => {
               const formattedAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status);
               const compactAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status, { compact: true });
               
+              const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+              const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+              const totalInstallments = hasInstallments ? req.installments!.length : 0;
+              const isScheduleExpanded = expandedScheduleIds.has(req.id);
+              const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+              const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+              const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+
               const canEdit = req.status !== RequisitionStatus.REJECTED && (
                 canPerform('canDeleteRequisition') || 
                 (req.status === RequisitionStatus.DRAFT && (req.requesterId === currentUser?.id || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN))
@@ -3347,6 +3632,54 @@ export const RequisitionsPanel: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Phased Installment Progress & Schedule Toggle for Mobile Cards */}
+                  {hasInstallments && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <div className="p-1 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                            <Layers size={11} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between text-[8.5px] font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono mb-1">
+                              <span>Installments: {paidInstallments}/{totalInstallments} Disbursed</span>
+                              <span>{installmentProgressPct}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-purple-100 dark:bg-purple-900/50 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
+                                style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => toggleScheduleExpand(req.id, e)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/80 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 rounded-lg text-[8.5px] font-bold transition-all shrink-0 cursor-pointer"
+                        >
+                          <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
+                          <span>{isScheduleExpanded ? "Hide" : "View Schedule"}</span>
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {isScheduleExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden pt-1"
+                          >
+                            <div className="p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                              <RequisitionInstallmentScheduleBreakdown req={req} compact />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
                   {/* Mobile Actions block */}
                   <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
@@ -3469,25 +3802,34 @@ export const RequisitionsPanel: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               <AnimatePresence mode="popLayout">
-                {disbursedItems.map((req, i) => (
-                  <motion.tr 
-                    key={req.id} 
-                    layout
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                    transition={{ 
-                      opacity: { duration: 0.2 },
-                      layout: { type: "spring", stiffness: 300, damping: 30 },
-                      y: { type: "spring", stiffness: 300, damping: 30 }
-                    }}
-                    onClick={() => setViewingReq(req)}
-                    className={cn(
-                      "transition-colors group cursor-pointer border-l-2",
-                      selectedIds.has(req.id) ? "bg-blue-50/50 border-l-blue-600" : "hover:bg-slate-50/80 border-l-transparent"
-                    )}
-                  >
-                    <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
+                {disbursedItems.flatMap((req, i) => {
+                  const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+                  const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+                  const totalInstallments = hasInstallments ? req.installments!.length : 0;
+                  const isScheduleExpanded = expandedScheduleIds.has(req.id);
+                  const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+                  const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+                  const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+
+                  const mainRow = (
+                    <motion.tr 
+                      key={req.id} 
+                      layout
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -15 }}
+                      transition={{ 
+                        opacity: { duration: 0.2 },
+                        layout: { type: "spring", stiffness: 300, damping: 30 },
+                        y: { type: "spring", stiffness: 300, damping: 30 }
+                      }}
+                      onClick={() => setViewingReq(req)}
+                      className={cn(
+                        "transition-colors group cursor-pointer border-l-2",
+                        selectedIds.has(req.id) ? "bg-blue-50/50 border-l-blue-600" : "hover:bg-slate-50/80 border-l-transparent"
+                      )}
+                    >
+                      <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
                           className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 accent-blue-600 cursor-pointer"
@@ -3495,84 +3837,135 @@ export const RequisitionsPanel: React.FC = () => {
                           onChange={() => toggleSelect(req.id)}
                         />
                       </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4">
-                      <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-none">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-[11px] md:text-sm truncate">
-                            <HighlightText text={req.title} highlight={globalSearchTerm} />
-                          </span>
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={11} className="text-rose-500 fill-rose-500" />
+                      <td className="px-3 md:px-6 py-2.5 md:py-4">
+                        <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-none">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-[11px] md:text-sm truncate">
+                              <HighlightText text={req.title} highlight={globalSearchTerm} />
                             </span>
-                          )}
-                          {req.attachments && req.attachments.length > 0 && (
-                            <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                              <Paperclip size={10} />
-                              {req.attachments.length}
+                            {req.flaggedForAudit && (
+                              <span title="Flagged for Audit" className="inline-flex shrink-0">
+                                <Flag size={11} className="text-rose-500 fill-rose-500" />
+                              </span>
+                            )}
+                            {req.attachments && req.attachments.length > 0 && (
+                              <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                <Paperclip size={10} />
+                                {req.attachments.length}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
+                            <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-50/80 border border-blue-200/50 text-blue-700 rounded-md text-[7.5px] md:text-[9px] font-extrabold uppercase tracking-wider leading-none w-fit">
+                              💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
                             </span>
+                          </div>
+
+                          {/* Phased Installment Progress & Schedule Toggle */}
+                          {hasInstallments && (
+                            <div className="mt-1 flex flex-wrap items-center gap-2 pt-0.5">
+                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-50/90 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 rounded-md text-[9px]">
+                                <Layers size={11} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                                <span className="font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono text-[8.5px]">
+                                  {paidInstallments}/{totalInstallments} Disbursed
+                                </span>
+                                <div className="w-14 sm:w-16 h-1.5 bg-purple-200/80 dark:bg-purple-900/60 rounded-full overflow-hidden shrink-0">
+                                  <div 
+                                    className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
+                                    style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
+                                  />
+                                </div>
+                                <span className="text-[8px] font-mono font-bold text-purple-700 dark:text-purple-300">
+                                  {installmentProgressPct}%
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => toggleScheduleExpand(req.id, e)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-white hover:bg-purple-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-md text-[8.5px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                              >
+                                <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
+                                <span>{isScheduleExpanded ? "Hide Schedule" : "View Schedule"}</span>
+                              </button>
+                            </div>
                           )}
                         </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
-                          <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
-                          <span className="inline-flex items-center px-1.5 py-0.5 bg-blue-50/80 border border-blue-200/50 text-blue-700 rounded-md text-[7.5px] md:text-[9px] font-extrabold uppercase tracking-wider leading-none w-fit">
-                            💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                      </td>
+                      <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
+                        <div className="flex flex-col">
+                          <span className="text-slate-900 font-bold text-[11px] md:text-xs">
+                            {req.requesterName}
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
+                            {req.groupName}
+                          </span>
+                          <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                        </div>
+                      </td>
+                      <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
+                        <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                      </td>
+                      <td className="px-3 md:px-6 py-2.5 md:py-4">
+                        <div className="flex justify-center">
+                          <span className="px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0">
+                            {req.status}
                           </span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
-                      <div className="flex flex-col">
-                        <span className="text-slate-900 font-bold text-[11px] md:text-xs">
-                          {req.requesterName}
+                      </td>
+                      <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
+                        <span className="text-[9px] md:text-[10px] font-mono font-bold text-slate-500">
+                          {formatDate(req.updatedAt)}
                         </span>
-                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
-                          {req.groupName}
-                        </span>
-                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
-                      <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
-                    </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4">
-                      <div className="flex justify-center">
-                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border border-blue-100 bg-blue-50 text-blue-600 text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0">
-                          {req.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
-                      <span className="text-[9px] md:text-[10px] font-mono font-bold text-slate-500">
-                        {formatDate(req.updatedAt)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewingReq(req);
-                          }}
-                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
-                          title="View Details"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyShareLinkForReq(req);
-                          }}
-                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
-                          title="Copy Shareable Link"
-                        >
-                          <Share2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingReq(req);
+                            }}
+                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
+                            title="View Details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyShareLinkForReq(req);
+                            }}
+                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                            title="Copy Shareable Link"
+                          >
+                            <Share2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+
+                  if (hasInstallments && isScheduleExpanded) {
+                    const expandedRow = (
+                      <motion.tr 
+                        key={`${req.id}-disbursed-schedule-expanded`} 
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
+                      >
+                        <td colSpan={7} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
+                          <RequisitionInstallmentScheduleBreakdown req={req} />
+                        </td>
+                      </motion.tr>
+                    );
+                    return [mainRow, expandedRow];
+                  }
+
+                  return [mainRow];
+                })}
               </AnimatePresence>
             </tbody>
             {disbursedList.length > 0 && (
@@ -3595,6 +3988,14 @@ export const RequisitionsPanel: React.FC = () => {
           {/* Mobile Cards View */}
           <div className="block md:hidden divide-y divide-slate-100">
             {disbursedItems.map((req) => {
+              const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+              const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+              const totalInstallments = hasInstallments ? req.installments!.length : 0;
+              const isScheduleExpanded = expandedScheduleIds.has(req.id);
+              const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+              const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+              const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+
               return (
                 <div 
                   key={req.id}
@@ -3657,6 +4058,54 @@ export const RequisitionsPanel: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Phased Installment Progress & Schedule Toggle for Mobile Cards */}
+                  {hasInstallments && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <div className="p-1 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-800/60 shrink-0">
+                            <Layers size={11} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between text-[8.5px] font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono mb-1">
+                              <span>Installments: {paidInstallments}/{totalInstallments} Disbursed</span>
+                              <span>{installmentProgressPct}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-purple-100 dark:bg-purple-900/50 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
+                                style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => toggleScheduleExpand(req.id, e)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/80 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800 rounded-lg text-[8.5px] font-bold transition-all shrink-0 cursor-pointer"
+                        >
+                          <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
+                          <span>{isScheduleExpanded ? "Hide" : "View Schedule"}</span>
+                        </button>
+                      </div>
+
+                      <AnimatePresence>
+                        {isScheduleExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden pt-1"
+                          >
+                            <div className="p-3 bg-slate-50 dark:bg-slate-900/80 rounded-xl border border-slate-200/80 dark:border-slate-800">
+                              <RequisitionInstallmentScheduleBreakdown req={req} compact />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
                   {/* Mobile Actions block */}
                   <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
@@ -5410,6 +5859,13 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   })()}
                 </section>
               </div>
+
+              {/* Phased Installment Schedule Section (if present) */}
+              {req.installments && req.installments.length > 0 && (
+                <section className="space-y-3">
+                  <RequisitionInstallmentScheduleBreakdown req={req} />
+                </section>
+              )}
 
               {/* Members Receiving Updates Section */}
               <section className="space-y-3">

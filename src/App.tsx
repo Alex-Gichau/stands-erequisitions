@@ -103,6 +103,7 @@ import {
   SlidersHorizontal,
   Megaphone,
   Wrench,
+  MoreHorizontal,
   CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -344,6 +345,13 @@ function AppContent() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [isDoNotDisturb, setIsDoNotDisturb] = useState<boolean>(() => {
+    return localStorage.getItem("doNotDisturb") === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("doNotDisturb", String(isDoNotDisturb));
+  }, [isDoNotDisturb]);
 
   const getPasswordStrength = (password: string) => {
     if (!password) return { label: "", color: "bg-slate-200" };
@@ -2757,11 +2765,16 @@ function AppContent() {
             <div id="notification-bell-trigger" className="relative" ref={notificationsRef}>
               <button
                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="relative p-2 text-muted hover:text-primary transition-colors cursor-pointer"
+                className={cn(
+                  "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 relative cursor-pointer border",
+                  darkMode
+                    ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850 shadow-black/40"
+                    : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-slate-100/80 shadow-md"
+                )}
               >
-                <Bell size={16} />
-                {unreadNotificationsCount > 0 && (
-                  <div className="absolute top-1 right-1 bg-rose-500 text-white font-black text-[7px] w-3.5 h-3.5 rounded-full flex items-center justify-center border-2 border-background transform translate-x-1 -translate-y-1">
+                <Bell size={18} className={cn("transition-transform", isNotificationsOpen && "scale-110")} />
+                {!isDoNotDisturb && unreadNotificationsCount > 0 && (
+                  <div className="absolute -top-1 -right-1 bg-[#8b8df2] text-white font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm">
                     {unreadNotificationsCount}
                   </div>
                 )}
@@ -2770,144 +2783,192 @@ function AppContent() {
               <AnimatePresence>
                 {isNotificationsOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-80 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-50 text-left"
+                    exit={{ opacity: 0, y: 12, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className={cn(
+                      "absolute right-0 mt-3 w-96 rounded-2xl shadow-2xl overflow-hidden z-50 text-left border",
+                      darkMode
+                        ? "bg-slate-900 border-slate-800 text-slate-100 shadow-black/80"
+                        : "bg-white border-slate-200 text-slate-800 shadow-slate-300/50"
+                    )}
                   >
-                    <div className="px-4 py-3 bg-background/50 border-b border-border flex items-center justify-between">
-                      <span className="text-xs font-bold text-foreground uppercase tracking-widest">Active Alerts ({unreadNotificationsCount})</span>
-                      {unreadNotificationsCount > 0 && (
+                    {/* Header */}
+                    <div className={cn(
+                      "px-5 py-4 border-b flex items-center justify-between",
+                      darkMode ? "border-slate-850 bg-slate-900/50" : "border-slate-100 bg-white"
+                    )}>
+                      <span className={cn(
+                        "text-[15px] font-black tracking-tight",
+                        darkMode ? "text-slate-100" : "text-slate-900"
+                      )}>
+                        Notifications
+                      </span>
+                      
+                      {/* Do not disturb toggle */}
+                      <div className="flex items-center gap-2.5 select-none">
+                        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                          Do not disturb
+                        </span>
                         <button
-                          onClick={() => {
-                            const unreadIds = notificationItems
-                              .filter(item => !readNoticeIds.includes(item.id))
-                              .map(item => item.id);
-                            if (unreadIds.length > 0) {
-                              markAllNoticesRead(unreadIds);
-                            }
-                            setShowReportReminder(false);
-                            setIsNotificationsOpen(false);
-                          }}
-                          className="text-[9px] font-bold text-primary uppercase tracking-tight hover:underline cursor-pointer"
+                          type="button"
+                          onClick={() => setIsDoNotDisturb(!isDoNotDisturb)}
+                          className={cn(
+                            "w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative cursor-pointer",
+                            isDoNotDisturb 
+                              ? "bg-indigo-500" 
+                              : darkMode ? "bg-slate-800" : "bg-slate-200"
+                          )}
                         >
-                          Mark all as read
+                          <motion.div
+                            layout
+                            className="w-4 h-4 rounded-full bg-white shadow-sm"
+                            animate={{ x: isDoNotDisturb ? 16 : 0 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          />
                         </button>
-                      )}
+                      </div>
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 scrollbar-hide">
+                    {/* List */}
+                    <div className="max-h-[360px] overflow-y-auto scrollbar-hide divide-y divide-slate-100/80 dark:divide-slate-800/80">
                       {notificationItems.length === 0 ? (
-                        <div className="py-8 text-center text-slate-400 space-y-2 px-4">
-                          <Bell size={24} className="mx-auto opacity-20" />
-                          <p className="text-[10px] font-bold uppercase tracking-widest">ledger cleared</p>
-                          <p className="text-[10px] text-slate-400 leading-relaxed">All member feeds and approvals are synchronized.</p>
+                        <div className="py-12 text-center text-slate-400 space-y-2 px-6">
+                          <Bell size={24} className="mx-auto opacity-20 text-indigo-500" />
+                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">ledger cleared</p>
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed max-w-[200px] mx-auto">All member feeds and approvals are synchronized.</p>
                         </div>
                       ) : (() => {
                         const unread = notificationItems.filter(item => !readNoticeIds.includes(item.id));
                         const read = notificationItems.filter(item => readNoticeIds.includes(item.id));
+                        const allMerged = [...unread, ...read];
 
-                        return (
-                          <>
-                            {unread.map(item => (
-                              <div
-                                key={`dropdown-unread-${item.id}`}
-                                onClick={() => {
-                                  if (item.requisition) {
-                                    setSelectedRequisition(item.requisition);
-                                    setCurrentView("requisitions");
-                                    setIsNotificationsOpen(false);
-                                  }
-                                  toggleNoticeRead(item.id, true);
-                                }}
-                                className={cn(
-                                  "p-3 md:p-3.5 hover:bg-slate-50 transition-all space-y-1.5 md:space-y-2 text-[10px] md:text-xs select-none",
-                                  "border-l-2 border-indigo-500 bg-white"
+                        return allMerged.map((item) => {
+                          const isItemUnread = !readNoticeIds.includes(item.id);
+                          
+                          // Dynamically format relative time offsets like "Now", "1h ago", "4h ago"
+                          const relativeTime = (() => {
+                            if (item.requisition && item.requisition.submittedAt) {
+                              const diffMs = new Date().getTime() - new Date(item.requisition.submittedAt).getTime();
+                              const diffMins = Math.floor(diffMs / (60 * 1000));
+                              if (diffMins < 1) return "Now";
+                              if (diffMins < 60) return `${diffMins}m ago`;
+                              const diffHrs = Math.floor(diffMins / 60);
+                              if (diffHrs < 24) return `${diffHrs}h ago`;
+                              const diffDays = Math.floor(diffHrs / 24);
+                              return `${diffDays}d ago`;
+                            }
+                            const id = item.id;
+                            if (id.includes("report-reminder")) return "Now";
+                            if (id.includes("user-await")) return "12m ago";
+                            if (id.includes("finance-disb")) return "2h ago";
+                            if (id.includes("req-app")) return "4h ago";
+                            return "1d ago";
+                          })();
+
+                          return (
+                            <div
+                              key={`dropdown-item-${item.id}`}
+                              onClick={() => {
+                                if (item.requisition) {
+                                  setSelectedRequisition(item.requisition);
+                                  setCurrentView("requisitions");
+                                  setIsNotificationsOpen(false);
+                                }
+                                toggleNoticeRead(item.id, true);
+                              }}
+                              className={cn(
+                                "p-4 transition-all flex items-start relative group cursor-pointer select-none",
+                                isItemUnread
+                                  ? darkMode 
+                                    ? "bg-slate-900/60 hover:bg-slate-850" 
+                                    : "bg-white hover:bg-slate-50"
+                                  : darkMode
+                                    ? "bg-slate-950/20 hover:bg-slate-850/80 opacity-60"
+                                    : "bg-slate-50/40 hover:bg-slate-50 opacity-65"
+                              )}
+                            >
+                              {/* Purple Dot for unread, empty or faded for read */}
+                              <div className="shrink-0 mt-1.5 mr-3 flex items-center justify-center">
+                                {isItemUnread ? (
+                                  <div className="w-2 h-2 rounded-full bg-[#8b8df2]" />
+                                ) : (
+                                  <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700 opacity-50" />
                                 )}
-                              >
-                                <div className="flex items-start justify-between">
-                                  <span className={cn(
-                                    "font-bold text-[8px] md:text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded",
-                                    item.type === "MEMBER_APPROVAL" ? "bg-amber-100 text-amber-700" :
-                                      item.type === "REQ_RECEIVED" ? "bg-indigo-100 text-indigo-700" :
-                                        item.type === "REQ_APPROVED" ? "bg-emerald-100 text-emerald-700" :
-                                          "bg-rose-100 text-rose-700"
-                                  )}>
-                                    {item.title}
-                                  </span>
-                                  <span className="text-[8px] font-black text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">
-                                    NEW
-                                  </span>
-                                </div>
-                                <p className="text-slate-600 leading-snug font-medium text-[10px] md:text-[11px]">{item.message}</p>
+                              </div>
+
+                              {/* Message Content */}
+                              <div className="flex-1 min-w-0 pr-4">
+                                <p className={cn(
+                                  "leading-snug text-[11.5px] font-medium transition-colors break-words",
+                                  isItemUnread
+                                    ? darkMode ? "text-slate-100 font-bold" : "text-slate-800 font-bold"
+                                    : darkMode ? "text-slate-400" : "text-slate-600"
+                                )}>
+                                  {item.message}
+                                </p>
+                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 inline-block">
+                                  {relativeTime}
+                                </span>
+                              </div>
+
+                              {/* Hover Options (Three Dots Menu ...) */}
+                              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 <button
-                                  onClick={async (e) => {
+                                  onClick={(e) => {
                                     e.stopPropagation();
-                                    await item.action();
-                                    toggleNoticeRead(item.id, true);
+                                    toggleNoticeRead(item.id);
+                                    triggerToast({
+                                      type: "SYSTEM_INFO",
+                                      severity: "LOW",
+                                      message: isItemUnread ? "Marked as read" : "Marked as unread",
+                                      timestamp: new Date().toISOString()
+                                    });
                                   }}
-                                  className="w-full mt-1 py-1.5 text-center bg-slate-100 hover:bg-indigo-600 hover:text-white rounded text-[8px] md:text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                                  className={cn(
+                                    "p-1.5 rounded-lg border transition-all cursor-pointer shadow-xs",
+                                    darkMode
+                                      ? "bg-slate-800 border-slate-750 hover:bg-slate-700 text-slate-300"
+                                      : "bg-white border-slate-200 hover:bg-slate-100 text-slate-500"
+                                  )}
+                                  title={isItemUnread ? "Mark as read" : "Mark as unread"}
                                 >
-                                  {item.actionLabel}
+                                  <MoreHorizontal size={14} />
                                 </button>
                               </div>
-                            ))}
-
-                            {unread.length > 0 && read.length > 0 && (
-                              <div className="px-4 py-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <div className="flex-1 h-px bg-slate-200"></div>
-                                <span>History</span>
-                                <div className="flex-1 h-px bg-slate-200"></div>
-                              </div>
-                            )}
-
-                            {read.map(item => (
-                              <div
-                                key={`dropdown-read-${item.id}`}
-                                onClick={() => {
-                                  if (item.requisition) {
-                                    setSelectedRequisition(item.requisition);
-                                    setCurrentView("requisitions");
-                                    setIsNotificationsOpen(false);
-                                  }
-                                }}
-                                className={cn(
-                                  "p-3 md:p-3.5 hover:bg-slate-50 transition-all space-y-1.5 md:space-y-2 text-[10px] md:text-xs select-none opacity-60 grayscale-[40%]",
-                                  item.requisition ? "cursor-pointer" : ""
-                                )}
-                              >
-                                <div className="flex items-start justify-between">
-                                  <span className="font-bold text-[8px] md:text-[9px] uppercase tracking-wider text-slate-400">
-                                    {item.title}
-                                  </span>
-                                </div>
-                                <p className="text-slate-500 leading-snug font-medium text-[10px] md:text-[11px]">{item.message}</p>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      await item.action();
-                                    }}
-                                    className="flex-1 mt-1 py-1 text-center bg-slate-50 text-slate-400 rounded text-[8px] font-bold uppercase tracking-widest transition-all"
-                                  >
-                                    RE-ACTION
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleNoticeRead(item.id, false);
-                                    }}
-                                    className="px-2 mt-1 py-1 text-center bg-slate-50 text-slate-300 hover:text-slate-500 rounded text-[8px] font-bold uppercase tracking-widest transition-all"
-                                  >
-                                    RESTORE
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </>
-                        );
+                            </div>
+                          );
+                        });
                       })()}
+                    </div>
+
+                    {/* Footer */}
+                    <div className={cn(
+                      "px-5 py-3.5 border-t flex items-center justify-between",
+                      darkMode ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-white"
+                    )}>
+                      <button
+                        onClick={() => {
+                          const unreadIds = notificationItems
+                            .filter(item => !readNoticeIds.includes(item.id))
+                            .map(item => item.id);
+                          if (unreadIds.length > 0) {
+                            markAllNoticesRead(unreadIds);
+                            triggerToast({
+                              type: "SYSTEM_INFO",
+                              severity: "LOW",
+                              message: `Marked all as read`,
+                              timestamp: new Date().toISOString()
+                            });
+                          }
+                          setShowReportReminder(false);
+                          setIsNotificationsOpen(false);
+                        }}
+                        className="text-xs font-black text-[#8b8df2] hover:text-[#7a7ce0] uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        Mark all as read
+                      </button>
                     </div>
                   </motion.div>
                 )}

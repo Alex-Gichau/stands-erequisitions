@@ -53,10 +53,29 @@ export enum RequisitionStatus {
   APPROVED_L1 = "APPROVED_L1",
   APPROVED_L2 = "APPROVED_L2", // Same as APPROVED in some contexts
   ESCALATED = "ESCALATED",
+  PARTIALLY_DISBURSED = "PARTIALLY_DISBURSED",
   DISBURSED = "DISBURSED",
   REJECTED = "REJECTED",
   CANCELLED = "CANCELLED",
   DELETED = "DELETED",
+}
+
+export interface RequisitionInstallment {
+  id: string;
+  installmentNumber: number;
+  title?: string;
+  amount: number;
+  percentage?: number;
+  dueDate?: string;
+  description?: string;
+  status: "PENDING" | "DISBURSED" | "CANCELLED";
+  disbursedAt?: string;
+  disbursedBy?: string;
+  disbursedByName?: string;
+  disbursementReference?: string;
+  paymentMethod?: "CHEQUE" | "CASH" | "MPESA" | "BANK_TRANSFER" | "EFT";
+  disbursementMethod?: string;
+  notes?: string;
 }
 
 export enum RecurrenceType {
@@ -154,6 +173,10 @@ export interface Requisition {
   notificationEmails?: string[];
   isSharedRequisition?: boolean;
   sharedGroups?: string[];
+  enableInstallments?: boolean;
+  installments?: RequisitionInstallment[];
+  disbursedAmount?: number;
+  remainingBalance?: number;
   flaggedForAudit?: boolean;
   inProcurement?: boolean;
   requiresMoreInfo?: boolean;

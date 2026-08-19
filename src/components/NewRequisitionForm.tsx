@@ -8,9 +8,9 @@ import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionCon
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store } from "lucide-react";
+import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { RecurrenceType, UserRole } from "../types";
+import { RecurrenceType, UserRole, RequisitionInstallment } from "../types";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
@@ -32,6 +32,19 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
   const [loading, setLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Installment Disbursement State
+  const [enableInstallments, setEnableInstallments] = useState<boolean>(false);
+  const [installments, setInstallments] = useState<Array<{
+    id: string;
+    installmentNumber: number;
+    amount: string;
+    description: string;
+    dueDate?: string;
+  }>>([
+    { id: "inst-1", installmentNumber: 1, amount: "", description: "Initial Advance / Mobilization Deposit" },
+    { id: "inst-2", installmentNumber: 2, amount: "", description: "Final Balance / Completion" }
+  ]);
 
   const [notificationEmails, setNotificationEmails] = useState<string[]>([]);
   const [customNotifyEmail, setCustomNotifyEmail] = useState("");
@@ -280,6 +293,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
       notificationEmails,
       isSharedRequisition,
       sharedGroups,
+      enableInstallments,
+      installments,
       savedAt: now.toISOString()
     };
 
@@ -304,7 +319,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     showAddVendorForm,
     notificationEmails,
     isSharedRequisition,
-    sharedGroups
+    sharedGroups,
+    enableInstallments,
+    installments
   ]);
 
   // Load draft from localStorage on initial render
@@ -328,6 +345,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         if (Array.isArray(draft.notificationEmails)) setNotificationEmails(draft.notificationEmails);
         if (draft.isSharedRequisition !== undefined) setIsSharedRequisition(Boolean(draft.isSharedRequisition));
         if (Array.isArray(draft.sharedGroups)) setSharedGroups(draft.sharedGroups);
+        if (draft.enableInstallments !== undefined) setEnableInstallments(Boolean(draft.enableInstallments));
+        if (Array.isArray(draft.installments) && draft.installments.length > 0) setInstallments(draft.installments);
         
         if (draft.savedAt) {
           const d = new Date(draft.savedAt);
@@ -343,6 +362,106 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
       }
     }
   }, [currentUser]);
+
+  // Installment Preset Calculation Helpers
+  const handleApplySplitPreset = (preset: "50-50" | "40-30-30" | "EVEN-3" | "EVEN-4") => {
+    const total = parseFloat(amount) || 0;
+    if (total <= 0) {
+      alert("Please enter a valid Requisition Total Amount above first.");
+      return;
+    }
+
+    if (preset === "50-50") {
+      const half = Math.round((total / 2) * 100) / 100;
+      const rem = Math.round((total - half) * 100) / 100;
+      setInstallments([
+        { id: `inst-1-${Date.now()}`, installmentNumber: 1, amount: half.toString(), description: "1st Installment (50% Advance / Mobilization)" },
+        { id: `inst-2-${Date.now()}`, installmentNumber: 2, amount: rem.toString(), description: "2nd Installment (50% Final Settlement)" }
+      ]);
+    } else if (preset === "40-30-30") {
+      const p1 = Math.round((total * 0.4) * 100) / 100;
+      const p2 = Math.round((total * 0.3) * 100) / 100;
+      const p3 = Math.round((total - p1 - p2) * 100) / 100;
+      setInstallments([
+        { id: `inst-1-${Date.now()}`, installmentNumber: 1, amount: p1.toString(), description: "1st Installment (40% Initial Mobilization)" },
+        { id: `inst-2-${Date.now()}`, installmentNumber: 2, amount: p2.toString(), description: "2nd Installment (30% Intermediate Deliverable)" },
+        { id: `inst-3-${Date.now()}`, installmentNumber: 3, amount: p3.toString(), description: "3rd Installment (30% Final Inspection / Sign-off)" }
+      ]);
+    } else if (preset === "EVEN-3") {
+      const per = Math.floor((total / 3) * 100) / 100;
+      const rem = Math.round((total - (per * 2)) * 100) / 100;
+      setInstallments([
+        { id: `inst-1-${Date.now()}`, installmentNumber: 1, amount: per.toString(), description: "Tranche 1 of 3" },
+        { id: `inst-2-${Date.now()}`, installmentNumber: 2, amount: per.toString(), description: "Tranche 2 of 3" },
+        { id: `inst-3-${Date.now()}`, installmentNumber: 3, amount: rem.toString(), description: "Tranche 3 of 3 (Final Balance)" }
+      ]);
+    } else if (preset === "EVEN-4") {
+      const per = Math.floor((total / 4) * 100) / 100;
+      const rem = Math.round((total - (per * 3)) * 100) / 100;
+      setInstallments([
+        { id: `inst-1-${Date.now()}`, installmentNumber: 1, amount: per.toString(), description: "Tranche 1 of 4" },
+        { id: `inst-2-${Date.now()}`, installmentNumber: 2, amount: per.toString(), description: "Tranche 2 of 4" },
+        { id: `inst-3-${Date.now()}`, installmentNumber: 3, amount: per.toString(), description: "Tranche 3 of 4" },
+        { id: `inst-4-${Date.now()}`, installmentNumber: 4, amount: rem.toString(), description: "Tranche 4 of 4 (Final Balance)" }
+      ]);
+    }
+  };
+
+  const handleAddInstallment = () => {
+    const nextNum = installments.length + 1;
+    const currentAllocated = installments.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
+    const total = parseFloat(amount) || 0;
+    const remaining = Math.max(0, Math.round((total - currentAllocated) * 100) / 100);
+    
+    setInstallments(prev => [
+      ...prev,
+      {
+        id: `inst-${Date.now()}-${nextNum}`,
+        installmentNumber: nextNum,
+        amount: remaining > 0 ? remaining.toString() : "",
+        description: `Installment #${nextNum} Milestone`
+      }
+    ]);
+  };
+
+  const handleRemoveInstallment = (index: number) => {
+    if (installments.length <= 2) {
+      alert("A minimum of 2 installment tranches is required when installment disbursement is enabled.");
+      return;
+    }
+    const updated = installments.filter((_, i) => i !== index).map((inst, i) => ({
+      ...inst,
+      installmentNumber: i + 1
+    }));
+    setInstallments(updated);
+  };
+
+  const handleInstallmentChange = (index: number, field: string, val: string) => {
+    setInstallments(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: val };
+      return updated;
+    });
+  };
+
+  const handleAutoBalanceRemaining = () => {
+    const total = parseFloat(amount) || 0;
+    if (total <= 0 || installments.length === 0) return;
+    const sumExceptLast = installments.slice(0, -1).reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
+    const remainingForLast = Math.max(0, Math.round((total - sumExceptLast) * 100) / 100);
+    
+    setInstallments(prev => {
+      const updated = [...prev];
+      const lastIdx = updated.length - 1;
+      updated[lastIdx] = { ...updated[lastIdx], amount: remainingForLast.toString() };
+      return updated;
+    });
+  };
+
+  const totalInstallmentScheduled = installments.reduce((sum, inst) => sum + (parseFloat(inst.amount) || 0), 0);
+  const totalReqAmountNum = parseFloat(amount) || 0;
+  const installmentDiff = Math.round((totalReqAmountNum - totalInstallmentScheduled) * 100) / 100;
+  const isInstallmentSumBalanced = Math.abs(installmentDiff) < 0.01 && totalReqAmountNum > 0;
 
   // Handle default group setting ONLY if there is no auto-saved group in localStorage
   useEffect(() => {
@@ -626,6 +745,24 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
 
       const reqTitle = title.trim() || "Untitled Requisition";
 
+      // Process and validate installments if enabled
+      let finalInstallments: RequisitionInstallment[] | undefined = undefined;
+      if (enableInstallments) {
+        if (!isInstallmentSumBalanced) {
+          setLoading(false);
+          alert(`Installment schedule mismatch: The sum of installments (KES ${totalInstallmentScheduled.toLocaleString()}) must equal the Requisition Total (KES ${parsedAmount.toLocaleString()}). Please balance the installments.`);
+          return;
+        }
+        finalInstallments = installments.map((inst, idx) => ({
+          id: inst.id || `inst-${Date.now()}-${idx + 1}`,
+          installmentNumber: idx + 1,
+          amount: parseFloat(inst.amount) || 0,
+          description: inst.description.trim() || `Installment #${idx + 1}`,
+          dueDate: inst.dueDate || undefined,
+          status: "PENDING" as const,
+        }));
+      }
+
       // 1. Convert/upload any base64 attachments to server storage first
       const uploadedAttachmentUrls = encodedAttachments.length > 0
         ? await uploadAttachmentsToLocalServer(encodedAttachments)
@@ -648,6 +785,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         notificationEmails: finalNotificationEmails,
         isSharedRequisition,
         sharedGroups: isSharedRequisition ? sharedGroups : [],
+        enableInstallments,
+        installments: finalInstallments,
+        disbursedAmount: 0,
+        remainingBalance: parsedAmount,
         attachments: uploadedAttachmentUrls,
       });
 
@@ -1559,6 +1700,197 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                   {amountWords || "Auto-calculated on input..."}
                 </div>
               </div>
+            </div>
+
+            {/* Installment / Milestone Disbursement Toggle */}
+            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                    <Split size={15} />
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">Disburse in Installments / Milestones</h5>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Allow this expense voucher to be approved once and disbursed in custom partial milestone payouts.</p>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={enableInstallments} 
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setEnableInstallments(enabled);
+                      if (enabled && totalReqAmountNum > 0 && installments.every(i => !i.amount)) {
+                        handleApplySplitPreset("50-50");
+                      }
+                    }} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* Installment Builder Form */}
+              {enableInstallments && (
+                <div className="space-y-3 pt-2 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/40 shadow-2xs">
+                  {/* Preset Buttons */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Sparkles size={12} className="text-amber-500" /> Split Presets:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApplySplitPreset("50-50")}
+                        className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        50% / 50%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplySplitPreset("40-30-30")}
+                        className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        40% / 30% / 30%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplySplitPreset("EVEN-3")}
+                        className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        3 Tranches
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplySplitPreset("EVEN-4")}
+                        className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition cursor-pointer"
+                      >
+                        4 Tranches
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Installment Rows */}
+                  <div className="space-y-2.5">
+                    {installments.map((inst, index) => {
+                      const instAmt = parseFloat(inst.amount) || 0;
+                      const instPct = totalReqAmountNum > 0 ? Math.round((instAmt / totalReqAmountNum) * 100) : 0;
+
+                      return (
+                        <div key={inst.id || index} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center">
+                                {index + 1}
+                              </span>
+                              <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                                Milestone #{index + 1}
+                              </span>
+                              {instPct > 0 && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold">
+                                  {instPct}%
+                                </span>
+                              )}
+                            </div>
+
+                            {installments.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInstallment(index)}
+                                className="p-1 text-slate-400 hover:text-rose-500 rounded transition cursor-pointer"
+                                title="Remove installment"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                            <div className="sm:col-span-6 space-y-1">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Description / Milestone Target</label>
+                              <input
+                                type="text"
+                                value={inst.description}
+                                onChange={(e) => handleInstallmentChange(index, "description", e.target.value)}
+                                placeholder="e.g., Phase 1 Mobilization Deposit"
+                                className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-indigo-500 font-medium"
+                              />
+                            </div>
+
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Amount (KES)</label>
+                              <input
+                                type="number"
+                                value={inst.amount}
+                                onChange={(e) => handleInstallmentChange(index, "amount", e.target.value)}
+                                placeholder="0.00"
+                                className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-indigo-500 font-mono font-bold text-slate-900 dark:text-white"
+                              />
+                            </div>
+
+                            <div className="sm:col-span-3 space-y-1">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Target Due Date (Opt)</label>
+                              <input
+                                type="date"
+                                value={inst.dueDate || ""}
+                                onChange={(e) => handleInstallmentChange(index, "dueDate", e.target.value)}
+                                className="w-full px-2 py-1.5 text-[11px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md outline-none focus:border-indigo-500 font-mono text-slate-700 dark:text-slate-300"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Actions & Balance Validator Bar */}
+                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={handleAddInstallment}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      <PlusCircle size={14} /> Add Another Installment
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {installmentDiff !== 0 && totalReqAmountNum > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleAutoBalanceRemaining}
+                          className="px-2.5 py-1 text-[10px] font-bold uppercase rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-500/20 transition cursor-pointer"
+                        >
+                          Auto-Balance Remaining
+                        </button>
+                      )}
+
+                      <div className={cn(
+                        "px-2.5 py-1 rounded-md text-[10px] font-mono font-bold flex items-center gap-1.5 border",
+                        isInstallmentSumBalanced 
+                          ? "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" 
+                          : "bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+                      )}>
+                        {isInstallmentSumBalanced ? (
+                          <>
+                            <CheckCircle2 size={12} className="text-emerald-600" />
+                            <span>Sum: KES {totalInstallmentScheduled.toLocaleString()} (100% Balanced)</span>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle size={12} className="text-rose-600" />
+                            <span>
+                              Scheduled: KES {totalInstallmentScheduled.toLocaleString()} / Total: KES {totalReqAmountNum.toLocaleString()}
+                              {installmentDiff > 0 ? ` (KES ${installmentDiff.toLocaleString()} remaining)` : ` (Exceeds by KES ${Math.abs(installmentDiff).toLocaleString()})`}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

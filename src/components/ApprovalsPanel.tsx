@@ -18,7 +18,10 @@ import {
   X,
   FileText,
   Flag,
-  History
+  History,
+  Layers,
+  Split,
+  CalendarClock
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
@@ -381,6 +384,40 @@ export const ApprovalsPanel: React.FC = () => {
                       <div className="p-3 md:p-4 bg-white rounded-lg md:rounded-xl border border-slate-200 text-[11px] md:text-xs text-slate-600 italic leading-relaxed max-h-32 overflow-y-auto scrollbar-hide">
                         "{selectedReq.description}"
                       </div>
+
+                      {selectedReq.enableInstallments && Array.isArray(selectedReq.installments) && selectedReq.installments.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-2">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-700">
+                            <span className="flex items-center gap-1.5 uppercase tracking-wider text-indigo-700">
+                              <Split size={12} /> Phased Milestone Schedule ({selectedReq.installments.length} Installments)
+                            </span>
+                            <span className="font-mono text-slate-500">
+                              {formatCurrency(selectedReq.disbursedAmount || 0)} / {formatCurrency(selectedReq.amount)}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-1.5 max-h-32 overflow-y-auto">
+                            {selectedReq.installments.map((inst) => (
+                              <div key={inst.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-800 font-bold flex items-center justify-center text-[9px]">
+                                    {inst.installmentNumber}
+                                  </span>
+                                  <span className="font-semibold text-slate-800">{inst.title}</span>
+                                  {inst.dueDate && (
+                                    <span className="text-slate-400 font-mono text-[9px] flex items-center gap-0.5">
+                                      <CalendarClock size={9} /> {new Date(inst.dueDate).toLocaleDateString('en-GB')}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-mono font-bold text-slate-900">{formatCurrency(inst.amount)}</span>
+                                  <span className="text-[8px] text-slate-400 font-mono ml-1">({inst.percentage}%)</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3 md:space-y-4">

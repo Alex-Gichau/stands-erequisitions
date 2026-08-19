@@ -42,7 +42,10 @@ import {
   User,
   Mail,
   UserCheck,
-  CreditCard
+  CreditCard,
+  Layers,
+  CalendarClock,
+  Split
 } from "lucide-react";
 import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition, Project } from "../types";
@@ -144,7 +147,8 @@ export const FinanceLedgerPanel: React.FC = () => {
     updateLedgerBookBudget,
     seedAllEcosystemData,
     syncingTargets,
-    canPerform
+    canPerform,
+    disburseInstallment
   } = useRequisitions();
 
   const handleToggleYearClosure = async () => {
@@ -768,6 +772,23 @@ export const FinanceLedgerPanel: React.FC = () => {
   const [referenceNum, setReferenceNum] = useState("");
   const [payoutNotes, setPayoutNotes] = useState("");
   const [isCommitingPayout, setIsCommitingPayout] = useState(false);
+  const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>("ALL");
+
+  // Keep selectedInstallmentId in sync when disbursingReq changes
+  React.useEffect(() => {
+    if (disbursingReq) {
+      if (disbursingReq.enableInstallments && Array.isArray(disbursingReq.installments) && disbursingReq.installments.length > 0) {
+        const firstPending = disbursingReq.installments.find(i => i.status === "PENDING");
+        if (firstPending) {
+          setSelectedInstallmentId(firstPending.id);
+        } else {
+          setSelectedInstallmentId("ALL");
+        }
+      } else {
+        setSelectedInstallmentId("ALL");
+      }
+    }
+  }, [disbursingReq]);
 
   // Mapping ministry groups to chart/category codes for double-entry tracking
   const getAccountingCode = (groupId: string): { code: string; name: string } => {
@@ -791,14 +812,22 @@ export const FinanceLedgerPanel: React.FC = () => {
   // 1. Calculate Financial Metrics
   const metrics = useMemo(() => {
     // Total approved or disbursed, which represents total committed funds
-    const totalDisbursed = requisitions
-      .filter(r => r.status === RequisitionStatus.DISBURSED)
-      .reduce((acc, r) => acc + r.amount, 0);
+    const totalDisbursed = requisitions.reduce((acc, r) => {
+      if (r.status === RequisitionStatus.DISBURSED) return acc + (r.amount || 0);
+      if (r.status === RequisitionStatus.PARTIALLY_DISBURSED) return acc + (r.disbursedAmount || 0);
+      return acc;
+    }, 0);
 
-    const pendingDisbursalCount = requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2).length;
-    const totalCommittedPending = requisitions
-      .filter(r => r.status === RequisitionStatus.APPROVED_L2)
-      .reduce((acc, r) => acc + r.amount, 0);
+    const pendingDisbursals = requisitions.filter(
+      r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED
+    );
+    const pendingDisbursalCount = pendingDisbursals.length;
+    const totalCommittedPending = pendingDisbursals.reduce((acc, r) => {
+      if (r.status === RequisitionStatus.PARTIALLY_DISBURSED) {
+        return acc + (r.remainingBalance ?? Math.max(0, (r.amount || 0) - (r.disbursedAmount || 0)));
+      }
+      return acc + (r.amount || 0);
+    }, 0);
 
     const activeProjects = projects.filter(p => p.fiscalYear === activeYear || (!p.fiscalYear && activeYear === 2026));
     const totalActiveBudget = activeProjects.length > 0
@@ -808,14 +837,21 @@ export const FinanceLedgerPanel: React.FC = () => {
     const totalRemainingBudget = (activeProjects.length > 0 ? activeProjects : projects).reduce((acc, p) => {
       const projectReqs = getProjectRequisitions(p, requisitions);
       const usedAmount = projectReqs
-        .filter(r => [RequisitionStatus.SUBMITTED, RequisitionStatus.APPROVED_L1, RequisitionStatus.ESCALATED, RequisitionStatus.APPROVED_L2, RequisitionStatus.DISBURSED].includes(r.status))
+        .filter(r => [
+          RequisitionStatus.SUBMITTED, 
+          RequisitionStatus.APPROVED_L1, 
+          RequisitionStatus.ESCALATED, 
+          RequisitionStatus.APPROVED_L2, 
+          RequisitionStatus.PARTIALLY_DISBURSED,
+          RequisitionStatus.DISBURSED
+        ].includes(r.status))
         .reduce((sum, r) => sum + r.amount, 0);
       return acc + (p.allocatedBudget - usedAmount);
     }, 0);
 
     // Disbursement efficiency: simulated speed
     const approvedRequisitions = requisitions.filter(
-      r => r.status === RequisitionStatus.DISBURSED || r.status === RequisitionStatus.APPROVED_L2
+      r => r.status === RequisitionStatus.DISBURSED || r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED
     );
     const averageTimeMinutes = approvedRequisitions.length > 0 ? 320 : 0; // Simulated stable speed in system
 
@@ -955,7 +991,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     }
   };
 
-  // Handle Manual Fund Disbursement Action
+  // Handle Manual Fund Disbursement Action (supports full & installment-based payouts)
   const handleRecordPayout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!disbursingReq) return;
@@ -970,31 +1006,53 @@ export const FinanceLedgerPanel: React.FC = () => {
     const requester = users?.find(u => u.id === disbursingReq.requesterId);
     const resolvedEmail = requester?.email || `${disbursingReq.requesterName.toLowerCase().replace(/\s+/g, "")}@church.org`;
 
+    const isInstallmentMode = disbursingReq.enableInstallments && selectedInstallmentId !== "ALL";
+    const targetInstallment = isInstallmentMode 
+      ? disbursingReq.installments?.find(i => i.id === selectedInstallmentId)
+      : null;
+
+    const payoutAmount = targetInstallment 
+      ? targetInstallment.amount 
+      : (disbursingReq.remainingBalance ?? (disbursingReq.amount - (disbursingReq.disbursedAmount || 0)));
+
     // 1. Trigger Loading Email Toast
     triggerToast({
       type: "FINANCE_DISBURSEMENT",
       severity: "MEDIUM",
-      message: `📧 Dispatching Cash Disbursement Email Notification to ${disbursingReq.requesterName} (${resolvedEmail})...`,
+      message: `📧 Dispatching ${isInstallmentMode ? `Installment #${targetInstallment?.installmentNumber} (KES ${payoutAmount.toLocaleString()})` : "Disbursement"} Notification to ${disbursingReq.requesterName} (${resolvedEmail})...`,
       timestamp: new Date().toISOString()
     });
 
     try {
-      const payoutNotesText = `Disbursement ref: ${disburseMethod} #${referenceNum}. ${payoutNotes ? `Notes: ${payoutNotes}` : ""}`;
-      
-      // Update state to DISBURSED, which logs the decision
-      await updateRequisitionStatus(
-        disbursingReq.id,
-        RequisitionStatus.DISBURSED,
-        "APPROVE",
-        payoutNotesText,
-        "SIGNATURE"
-      );
+      if (isInstallmentMode && targetInstallment) {
+        await disburseInstallment(
+          disbursingReq.id,
+          targetInstallment.id,
+          {
+            referenceNum: referenceNum.trim(),
+            paymentMethod: disburseMethod,
+            notes: payoutNotes.trim() || undefined,
+            amount: payoutAmount,
+          }
+        );
+      } else {
+        const payoutNotesText = `Disbursement ref: ${disburseMethod} #${referenceNum}. ${payoutNotes ? `Notes: ${payoutNotes}` : ""}`;
+        
+        // Update state to DISBURSED, which auto-marks all remaining installments and logs the decision
+        await updateRequisitionStatus(
+          disbursingReq.id,
+          RequisitionStatus.DISBURSED,
+          "APPROVE",
+          payoutNotesText,
+          "SIGNATURE"
+        );
 
-      await addSystemLog(
-        "FUNDS_DISBURSED",
-        `Disbursed KES ${disbursingReq.amount.toLocaleString()} for '${disbursingReq.title}' via ${disburseMethod} (Ref: ${referenceNum})`,
-        { requisitionId: disbursingReq.id, amount: disbursingReq.amount, method: disburseMethod, referenceNum }
-      );
+        await addSystemLog(
+          "FUNDS_DISBURSED",
+          `Disbursed KES ${payoutAmount.toLocaleString()} for '${disbursingReq.title}' via ${disburseMethod} (Ref: ${referenceNum})`,
+          { requisitionId: disbursingReq.id, amount: payoutAmount, method: disburseMethod, referenceNum }
+        );
+      }
 
       // 3. Trigger Success Toast
       triggerToast({
@@ -1006,10 +1064,11 @@ export const FinanceLedgerPanel: React.FC = () => {
 
       setReferenceNum("");
       setPayoutNotes("");
+      setSelectedInstallmentId("ALL");
       setDisbursingReq(null);
-    } catch (err) {
-      console.error("Failed to records payout:", err);
-      alert("Authorization issue or Firestore write error");
+    } catch (err: any) {
+      console.error("Failed to record payout:", err);
+      alert(err?.message || "Authorization issue or Firestore write error");
     } finally {
       setIsCommitingPayout(false);
     }
@@ -1018,8 +1077,11 @@ export const FinanceLedgerPanel: React.FC = () => {
   // Filtered list of requisitions specifically acting as General Ledger Line Items
   const ledgerEntries = useMemo(() => {
     return requisitions.filter(req => {
-      // Must be relevant to finance: approved for payment or fully paid out
-      const isFinanceTier = req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED;
+      // Must be relevant to finance: approved for payment or fully paid out or in partial installment state
+      const isFinanceTier = 
+        req.status === RequisitionStatus.APPROVED_L2 || 
+        req.status === RequisitionStatus.PARTIALLY_DISBURSED ||
+        req.status === RequisitionStatus.DISBURSED;
       if (!isFinanceTier) return false;
 
       // Project filter
@@ -1035,7 +1097,7 @@ export const FinanceLedgerPanel: React.FC = () => {
       if (!matchesSearch) return false;
 
       // Status filters
-      if (statusFilter === "PENDING_DISBURSAL" && req.status !== RequisitionStatus.APPROVED_L2) return false;
+      if (statusFilter === "PENDING_DISBURSAL" && req.status !== RequisitionStatus.APPROVED_L2 && req.status !== RequisitionStatus.PARTIALLY_DISBURSED) return false;
       if (statusFilter === "DISBURSED" && req.status !== RequisitionStatus.DISBURSED) return false;
 
       return true;
@@ -1947,7 +2009,7 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
 
           {/* 5. Awaiting Disbursement Box */}
-          {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2).length > 0 && (
+          {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED).length > 0 && (
             <div className="bg-amber-50/50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-inner">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1960,32 +2022,67 @@ export const FinanceLedgerPanel: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2).map((req) => (
-                  <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[9px] font-mono uppercase text-slate-400 font-bold">#{req.id.substr(0, 8)}</span>
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={10} className="text-rose-500 fill-rose-500" />
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-xs font-extrabold text-[#4f46e5]">{formatCurrency(req.amount)}</span>
-                      </div>
-                      <h4 className="text-xs font-bold text-slate-800 leading-snug line-clamp-1">{req.title}</h4>
-                      <p className="text-[10px] text-slate-500 font-medium">Group: {req.groupName} • Requester: {req.requesterName}</p>
-                    </div>
+                {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED).map((req) => {
+                  const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
+                  const remaining = req.remainingBalance ?? Math.max(0, (req.amount || 0) - (req.disbursedAmount || 0));
+                  const nextPendingInst = req.enableInstallments && Array.isArray(req.installments) 
+                    ? req.installments.find(i => i.status === "PENDING")
+                    : null;
 
-                    <button
-                      onClick={() => setDisbursingReq(req)}
-                      className="w-full text-center py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Process Disbursement Voucher
-                    </button>
-                  </div>
-                ))}
+                  return (
+                    <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] font-mono uppercase text-slate-400 font-bold">#{req.id.substr(0, 8)}</span>
+                            {req.flaggedForAudit && (
+                              <span title="Flagged for Audit" className="inline-flex shrink-0">
+                                <Flag size={10} className="text-rose-500 fill-rose-500" />
+                              </span>
+                            )}
+                            {isPartial ? (
+                              <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-full font-bold uppercase">
+                                Partial Payout
+                              </span>
+                            ) : req.enableInstallments ? (
+                              <span className="text-[8px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-full font-bold uppercase flex items-center gap-0.5">
+                                <Layers size={8} /> {req.installments?.length || 0} Installments
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-extrabold text-[#4f46e5] block">{formatCurrency(req.amount)}</span>
+                            {isPartial && (
+                              <span className="text-[8.5px] font-bold text-amber-600 block">
+                                Remaining: {formatCurrency(remaining)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <h4 className="text-xs font-bold text-slate-800 leading-snug line-clamp-1">{req.title}</h4>
+                        <p className="text-[10px] text-slate-500 font-medium">Group: {req.groupName} • Requester: {req.requesterName}</p>
+
+                        {req.enableInstallments && nextPendingInst && (
+                          <div className="mt-1 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 flex items-center justify-between text-[9.5px]">
+                            <span className="font-semibold text-indigo-900 flex items-center gap-1">
+                              <Split size={11} className="text-indigo-600" />
+                              Next: #{nextPendingInst.installmentNumber} ({nextPendingInst.title})
+                            </span>
+                            <span className="font-mono font-bold text-indigo-700">{formatCurrency(nextPendingInst.amount)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => setDisbursingReq(req)}
+                        className="w-full text-center py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Banknote size={13} />
+                        {isPartial ? "Process Next Installment" : req.enableInstallments ? "Process Installment Disbursement" : "Process Disbursement Voucher"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2023,12 +2120,22 @@ export const FinanceLedgerPanel: React.FC = () => {
                     {ledgerEntries.map((req) => {
                       const isExpanded = expandedReqId === req.id;
                       const codeInfo = getAccountingCode(req.groupId);
+                      const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
+                      const disbursedAmt = req.disbursedAmount || 0;
+                      const remainingAmt = req.remainingBalance ?? Math.max(0, (req.amount || 0) - disbursedAmt);
+                      const percentDisbursed = req.amount > 0 ? Math.round((disbursedAmt / req.amount) * 100) : 0;
+
                       return (
                         <React.Fragment key={req.id}>
                           <tr className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-6 font-mono">
                               <div className="text-[11px] font-bold text-slate-800">#{req.id.substr(0, 8).toUpperCase()}</div>
                               <div className="text-[9px] text-slate-400 uppercase tracking-wider">Acc: {codeInfo.code}</div>
+                              {req.enableInstallments && (
+                                <span className="inline-flex items-center gap-0.5 text-[8px] bg-slate-100 text-indigo-700 px-1 rounded font-sans font-semibold mt-0.5">
+                                  <Layers size={8} /> Phased ({req.installments?.length || 0})
+                                </span>
+                              )}
                             </td>
                             <td className="py-4 px-4">
                               <div className="flex items-center gap-1.5 font-bold text-slate-800">
@@ -2046,7 +2153,16 @@ export const FinanceLedgerPanel: React.FC = () => {
                               </div>
                             </td>
                             <td className="py-4 px-4 text-right font-mono font-bold text-rose-600">
-                              KES {req.amount.toLocaleString()}.00
+                              {isPartial ? (
+                                <div>
+                                  <span>KES {disbursedAmt.toLocaleString()}.00</span>
+                                  <div className="text-[9px] font-normal text-slate-400">
+                                    of KES {req.amount.toLocaleString()} ({percentDisbursed}%)
+                                  </div>
+                                </div>
+                              ) : (
+                                <span>KES {req.amount.toLocaleString()}.00</span>
+                              )}
                             </td>
                             <td className="py-4 px-4 text-right font-mono font-medium text-slate-400">
                               - Credit Central Bank
@@ -2057,10 +2173,26 @@ export const FinanceLedgerPanel: React.FC = () => {
                                   "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block",
                                   req.status === RequisitionStatus.DISBURSED 
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
-                                    : "bg-amber-50 text-amber-700 border border-amber-100"
+                                    : isPartial
+                                      ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                                      : "bg-amber-50 text-amber-700 border border-amber-100"
                                 )}>
-                                  {req.status === RequisitionStatus.DISBURSED ? "PAID OUT" : "UNPAID REQ"}
+                                  {req.status === RequisitionStatus.DISBURSED 
+                                    ? "PAID OUT" 
+                                    : isPartial 
+                                      ? `PARTIAL (${percentDisbursed}%)` 
+                                      : "UNPAID REQ"}
                                 </span>
+
+                                {(req.status === RequisitionStatus.APPROVED_L2 || isPartial) && (
+                                  <button
+                                    onClick={() => setDisbursingReq(req)}
+                                    className="p-1 hover:bg-indigo-50 text-slate-500 hover:text-indigo-600 rounded transition-colors cursor-pointer"
+                                    title={isPartial ? "Disburse Next Installment" : "Process Disbursement"}
+                                  >
+                                    <Banknote size={13} />
+                                  </button>
+                                )}
                                 
                                 <button
                                   onClick={() => printLedgerVoucher(req)}
@@ -2073,6 +2205,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                                 <button
                                   onClick={() => setExpandedReqId(isExpanded ? null : req.id)}
                                   className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors cursor-pointer"
+                                  title={isExpanded ? "Collapse Details" : "Expand Details"}
                                 >
                                   {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                                 </button>
@@ -2084,7 +2217,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                           {isExpanded && (
                             <tr>
                               <td colSpan={5} className="bg-slate-50/50 p-4 border-t border-b border-dashed border-slate-200">
-                                <div className="space-y-2 text-[11px] text-slate-600">
+                                <div className="space-y-3 text-[11px] text-slate-600">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-200 text-[10px]">
                                     <div>
                                       <span className="font-bold text-slate-400 uppercase block">Requester Details</span>
@@ -2100,6 +2233,96 @@ export const FinanceLedgerPanel: React.FC = () => {
 
                                   <p><strong>Accounting Narrative:</strong> {req.description || "No description provided."}</p>
                                   {req.amountWords && <p><strong>Amount in Words:</strong> {req.amountWords}</p>}
+
+                                  {/* Installment schedule breakdown in expanded view */}
+                                  {req.enableInstallments && Array.isArray(req.installments) && req.installments.length > 0 && (
+                                    <div className="bg-white p-3.5 rounded-xl border border-indigo-100 space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <Split size={14} className="text-indigo-600" />
+                                          <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider">
+                                            Installment Milestone Schedule
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] font-bold">
+                                          <span className="text-emerald-700 font-mono">{formatCurrency(disbursedAmt)}</span>
+                                          <span className="text-slate-400"> / </span>
+                                          <span className="text-slate-700 font-mono">{formatCurrency(req.amount)}</span>
+                                          <span className="text-indigo-600 ml-1.5">({percentDisbursed}% settled)</span>
+                                        </div>
+                                      </div>
+
+                                      {/* Progress Bar */}
+                                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                        <div 
+                                          className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                                          style={{ width: `${percentDisbursed}%` }}
+                                        />
+                                      </div>
+
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-[10px]">
+                                          <thead>
+                                            <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px]">
+                                              <th className="py-1.5 px-2">#</th>
+                                              <th className="py-1.5 px-2">Milestone / Title</th>
+                                              <th className="py-1.5 px-2">Due Date</th>
+                                              <th className="py-1.5 px-2 text-right">Amount</th>
+                                              <th className="py-1.5 px-2 text-center">Status</th>
+                                              <th className="py-1.5 px-2">Payment Details</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                            {req.installments.map((inst) => (
+                                              <tr key={inst.id} className="hover:bg-slate-50">
+                                                <td className="py-2 px-2 font-bold font-mono text-slate-500">#{inst.installmentNumber}</td>
+                                                <td className="py-2 px-2 font-semibold text-slate-800">{inst.title}</td>
+                                                <td className="py-2 px-2 text-slate-500 font-mono text-[9px]">
+                                                  {inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('en-GB') : "On Demand"}
+                                                </td>
+                                                <td className="py-2 px-2 text-right font-mono font-bold text-slate-900">
+                                                  {formatCurrency(inst.amount)} <span className="text-[8px] font-normal text-slate-400">({inst.percentage}%)</span>
+                                                </td>
+                                                <td className="py-2 px-2 text-center">
+                                                  <span className={cn(
+                                                    "px-2 py-0.5 rounded-full font-black text-[8px] uppercase",
+                                                    inst.status === "DISBURSED"
+                                                      ? "bg-emerald-100 text-emerald-800"
+                                                      : "bg-amber-100 text-amber-800"
+                                                  )}>
+                                                    {inst.status === "DISBURSED" ? "Paid Out" : "Pending"}
+                                                  </span>
+                                                </td>
+                                                <td className="py-2 px-2 text-[9px] text-slate-500">
+                                                  {inst.status === "DISBURSED" ? (
+                                                    <span className="font-mono text-emerald-700 font-semibold">
+                                                      {inst.disbursementMethod || "EFT"} Ref: {inst.disbursementReference || "N/A"} 
+                                                      {inst.disbursedAt && ` (${new Date(inst.disbursedAt).toLocaleDateString('en-GB')})`}
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-slate-400 italic">Awaiting release</span>
+                                                  )}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+
+                                      {(req.status === RequisitionStatus.APPROVED_L2 || isPartial) && (
+                                        <div className="pt-1 flex justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={() => setDisbursingReq(req)}
+                                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                          >
+                                            <Banknote size={12} />
+                                            Disburse Next Installment
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   
                                   <div className="flex flex-wrap gap-4 pt-2 text-[10px] text-slate-500 border-t border-slate-200">
                                     <p><strong>Submitted Date:</strong> {req.submittedAt ? new Date(req.submittedAt).toLocaleString() : "N/A"}</p>
@@ -3005,6 +3228,17 @@ export const FinanceLedgerPanel: React.FC = () => {
           const requesterRole = requesterObj?.role || "Church Group Representative";
           const historyList = Array.isArray(disbursingReq.approvalHistory) ? disbursingReq.approvalHistory : [];
 
+          const hasInstallments = Boolean(disbursingReq.enableInstallments && Array.isArray(disbursingReq.installments) && disbursingReq.installments.length > 0);
+          const isInstallmentMode = hasInstallments && selectedInstallmentId !== "ALL";
+          const targetInstallment = isInstallmentMode
+            ? disbursingReq.installments?.find(i => i.id === selectedInstallmentId)
+            : null;
+          const disbursedAmt = disbursingReq.disbursedAmount || 0;
+          const remainingAmt = disbursingReq.remainingBalance ?? Math.max(0, (disbursingReq.amount || 0) - disbursedAmt);
+          const payoutAmount = targetInstallment ? targetInstallment.amount : remainingAmt;
+          const percentDisbursed = disbursingReq.amount > 0 ? Math.round((disbursedAmt / disbursingReq.amount) * 100) : 0;
+          const pendingInstallments = hasInstallments ? (disbursingReq.installments?.filter(i => i.status === "PENDING") || []) : [];
+
           return (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
               <motion.div
@@ -3034,9 +3268,16 @@ export const FinanceLedgerPanel: React.FC = () => {
                   {/* 1. Requisition Summary Card */}
                   <div className="border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-white p-4 rounded-xl space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-bold">
-                      <span className="font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        REQUISITION #{disbursingReq.id.substr(0, 8)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          REQUISITION #{disbursingReq.id.substr(0, 8)}
+                        </span>
+                        {hasInstallments && (
+                          <span className="text-[9px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-bold uppercase flex items-center gap-1">
+                            <Layers size={9} /> Phased ({disbursingReq.installments?.length} Installments)
+                          </span>
+                        )}
+                      </div>
                       <span className="text-indigo-900 bg-indigo-100/70 px-2.5 py-0.5 rounded-full font-semibold text-[10px]">
                         {disbursingReq.groupName}
                       </span>
@@ -3044,8 +3285,15 @@ export const FinanceLedgerPanel: React.FC = () => {
                     
                     <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 pt-1">
                       <h4 className="text-sm font-bold text-slate-900 leading-snug">{disbursingReq.title}</h4>
-                      <div className="text-lg font-black text-indigo-700 shrink-0">
-                        {formatCurrency(disbursingReq.amount)}
+                      <div className="text-right shrink-0">
+                        <div className="text-lg font-black text-indigo-700">
+                          {formatCurrency(disbursingReq.amount)}
+                        </div>
+                        {hasInstallments && (
+                          <div className="text-[10px] font-medium text-slate-500">
+                            Disbursed: <span className="font-bold text-emerald-700">{formatCurrency(disbursedAmt)}</span> • Remaining: <span className="font-bold text-amber-600">{formatCurrency(remainingAmt)}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -3070,7 +3318,170 @@ export const FinanceLedgerPanel: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 2. Requester Details */}
+                  {/* 2. Installment Milestone Selection (if enabled) */}
+                  {hasInstallments && (
+                    <div className="border border-indigo-200 bg-indigo-50/30 rounded-xl p-4 space-y-3.5 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Split size={16} className="text-indigo-600" />
+                          <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            Installment Milestone Release Options
+                          </h5>
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-full">
+                          {percentDisbursed}% Settled
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${percentDisbursed}%` }}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Select Milestone to Release Now:
+                        </span>
+
+                        <div className="grid grid-cols-1 gap-2">
+                          {disbursingReq.installments?.map((inst) => {
+                            const isPaid = inst.status === "DISBURSED";
+                            const isSelected = selectedInstallmentId === inst.id;
+
+                            return (
+                              <div
+                                key={inst.id}
+                                onClick={() => {
+                                  if (!isPaid) setSelectedInstallmentId(inst.id);
+                                }}
+                                className={cn(
+                                  "p-3 rounded-xl border transition-all text-xs flex items-center justify-between",
+                                  isPaid
+                                    ? "bg-emerald-50/50 border-emerald-200/80 opacity-80 cursor-default"
+                                    : isSelected
+                                      ? "bg-white border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs cursor-pointer"
+                                      : "bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50/80 cursor-pointer"
+                                )}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className={cn(
+                                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                    isPaid
+                                      ? "bg-emerald-600 text-white"
+                                      : isSelected
+                                        ? "bg-indigo-600 text-white"
+                                        : "border border-slate-300 text-slate-500"
+                                  )}>
+                                    {isPaid ? <CheckCircle2 size={12} /> : inst.installmentNumber}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-slate-900">{inst.title}</span>
+                                      <span className="text-[10px] text-slate-500 font-mono">({inst.percentage}%)</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                      {inst.dueDate ? (
+                                        <span className="flex items-center gap-1 text-slate-600">
+                                          <CalendarClock size={10} /> Due {new Date(inst.dueDate).toLocaleDateString('en-GB')}
+                                        </span>
+                                      ) : (
+                                        <span>On Demand Milestone</span>
+                                      )}
+                                      {isPaid && inst.disbursementReference && (
+                                        <span className="font-mono text-emerald-700">
+                                          • {inst.disbursementMethod} Ref: {inst.disbursementReference}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <div className={cn(
+                                    "font-mono font-bold text-sm",
+                                    isPaid ? "text-emerald-700" : isSelected ? "text-indigo-700" : "text-slate-800"
+                                  )}>
+                                    {formatCurrency(inst.amount)}
+                                  </div>
+                                  <span className={cn(
+                                    "text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-0.5",
+                                    isPaid
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : isSelected
+                                        ? "bg-indigo-100 text-indigo-800"
+                                        : "bg-amber-100 text-amber-800"
+                                  )}>
+                                    {isPaid ? "Paid Out" : isSelected ? "Selected for Release" : "Pending"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Option to disburse full remaining balance at once */}
+                          {pendingInstallments.length > 1 && (
+                            <div
+                              onClick={() => setSelectedInstallmentId("ALL")}
+                              className={cn(
+                                "p-3 rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer",
+                                selectedInstallmentId === "ALL"
+                                  ? "bg-white border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs"
+                                  : "bg-white border-slate-200 hover:border-indigo-300 hover:bg-slate-50/80"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                                  selectedInstallmentId === "ALL"
+                                    ? "bg-indigo-600 text-white"
+                                    : "border border-slate-300 text-slate-500"
+                                )}>
+                                  <Coins size={12} />
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-900">Disburse Entire Remaining Balance</span>
+                                  <p className="text-[10px] text-slate-500 mt-0.5">
+                                    Release full remaining funds ({pendingInstallments.length} pending milestones) in one transaction.
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <div className="font-mono font-bold text-sm text-indigo-700">
+                                  {formatCurrency(remainingAmt)}
+                                </div>
+                                <span className={cn(
+                                  "text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-0.5",
+                                  selectedInstallmentId === "ALL" ? "bg-indigo-100 text-indigo-800" : "bg-slate-100 text-slate-600"
+                                )}>
+                                  Full Settlement
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Active Selection Indicator */}
+                      <div className="p-2.5 bg-indigo-100/60 rounded-lg flex items-center justify-between text-xs text-indigo-950 font-medium">
+                        <span>
+                          {isInstallmentMode && targetInstallment ? (
+                            <>Ready to disburse <strong>Installment #{targetInstallment.installmentNumber}</strong> ({targetInstallment.title})</>
+                          ) : (
+                            <>Ready to settle <strong>Entire Remaining Balance</strong></>
+                          )}
+                        </span>
+                        <span className="font-mono font-extrabold text-indigo-700 text-sm">
+                          {formatCurrency(payoutAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Requester Details */}
                   <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
@@ -3111,7 +3522,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 3. Approvers & Authorization History */}
+                  {/* 4. Approvers & Authorization History */}
                   <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
@@ -3196,12 +3607,17 @@ export const FinanceLedgerPanel: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 4. Disbursement Settlement Details (Form inputs) */}
+                  {/* 5. Disbursement Settlement Details (Form inputs) */}
                   <div className="border border-slate-200 bg-slate-50/70 rounded-xl p-4 space-y-4">
-                    <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <Banknote size={15} className="text-indigo-600" />
-                      Disbursement Payout Release Details
-                    </h5>
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <Banknote size={15} className="text-indigo-600" />
+                        Disbursement Payout Release Details
+                      </h5>
+                      <span className="text-xs font-mono font-bold text-indigo-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                        KES {payoutAmount.toLocaleString()}.00
+                      </span>
+                    </div>
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Disbursement Channel</label>
@@ -3271,7 +3687,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                         <>Committing Payout...</>
                       ) : (
                         <>
-                          <CheckCircle2 size={16} /> Confirm Release
+                          <CheckCircle2 size={16} /> Confirm Release ({formatCurrency(payoutAmount)})
                         </>
                       )}
                     </button>

@@ -5593,11 +5593,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   const containerClass = isPage
     ? cn(
         "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-full shadow-sm flex flex-col h-[calc(100vh-110px)] min-h-[500px] select-text relative overflow-hidden transition-all duration-300",
-        isSidePreviewOpen && "lg:pr-[500px] xl:pr-[580px]"
+        isSidePreviewOpen && "lg:mr-[520px] xl:mr-[600px] lg:max-w-[calc(100%-520px)] xl:max-w-[calc(100%-600px)]"
       )
     : cn(
         "bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-4xl h-full md:h-[90vh] md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col max-w-full relative transition-all duration-300",
-        isSidePreviewOpen && "lg:max-w-2xl xl:max-w-3xl lg:-translate-x-28 xl:-translate-x-40"
+        isSidePreviewOpen && "lg:w-[calc(100vw-540px)] xl:w-[calc(100vw-620px)] lg:max-w-[calc(100vw-540px)] xl:max-w-[calc(100vw-620px)] lg:mr-[520px] xl:mr-[600px] lg:ml-2 xl:ml-4"
       );
 
   const mainContent = (
@@ -5785,9 +5785,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             );
           })()}
 
-          <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-3">
+          <div className={cn("flex-1 min-h-0 flex flex-col", !isSidePreviewOpen && "lg:grid lg:grid-cols-3")}>
             {/* Left Content */}
-            <div ref={leftPanelRef} className="lg:col-span-2 p-4 md:p-8 space-y-5 md:space-y-8 border-b lg:border-b-0 lg:border-r border-slate-100 h-auto overflow-visible">
+            <div ref={leftPanelRef} className={cn("p-4 md:p-8 space-y-5 md:space-y-8 h-auto overflow-visible", isSidePreviewOpen ? "w-full border-b-0" : "lg:col-span-2 border-b lg:border-b-0 lg:border-r border-slate-100")}>
               <section className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-[0.2em]">Requisition Description</h4>
@@ -5797,8 +5797,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 </div>
               </section>
 
-              <div className="flex flex-wrap sm:grid sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1">
+              <div className="flex flex-col gap-3.5 md:gap-4 w-full">
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 w-full min-w-0">
                   <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Requested Amount</h4>
                   <div className="space-y-1 min-w-0">
                     <p className="text-lg md:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono break-all">{formatCurrency(req.amount)}</p>
@@ -5806,7 +5806,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   </div>
                 </section>
 
-                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1">
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 w-full min-w-0">
                   <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Individual Requestor</h4>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 text-primary font-bold text-xs md:text-base flex items-center justify-center shrink-0">
@@ -5819,7 +5819,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   </div>
                 </section>
 
-                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 min-w-[200px] flex-1 col-span-1 sm:col-span-2 xl:col-span-1">
+                <section className="space-y-2 bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 w-full min-w-0">
                   <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Vendor</h4>
                   {(() => {
                     const vendorName = req.payableTo || "";
@@ -7104,8 +7104,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               )}
             </div>
 
-            {/* Right Sidebar - History & Status */}
-            <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible">
+            {/* Right Sidebar - History & Status (Hidden when side preview is open) */}
+            {!isSidePreviewOpen && (
+              <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible lg:col-span-1">
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2">
                   <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest shrink-0">
@@ -7330,6 +7331,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                  </div>
               </section>
             </div>
+            )}
           </div>
         </div>
 
@@ -7759,7 +7761,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     }
 
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+      <div className={cn(
+        "fixed inset-0 z-[100] flex items-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden transition-all duration-300",
+        isSidePreviewOpen ? "justify-start pl-2 sm:pl-4 md:pl-6" : "justify-center"
+      )}>
         {mainContent}
       </div>
     );

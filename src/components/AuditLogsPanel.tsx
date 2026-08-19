@@ -24,7 +24,6 @@ import { useRequisitions } from "../contexts/RequisitionContext";
 import { SystemLog, UserRole } from "../types";
 import { cn } from "../lib/utils";
 import { getTimeUntilMidnightPT } from "../lib/errorMonitor";
-import { getFirestoreWriteCount } from "../lib/quotaMonitor";
 import { AuditSummaryWidget } from "./AuditSummaryWidget";
 import { EmailHistoryAuditPanel } from "./EmailHistoryAuditPanel";
 
@@ -35,7 +34,6 @@ export const AuditLogsPanel: React.FC = () => {
   const [selectedLevelFilter, setSelectedLevelFilter] = useState("ALL");
   const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
   const [activeTab, setActiveTab] = useState<'LOGS' | 'EMAILS'>('LOGS');
-  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 15;
@@ -149,13 +147,6 @@ export const AuditLogsPanel: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowQuotaModal(true)}
-            className="flex items-center gap-2 px-5 py-3 border-2 border-indigo-100 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-sm cursor-pointer bg-white"
-          >
-            <Activity size={14} />
-            Quota Monitor
-          </button>
-          <button
             onClick={exportLogsCsv}
             className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
           >
@@ -168,58 +159,6 @@ export const AuditLogsPanel: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {showQuotaModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2">
-                <Activity className="text-indigo-600" size={20} />
-                <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">System Quota & Performance Monitor</h3>
-              </div>
-              <button 
-                onClick={() => setShowQuotaModal(false)}
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-4 text-xs font-sans">
-              <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-950">
-                  <span>Current Fetch Limit</span>
-                  <span className="font-mono text-indigo-600 font-black">{systemLogLimit} Records</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-950">
-                  <span>Tracked Writes (Session)</span>
-                  <span className="font-mono text-emerald-600 font-black">{getFirestoreWriteCount().toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-950">
-                  <span>Daily Quota Reset</span>
-                  <span className="font-mono text-slate-600">{getTimeUntilMidnightPT()}</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Performance Strategy</span>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Audit queries use bounded limits (<strong className="text-slate-800">limit(N)</strong>) and indexed timestamp sorting to guarantee low latency without downloading large historical datasets on startup.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setShowQuotaModal(false)}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-              >
-                Close Monitor
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'LOGS' ? (
       <div className="space-y-6">

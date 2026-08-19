@@ -469,7 +469,6 @@ function AppContent() {
     canPerform,
     fiscalYears,
     setActiveFiscalYear,
-    firestoreQuotaExceeded,
     setSyncTargets,
     updateUserProfile,
     updateCurrentUserPassword,
@@ -948,7 +947,7 @@ function AppContent() {
       .filter(log => {
         const pBy = log.performedBy?.toLowerCase() || "";
         const matchesUser = pBy.includes(nameLower) || pBy.includes(emailLower) || log.metadata?.email?.toLowerCase() === emailLower;
-        const isInternalSync = log.action?.includes("SYNC") || log.action?.includes("RENDER") || log.action === "QUOTA_MONITOR_REPORT";
+        const isInternalSync = log.action?.includes("SYNC") || log.action?.includes("RENDER");
         return matchesUser && !isInternalSync;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -2284,15 +2283,6 @@ function AppContent() {
               <span>Offline Mode • Viewing Cached Financial Data (Read-only)</span>
             </div>
             <span className="bg-amber-700/60 dark:bg-amber-800/60 px-2 py-0.5 rounded text-[8px] font-bold">LOCAL CACHE READY</span>
-          </div>
-        )}
-        {firestoreQuotaExceeded && (
-          <div className="bg-blue-600 dark:bg-blue-700 text-white select-none px-4 md:px-8 py-2 md:py-2.5 flex items-center justify-between text-[10px] font-black uppercase tracking-widest gap-4 shrink-0 transition-all shadow-md z-40 border-b border-blue-500/20">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
-              <span>Quota Exceeded • Operating in Local Standby Mode with Secure Cached Data</span>
-            </div>
-            <span className="bg-blue-700/60 dark:bg-blue-800/60 px-2 py-0.5 rounded text-[8px] font-bold">LOCAL ACTIVE</span>
           </div>
         )}
         {systemSettings.isSystemOffline && adminBypass && (

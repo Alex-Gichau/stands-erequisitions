@@ -3,8 +3,7 @@ const files = [
   'src/contexts/RequisitionContext.tsx',
   'src/lib/supabase.ts',
   'src/lib/databaseService.ts',
-  'src/components/SettingsPanel.tsx',
-  'src/lib/quotaMonitor.ts'
+  'src/components/SettingsPanel.tsx'
 ];
 
 files.forEach(f => {

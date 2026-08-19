@@ -5,7 +5,7 @@ import './index.css';
 import { initErrorMonitor } from './lib/errorMonitor';
 import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 
-// Initialize global error monitoring to catch Slack notifications including Quota Limits
+// Initialize global error monitoring for system diagnostics
 initErrorMonitor();
 
 createRoot(document.getElementById('root')!).render(

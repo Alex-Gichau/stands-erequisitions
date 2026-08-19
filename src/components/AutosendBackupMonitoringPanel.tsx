@@ -10,9 +10,10 @@ import {
   fetchAutosendStatus, 
   updateAutosendConfigOnServer, 
   triggerAutosendBackupEmail,
-  getNextBackupScheduledDate
+  getNextBackupScheduledDate,
+  downloadBackupLocally,
+  generateBackupPayload
 } from "../services/autosendBackupService";
-import { downloadBackupLocally, generateBackupPayload } from "../services/googleDriveBackupService";
 import { 
   Mail, 
   Send, 
@@ -525,47 +526,7 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* 2. Google Drive Auto-Sync Toggle */}
-          <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
-            featuresInput.googleDriveSync 
-              ? "bg-blue-50/70 dark:bg-slate-800/90 border-blue-300 dark:border-blue-600 shadow-md shadow-blue-500/5" 
-              : "bg-white/80 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 opacity-75 hover:opacity-100"
-          }`}>
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-sm">
-                    <Cloud size={18} />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                      GOOGLE DRIVE AUTO-SYNC
-                    </h5>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Syncs snapshot to Google Drive</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleFeatureToggle("googleDriveSync")}
-                  className={`w-12 h-6.5 rounded-full transition-all relative p-0.5 cursor-pointer shrink-0 ${
-                    featuresInput.googleDriveSync ? "bg-blue-600 shadow-md shadow-blue-500/30" : "bg-slate-300 dark:bg-slate-700"
-                  }`}
-                >
-                  <div className={`w-5.5 h-5.5 rounded-full bg-white shadow-sm transition-all ${
-                    featuresInput.googleDriveSync ? "translate-x-5.5" : "translate-x-0.5"
-                  }`} />
-                </button>
-              </div>
-
-              <div className="pt-2 border-t border-blue-200/60 dark:border-slate-700">
-                <p className="text-[11px] font-bold text-blue-700 dark:text-blue-300 font-mono">
-                  Target: ict.team@pceastandrews.org
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Server Local Snapshot Toggle */}
+          {/* 2. Server Local Snapshot Toggle */}
           <div className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
             featuresInput.saveServerDiskSnapshot 
               ? "bg-slate-100/80 dark:bg-slate-800/90 border-slate-400 dark:border-slate-600 shadow-md" 

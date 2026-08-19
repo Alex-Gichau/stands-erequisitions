@@ -19,6 +19,7 @@ dotenv.config();
 
 import nodemailer from "nodemailer";
 import { google } from "googleapis";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const fileMappings: { [key: string]: string } = {
   "users": "users_export.json",
@@ -889,6 +890,105 @@ async function startServer() {
     } catch (err: any) {
       console.error("[Local Upload] Failed saving file:", err.message || err);
       res.status(500).json({ error: `Failed to store attachment locally: ${err.message || err}` });
+    }
+  });
+
+  // AI 1-Pager Executive Report Summary Endpoint (Gemini API)
+  app.post("/api/reports/ai-summary", async (req, res) => {
+    try {
+      const { filters, metrics, groupBreakdown, sampleRequisitions } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey || apiKey.trim() === "" || apiKey === "MY_GEMINI_API_KEY") {
+        return res.status(400).json({
+          error: "GEMINI_API_KEY is missing or unconfigured in .env file.",
+          missingKey: true
+        });
+      }
+
+      const ai = new GoogleGenAI({
+        apiKey: apiKey.trim(),
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build"
+          }
+        }
+      });
+
+      const prompt = `
+You are the Chief Financial Auditor and Executive AI Analyst for St. Andrew's PCEA Church eRequisitions Portal.
+Generate a concise, authoritative 1-page executive financial report summary for church leadership and the treasury committee based on the following scope and ledger data:
+
+Reporting Scope & Parameters:
+- Date Range Scope: ${filters?.startDate || "Inception"} to ${filters?.endDate || "Current Date"}
+- Target Ministry / Department: ${filters?.group || "ALL_CHURCH_GROUPS"}
+- Requisition Status: ${filters?.status || "ALL_STATUSES"}
+- Fiscal Year: ${filters?.fiscalYear || "CURRENT"}
+
+Financial Metrics Summary:
+- Total Requisition Volume: ${metrics?.totalCount || 0} transactions
+- Total Requested Capital (KES): ${metrics?.totalAmount || 0}
+- Total Disbursed / Settled Outflows (KES): ${metrics?.disbursedAmount || 0}
+- Total Pending / Commitment Pipeline (KES): ${metrics?.pendingAmount || 0}
+- Total Rejected / Voided Value (KES): ${metrics?.rejectedAmount || 0}
+- Audit Flagged Count: ${metrics?.flaggedCount || 0} items
+
+Department Spending Distribution:
+${JSON.stringify(groupBreakdown || [], null, 2)}
+
+Sample High-Value Ledger Transactions:
+${JSON.stringify(sampleRequisitions || [], null, 2)}
+
+Your response MUST adhere strictly to the JSON schema specified. Write in an executive, dignified tone suitable for church treasury records.
+`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.7-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: "Formal title of the 1-page summary" },
+              periodLabel: { type: Type.STRING, description: "Descriptive label of the audit scope period" },
+              executiveNarrative: { type: Type.STRING, description: "2 to 3 concise paragraphs of executive analysis on expenditure, compliance, and departmental usage" },
+              keyHighlights: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "3 to 5 financial performance highlights or key metrics"
+              },
+              auditObservations: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "2 to 4 audit, risk, compliance, or tax observation points"
+              },
+              treasuryRecommendations: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "2 to 4 strategic recommendations for the treasury and audit committee"
+              }
+            },
+            required: ["title", "periodLabel", "executiveNarrative", "keyHighlights", "auditObservations", "treasuryRecommendations"]
+          }
+        }
+      });
+
+      const jsonText = response.text || "{}";
+      const parsedData = JSON.parse(jsonText);
+
+      res.json({
+        success: true,
+        data: {
+          ...parsedData,
+          generatedAt: new Date().toISOString()
+        }
+      });
+    } catch (err: any) {
+      console.error("[AI Report Summary] Generation error:", err.message || err);
+      res.status(500).json({
+        error: err.message || "Failed to generate AI executive report summary."
+      });
     }
   });
 
@@ -2966,7 +3066,7 @@ async function startServer() {
       targetChannel = "#workflow-alerts";
     }
 
-    // 3. Security logs / promotions / quota failures / user logins -> #system-logs
+    // 3. Security logs / promotions / user logins -> #system-logs
     if (
       actLower.includes("login") ||
       actLower.includes("sign_in") ||
@@ -2975,7 +3075,6 @@ async function startServer() {
       actLower.includes("role_updated") || 
       actLower.includes("user_approval") || 
       actLower.includes("suspension") ||
-      actLower.includes("quota_fallback") ||
       action === "USER_PROMOTION" ||
       action === "SECURITY_WARNING" ||
       action === "UNUSUAL_DRIVE_DOC_ACCESS_WARNING"

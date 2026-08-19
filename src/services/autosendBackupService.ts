@@ -10,7 +10,6 @@ export type BackupFrequency = "WEEKLY" | "MONTHLY" | "EVERY_5_DAYS" | "DAILY" | 
 
 export interface BackupTargetFeatures {
   sendEmail: boolean;
-  googleDriveSync: boolean;
   saveServerDiskSnapshot: boolean;
   includeAuditLogs: boolean;
   includeCalendarAndLedger: boolean;
@@ -26,7 +25,7 @@ export interface BackupEmailLog {
   sizeKb: number;
   status: "DELIVERED" | "SENT_ATTACHMENT" | "SIMULATED_LOCAL_STORE" | "FAILED";
   warning?: string | null;
-  triggerType?: "MANUAL" | "SCHEDULED" | "AUTO_DRIVE" | "SCHEDULED_WEEKLY" | "SCHEDULED_MONTHLY" | "SCHEDULED_5_DAYS";
+  triggerType?: "MANUAL" | "SCHEDULED" | "SCHEDULED_WEEKLY" | "SCHEDULED_MONTHLY" | "SCHEDULED_5_DAYS";
   summary?: {
     totalRequisitions: number;
     totalUsers: number;
@@ -52,12 +51,42 @@ const LOCAL_STORAGE_CONFIG_KEY = "st_andrews_autosend_email_backup_config";
 
 export const DEFAULT_BACKUP_FEATURES: BackupTargetFeatures = {
   sendEmail: true,
-  googleDriveSync: true,
   saveServerDiskSnapshot: true,
   includeAuditLogs: true,
   includeCalendarAndLedger: true,
   slackAlertEnabled: false,
   slackWebhookUrl: ""
+};
+
+export const generateBackupPayload = (contextData: any) => {
+  return {
+    timestamp: new Date().toISOString(),
+    version: "4.2.0",
+    targetAccount: "ict.team@pceastandrews.org",
+    systemSettings: contextData.systemSettings || {},
+    users: contextData.users || [],
+    requisitions: contextData.requisitions || [],
+    projects: contextData.projects || [],
+    churchGroups: contextData.churchGroups || [],
+    ledgerBooks: contextData.ledgerBooks || [],
+    systemLogs: contextData.systemLogs || [],
+    customCalendarEvents: contextData.customCalendarEvents || [],
+    supplementaryRequests: contextData.supplementaryRequests || []
+  };
+};
+
+export const downloadBackupLocally = (backupPayload: any) => {
+  const jsonStr = JSON.stringify(backupPayload, null, 2);
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 16);
+  a.href = url;
+  a.download = `PCEA_St_Andrews_Backup_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
 export const getLocalAutosendConfig = (): AutosendConfig => {
@@ -245,7 +274,7 @@ export const updateAutosendConfigOnServer = async (configUpdate: Partial<Autosen
 export const triggerAutosendBackupEmail = async (
   email?: string,
   contextData?: any,
-  triggerType: "MANUAL" | "SCHEDULED" | "AUTO_DRIVE" = "MANUAL",
+  triggerType: "MANUAL" | "SCHEDULED" = "MANUAL",
   force: boolean = false
 ): Promise<{ success: boolean; message: string; log?: BackupEmailLog }> => {
   const targetEmail = (email || AUTOSEND_DEFAULT_EMAIL).trim();

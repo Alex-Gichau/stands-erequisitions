@@ -1492,3 +1492,340 @@ export function printRequisitionVoucher(req: Requisition, currentUser: any): voi
     alert("Please allow popups to print the voucher.");
   }
 }
+
+/**
+ * Downloads a high-resolution 1-page PDF for the AI Executive Report Summary.
+ */
+export function downloadAiSummaryPdf(aiData: any, filtersInfo: string): void {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Dark Header Banner
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, 210, 26, "F");
+
+    // Gold/Primary Accent Line
+    doc.setFillColor(79, 70, 229); // primary indigo
+    doc.rect(0, 26, 210, 2, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(255, 255, 255);
+    doc.text("ST. ANDREW'S PCEA CHURCH", 14, 12);
+
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text("AI EXECUTIVE FINANCIAL REPORT SUMMARY (1-PAGER)", 14, 19);
+
+    doc.setFontSize(8);
+    doc.setTextColor(226, 232, 240);
+    doc.text(`Scope: ${filtersInfo || "Global Ledger"}`, 196, 12, { align: "right" });
+    const genDate = aiData.generatedAt ? new Date(aiData.generatedAt).toLocaleDateString("en-KE") : new Date().toLocaleDateString("en-KE");
+    doc.text(`Generated: ${genDate}`, 196, 19, { align: "right" });
+
+    let y = 36;
+
+    // Report Title & Period Label
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text(aiData.title || "Executive Financial Summary", 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(79, 70, 229);
+    doc.text(`PERIOD: ${aiData.periodLabel || filtersInfo}`, 14, y);
+    y += 9;
+
+    // 1. Executive Narrative
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("1. EXECUTIVE SUMMARY NARRATIVE", 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(51, 65, 85);
+    const narrativeLines = doc.splitTextToSize(aiData.executiveNarrative || "No narrative content provided.", 182);
+    doc.text(narrativeLines, 14, y);
+    y += (narrativeLines.length * 4.2) + 7;
+
+    // 2. Key Highlights
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("2. KEY FINANCIAL HIGHLIGHTS", 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    (aiData.keyHighlights || []).forEach((item: string) => {
+      const lines = doc.splitTextToSize(`• ${item}`, 178);
+      doc.text(lines, 16, y);
+      y += (lines.length * 4) + 1.2;
+    });
+    y += 5;
+
+    // 3. Audit & Governance Observations
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("3. AUDIT & GOVERNANCE OBSERVATIONS", 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    (aiData.auditObservations || []).forEach((item: string) => {
+      const lines = doc.splitTextToSize(`• ${item}`, 178);
+      doc.text(lines, 16, y);
+      y += (lines.length * 4) + 1.2;
+    });
+    y += 5;
+
+    // 4. Strategic Treasury Recommendations
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("4. STRATEGIC TREASURY RECOMMENDATIONS", 14, y);
+    y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    (aiData.treasuryRecommendations || []).forEach((item: string) => {
+      const lines = doc.splitTextToSize(`• ${item}`, 178);
+      doc.text(lines, 16, y);
+      y += (lines.length * 4) + 1.2;
+    });
+
+    // Footer
+    doc.setFillColor(241, 245, 249); // slate-100
+    doc.rect(0, 280, 210, 17, "F");
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(100, 116, 139);
+    doc.text("ST. ANDREW'S PCEA eREQUISITIONS PORTAL — OFFICIAL AI AUDIT SUMMARY 1-PAGER", 14, 289);
+    doc.setFont("helvetica", "normal");
+    doc.text("PAGE 1 OF 1", 196, 289, { align: "right" });
+
+    const fileName = `St_Andrews_AI_Financial_Summary_${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error("Failed to generate AI summary PDF:", err);
+  }
+}
+
+/**
+ * Prints a formatted 1-page printable document for the AI Report Summary.
+ */
+export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
+  const fileDate = new Date().toLocaleDateString("en-KE", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${aiData.title || "St. Andrew's PCEA AI Financial Report Summary"}</title>
+  <style>
+    @page { size: A4; margin: 12mm; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 20px;
+      line-height: 1.5;
+      font-size: 11px;
+    }
+    .page-card {
+      border: 2px solid #0f172a;
+      border-radius: 12px;
+      padding: 24px;
+      background: #ffffff;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background-color: #0f172a;
+      color: #ffffff;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 20px;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      margin: 0;
+    }
+    .subtitle {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #4f46e5;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .badge {
+      background: #4f46e5;
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .section-title {
+      font-size: 10.5px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #1e293b;
+      border-left: 4px solid #4f46e5;
+      padding-left: 8px;
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+    .narrative {
+      font-size: 10.5px;
+      color: #334155;
+      text-align: justify;
+      margin-bottom: 14px;
+      line-height: 1.6;
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+    li {
+      margin-bottom: 4px;
+      color: #334155;
+      font-size: 10px;
+    }
+    .footer {
+      margin-top: 20px;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5px;
+      color: #64748b;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-card">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">✝</div>
+        <div>
+          <h1 class="title">St. Andrew's PCEA</h1>
+          <p class="subtitle">AI Executive Financial Report Summary (1-Pager)</p>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <span class="badge">AI Certified</span>
+        <div style="font-size: 9px; font-weight: 700; color: #64748b; margin-top: 4px;">DATE: ${fileDate}</div>
+        <div style="font-size: 8px; font-family: monospace; color: #94a3b8;">SCOPE: ${filtersInfo}</div>
+      </div>
+    </div>
+
+    <div class="section-title">${aiData.title || "Executive Financial Summary"}</div>
+    <div style="font-size: 9px; font-weight: 800; color: #4f46e5; margin-bottom: 8px; text-transform: uppercase;">
+      PERIOD: ${aiData.periodLabel || filtersInfo}
+    </div>
+
+    <div class="section-title">Executive Summary Narrative</div>
+    <div class="narrative">
+      ${aiData.executiveNarrative}
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <div class="section-title" style="margin-top:0;">Key Financial Highlights</div>
+        <ul>
+          ${(aiData.keyHighlights || []).map((h: string) => `<li>${h}</li>`).join("")}
+        </ul>
+      </div>
+      <div class="box">
+        <div class="section-title" style="margin-top:0;">Audit & Governance Observations</div>
+        <ul>
+          ${(aiData.auditObservations || []).map((o: string) => `<li>${o}</li>`).join("")}
+        </ul>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="section-title" style="margin-top:0;">Strategic Treasury Recommendations</div>
+      <ul>
+        ${(aiData.treasuryRecommendations || []).map((r: string) => `<li>${r}</li>`).join("")}
+      </ul>
+    </div>
+
+    <div class="footer">
+      <div>ST. ANDREW'S PCEA eREQUISITIONS PORTAL — OFFICIAL AI FINANCIAL AUDIT SUMMARY</div>
+      <div>GENERATED AT ${new Date(aiData.generatedAt || Date.now()).toLocaleString()}</div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const printWindow = window.open("", "_blank", "width=850,height=1000");
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  }
+}

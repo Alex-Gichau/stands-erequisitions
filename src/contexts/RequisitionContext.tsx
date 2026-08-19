@@ -527,7 +527,6 @@ const initializeApp = (...args: any[]) => {};
 const deleteApp = async (a: any) => {};
 
 // Temporary fix until migration is fully cleaned up
-const isFirestoreQuotaExceeded = () => false;
 
 // Helper to recursively remove any fields with value undefined to prevent Firestore write/update failures
 function cleanFirestoreData(data: any): any {
@@ -650,8 +649,6 @@ interface RequisitionContextType {
     targetNotes?: string,
     setActiveImmediately?: boolean
   ) => Promise<void>;
-  firestoreQuotaExceeded: boolean;
-  setFirestoreQuotaExceeded: (val: boolean) => void;
   setSyncTargets: (targets: string[]) => void;
   systemLogLimit: number;
   setSystemLogLimit: (limit: number) => void;
@@ -824,9 +821,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setIsDbSaving(false);
     }
   }, []);
-  const [firestoreQuotaExceeded, setFirestoreQuotaExceeded] = useState(() => {
-    return isFirestoreQuotaExceeded();
-  });
   const skipFirestore = true; // Route exclusively to local MongoDB/Mongoose server endpoints
   const [activeSyncTargets, setActiveSyncTargets] = useState<Set<string>>(new Set(['settings', 'alerts']));
   const [syncingTargets, setSyncingTargets] = useState<Set<string>>(new Set());
@@ -848,18 +842,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const handleSyncError = useCallback((err: any, opType: OperationType, path: string) => {
-    if (
-      err?.code === "resource-exhausted" || 
-      err?.message?.includes("Quota exceeded") || 
-      String(err).includes("Quota exceeded")
-    ) {
-      setFirestoreQuotaExceeded(true);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("firestore_actual_quota_exceeded", "true");
-      }
-      console.log(`[Firestore Quota Exceeded] onSnapshot failed for ${path}: continuing with local cache.`);
-      return;
-    }
     handleFirestoreError(err, opType, path);
   }, []);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -2061,7 +2043,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubRequisitions();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2091,7 +2072,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubProjects();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2123,7 +2103,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubAlerts();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2152,7 +2131,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
     fetchFiscalYears();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2174,7 +2152,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubTransactions();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2194,7 +2171,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubForecast();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2216,7 +2192,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubReports();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2248,7 +2223,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubLogs();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2304,7 +2278,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubUsers();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2328,7 +2301,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     return () => unsubPermissions();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2345,7 +2317,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }, (err) => handleSyncError(err, OperationType.LIST, "thresholds"));
     return () => unsubThresholds();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2404,7 +2375,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updatePresence(false);
     };
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2424,7 +2394,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     );
     return () => unsubLedgers();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2443,15 +2412,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setSupplementaryRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupplementaryBudgetRequest)));
       },
       (err) => {
-         if (err?.code === "resource-exhausted" || err?.message?.includes("Quota exceeded") || String(err).includes("Quota exceeded")) {
-           setFirestoreQuotaExceeded(true);
-         }
          console.log("Supplementary budget sync failed/not initialized:", err);
       }
     );
     return () => unsubSupplementary();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2472,9 +2437,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setVendors(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
       } catch (err) {
         fetchedTargetsRef.current.delete('vendors');
-        if (err?.code === "resource-exhausted" || err?.message?.includes("Quota exceeded") || String(err).includes("Quota exceeded")) {
-          setFirestoreQuotaExceeded(true);
-        }
         console.log("Vendors fetch failed:", err);
       } finally {
         stopSyncing('vendors');
@@ -2482,7 +2444,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
     fetchVendors();
   }, [
-    firestoreQuotaExceeded,
     currentUserId,
     currentUserIsApproved,
     currentUserIsSuspended,
@@ -2566,7 +2527,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     checkExpiryAlerts();
-  }, [requisitions, alerts, projects, thresholds, firestoreQuotaExceeded, currentUserId, currentUserRole, db, addSystemLog]);
+  }, [requisitions, alerts, projects, thresholds, currentUserId, currentUserRole, db, addSystemLog]);
 
   // Automated background trigger for FINANCE alerts on L2 Approved status
   useEffect(() => {
@@ -2602,7 +2563,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     checkL2ApprovedAlerts();
-  }, [requisitions, alerts, firestoreQuotaExceeded, currentUserId, db, addSystemLog]);
+  }, [requisitions, alerts, currentUserId, db, addSystemLog]);
 
   // Recurring Requisitions Watcher
   useEffect(() => {
@@ -2658,7 +2619,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     checkRecurring();
-  }, [requisitions, firestoreQuotaExceeded, currentUserId, db, addSystemLog, systemSettings]);
+  }, [requisitions, currentUserId, db, addSystemLog, systemSettings]);
 
   // --- UNIFIED MONGODB DATA LOADER FOR ALL 15 DATASETS ---
   useEffect(() => {
@@ -3984,21 +3945,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // OPTIMISTIC UPDATE: Instantly reflect new requisition in React state for zero UI delay
     setRequisitions(prev => [newReq, ...prev.filter(r => r.id !== id)]);
 
-    if (isFirestoreQuotaExceeded()) {
-      console.log("[Quota Fallback] Firestore Daily limits exceeded. Adding requisition local state.");
-      addSystemLog("QUOTA_FALLBACK_ACTIVE", `Firestore daily write quota exceeded. Requisition '${newReq.title}' saved locally.`, {
-        requisitionId: id,
-        title: newReq.title,
-        amount: newReq.amount,
-        group: newReq.groupName
-      }).catch(() => {});
-
-      if (newReq.status === RequisitionStatus.SUBMITTED) {
-        sendEmailNotification(newReq, "SUBMITTED").catch(() => {});
-      }
-      return newReq;
-    }
-
     try {
       // Async database persistence
       await databaseService.saveRequisition(cleanFirestoreData(newReq));
@@ -4057,56 +4003,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       method,
       timestamp: new Date().toISOString(),
     });
-
-    if (isFirestoreQuotaExceeded()) {
-      console.log("[Quota Fallback] Firestore limits exceeded. Executing updateRequisitionStatus offline fallback.");
-      const req = requisitions.find(r => r.id === id);
-      if (!req) return;
-
-      // Security check: Restricted approver can only approve requisitions of their affiliated groups
-      const isRestrictedRole = currentUser?.role ? [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2].includes(currentUser.role) : false;
-      if (isRestrictedRole) {
-        const filterGroups = currentUser?.groups || [];
-        const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUser?.group ? [currentUser.group] : []);
-        const belongsToAffiliatedGroup = parsedGroups.includes(req.groupId) || parsedGroups.includes(req.groupName);
-        if (!belongsToAffiliatedGroup) {
-          throw new Error("Security Violation: You are not authorized to approve, reject, or modify requisitions for this church group.");
-        }
-      }
-
-      const updates: any = {
-        status,
-        updatedAt: new Date().toISOString(),
-        approvalHistory: [...req.approvalHistory, historyAction],
-      };
-
-      if (status === RequisitionStatus.APPROVED_L1) updates.approvedAtL1 = new Date().toISOString();
-      if (status === RequisitionStatus.APPROVED_L2) updates.approvedAtL2 = new Date().toISOString();
-      if (status === RequisitionStatus.DISBURSED) updates.disbursedAt = new Date().toISOString();
-
-      const updatedReq: Requisition = {
-        ...req,
-        ...updates
-      };
-
-      setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));
-
-      addSystemLog("QUOTA_FALLBACK_ACTIVE", `Firestore write limits exceeded. Requisition '${req.title}' updated locally to status '${status}'.`, {
-        requisitionId: id,
-        newStatus: status
-      }).catch(() => {});
-
-      if (status === RequisitionStatus.APPROVED_L1 || status === RequisitionStatus.APPROVED_L2 || status === RequisitionStatus.DISBURSED || status === RequisitionStatus.REJECTED) {
-         sendEmailNotification(
-           updatedReq, 
-           status, 
-           decision === "REJECT" ? (rejectionReason || note) : note,
-           currentUser?.name || currentUser?.email || "Reviewing Official"
-         );
-      }
-
-      return;
-    }
 
     try {
       const reqRef = doc(db, "requisitions", id);
@@ -4377,36 +4273,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     return withDbLoading("Saving requisition changes...", async () => {
-      if (isFirestoreQuotaExceeded()) {
-      console.log("[Quota Fallback] Firestore limits exceeded. Executing updateRequisition offline fallback.");
       const currentReq = requisitions.find(r => r.id === id);
-      if (!currentReq) return;
-
-      const newAmount = updates.amount !== undefined ? updates.amount : currentReq.amount;
-      const cleanedUpdates = {
-        ...updates,
-        updatedAt: new Date().toISOString(),
-        flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
-      };
-
-      const updatedReq: Requisition = {
-        ...currentReq,
-        ...cleanedUpdates
-      };
-
-      setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));
-
-      addSystemLog("QUOTA_FALLBACK_ACTIVE", `Firestore write limits exceeded. Requisition '${id}' edited locally.`, {
-        requisitionId: id,
-        updates
-      }).catch(() => {});
-
-      if (updates.status === RequisitionStatus.SUBMITTED && currentReq.status !== RequisitionStatus.SUBMITTED) {
-        sendEmailNotification(updatedReq, "SUBMITTED").catch(() => {});
-      }
-
-      return;
-    }
 
     try {
       let updatedReq: Requisition | undefined;
@@ -5086,8 +4953,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       toggleFiscalYearStatus,
       setActiveFiscalYear,
       cloneFiscalYearBudgets,
-      firestoreQuotaExceeded,
-      setFirestoreQuotaExceeded,
       setSyncTargets,
       syncingTargets,
       sendBulkEmail,

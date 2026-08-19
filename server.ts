@@ -1146,6 +1146,24 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   }
   const StrictRequisitionModel = mongoose.model('Requisition', RequisitionSchema);
 
+  // Define Schema for Notification States
+  const NotificationStateSchema = new mongoose.Schema({
+    id: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, index: true },
+    readNoticeIds: { type: [String], default: [] },
+    starredNoticeIds: { type: [String], default: [] },
+    archivedNoticeIds: { type: [String], default: [] },
+    deletedNoticeIds: { type: [String], default: [] },
+  }, {
+    timestamps: true,
+    strict: false,
+  });
+
+  if (mongoose.models && mongoose.models.NotificationState) {
+    delete mongoose.models.NotificationState;
+  }
+  const StrictNotificationStateModel = mongoose.model('NotificationState', NotificationStateSchema);
+
   // Helper functions to recursively convert object keys between snake_case and camelCase to bridge MongoDB camelCase schemas and client snake_case payloads.
   function isPlainObject(item: any): boolean {
     if (typeof item !== "object" || item === null || item instanceof Date || item instanceof RegExp) {
@@ -1547,7 +1565,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
     "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
-    "user_reaction_histories"
+    "user_reaction_histories", "notification_states"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -1570,7 +1588,8 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "vendors": models.Vendor,
     "settings": (models as any).Settings,
     "user_reaction_histories": (models as any).UserReactionHistory,
-    "user_reaction_history": (models as any).UserReactionHistory
+    "user_reaction_history": (models as any).UserReactionHistory,
+    "notification_states": StrictNotificationStateModel
   };
 
   // Bulk get (load all 15 datasets at once)

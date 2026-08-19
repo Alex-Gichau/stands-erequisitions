@@ -631,6 +631,12 @@ interface RequisitionContextType {
   readNoticeIds: string[];
   toggleNoticeRead: (id: string, forceRead?: boolean) => void;
   markAllNoticesRead: (ids: string[]) => void;
+  starredNoticeIds: string[];
+  archivedNoticeIds: string[];
+  deletedNoticeIds: string[];
+  toggleNoticeStarred: (id: string, forceState?: boolean) => void;
+  toggleNoticeArchived: (id: string, forceState?: boolean) => void;
+  toggleNoticeDeleted: (id: string, forceState?: boolean) => void;
   permissionConfigs: PermissionConfig[];
   canAccess: (viewId: string) => boolean;
   canPerform: (actionId: keyof PermissionConfig["actions"]) => boolean;
@@ -874,42 +880,147 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return [];
   });
 
+  const [starredNoticeIds, setStarredNoticeIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("starred_notification_ids");
+        return saved ? JSON.parse(saved) : [];
+      } catch (err) {}
+    }
+    return [];
+  });
+
+  const [archivedNoticeIds, setArchivedNoticeIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("archived_notification_ids");
+        return saved ? JSON.parse(saved) : [];
+      } catch (err) {}
+    }
+    return [];
+  });
+
+  const [deletedNoticeIds, setDeletedNoticeIds] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("deleted_notification_ids");
+        return saved ? JSON.parse(saved) : [];
+      } catch (err) {}
+    }
+    return [];
+  });
+
+  // Load notification states from MongoDB on initial mount
+  useEffect(() => {
+    async function loadNotificationStatesFromDB() {
+      try {
+        const res = await fetch("/api/db/notification_states/user_global");
+        if (res.ok) {
+          const json = await res.json();
+          const doc = json.data || json;
+          if (doc) {
+            if (Array.isArray(doc.readNoticeIds)) setReadNoticeIds(doc.readNoticeIds);
+            if (Array.isArray(doc.starredNoticeIds)) setStarredNoticeIds(doc.starredNoticeIds);
+            if (Array.isArray(doc.archivedNoticeIds)) setArchivedNoticeIds(doc.archivedNoticeIds);
+            if (Array.isArray(doc.deletedNoticeIds)) setDeletedNoticeIds(doc.deletedNoticeIds);
+          }
+        }
+      } catch (e) {
+        console.warn("[MongoDB Sync] Failed to load notification states from MongoDB", e);
+      }
+    }
+    loadNotificationStatesFromDB();
+  }, []);
+
+  // Sync state helper to MongoDB REST API
+  const syncNotificationStatesToDB = useCallback((
+    read: string[], 
+    starred: string[], 
+    archived: string[], 
+    deleted: string[]
+  ) => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("read_notification_ids", JSON.stringify(read));
+        localStorage.setItem("starred_notification_ids", JSON.stringify(starred));
+        localStorage.setItem("archived_notification_ids", JSON.stringify(archived));
+        localStorage.setItem("deleted_notification_ids", JSON.stringify(deleted));
+      } catch (err) {}
+    }
+
+    fetch("/api/db/notification_states/user_global", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: "user_global",
+        readNoticeIds: read,
+        starredNoticeIds: starred,
+        archivedNoticeIds: archived,
+        deletedNoticeIds: deleted,
+        updatedAt: new Date().toISOString()
+      })
+    }).catch(err => console.warn("[MongoDB Sync] Failed to persist notification state to MongoDB", err));
+  }, []);
+
   const toggleNoticeRead = useCallback((id: string, forceRead?: boolean) => {
     setReadNoticeIds(prev => {
       let next;
       if (forceRead !== undefined) {
-        if (forceRead) {
-          next = prev.includes(id) ? prev : [...prev, id];
-        } else {
-          next = prev.filter(item => item !== id);
-        }
+        next = forceRead ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(item => item !== id);
       } else {
         next = prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id];
       }
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("read_notification_ids", JSON.stringify(next));
-        } catch (err) {
-          console.error("Failed to save read notices", err);
-        }
-      }
+      syncNotificationStatesToDB(next, starredNoticeIds, archivedNoticeIds, deletedNoticeIds);
       return next;
     });
-  }, []);
+  }, [starredNoticeIds, archivedNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
 
   const markAllNoticesRead = useCallback((ids: string[]) => {
     setReadNoticeIds(prev => {
       const next = Array.from(new Set([...prev, ...ids]));
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("read_notification_ids", JSON.stringify(next));
-        } catch (err) {
-          console.error("Failed to save read notices", err);
-        }
-      }
+      syncNotificationStatesToDB(next, starredNoticeIds, archivedNoticeIds, deletedNoticeIds);
       return next;
     });
-  }, []);
+  }, [starredNoticeIds, archivedNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
+
+  const toggleNoticeStarred = useCallback((id: string, forceState?: boolean) => {
+    setStarredNoticeIds(prev => {
+      let next;
+      if (forceState !== undefined) {
+        next = forceState ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(item => item !== id);
+      } else {
+        next = prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id];
+      }
+      syncNotificationStatesToDB(readNoticeIds, next, archivedNoticeIds, deletedNoticeIds);
+      return next;
+    });
+  }, [readNoticeIds, archivedNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
+
+  const toggleNoticeArchived = useCallback((id: string, forceState?: boolean) => {
+    setArchivedNoticeIds(prev => {
+      let next;
+      if (forceState !== undefined) {
+        next = forceState ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(item => item !== id);
+      } else {
+        next = prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id];
+      }
+      syncNotificationStatesToDB(readNoticeIds, starredNoticeIds, next, deletedNoticeIds);
+      return next;
+    });
+  }, [readNoticeIds, starredNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
+
+  const toggleNoticeDeleted = useCallback((id: string, forceState?: boolean) => {
+    setDeletedNoticeIds(prev => {
+      let next;
+      if (forceState !== undefined) {
+        next = forceState ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter(item => item !== id);
+      } else {
+        next = prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id];
+      }
+      syncNotificationStatesToDB(readNoticeIds, starredNoticeIds, archivedNoticeIds, next);
+      return next;
+    });
+  }, [readNoticeIds, starredNoticeIds, archivedNoticeIds, syncNotificationStatesToDB]);
 
   const canAccess = useCallback((viewId: string) => {
     if (!currentUser) return false;
@@ -5095,6 +5206,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       readNoticeIds,
       toggleNoticeRead,
       markAllNoticesRead,
+      starredNoticeIds,
+      archivedNoticeIds,
+      deletedNoticeIds,
+      toggleNoticeStarred,
+      toggleNoticeArchived,
+      toggleNoticeDeleted,
       permissionConfigs,
       canAccess,
       canPerform,

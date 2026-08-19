@@ -46,7 +46,6 @@ import { cn } from "../lib/utils";
 import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { SystemHealth } from "./SystemHealth";
-import { DriveBackupModal } from "./DriveBackupModal";
 import { AutosendBackupMonitoringPanel } from "./AutosendBackupMonitoringPanel";
 
 export const SettingsPanel: React.FC = () => {
@@ -66,7 +65,6 @@ export const SettingsPanel: React.FC = () => {
     logout,
   } = useRequisitions();
 
-  const [isDriveBackupModalOpen, setIsDriveBackupModalOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<"profile" | "security" | "expiry" | "notifications" | "backups" | "health" | "database">("profile");
   const [searchQuery, setSearchQuery] = React.useState("");
 
@@ -371,7 +369,7 @@ export const SettingsPanel: React.FC = () => {
     { id: "security", label: "Security & Auth", icon: Lock, description: "Password, biometrics & connected devices" },
     { id: "expiry", label: "Limits & Expiry", icon: Clock, description: "Requisition duration & operational limits" },
     { id: "notifications", label: "Notifications & Slack", icon: Bell, description: "Email alerts & Slack webhook dispatches" },
-    { id: "backups", label: "Drive & Auto Backups", icon: Cloud, description: "5-Hour Drive backup & JSON email snapshots" },
+    { id: "backups", label: "Automated Backups", icon: Cloud, description: "Scheduled JSON email snapshots & snapshots" },
     { id: "health", label: "System Health & Logs", icon: Gauge, description: "Telemetry speed & real-time audit trails" },
     { id: "database", label: "Database & Compass", icon: Database, description: "MongoDB cluster, guides & dumps" }
   ];
@@ -937,37 +935,11 @@ export const SettingsPanel: React.FC = () => {
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                      Drive Backup & Automated Monitoring
+                      Automated System Backups
                     </h1>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      5-Hour Google Drive auto-backups and scheduled JSON email snapshots.
+                      Automated scheduled JSON email snapshots and system snapshots.
                     </p>
-                  </div>
-
-                  {/* Drive Backup Modal Launcher */}
-                  <div className="p-6 rounded-3xl border border-blue-200/80 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900/40 space-y-4 max-w-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0">
-                        <Cloud size={24} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                          Google Drive 5-Hour Automated Backup
-                        </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          Targets <strong>ict.team@pceastandrews.org</strong> every 5 hours.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsDriveBackupModalOpen(true)}
-                      className="bg-[#0f172a] hover:bg-[#1e293b] text-white rounded-2xl px-8 py-3.5 font-bold text-sm shadow-md transition-all cursor-pointer flex items-center gap-2"
-                    >
-                      <Cloud size={16} />
-                      <span>Manage Drive Backup & View Logs</span>
-                    </button>
                   </div>
 
                   {/* Autosend Backup Panel Component */}
@@ -1139,10 +1111,6 @@ sudo systemctl enable mongod`}
 
       </div>
 
-      <DriveBackupModal 
-        isOpen={isDriveBackupModalOpen} 
-        onClose={() => setIsDriveBackupModalOpen(false)} 
-      />
     </div>
   );
 };

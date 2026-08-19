@@ -5079,98 +5079,6 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
 
 
 
-  app.post("/api/backup-all-to-drive", express.json({ limit: "50mb" }), async (req, res) => {
-    try {
-      const requisitions = req.body?.requisitions || readJsonCollection("requisitions") || [];
-      const users = req.body?.users || readJsonCollection("users") || [];
-      const projects = req.body?.projects || readJsonCollection("projects") || [];
-      const churchGroups = req.body?.churchGroups || readJsonCollection("church_groups") || [];
-      const systemLogs = req.body?.systemLogs || readJsonCollection("system_logs") || [];
-      const customCalendarEvents = req.body?.customCalendarEvents || readJsonCollection("custom_calendar_events") || [];
-
-      const targetAccount = "ict.team@pceastandrews.org";
-      const timestamp = new Date().toISOString();
-      const dateStr = timestamp.replace(/[:.]/g, "-").slice(0, 16);
-      const fileName = `PCEA_St_Andrews_Backup_${dateStr}.json`;
-
-      const backupContent = {
-        timestamp,
-        targetAccount,
-        version: "4.2.0",
-        systemSettings: req.body?.systemSettings || {},
-        users,
-        requisitions,
-        projects,
-        churchGroups,
-        systemLogs,
-        customCalendarEvents,
-        schedule: "Every 5 hours"
-      };
-
-      try {
-        const clients = getGoogleClients();
-        const drive = clients.drive;
-
-        const fileMetadata = {
-          name: fileName,
-          mimeType: "application/json",
-          description: `PCEA St. Andrews Automated 5-Hour Backup for ${targetAccount}`
-        };
-
-        const media = {
-          mimeType: "application/json",
-          body: JSON.stringify(backupContent, null, 2)
-        };
-
-        const driveFile = await drive.files.create({
-          requestBody: fileMetadata,
-          media: media,
-          fields: "id, name, webViewLink"
-        });
-
-        const fileId = driveFile.data.id;
-        const webViewLink = driveFile.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
-
-        return res.json({
-          success: true,
-          mode: "google_drive_live",
-          fileId,
-          fileName,
-          webViewLink,
-          targetAccount,
-          timestamp,
-          message: `Successfully uploaded 5-hour automated backup "${fileName}" to Google Drive for ${targetAccount}.`
-        });
-      } catch (driveErr: any) {
-        console.log("[Google Drive Storage] Cloud sync offline or unauthenticated; saving backup to local system storage:", driveErr.message || driveErr);
-      }
-
-      // Local persistent backup storage fallback
-      const backupDir = path.join(getBaseDataDir(), "drive_backups");
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-      const localBackupPath = path.join(backupDir, fileName);
-      fs.writeFileSync(localBackupPath, JSON.stringify(backupContent, null, 2), "utf-8");
-
-      return res.json({
-        success: true,
-        mode: "local_drive_backup_storage",
-        fileName,
-        localPath: localBackupPath,
-        targetAccount,
-        timestamp,
-        message: `Saved automated 5-hour backup snapshot "${fileName}" for target ${targetAccount}.`
-      });
-    } catch (err: any) {
-      console.error("[/api/backup-all-to-drive error]:", err);
-      return res.status(500).json({
-        success: false,
-        error: err.message || "Failed to execute Google Drive backup"
-      });
-    }
-  });
-
   // Helper storage functions for Backup Email Autosend
   const backupEmailLogsPath = path.join(getBaseDataDir(), "backup_email_logs.json");
   const backupEmailConfigPath = path.join(getBaseDataDir(), "backup_email_config.json");
@@ -5336,7 +5244,6 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       totalBackupsSent: 0,
       features: {
         sendEmail: true,
-        googleDriveSync: true,
         saveServerDiskSnapshot: true,
         includeAuditLogs: true,
         includeCalendarAndLedger: true,
@@ -5381,7 +5288,6 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
 
       const features = config.features || {
         sendEmail: true,
-        googleDriveSync: true,
         saveServerDiskSnapshot: true,
         includeAuditLogs: true,
         includeCalendarAndLedger: true,

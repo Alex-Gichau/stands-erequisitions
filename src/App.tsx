@@ -1180,6 +1180,14 @@ function AppContent() {
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
 
+        {/* CSS grid background pattern tilted 30 degrees with radial mask */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none [mask-image:radial-gradient(ellipse_90%_90%_at_50%_50%,#000_50%,transparent_100%)]">
+          <div 
+            className="absolute w-[200%] h-[200%] -top-[50%] -left-[50%] bg-[linear-gradient(to_right,rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.22)_1px,transparent_1px)] bg-[size:4rem_4rem]"
+            style={{ transform: "rotate(30deg)" }}
+          />
+        </div>
+
         {/* Global Database Saving / Updating Indicator */}
         <AnimatePresence>
           {isDbSaving && (

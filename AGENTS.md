@@ -52,17 +52,14 @@ This document defines the system architecture, file processing standards, financ
 
 ## 4. Disaster Recovery & Automated Backup Systems
 
-1. **5-Hour Google Drive Backup**:
-   - `googleDriveBackupService.ts` automatically packages system snapshots (requisitions, ledger books, user accounts, audit logs) every 5 hours, targeting `ict.team@pceastandrews.org`.
-
-2. **Automated Snapshot Dispatch**:
+1. **Automated Snapshot Dispatch**:
    - `autosendBackupService.ts` dispatches JSON data snapshots to configured backup channels.
 
-3. **Slack Webhook Integration**:
+2. **Slack Webhook Integration**:
    - Sends real-time alerts for financial disbursements, high-value audit flags, and system exceptions.
 
-4. **Health Diagnostics Panel**:
-   - `SystemHealth.tsx` monitors memory usage, active connection count, ledger record counts, and background backup timers.
+3. **Health Diagnostics Panel**:
+   - `SystemHealth.tsx` monitors memory usage, active connection count, and ledger record counts.
 
 ---
 

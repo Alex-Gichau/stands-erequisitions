@@ -3166,52 +3166,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     systemLogLimit
   ]);
 
-  // 5-hour Automated Google Drive System Backup Runner
-  useEffect(() => {
-    const runAutoBackup = async () => {
-      const LAST_BACKUP_TIME_KEY = "st_andrews_last_drive_backup_timestamp";
-      const BACKUP_INTERVAL_MS = 5 * 60 * 60 * 1000;
-      const lastTs = localStorage.getItem(LAST_BACKUP_TIME_KEY);
-      const now = Date.now();
-
-      if (!lastTs || now - new Date(lastTs).getTime() >= BACKUP_INTERVAL_MS) {
-        try {
-          const payload = {
-            timestamp: new Date().toISOString(),
-            version: "4.2.0",
-            targetAccount: "ict.team@pceastandrews.org",
-            systemSettings,
-            users,
-            requisitions,
-            projects,
-            churchGroups,
-            ledgerBooks,
-            systemLogs,
-            customCalendarEvents,
-            supplementaryRequests
-          };
-
-          const res = await fetch("/api/backup-all-to-drive", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-
-          if (res.ok) {
-            localStorage.setItem(LAST_BACKUP_TIME_KEY, new Date().toISOString());
-            console.log("[Google Drive Auto-Backup] 5-hour backup completed successfully for ict.team@pceastandrews.org.");
-          }
-        } catch (e) {
-          console.warn("[Google Drive Auto-Backup] Scheduled backup check failed:", e);
-        }
-      }
-    };
-
-    runAutoBackup();
-    const driveBackupInterval = setInterval(runAutoBackup, 30 * 60 * 1000); // Check every 30m if 5h elapsed
-    return () => clearInterval(driveBackupInterval);
-  }, [requisitions.length, users.length, projects.length]);
-
 
 
   const login = async () => {

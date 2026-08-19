@@ -838,9 +838,7 @@ const Dashboard: React.FC<{
             </div>
             <div className="text-[7px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 md:mb-2">{stat.label}</div>
             <div className="text-base md:text-2xl font-bold text-slate-900 mb-0.5 md:mb-1">{stat.value}</div>
-            <div className={cn("text-[7px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-full inline-block", stat.bg, stat.color)}>
-              Live Sync
-            </div>
+            
           </motion.div>
         ))}
       </div>

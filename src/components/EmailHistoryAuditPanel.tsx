@@ -29,6 +29,18 @@ import {
 import { EmailAuditLog, SystemLog } from '../types';
 import { cn } from '../lib/utils';
 import { useRequisitions } from '../contexts/RequisitionContext';
+import { 
+  AreaChart, 
+  Area, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
 
 interface EmailHistoryAuditPanelProps {
   systemLogs?: SystemLog[];
@@ -50,6 +62,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
   const [testType, setTestType] = useState<string>('DIAGNOSTIC_VERIFICATION');
   const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [graphTimeframe, setGraphTimeframe] = useState<'12H' | '24H' | '1D' | '1M' | '1Y'>('24H');
+  const [graphViewMode, setGraphViewMode] = useState<'STATUS' | 'CATEGORY'>('STATUS');
 
   const itemsPerPage = 15;
 
@@ -188,6 +202,323 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       successRate
     };
   }, [allMergedLogs]);
+
+  // Aggregate and calculate chart data based on selected timeframe and grouping mode
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const dataPoints: {
+      label: string;
+      total: number;
+      success: number;
+      failed: number;
+      skipped: number;
+      requisitions: number;
+      backups: number;
+      security: number;
+      others: number;
+    }[] = [];
+
+    // If there are no merged email logs, generate real-looking mock trends so the user is greeted with a highly professional chart visual right away
+    const isMock = allMergedLogs.length === 0;
+
+    if (isMock) {
+      if (graphTimeframe === '12H') {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+          const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          const idx = 11 - i;
+          
+          const total = idx % 4 === 0 ? 3 : (idx % 3 === 0 ? 1 : 2);
+          const success = total - (idx % 6 === 0 ? 1 : 0);
+          const failed = total - success;
+          
+          dataPoints.push({
+            label: hourLabel,
+            total,
+            success,
+            failed,
+            skipped: 0,
+            requisitions: success > 0 ? Math.ceil(success * 0.7) : 0,
+            backups: idx % 3 === 0 ? 1 : 0,
+            security: idx % 5 === 0 ? 1 : 0,
+            others: 0
+          });
+        }
+      } else if (graphTimeframe === '24H') {
+        for (let i = 23; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+          const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          const idx = 23 - i;
+          
+          const total = idx % 5 === 0 ? 4 : (idx % 3 === 0 ? 2 : 1);
+          const success = total - (idx % 8 === 0 ? 1 : 0);
+          const failed = total - success;
+
+          dataPoints.push({
+            label: hourLabel,
+            total,
+            success,
+            failed,
+            skipped: 0,
+            requisitions: success > 0 ? Math.ceil(success * 0.7) : 0,
+            backups: idx % 4 === 0 ? 1 : 0,
+            security: idx % 6 === 0 ? 1 : 0,
+            others: 0
+          });
+        }
+      } else if (graphTimeframe === '1D') {
+        // 1 Day: Split into 3-hour blocks (8 blocks total)
+        for (let i = 7; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 3 * 60 * 60 * 1000);
+          const blockStart = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+          const startLabel = blockStart.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          const endLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          const idx = 7 - i;
+
+          const total = 5 + (idx * 3) % 7;
+          const success = total - (idx % 5 === 0 ? 1 : 0);
+          const failed = total - success;
+
+          dataPoints.push({
+            label: `${startLabel}-${endLabel}`,
+            total,
+            success,
+            failed,
+            skipped: 0,
+            requisitions: Math.max(1, success - 2),
+            backups: 1,
+            security: idx % 3 === 0 ? 1 : 0,
+            others: 0
+          });
+        }
+      } else if (graphTimeframe === '1M') {
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          const dayLabel = d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+          const idx = 29 - i;
+          
+          const dayOfWeek = d.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          
+          const total = isWeekend ? (1 + idx % 3) : (8 + idx % 8);
+          const success = total - (idx % 9 === 0 ? 1 : 0);
+          const failed = total - success;
+
+          dataPoints.push({
+            label: dayLabel,
+            total,
+            success,
+            failed,
+            skipped: isWeekend ? 1 : 0,
+            requisitions: Math.max(0, success - 3),
+            backups: 1,
+            security: isWeekend ? 0 : 1,
+            others: 0
+          });
+        }
+      } else if (graphTimeframe === '1Y') {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthLabel = d.toLocaleDateString('en-KE', { month: 'short', year: '2-digit' });
+          const idx = 11 - i;
+          
+          const total = 120 + idx * 22 + (idx % 3) * 30;
+          const success = Math.floor(total * 0.97);
+          const failed = total - success;
+
+          dataPoints.push({
+            label: monthLabel,
+            total,
+            success,
+            failed,
+            skipped: Math.floor(total * 0.01),
+            requisitions: Math.floor(success * 0.72),
+            backups: Math.floor(success * 0.16),
+            security: Math.floor(success * 0.09),
+            others: Math.floor(success * 0.03)
+          });
+        }
+      }
+    } else {
+      if (graphTimeframe === '12H') {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+          const hourStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0);
+          const hourEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 59, 59, 999);
+          
+          const logsInHour = allMergedLogs.filter(log => {
+            const logTime = new Date(log.timestamp).getTime();
+            return logTime >= hourStart.getTime() && logTime <= hourEnd.getTime();
+          });
+
+          const success = logsInHour.filter(l => l.status === 'DELIVERED' || l.status === 'SIMULATED').length;
+          const failed = logsInHour.filter(l => l.status === 'FAILED').length;
+          const skipped = logsInHour.filter(l => l.status === 'SKIPPED').length;
+          const total = logsInHour.length;
+
+          const requisitions = logsInHour.filter(l => l.category === 'REQUISITION_WORKFLOW').length;
+          const backups = logsInHour.filter(l => l.category === 'BACKUP_SNAPSHOT').length;
+          const security = logsInHour.filter(l => l.category === 'PASSWORD_RESET').length;
+          const others = total - (requisitions + backups + security);
+
+          const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          dataPoints.push({
+            label: hourLabel,
+            total,
+            success,
+            failed,
+            skipped,
+            requisitions,
+            backups,
+            security,
+            others
+          });
+        }
+      } else if (graphTimeframe === '24H') {
+        for (let i = 23; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 60 * 60 * 1000);
+          const hourStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0);
+          const hourEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 59, 59, 999);
+
+          const logsInHour = allMergedLogs.filter(log => {
+            const logTime = new Date(log.timestamp).getTime();
+            return logTime >= hourStart.getTime() && logTime <= hourEnd.getTime();
+          });
+
+          const success = logsInHour.filter(l => l.status === 'DELIVERED' || l.status === 'SIMULATED').length;
+          const failed = logsInHour.filter(l => l.status === 'FAILED').length;
+          const skipped = logsInHour.filter(l => l.status === 'SKIPPED').length;
+          const total = logsInHour.length;
+
+          const requisitions = logsInHour.filter(l => l.category === 'REQUISITION_WORKFLOW').length;
+          const backups = logsInHour.filter(l => l.category === 'BACKUP_SNAPSHOT').length;
+          const security = logsInHour.filter(l => l.category === 'PASSWORD_RESET').length;
+          const others = total - (requisitions + backups + security);
+
+          const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          dataPoints.push({
+            label: hourLabel,
+            total,
+            success,
+            failed,
+            skipped,
+            requisitions,
+            backups,
+            security,
+            others
+          });
+        }
+      } else if (graphTimeframe === '1D') {
+        for (let i = 7; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * 3 * 60 * 60 * 1000);
+          const blockStart = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+          const blockEnd = d;
+
+          const logsInBlock = allMergedLogs.filter(log => {
+            const logTime = new Date(log.timestamp).getTime();
+            return logTime > blockStart.getTime() && logTime <= blockEnd.getTime();
+          });
+
+          const success = logsInBlock.filter(l => l.status === 'DELIVERED' || l.status === 'SIMULATED').length;
+          const failed = logsInBlock.filter(l => l.status === 'FAILED').length;
+          const skipped = logsInBlock.filter(l => l.status === 'SKIPPED').length;
+          const total = logsInBlock.length;
+
+          const requisitions = logsInBlock.filter(l => l.category === 'REQUISITION_WORKFLOW').length;
+          const backups = logsInBlock.filter(l => l.category === 'BACKUP_SNAPSHOT').length;
+          const security = logsInBlock.filter(l => l.category === 'PASSWORD_RESET').length;
+          const others = total - (requisitions + backups + security);
+
+          const startLabel = blockStart.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          const endLabel = blockEnd.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
+          dataPoints.push({
+            label: `${startLabel}-${endLabel}`,
+            total,
+            success,
+            failed,
+            skipped,
+            requisitions,
+            backups,
+            security,
+            others
+          });
+        }
+      } else if (graphTimeframe === '1M') {
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+          const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+          const logsInDay = allMergedLogs.filter(log => {
+            const logTime = new Date(log.timestamp).getTime();
+            return logTime >= dayStart.getTime() && logTime <= dayEnd.getTime();
+          });
+
+          const success = logsInDay.filter(l => l.status === 'DELIVERED' || l.status === 'SIMULATED').length;
+          const failed = logsInDay.filter(l => l.status === 'FAILED').length;
+          const skipped = logsInDay.filter(l => l.status === 'SKIPPED').length;
+          const total = logsInDay.length;
+
+          const requisitions = logsInDay.filter(l => l.category === 'REQUISITION_WORKFLOW').length;
+          const backups = logsInDay.filter(l => l.category === 'BACKUP_SNAPSHOT').length;
+          const security = logsInDay.filter(l => l.category === 'PASSWORD_RESET').length;
+          const others = total - (requisitions + backups + security);
+
+          const dayLabel = d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
+          dataPoints.push({
+            label: dayLabel,
+            total,
+            success,
+            failed,
+            skipped,
+            requisitions,
+            backups,
+            security,
+            others
+          });
+        }
+      } else if (graphTimeframe === '1Y') {
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthStart = new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+          const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+          const logsInMonth = allMergedLogs.filter(log => {
+            const logTime = new Date(log.timestamp).getTime();
+            return logTime >= monthStart.getTime() && logTime <= monthEnd.getTime();
+          });
+
+          const success = logsInMonth.filter(l => l.status === 'DELIVERED' || l.status === 'SIMULATED').length;
+          const failed = logsInMonth.filter(l => l.status === 'FAILED').length;
+          const skipped = logsInMonth.filter(l => l.status === 'SKIPPED').length;
+          const total = logsInMonth.length;
+
+          const requisitions = logsInMonth.filter(l => l.category === 'REQUISITION_WORKFLOW').length;
+          const backups = logsInMonth.filter(l => l.category === 'BACKUP_SNAPSHOT').length;
+          const security = logsInMonth.filter(l => l.category === 'PASSWORD_RESET').length;
+          const others = total - (requisitions + backups + security);
+
+          const monthLabel = d.toLocaleDateString('en-KE', { month: 'short', year: '2-digit' });
+          dataPoints.push({
+            label: monthLabel,
+            total,
+            success,
+            failed,
+            skipped,
+            requisitions,
+            backups,
+            security,
+            others
+          });
+        }
+      }
+    }
+
+    return {
+      points: dataPoints,
+      isMock
+    };
+  }, [allMergedLogs, graphTimeframe]);
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
@@ -485,6 +816,241 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           <p className="text-[10px] text-slate-400 font-medium">
             {stats.delivered} sent • {stats.simulated} sim • {stats.failed} err
           </p>
+        </div>
+      </div>
+
+      {/* 1b. Interactive Chart Section */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">Email Dispatch Audit Volume</h3>
+              {chartData.isMock && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">
+                  <Sparkles size={10} />
+                  Sandbox Simulation
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium">Real-time mailer analytics & network traffic visualization</p>
+          </div>
+
+          {/* Timeframe Selectors & Breakdown Modes */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Breakdown Toggle */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setGraphViewMode('STATUS')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  graphViewMode === 'STATUS'
+                    ? "bg-white text-slate-900 shadow-xs border border-slate-200"
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Delivery Status
+              </button>
+              <button
+                type="button"
+                onClick={() => setGraphViewMode('CATEGORY')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                  graphViewMode === 'CATEGORY'
+                    ? "bg-white text-slate-900 shadow-xs border border-slate-200"
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Category
+              </button>
+            </div>
+
+            {/* Timeframe Buttons */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              {(['12H', '24H', '1D', '1M', '1Y'] as const).map((tf) => {
+                const labelMap = {
+                  '12H': '12 Hrs',
+                  '24H': '24 Hrs',
+                  '1D': '1 Day',
+                  '1M': '1 Month',
+                  '1Y': '1 Year'
+                };
+                return (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setGraphTimeframe(tf)}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                      graphTimeframe === tf
+                        ? "bg-white text-slate-900 shadow-xs border border-slate-200"
+                        : "text-slate-500 hover:text-slate-800"
+                    )}
+                  >
+                    {labelMap[tf]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Recharts Container */}
+        <div className="h-64 w-full relative pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            {graphViewMode === 'STATUS' ? (
+              <AreaChart data={chartData.points} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorSuccess" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
+                  </linearGradient>
+                  <linearGradient id="colorFailed" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="label" 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }}
+                />
+                <YAxis 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }}
+                />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white rounded-xl p-3 shadow-xl border border-slate-800 max-w-xs space-y-1.5 text-[10px]">
+                          <div className="font-bold text-slate-400 font-mono">
+                            {data.label}
+                          </div>
+                          <div className="divide-y divide-slate-800">
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-emerald-400 font-sans">SUCCESS:</span>
+                              <span className="font-black font-mono text-emerald-300">{data.success}</span>
+                            </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-rose-400 font-sans">FAILED:</span>
+                              <span className="font-black font-mono text-rose-300">{data.failed}</span>
+                            </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-amber-400 font-sans">SKIPPED:</span>
+                              <span className="font-black font-mono text-amber-300">{data.skipped}</span>
+                            </div>
+                            <div className="py-1 pt-1.5 flex justify-between gap-6 font-bold border-t border-slate-800">
+                              <span className="text-slate-200">TOTAL VOLUME:</span>
+                              <span className="font-black font-mono text-white text-xs">{data.total}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Area type="monotone" dataKey="success" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorSuccess)" name="Success (Delivered/Simulated)" />
+                <Area type="monotone" dataKey="failed" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorFailed)" name="Failed" />
+              </AreaChart>
+            ) : (
+              <BarChart data={chartData.points} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis 
+                  dataKey="label" 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }}
+                />
+                <YAxis 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fill: "#94a3b8", fontSize: 9, fontWeight: 700 }}
+                />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white rounded-xl p-3 shadow-xl border border-slate-800 max-w-xs space-y-1.5 text-[10px]">
+                          <div className="font-bold text-slate-400 font-mono">
+                            {data.label}
+                          </div>
+                          <div className="divide-y divide-slate-800">
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-blue-400 font-sans">REQUISITIONS:</span>
+                              <span className="font-black font-mono text-blue-300">{data.requisitions}</span>
+                            </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-purple-400 font-sans">BACKUPS:</span>
+                              <span className="font-black font-mono text-purple-300">{data.backups}</span>
+                            </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-amber-400 font-sans">SECURITY & AUTH:</span>
+                              <span className="font-black font-mono text-amber-300">{data.security}</span>
+                            </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-slate-400 font-sans">OTHERS:</span>
+                              <span className="font-black font-mono text-slate-300">{data.others}</span>
+                            </div>
+                            <div className="py-1 pt-1.5 flex justify-between gap-6 font-bold border-t border-slate-800">
+                              <span className="text-slate-200">TOTAL VOLUME:</span>
+                              <span className="font-black font-mono text-white text-xs">{data.total}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar dataKey="requisitions" stackId="a" fill="#3b82f6" name="Requisitions" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="backups" stackId="a" fill="#a855f7" name="Backups" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="security" stackId="a" fill="#f59e0b" name="Security & Auth" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="others" stackId="a" fill="#64748b" name="Others" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+
+        {/* Legend Indicator Panel */}
+        <div className="flex flex-wrap justify-center gap-6 pt-2 border-t border-slate-100 text-[10px] font-bold uppercase tracking-wider">
+          {graphViewMode === 'STATUS' ? (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-emerald-500 rounded-sm" />
+                <span className="text-slate-600">Success Dispatches (Sent/Simulated)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-rose-500 rounded-sm" />
+                <span className="text-slate-600">Failed Dispatches</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-blue-500 rounded-sm" />
+                <span className="text-slate-600">Requisitions</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-purple-500 rounded-sm" />
+                <span className="text-slate-600">Backups</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-amber-500 rounded-sm" />
+                <span className="text-slate-600">Security & Auth</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-slate-500 rounded-sm" />
+                <span className="text-slate-600">Others</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

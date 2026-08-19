@@ -76,6 +76,7 @@ This document defines the system architecture, file processing standards, financ
 - **Phase 3 (Upcoming)**:
   - Client-side image compression prior to base64 encoding to optimize memory footprint.
   - Offline requisition draft queueing for low-connectivity environments.
+  - Requisition Installment Disbursements: Implement a schema and status system allowing approved high-value requisitions to be disbursed in customized financial installments (e.g., partial disbursement tracking, ledger balances, and multi-stage status indicators).
 
 - **Phase 4 (Deployment)**:
   - Production Cloud Run deployment with continuous container health monitoring.

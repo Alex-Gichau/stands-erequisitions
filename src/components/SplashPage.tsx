@@ -81,7 +81,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
   darkMode = true,
   onComplete,
   isDataReady = true,
-  durationMs = 3500,
+  durationMs = 4500,
 }) => {
   const [progress, setProgress] = useState(0);
   const startTimeRef = useRef<number | null>(null);

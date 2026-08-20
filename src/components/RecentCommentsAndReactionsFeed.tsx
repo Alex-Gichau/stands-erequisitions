@@ -26,7 +26,8 @@ import {
   Send,
   User as UserIcon,
   CornerDownRight,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 
 interface RecentCommentsAndReactionsFeedProps {
@@ -340,13 +341,27 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
     }
   }, [requisitions, setSelectedRequisition, setGlobalSearchTerm, onViewChange]);
 
-  const displayedCards = filteredComments.slice(0, displayLimit);
-  const hasMore = filteredComments.length > displayLimit;
+  // Ref for horizontal scroll container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -340, behavior: "smooth" });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 340, behavior: "smooth" });
+    }
+  };
+
+  const displayedCards = filteredComments;
 
   return (
     <div 
       id="recent-comments-reactions-feed-section"
-      className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 space-y-6 my-8 relative overflow-hidden"
+      className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 space-y-6 my-8 relative overflow-hidden shadow-xs border border-slate-100 dark:border-slate-800"
     >
       {/* Decorative Accent Glow */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
@@ -369,19 +384,19 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             Recent Comments & Reactions
           </h3>
           <p className="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-medium leading-relaxed max-w-2xl">
-            Realtime discussion cards and reactions from team members on requisitions matching your account permission role.
+            Realtime discussion cards and reactions from team members. Click any card or title badge to jump straight to the requisition details.
           </p>
         </div>
 
-        {/* Search Controls */}
+        {/* Search & Row Navigation Controls */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="relative min-w-[240px]">
+          <div className="relative min-w-[200px] sm:min-w-[240px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search comments or requisitions..."
+              placeholder="Search comments..."
               className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all placeholder:text-slate-400"
             />
             {searchTerm && (
@@ -393,25 +408,52 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
               </button>
             )}
           </div>
+
+          {/* Left / Right Row Scroll Controls */}
+          {displayedCards.length > 0 && (
+            <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+              <button
+                onClick={scrollLeft}
+                aria-label="Scroll left"
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer"
+                title="Scroll comments left"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={scrollRight}
+                aria-label="Scroll right"
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer"
+                title="Scroll comments right"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Cards Grid (Social Tweet Style Layout) */}
+      {/* Single-Row Horizontal Cards Carousel */}
       {displayedCards.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div 
+          ref={scrollContainerRef}
+          className="flex flex-row overflow-x-auto gap-4 md:gap-5 pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory focus:outline-none"
+          style={{ scrollbarWidth: "thin" }}
+        >
           {displayedCards.map((card) => {
             const existingReactions = Object.entries(card.reactionCounts).filter(([_, count]) => count > 0);
 
             return (
               <motion.div
                 key={card.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.2 }}
-                className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl md:rounded-3xl p-5 md:p-6 transition-all relative group flex flex-col justify-between"
+                onClick={() => handleJumpToRequisition(card.rawRequisition)}
+                className="min-w-[300px] sm:min-w-[340px] md:min-w-[370px] max-w-[370px] shrink-0 snap-start bg-slate-50/80 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 rounded-2xl md:rounded-3xl p-5 md:p-6 transition-all duration-200 relative group flex flex-col justify-between border border-slate-200/70 dark:border-slate-700/60 hover:border-sky-400/80 dark:hover:border-sky-500/80 hover:shadow-lg hover:shadow-sky-500/5 cursor-pointer select-none"
               >
                 <div>
-                  {/* Top Header: User Profile, Name, Verified Blue Checkmark, Access Level, Top-Right Title Badge Button */}
+                  {/* Top Header: User Profile, Name, Verified Checkmark, Access Level, Title Badge */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 min-w-0">
                       {/* Avatar Photo or Initial Circle */}
@@ -459,36 +501,35 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
                       </div>
                     </div>
 
-                    {/* Top Right Requisition Title Badge Button */}
-                    <button
-                      onClick={() => handleJumpToRequisition(card.rawRequisition)}
-                      className="shrink-0 bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900/80 text-sky-600 dark:text-sky-400 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-sky-200/80 dark:border-sky-800/80 transition-all flex items-center gap-1 cursor-pointer max-w-[170px] truncate"
-                      title={`Open requisition: ${card.requisitionTitle}`}
+                    {/* Top Right Requisition Title Badge */}
+                    <div
+                      className="shrink-0 bg-sky-50 dark:bg-sky-950/60 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/80 text-sky-600 dark:text-sky-400 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-sky-200/80 dark:border-sky-800/80 transition-all flex items-center gap-1 max-w-[130px] sm:max-w-[150px] truncate"
+                      title={`Requisition: ${card.requisitionTitle}`}
                     >
                       <Tag size={10} className="text-sky-500 shrink-0" />
                       <span className="truncate">{card.requisitionTitle}</span>
-                    </button>
+                    </div>
                   </div>
 
-                  {/* Main Comment Narrative Body */}
-                  <div className="my-3 text-slate-800 dark:text-slate-100 text-sm md:text-base font-normal leading-relaxed break-words font-sans">
+                  {/* Main Comment Narrative Body with 3-line clamp */}
+                  <div className="my-3 text-slate-800 dark:text-slate-100 text-xs md:text-sm font-normal leading-relaxed break-words font-sans line-clamp-3">
                     {renderFormattedCommentText(card.text)}
                   </div>
 
-                  {/* Timestamp Line (Matching "9:30 PM • Feb 5, 2022" format) */}
-                  <div className="text-[11px] font-sans text-slate-400 dark:text-slate-500 my-2.5 pt-2 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between">
+                  {/* Timestamp Line */}
+                  <div className="text-[11px] font-sans text-slate-400 dark:text-slate-500 my-2 pt-2 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between">
                     <span>{formatSocialTimestamp(card.timestamp)}</span>
                     <span className="text-[10px] font-mono text-slate-400">({formatRelativeShort(card.timestamp)})</span>
                   </div>
                 </div>
 
-                {/* Bottom Action / Read-Only Reaction Bar */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-slate-400 text-xs">
+                {/* Bottom Action / Reaction Bar */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-slate-400 text-xs" onClick={(e) => e.stopPropagation()}>
                   {/* Icon 1: Reply / Comment Count */}
                   <button
                     onClick={() => setSelectedPreviewCard(card)}
                     className="flex items-center gap-1.5 hover:text-sky-500 transition-colors cursor-pointer text-[11px] font-medium"
-                    title={`${card.replyCount} replies`}
+                    title={`${card.replyCount} replies - Click for details`}
                   >
                     <MessageSquare size={15} className="text-slate-400 group-hover:text-sky-500" />
                     <span>{card.replyCount}</span>
@@ -500,7 +541,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
                       existingReactions.map(([emoji, count]) => (
                         <span
                           key={emoji}
-                          className="px-2 py-0.5 rounded-md text-[11px] bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium select-none flex items-center gap-1 cursor-default"
+                          className="px-2 py-0.5 rounded-md text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium select-none flex items-center gap-1 cursor-default"
                           title={`${count} reaction${count === 1 ? "" : "s"}`}
                         >
                           <span>{emoji}</span>
@@ -561,18 +602,6 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
               Reset Search Filter
             </button>
           )}
-        </div>
-      )}
-
-      {/* Load More Button */}
-      {hasMore && (
-        <div className="flex justify-center pt-2">
-          <button
-            onClick={() => setDisplayLimit(prev => prev + 6)}
-            className="text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 px-6 py-2.5 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer shadow-2xs"
-          >
-            Load More Activity Cards ({filteredComments.length - displayLimit} remaining)
-          </button>
         </div>
       )}
 

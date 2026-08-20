@@ -1855,6 +1855,9 @@ const Dashboard: React.FC<{
         </div>
       </div>
 
+      {/* Realtime Recent Comments & Reactions Feed */}
+      <RecentCommentsAndReactionsFeed onViewChange={onViewChange} />
+
       {/* Receipt Generator Modal */}
       <AnimatePresence>
         {isGeneratingReceipt && (

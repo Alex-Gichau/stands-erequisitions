@@ -1516,7 +1516,7 @@ function AppContent() {
     return (
       <SplashPage
         darkMode={darkMode}
-        durationMs={3500}
+        durationMs={4500}
         isDataReady={!loading && !authLoading}
         onComplete={() => setShowSplash(false)}
       />

@@ -10,7 +10,7 @@ export default defineConfig(() => {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || ''),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''),
       'import.meta.env.VITE_VPS_IP': JSON.stringify(process.env.VPS_IP || process.env.VITE_VPS_IP || '178.104.122.211'),
-      'import.meta.env.VITE_SERVER_PORT': JSON.stringify(process.env.SERVER_PORT || process.env.VITE_SERVER_PORT || '3000'),
+      'import.meta.env.VITE_SERVER_PORT': JSON.stringify(process.env.SERVER_PORT || process.env.VITE_SERVER_PORT || '5004'),
       'process.env.UPLOADS_DIR': JSON.stringify(process.env.UPLOADS_DIR || './uploads'),
       'process.env.DATA_DIR': JSON.stringify(process.env.DATA_DIR || './server/data'),
       'process.env.BASE_DATA_DIR': JSON.stringify(process.env.BASE_DATA_DIR || './data'),

@@ -212,7 +212,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.18, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-8"
+            className="mb-5"
           >
             <h1
               className={`text-2xl sm:text-3xl font-black uppercase tracking-wider ${
@@ -230,7 +230,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
           <motion.div
             initial={{ opacity: 0, width: "80%" }}
             animate={{ opacity: 1, width: "100%" }}
-            transition={{ delay: 0.25, duration: 0.4, ease: "easeOut" }}
+            transition={{ delay: 0.25, duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-[240px]"
           >
             <div

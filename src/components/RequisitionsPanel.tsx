@@ -238,13 +238,26 @@ export const WHATSAPP_QUICK_REACTION_OPTIONS = REACTION_OPTIONS;
 export const WHATSAPP_EXTENDED_REACTION_OPTIONS: { emoji: string; label: string }[] = [];
 export const COMMENT_REACTION_OPTIONS = REACTION_OPTIONS;
 
+export function formatEmailToName(email: string): string {
+  if (!email || typeof email !== "string" || !email.includes("@")) return "";
+  const prefix = email.split("@")[0].replace(/[._-]/g, " ").trim();
+  if (!prefix) return "";
+  return prefix
+    .split(" ")
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
   const map = new Map<string, string>();
   if (!Array.isArray(allUsers)) return map;
 
   allUsers.forEach((u: any) => {
     if (!u) return;
-    const resolvedName = u.name || u.displayName || u.username || resolveSenderName(u, allUsers) || (u.email ? u.email.split("@")[0].replace(/[._-]/g, " ").split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "");
+    const directName = u.name || u.displayName || u.username || resolveSenderName(u, allUsers) || "";
+    const emailName = formatEmailToName(u.email || "");
+    const resolvedName = directName || emailName;
     if (!resolvedName) return;
 
     if (u.id) map.set(String(u.id).trim().toLowerCase(), resolvedName);
@@ -591,14 +604,15 @@ export function sanitizeCommentReactions(
         item.userIds.forEach((uid: any) => {
           if (uid) {
             const resolvedUid = typeof uid === "string" ? uid : (uid.id || uid.uid || uid.userId || "anon");
-            const resolvedEmail = typeof uid === "object" ? uid.email || "" : "";
-            const directName = typeof uid === "object" ? uid.name || uid.userName || "" : "";
-            const lookupName = userMap.get(String(resolvedUid).toLowerCase()) || (resolvedEmail ? userMap.get(String(resolvedEmail).toLowerCase()) : "") || directName;
+            const resolvedEmail = typeof uid === "object" ? (uid.email || uid.userEmail || "") : "";
+            const directName = typeof uid === "object" ? (uid.name || uid.userName || "") : "";
+            const emailName = formatEmailToName(resolvedEmail);
+            const lookupName = userMap.get(String(resolvedUid).toLowerCase()) || (resolvedEmail ? userMap.get(String(resolvedEmail).toLowerCase()) : "") || directName || emailName;
             list.push({
               emoji,
               userId: resolvedUid,
               userEmail: resolvedEmail,
-              userName: lookupName || directName || ""
+              userName: lookupName || directName || emailName || ""
             });
           }
         });
@@ -609,12 +623,14 @@ export function sanitizeCommentReactions(
           emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
         }
         const rUid = item.userId ? String(item.userId).trim().toLowerCase() : "";
-        const rUemail = item.userEmail ? String(item.userEmail).trim().toLowerCase() : "";
-        const lookupName = (rUid && userMap.get(rUid)) || (rUemail && userMap.get(rUemail)) || item.userName || item.name || "";
+        const rUemail = item.userEmail ? String(item.userEmail).trim().toLowerCase() : (item.email ? String(item.email).trim().toLowerCase() : "");
+        const emailName = formatEmailToName(rUemail);
+        const lookupName = (rUid && userMap.get(rUid)) || (rUemail && userMap.get(rUemail)) || item.userName || item.name || emailName || "";
         list.push({
           ...item,
           emoji,
-          userName: lookupName || item.userName || item.name || ""
+          userEmail: item.userEmail || item.email || "",
+          userName: lookupName || item.userName || item.name || emailName || ""
         });
       } else {
         // Dictionary format { "👍": ["u1", "u2"], "👎": ["u3"] } or legacy { thumbsUp: [...] }
@@ -629,12 +645,13 @@ export function sanitizeCommentReactions(
               const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
               const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
               const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
-              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName;
+              const emailName = formatEmailToName(uEmail);
+              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName || emailName;
               list.push({
                 emoji,
                 userId: uId,
                 userEmail: uEmail,
-                userName: lookupName || directName || ""
+                userName: lookupName || directName || emailName || ""
               });
             });
           } else if (typeof val === "boolean" && val) {
@@ -644,12 +661,13 @@ export function sanitizeCommentReactions(
               const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
               const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
               const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
-              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName;
+              const emailName = formatEmailToName(uEmail);
+              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName || emailName;
               list.push({
                 emoji,
                 userId: uId,
                 userEmail: uEmail,
-                userName: lookupName || directName || ""
+                userName: lookupName || directName || emailName || ""
               });
             });
           }
@@ -667,11 +685,12 @@ export function sanitizeCommentReactions(
     if (!r || !r.emoji) continue;
 
     if (currentUser && isUserReactionMatch(r, currentUser, allUsers)) {
+      const curDisplayName = currentUser?.name || currentUser?.displayName || (currentUser as any)?.username || formatEmailToName(currentUser?.email || "") || "You";
       userReactionMap.set("__current_user__", {
         ...r,
         userId: currentUser?.id || currentUser?.uid || currentUser?.email || "u-current",
         userEmail: currentUser?.email || "",
-        userName: currentUser?.name || currentUser?.displayName || (currentUser as any)?.username || "You"
+        userName: curDisplayName
       });
       continue;
     }
@@ -705,15 +724,17 @@ export function sanitizeCommentReactions(
       userKey = `user_${matchedUser.id || matchedUser.uid || matchedUser.email}`;
       resolvedReaction.userId = matchedUser.id || matchedUser.uid;
       resolvedReaction.userEmail = matchedUser.email;
-      resolvedReaction.userName = matchedUser.name || matchedUser.displayName || matchedUser.username || matchedUser.email;
+      resolvedReaction.userName = matchedUser.name || matchedUser.displayName || matchedUser.username || formatEmailToName(matchedUser.email) || matchedUser.email;
     } else if (rUemail || rEmail) {
       userKey = `email_${rUemail || rEmail}`;
-      if (!resolvedReaction.userName) {
-        const prefix = (rUemail || rEmail).split("@")[0].replace(/[._-]/g, " ");
-        resolvedReaction.userName = prefix.split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+      if (!resolvedReaction.userName || ["user", "anon", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(resolvedReaction.userName.toLowerCase().trim())) {
+        resolvedReaction.userName = formatEmailToName(rUemail || rEmail);
       }
     } else if (rUid && !rUid.startsWith("u-") && !rUid.startsWith("anon") && rUid !== "user") {
       userKey = `id_${rUid}`;
+      if (!resolvedReaction.userName) {
+        resolvedReaction.userName = userMap.get(rUid) || "";
+      }
     } else if (rUname && !["anon", "user", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(rUname)) {
       userKey = `name_${rUname}`;
     } else {
@@ -757,7 +778,8 @@ export function handleReactionLogic({
   newReactions: any[];
 } {
   const currentUserId = currentUser?.id || currentUser?.uid || currentUser?.email || "anon";
-  const currentUserName = currentUser?.name || (currentUser as any)?.displayName || (currentUser as any)?.username || resolveSenderName(currentUser, users) || currentUser?.email || "User";
+  const userEmailName = formatEmailToName(currentUser?.email || "");
+  const currentUserName = currentUser?.name || (currentUser as any)?.displayName || (currentUser as any)?.username || resolveSenderName(currentUser, users) || userEmailName || currentUser?.email || "User";
 
   // 1. Sanitize all current reactions (deduplicating to at most 1 reaction per user)
   const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
@@ -783,7 +805,10 @@ export function handleReactionLogic({
       userId: currentUserId,
       userEmail: currentUser?.email || "",
       userName: currentUserName,
-      createdAt: new Date().toISOString()
+      userRole: currentUser?.role || "",
+      userAvatar: currentUser?.photoURL || (currentUser as any)?.avatarUrl || "",
+      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
     newReactions = [
       ...sanitized.filter((r: any) => !isUserReactionMatch(r, currentUser, users)),
@@ -797,7 +822,10 @@ export function handleReactionLogic({
       userId: currentUserId,
       userEmail: currentUser?.email || "",
       userName: currentUserName,
-      createdAt: new Date().toISOString()
+      userRole: currentUser?.role || "",
+      userAvatar: currentUser?.photoURL || (currentUser as any)?.avatarUrl || "",
+      createdAt: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
     newReactions = [...sanitized, newReactionObj];
     action = "ADDED";
@@ -870,8 +898,7 @@ export function extractUserDisplayName(user: any): string {
     const trimmed = user.trim();
     if (!trimmed) return "";
     if (trimmed.includes("@")) {
-      const emailPrefix = trimmed.split("@")[0].replace(/[._-]/g, " ").trim();
-      return emailPrefix.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      return formatEmailToName(trimmed);
     }
     return trimmed.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
@@ -880,8 +907,7 @@ export function extractUserDisplayName(user: any): string {
     return nameCandidate.trim().split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   }
   if (user.email && typeof user.email === "string" && user.email.includes("@")) {
-    const emailPrefix = user.email.split("@")[0].replace(/[._-]/g, " ").trim();
-    return emailPrefix.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    return formatEmailToName(user.email);
   }
   return "";
 }
@@ -911,7 +937,7 @@ export function resolveReactorNames(
     const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
     const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
 
-    // 1. Explicitly check if this is the currently logged in user -> returns their FirstName e.g. "John"
+    // 1. Explicitly check if this is the currently logged in user -> returns their FirstName e.g. "John" or "You"
     const isCurrent = Boolean(
       (rUserId === "u-current") ||
       (rUserId === "__current_user__") ||
@@ -930,7 +956,22 @@ export function resolveReactorNames(
       return;
     }
 
-    // 2. Lookup in user map by ID, UID, email, or username
+    // 2. Direct embedded and persisted userName from database record
+    if (rUserName && rUserName.trim().length > 0) {
+      const isGeneric = [
+        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "church member", "undefined", "null"
+      ].includes(rUserName.toLowerCase().trim());
+
+      if (!isGeneric) {
+        const first = extractUserFirstName(rUserName);
+        if (first) {
+          names.push(first);
+          return;
+        }
+      }
+    }
+
+    // 3. Lookup in user map by ID, UID, email, or username
     if (rUserId && userMap.has(rUserId)) {
       const resolved = userMap.get(rUserId)!;
       if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
@@ -956,22 +997,7 @@ export function resolveReactorNames(
       }
     }
 
-    // 3. Use stored and persisted userName if available
-    if (rUserName && rUserName.trim().length > 0) {
-      const isGeneric = [
-        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "church member", "undefined", "null"
-      ].includes(rUserName.toLowerCase().trim());
-
-      if (!isGeneric) {
-        const first = extractUserFirstName(rUserName);
-        if (first) {
-          names.push(first);
-          return;
-        }
-      }
-    }
-
-    // 4. Derive from email address
+    // 4. Derive from email address (e.g. gichaumburu@gmail.com -> Gichau)
     const emailToParse = rUserEmail || rEmail || (rUserId.includes("@") ? rUserId : "");
     if (emailToParse && emailToParse.includes("@")) {
       const first = extractUserFirstName(emailToParse);
@@ -999,7 +1025,7 @@ export function resolveReactorNames(
       }
     }
 
-    // 6. Last resort: formatted user identity
+    // 6. Formatted user identity / Fallback
     if (rUserId && !["anon", "user", "undefined", "null"].includes(rUserId)) {
       names.push(rUserId.length > 10 ? `User ${rUserId.slice(0, 4)}` : rUserId);
     } else {
@@ -1034,12 +1060,12 @@ export function resolveReactorsProfiles(
   reactionsList: any[],
   allUsers: any[] = [],
   currentLoggedInUser: any = null
-): Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean }> {
+): Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string }> {
   const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
   if (!sanitized || sanitized.length === 0) return [];
 
   const userMap = buildUserLookupMap(allUsers);
-  const profiles: Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean }> = [];
+  const profiles: Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string }> = [];
   const seen = new Set<string>();
 
   const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
@@ -1074,13 +1100,18 @@ export function resolveReactorsProfiles(
       )
     ) : null;
 
+    const emailName = formatEmailToName(rUserEmail || rEmail || "");
     const resolvedName = isCurrent
       ? (extractUserDisplayName(currentLoggedInUser) || "You")
-      : (extractUserDisplayName(userObj) || r.userName || extractUserDisplayName(rUserEmail) || "Member");
+      : (extractUserDisplayName(userObj) || (rUserName && !["user", "anon", "someone", "member"].includes(rUserName.toLowerCase()) ? rUserName : "") || emailName || extractUserDisplayName(rUserEmail) || "Member");
 
     const avatar = isCurrent
       ? (currentLoggedInUser?.photoURL || (currentLoggedInUser as any)?.avatarUrl)
       : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.userAvatar || r.userPhotoURL);
+
+    const role = isCurrent
+      ? (currentLoggedInUser?.role || (currentLoggedInUser as any)?.userRole)
+      : (userObj?.role || r.userRole || r.role);
 
     const key = isCurrent ? "current_user" : (userObj?.id || r.userId || r.userEmail || resolvedName);
 
@@ -1091,7 +1122,9 @@ export function resolveReactorsProfiles(
         name: resolvedName,
         avatar,
         emoji: r.emoji,
-        isCurrent
+        isCurrent,
+        email: isCurrent ? currentLoggedInUser?.email : (userObj?.email || r.userEmail || r.email || ""),
+        role
       });
     }
   });
@@ -7664,14 +7697,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           (currentUser?.email && (rUemail === String(currentUser.email).toLowerCase() || rUid === String(currentUser.email).toLowerCase()))
                         );
 
-                        const resolvedName = resolveSenderName({ id: r.userId, email: r.userEmail, name: r.userName }, users) || r.userName || (r.userEmail ? r.userEmail.split("@")[0] : "Church Member");
+                        const emailName = formatEmailToName(r.userEmail || r.email || "");
+                        const resolvedName = (isCurrent && extractUserDisplayName(currentUser))
+                          ? extractUserDisplayName(currentUser)
+                          : (resolveSenderName({ id: r.userId, email: r.userEmail, name: r.userName }, users) || (r.userName && !["user", "anon", "someone", "member"].includes(r.userName.toLowerCase()) ? r.userName : "") || emailName || "Parish Member");
                         const userObj = users.find((u: any) => 
                           (u.id && r.userId && u.id === r.userId) || 
                           (u.email && r.userEmail && u.email.toLowerCase() === r.userEmail.toLowerCase())
                         );
                         const avatar = isCurrent 
                           ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) 
-                          : (userObj?.photoURL || (userObj as any)?.avatarUrl);
+                          : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.userAvatar || r.userPhotoURL);
 
                         return (
                           <div key={idx} className={cn("flex items-center justify-between gap-3 pt-2.5 first:pt-0", idx > 0 && "pt-2.5")}>

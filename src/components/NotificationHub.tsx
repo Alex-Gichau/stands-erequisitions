@@ -831,7 +831,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           )}
 
           {/* Grouped Notification List Stream */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto p-3 space-y-4 subtle-scrollbar">
             {groupedSections.length === 0 ? (
               <div className="py-16 text-center text-slate-400 space-y-3 px-4">
                 <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
@@ -1156,7 +1156,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 </div>
 
                 {/* Notification Full Content Scrollable Area */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 subtle-scrollbar">
                   
                   {/* Header Information with User Directory Profile Photo */}
                   <div className="space-y-4 pb-6 border-b border-slate-200/80 dark:border-slate-800">

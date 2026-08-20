@@ -1025,6 +1025,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const canAccess = useCallback((viewId: string) => {
     if (!currentUser) return false;
     if (currentUser.role === UserRole.SUPER_ADMIN) return true;
+    if (viewId === "settings" || viewId === "help") return true;
     
     if (viewId === "finance") {
       return [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2, UserRole.FINANCE, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);
@@ -1050,9 +1051,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     
     const defaults: Record<string, string[]> = {
-      [UserRole.CHURCH_GROUP]: ["dashboard", "requisitions", "notifications", "finance", "transactions", "vendors"],
-      [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors"],
-      [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors"],
+      [UserRole.CHURCH_GROUP]: ["dashboard", "requisitions", "notifications", "finance", "transactions", "vendors", "settings"],
+      [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
+      [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
       [UserRole.FINANCE]: ["dashboard", "requisitions", "finance", "reports", "notifications", "settings", "auditTrail", "transactions", "vendors"],
       [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
     };

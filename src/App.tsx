@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from "react";
 // @ts-ignore
 const db = {};
 const doc = (a: any, b: any, c?: any) => { };
@@ -23,8 +23,6 @@ import { ProfilePrompt } from "./components/ProfilePrompt";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { ProductTour } from "./components/ProductTour";
 import { FeedbackModal } from "./components/FeedbackModal";
-import { BugReportModal } from "./components/BugReportModal";
-import { ContactFinanceModal } from "./components/ContactFinanceModal";
 import { SplashPage } from "./components/SplashPage";
 import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
 import { PanelSkeletonFallback } from "./components/PanelSkeletonFallback";
@@ -360,11 +358,6 @@ function AppContent() {
     return { label: "Strong", color: "bg-emerald-500" };
   };
 
-  // Contact finance office states
-  const [showContactFinanceModal, setShowContactFinanceModal] = useState(false);
-  const [financeEmailSubject, setFinanceEmailSubject] = useState("");
-  const [financeEmailBody, setFinanceEmailBody] = useState("");
-
   // Connection listeners for dynamic online/offline monitoring
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -379,14 +372,48 @@ function AppContent() {
     };
   }, []);
 
-  // Clear authentication fields on mount/refresh to respect privacy and browser auto-fill preferences
-  useEffect(() => {
+  const loginFormRef = useRef<HTMLFormElement>(null);
+
+  // Clear authentication text fields on page refresh/mount and handle browser auto-fill clearing
+  const clearAuthFields = useCallback(() => {
     setEmail("");
     setPassword("");
     setName("");
     setError("");
     setSuccess("");
+    if (loginFormRef.current) {
+      loginFormRef.current.reset();
+      // Directly clear value property on all input elements in the login form
+      const inputs = loginFormRef.current.querySelectorAll("input");
+      inputs.forEach((input) => {
+        input.value = "";
+      });
+    }
   }, []);
+
+  // Clear authentication fields on mount/refresh and stagger resets to prevent browser auto-fill retention
+  useEffect(() => {
+    clearAuthFields();
+
+    const t1 = setTimeout(clearAuthFields, 50);
+    const t2 = setTimeout(clearAuthFields, 150);
+    const t3 = setTimeout(clearAuthFields, 300);
+
+    const handlePageShow = () => {
+      clearAuthFields();
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("load", clearAuthFields);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("load", clearAuthFields);
+    };
+  }, [clearAuthFields]);
 
   // Standard best-practice pre-fetch: As soon as login page loads, warm up and fetch all dashboard data
   useEffect(() => {
@@ -487,6 +514,13 @@ function AppContent() {
     selectedRequisition,
     setSelectedRequisition
   } = useRequisitions();
+
+  // Clear login text fields whenever auth mode toggles or user is not logged in
+  useEffect(() => {
+    if (!currentUser) {
+      clearAuthFields();
+    }
+  }, [authMode, currentUser, clearAuthFields]);
 
   const [sendingTestSummary, setSendingTestSummary] = useState(false);
 
@@ -976,7 +1010,6 @@ function AppContent() {
   }, []);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
   const [isFyDropdownOpen, setIsFyDropdownOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -1003,7 +1036,6 @@ function AppContent() {
       if (e.key === 'Escape') {
         setIsNotificationsOpen(false);
         setIsProfileOpen(false);
-        setIsBugReportOpen(false);
         setIsSearchFocused(false);
         setSelectedRequisition(null);
         setIsGeneratingReceiptFromHub(null);
@@ -1285,14 +1317,29 @@ function AppContent() {
               <span className="relative px-4 bg-slate-900 text-slate-500 text-[9px] font-bold uppercase tracking-widest">Or Login Via Email</span>
             </div>
 
-            <form className="space-y-4" onSubmit={handleEmailAuth}>
+            <form ref={loginFormRef} autoComplete="off" className="space-y-4" onSubmit={handleEmailAuth}>
               <div className="space-y-4">
+                {authMode === "EMAIL_SIGNUP" && (
+                  <div className="relative">
+                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                    <input 
+                      type="text"
+                      name="name"
+                      autoComplete="off"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-slate-700"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                )}
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
                   <input 
                     type="email"
                     name="email"
-                    autoComplete="username"
+                    autoComplete="off"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -1304,7 +1351,7 @@ function AppContent() {
                   <input 
                     type={showPassword ? "text" : "password"}
                     name="password"
-                    autoComplete={authMode === "EMAIL_SIGNUP" ? "new-password" : "current-password"}
+                    autoComplete="new-password"
                     required
                     maxLength={15}
                     value={password}
@@ -3009,7 +3056,7 @@ function AppContent() {
                     className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-[60]"
                   >
                     <div className="p-4 border-b border-slate-50">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Authenticated Transaction</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">User Information</p>
                       <p className="text-xs font-bold text-slate-900 truncate">{currentUser.email}</p>
                     </div>
                     <div className="p-2">
@@ -3047,32 +3094,6 @@ function AppContent() {
                         <HelpCircle size={14} className="text-slate-400" />
                         PORTAL HELP
                       </button>
-                      <button
-                        onClick={() => {
-                          setIsBugReportOpen(true);
-                          setIsProfileOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors text-left cursor-pointer"
-                      >
-                        <Bug size={14} className="text-slate-400" />
-                        REPORT BUG / FEEDBACK
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowContactFinanceModal(true);
-                          setIsProfileOpen(false);
-                          setFinanceEmailSubject("");
-                          setFinanceEmailBody("");
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors text-left cursor-pointer"
-                      >
-                        <Mail size={14} className="text-slate-400" />
-                        CONTACT FINANCE OFFICE
-                      </button>
-
-                      <div className="h-[1px] bg-slate-50 my-1" />
-
-
 
                       <div className="h-[1px] bg-slate-50 my-1" />
 
@@ -3141,18 +3162,6 @@ function AppContent() {
         onClose={() => setIsTourOpen(false)}
         currentView={currentView}
         onViewChange={setCurrentView}
-      />
-
-      <BugReportModal
-        isOpen={isBugReportOpen}
-        onClose={() => setIsBugReportOpen(false)}
-        currentUser={currentUser}
-      />
-
-      <ContactFinanceModal
-        isOpen={showContactFinanceModal}
-        onClose={() => setShowContactFinanceModal(false)}
-        currentUser={currentUser}
       />
 
       <BackgroundUploadWidget />

@@ -29,6 +29,9 @@ export interface UserProfile {
   phone?: string;
   department?: string;
   photoURL?: string;
+  profilePicUrl?: string;
+  avatarUrl?: string;
+  photo_url?: string;
   tempPassword?: string;
   isOnline?: boolean;
   lastSeen?: string;
@@ -99,11 +102,18 @@ export interface ApprovalNote {
 
 export interface CommentReaction {
   emoji: string;
-  userIds?: string[];
-  userId?: string;
-  userEmail?: string;
+  name: string;
+  userDirectoryId: string;
+  profilePicUrl?: string;
   userName?: string;
+  userId?: string;
+  photoURL?: string;
+  userAvatar?: string;
+  userEmail?: string;
+  email?: string;
+  userRole?: string;
   createdAt?: string;
+  timestamp?: string;
   [key: string]: any;
 }
 

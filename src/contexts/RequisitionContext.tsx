@@ -254,6 +254,66 @@ export function safeNormalizeComments(comments: any): any[] {
     }
   }
   if (!Array.isArray(parsed)) return [];
+
+  const normalizeReactions = (rawReactions: any): any[] => {
+    if (!rawReactions) return [];
+    let list = rawReactions;
+    if (typeof rawReactions === 'string') {
+      try {
+        list = JSON.parse(rawReactions);
+      } catch (e) {
+        return [];
+      }
+    }
+    if (!Array.isArray(list)) {
+      if (typeof list === 'object') list = Object.values(list);
+      else return [];
+    }
+
+    return list.map((r: any) => {
+      if (!r) return null;
+      if (typeof r === 'string') {
+        return {
+          emoji: r,
+          name: 'User',
+          userName: 'User',
+          userDirectoryId: 'anon',
+          userId: 'anon',
+          profilePicUrl: '',
+          photoURL: '',
+          userAvatar: '',
+          createdAt: new Date().toISOString(),
+          timestamp: new Date().toISOString()
+        };
+      }
+      if (typeof r !== 'object') return null;
+
+      const emoji = r.emoji || (r.reaction === 'dislike' || r.type === 'dislike' ? '👎' : '👍');
+      const name = r.name || r.userName || r.authorName || (r.userEmail ? r.userEmail.split('@')[0] : (r.email ? r.email.split('@')[0] : 'User'));
+      const userDirectoryId = r.userDirectoryId || r.userId || r.uid || r.authorId || (r.userEmail || r.email || 'anon');
+      const profilePicUrl = r.profilePicUrl || r.photoURL || r.userAvatar || r.avatarUrl || r.authorAvatar || '';
+      const userEmail = r.userEmail || r.email || '';
+      const userRole = r.userRole || r.role || '';
+      const createdAt = r.createdAt || r.timestamp || new Date().toISOString();
+
+      return {
+        emoji,
+        name,
+        userName: name,
+        userDirectoryId,
+        userId: userDirectoryId,
+        profilePicUrl,
+        photoURL: profilePicUrl,
+        userAvatar: profilePicUrl,
+        userEmail,
+        email: userEmail,
+        userRole,
+        createdAt,
+        timestamp: createdAt
+      };
+    }).filter(Boolean);
+  };
+
   return parsed.map((c: any) => {
     if (typeof c === 'string') {
       try {
@@ -277,6 +337,12 @@ export function safeNormalizeComments(comments: any): any[] {
       const rName = r.authorName || r.author_name || r.authorEmail || r.author_email || "User";
       const rEmail = r.authorEmail || r.author_email || "";
       const rCreatedAt = r.createdAt || r.created_at || r.timestamp || new Date().toISOString();
+      const normRepliesReactions = normalizeReactions(r.reactions);
+      const replyCounts = normRepliesReactions.reduce((acc: Record<string, number>, rx: any) => {
+        if (rx?.emoji) acc[rx.emoji] = (acc[rx.emoji] || 0) + 1;
+        return acc;
+      }, {});
+
       return {
         id: r.id || `reply_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         authorId: r.authorId || r.author_id || "anonymous",
@@ -290,14 +356,20 @@ export function safeNormalizeComments(comments: any): any[] {
         createdAt: rCreatedAt,
         parentId: r.parentId || c.id,
         replyTo: r.replyTo,
-        reactions: r.reactions || [],
-        reactionCounts: r.reactionCounts || {},
-        reactedUserIds: r.reactedUserIds || [],
+        reactions: normRepliesReactions,
+        reactionCounts: Object.keys(replyCounts).length > 0 ? replyCounts : (r.reactionCounts || {}),
+        reactedUserIds: normRepliesReactions.map((rx: any) => rx.userDirectoryId || rx.userId).filter(Boolean),
         reactionSummary: r.reactionSummary,
         attachments: Array.isArray(r.attachments) ? r.attachments : [],
         isEdited: Boolean(r.isEdited || r.is_edited)
       };
     }).filter(Boolean);
+
+    const normCommentsReactions = normalizeReactions(c.reactions);
+    const commentCounts = normCommentsReactions.reduce((acc: Record<string, number>, rx: any) => {
+      if (rx?.emoji) acc[rx.emoji] = (acc[rx.emoji] || 0) + 1;
+      return acc;
+    }, {});
 
     return {
       id: c.id || `comment_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -312,9 +384,9 @@ export function safeNormalizeComments(comments: any): any[] {
       createdAt,
       parentId: c.parentId !== undefined ? c.parentId : (c.parent_id !== undefined ? c.parent_id : (c.replyTo?.id || null)),
       replyTo: c.replyTo || (c.parent_id ? { id: c.parent_id, authorName: c.parent_author_name || "User", text: "" } : undefined),
-      reactions: c.reactions || [],
-      reactionCounts: c.reactionCounts || {},
-      reactedUserIds: c.reactedUserIds || [],
+      reactions: normCommentsReactions,
+      reactionCounts: Object.keys(commentCounts).length > 0 ? commentCounts : (c.reactionCounts || {}),
+      reactedUserIds: normCommentsReactions.map((rx: any) => rx.userDirectoryId || rx.userId).filter(Boolean),
       reactionSummary: c.reactionSummary,
       replies: normalizedReplies,
       attachments: Array.isArray(c.attachments) ? c.attachments : [],

@@ -3607,7 +3607,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     </div>
 
                     {!isVoucherTimelineCollapsed && (
-                      <div className="space-y-4 relative ml-1 pt-1 max-h-60 overflow-y-auto pr-1">
+                      <div className="space-y-4 relative ml-1 pt-1">
                         {/* Vertical Connector Line */}
                         <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
 

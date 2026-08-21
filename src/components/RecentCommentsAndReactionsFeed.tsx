@@ -244,7 +244,9 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             if (!r || !r.emoji) return;
             reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
 
-            const isUser = (r.userId && (r.userId === currentUserId || r.userId === currentUser?.id)) ||
+            const rDirId = r.userDirectoryId || r.userId;
+            const curUid = (currentUser as any)?.uid;
+            const isUser = (rDirId && (rDirId === currentUserId || rDirId === currentUser?.id || (curUid && rDirId === curUid))) ||
               (r.userEmail && r.userEmail.toLowerCase().trim() === currentUserEmail) ||
               (Array.isArray(r.userIds) && r.userIds.includes(currentUserId));
 

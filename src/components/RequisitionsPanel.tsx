@@ -270,6 +270,68 @@ export function buildUserLookupMap(allUsers: any[] = []): Map<string, string> {
   return map;
 }
 
+export function buildUserProfilePicMap(allUsers: any[] = []): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(allUsers)) return map;
+
+  allUsers.forEach((u: any) => {
+    if (!u) return;
+    const pic = u.photoURL || u.profilePicUrl || u.avatarUrl || u.photo_url || "";
+    if (!pic) return;
+
+    if (u.id) map.set(String(u.id).trim().toLowerCase(), pic);
+    if (u.uid) map.set(String(u.uid).trim().toLowerCase(), pic);
+    if (u._id) map.set(String(u._id).trim().toLowerCase(), pic);
+    if (u.email) map.set(String(u.email).trim().toLowerCase(), pic);
+    if (u.username) map.set(String(u.username).trim().toLowerCase(), pic);
+  });
+
+  return map;
+}
+
+export function getUserDirectoryProfilePic(
+  identifier: any,
+  allUsers: any[] = []
+): string {
+  if (!identifier) return "";
+  if (!Array.isArray(allUsers) || allUsers.length === 0) {
+    if (typeof identifier === "object") {
+      return identifier.photoURL || identifier.profilePicUrl || identifier.avatarUrl || identifier.photo_url || identifier.userAvatar || "";
+    }
+    return "";
+  }
+
+  const uid = typeof identifier === "string" 
+    ? identifier.trim().toLowerCase() 
+    : (identifier.userDirectoryId || identifier.userId || identifier.id || identifier.uid || "").toString().trim().toLowerCase();
+    
+  const email = typeof identifier === "object" 
+    ? (identifier.userEmail || identifier.email || "").toString().trim().toLowerCase() 
+    : (typeof identifier === "string" && identifier.includes("@") ? identifier.trim().toLowerCase() : "");
+
+  const matched = allUsers.find((u: any) => {
+    if (!u) return false;
+    const uId = u.id ? String(u.id).trim().toLowerCase() : "";
+    const uUid = u.uid ? String(u.uid).trim().toLowerCase() : "";
+    const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
+    return (
+      (uId && (uId === uid || (email && uId === email))) ||
+      (uUid && (uUid === uid || (email && uUid === email))) ||
+      (uEmail && ((uid && uEmail === uid) || (email && uEmail === email)))
+    );
+  });
+
+  if (matched) {
+    return matched.photoURL || matched.profilePicUrl || matched.avatarUrl || matched.photo_url || "";
+  }
+
+  if (typeof identifier === "object") {
+    return identifier.photoURL || identifier.profilePicUrl || identifier.avatarUrl || identifier.photo_url || identifier.userAvatar || "";
+  }
+
+  return "";
+}
+
 /**
  * Requisition Ownership Discussion Row:
  * Renders small overlapping profile photos of people who commented on the requisition
@@ -576,24 +638,34 @@ export function sanitizeCommentReactions(
   } else if (Array.isArray(rawReactions)) {
     rawList = rawReactions;
   } else if (typeof rawReactions === "object") {
-    rawList = [rawReactions];
+    rawList = Array.isArray((rawReactions as any).reactions) ? (rawReactions as any).reactions : Object.values(rawReactions);
   }
 
   if (!Array.isArray(rawList) || rawList.length === 0) return [];
 
   const userMap = buildUserLookupMap(allUsers);
+  const userPicMap = buildUserProfilePicMap(allUsers);
 
-  // Normalize all incoming reaction formats into flat list of individual { emoji, userId, userName, ... } records
+  // Normalize all incoming reaction formats into flat list of individual { emoji, name, userDirectoryId, profilePicUrl, ... } records
   const list: any[] = [];
   for (const item of rawList) {
     if (!item) continue;
     if (typeof item === "string") {
-      // Legacy single emoji string: normalize to 👍 or 👎
+      // Legacy single emoji string
       let emoji = item;
       if (emoji !== "👍" && emoji !== "👎") {
         emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
       }
-      list.push({ emoji, userId: "anon", userName: "" });
+      list.push({
+        emoji,
+        name: "User",
+        userName: "User",
+        userDirectoryId: "anon",
+        userId: "anon",
+        profilePicUrl: "",
+        photoURL: "",
+        userAvatar: ""
+      });
     } else if (typeof item === "object") {
       if (item.emoji && Array.isArray(item.userIds)) {
         // Schema { emoji: string, userIds: string[] }
@@ -603,37 +675,59 @@ export function sanitizeCommentReactions(
         }
         item.userIds.forEach((uid: any) => {
           if (uid) {
-            const resolvedUid = typeof uid === "string" ? uid : (uid.id || uid.uid || uid.userId || "anon");
+            const resolvedUid = typeof uid === "string" ? uid : (uid.id || uid.uid || uid.userId || uid.userDirectoryId || "anon");
             const resolvedEmail = typeof uid === "object" ? (uid.email || uid.userEmail || "") : "";
             const directName = typeof uid === "object" ? (uid.name || uid.userName || "") : "";
             const emailName = formatEmailToName(resolvedEmail);
             const lookupName = userMap.get(String(resolvedUid).toLowerCase()) || (resolvedEmail ? userMap.get(String(resolvedEmail).toLowerCase()) : "") || directName || emailName;
+            const directoryPic = (resolvedUid && userPicMap.get(String(resolvedUid).toLowerCase())) || (resolvedEmail && userPicMap.get(String(resolvedEmail).toLowerCase())) || "";
+            const directPic = typeof uid === "object" ? (uid.profilePicUrl || uid.photoURL || uid.userAvatar || uid.avatarUrl || "") : "";
+            const profilePic = directoryPic || directPic;
             list.push({
               emoji,
+              name: lookupName || directName || emailName || "User",
+              userName: lookupName || directName || emailName || "User",
+              userDirectoryId: resolvedUid,
               userId: resolvedUid,
+              profilePicUrl: profilePic,
+              photoURL: profilePic,
+              userAvatar: profilePic,
               userEmail: resolvedEmail,
-              userName: lookupName || directName || emailName || ""
+              email: resolvedEmail
             });
           }
         });
       } else if (item.emoji) {
-        // Schema { emoji: string, userId: string, ... }
+        // Schema { emoji: string, name, userDirectoryId, profilePicUrl, ... }
         let emoji = item.emoji;
         if (emoji !== "👍" && emoji !== "👎") {
           emoji = (emoji === "👎" || emoji === "dislike") ? "👎" : "👍";
         }
-        const rUid = item.userId ? String(item.userId).trim().toLowerCase() : "";
-        const rUemail = item.userEmail ? String(item.userEmail).trim().toLowerCase() : (item.email ? String(item.email).trim().toLowerCase() : "");
+        const rUid = item.userDirectoryId || item.userId || item.uid || "anon";
+        const rUemail = item.userEmail || item.email || "";
         const emailName = formatEmailToName(rUemail);
-        const lookupName = (rUid && userMap.get(rUid)) || (rUemail && userMap.get(rUemail)) || item.userName || item.name || emailName || "";
+        const recordedName = item.name || item.userName || item.authorName || emailName || (rUid && userMap.get(String(rUid).toLowerCase())) || "User";
+        const directoryPic = (rUid && userPicMap.get(String(rUid).toLowerCase())) || (rUemail && userPicMap.get(String(rUemail).toLowerCase())) || "";
+        const recordedPic = directoryPic || item.profilePicUrl || item.photoURL || item.userAvatar || item.avatarUrl || item.authorAvatar || "";
+
         list.push({
           ...item,
           emoji,
-          userEmail: item.userEmail || item.email || "",
-          userName: lookupName || item.userName || item.name || emailName || ""
+          name: recordedName,
+          userName: recordedName,
+          userDirectoryId: rUid,
+          userId: rUid,
+          profilePicUrl: recordedPic,
+          photoURL: recordedPic,
+          userAvatar: recordedPic,
+          userEmail: rUemail,
+          email: rUemail,
+          userRole: item.userRole || item.role || "",
+          createdAt: item.createdAt || item.timestamp || new Date().toISOString(),
+          timestamp: item.createdAt || item.timestamp || new Date().toISOString()
         });
       } else {
-        // Dictionary format { "👍": ["u1", "u2"], "👎": ["u3"] } or legacy { thumbsUp: [...] }
+        // Dictionary format { "👍": ["u1", "u2"], "👎": ["u3"] }
         Object.entries(item).forEach(([key, val]: [string, any]) => {
           let emoji = key;
           if (key === "thumbsUp" || key === "thumbs_up" || key === "like" || key === "heart" || key === "celebration" || key === "party") emoji = "👍";
@@ -642,33 +736,37 @@ export function sanitizeCommentReactions(
 
           if (Array.isArray(val)) {
             val.forEach((u: any) => {
-              const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
+              const uId = typeof u === "string" ? u : (u?.userDirectoryId || u?.id || u?.uid || u?.userId || "anon");
               const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
               const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
               const emailName = formatEmailToName(uEmail);
               const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName || emailName;
+              const directoryPic = (uId && userPicMap.get(String(uId).toLowerCase())) || (uEmail && userPicMap.get(String(uEmail).toLowerCase())) || "";
+              const directPic = typeof u === "object" ? (u?.profilePicUrl || u?.photoURL || u?.userAvatar || "") : "";
+              const profilePic = directoryPic || directPic;
               list.push({
                 emoji,
+                name: lookupName || directName || emailName || "User",
+                userName: lookupName || directName || emailName || "User",
+                userDirectoryId: uId,
                 userId: uId,
+                profilePicUrl: profilePic,
+                photoURL: profilePic,
+                userAvatar: profilePic,
                 userEmail: uEmail,
-                userName: lookupName || directName || emailName || ""
+                email: uEmail
               });
             });
           } else if (typeof val === "boolean" && val) {
-            list.push({ emoji, userId: "anon", userName: "" });
-          } else if (val && typeof val === "object" && Array.isArray(val.userIds)) {
-            val.userIds.forEach((u: any) => {
-              const uId = typeof u === "string" ? u : (u?.id || u?.uid || u?.userId || "anon");
-              const uEmail = typeof u === "object" ? (u?.email || u?.userEmail || "") : "";
-              const directName = typeof u === "object" ? (u?.name || u?.userName || "") : "";
-              const emailName = formatEmailToName(uEmail);
-              const lookupName = userMap.get(String(uId).toLowerCase()) || (uEmail ? userMap.get(String(uEmail).toLowerCase()) : "") || directName || emailName;
-              list.push({
-                emoji,
-                userId: uId,
-                userEmail: uEmail,
-                userName: lookupName || directName || emailName || ""
-              });
+            list.push({
+              emoji,
+              name: "User",
+              userName: "User",
+              userDirectoryId: "anon",
+              userId: "anon",
+              profilePicUrl: "",
+              photoURL: "",
+              userAvatar: ""
             });
           }
         });
@@ -678,71 +776,29 @@ export function sanitizeCommentReactions(
 
   if (list.length === 0) return [];
 
-  // Enforce STRICTLY ONE REACTION PER USER
+  // Enforce STRICTLY ONE REACTION PER USER (deduplicate by userDirectoryId or email)
+  // Store user info reactions as recorded on database schema without overriding with currentUser
   const userReactionMap = new Map<string, any>();
 
   for (const r of list) {
     if (!r || !r.emoji) continue;
 
-    if (currentUser && isUserReactionMatch(r, currentUser, allUsers)) {
-      const curDisplayName = currentUser?.name || currentUser?.displayName || (currentUser as any)?.username || formatEmailToName(currentUser?.email || "") || "You";
-      userReactionMap.set("__current_user__", {
-        ...r,
-        userId: currentUser?.id || currentUser?.uid || currentUser?.email || "u-current",
-        userEmail: currentUser?.email || "",
-        userName: curDisplayName
-      });
-      continue;
-    }
-
-    const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
-    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
-    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
-    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
-
-    const matchedUser = Array.isArray(allUsers) && allUsers.length > 0 ? allUsers.find((u: any) => {
-      if (!u) return false;
-      const uId = u.id ? String(u.id).trim().toLowerCase() : "";
-      const uUid = u.uid ? String(u.uid).trim().toLowerCase() : "";
-      const uEmail = u.email ? String(u.email).trim().toLowerCase() : "";
-      const uName = u.name ? String(u.name).trim().toLowerCase() : "";
-      const uUsername = u.username ? String(u.username).trim().toLowerCase() : "";
-
-      return (
-        (uId && (uId === rUid || uId === rUemail || uId === rEmail)) ||
-        (uUid && (uUid === rUid || uUid === rUemail || uUid === rEmail)) ||
-        (uEmail && (uEmail === rUid || uEmail === rUemail || uEmail === rEmail)) ||
-        (uUsername && (uUsername === rUid || (rUname && uUsername === rUname))) ||
-        (uName && rUname && uName === rUname)
-      );
-    }) : null;
+    const rUid = r.userDirectoryId ? String(r.userDirectoryId).trim().toLowerCase() : (r.userId ? String(r.userId).trim().toLowerCase() : "");
+    const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : (r.email ? String(r.email).trim().toLowerCase() : "");
+    const rName = r.name ? String(r.name).trim() : (r.userName ? String(r.userName).trim() : "");
 
     let userKey: string;
-    let resolvedReaction = { ...r };
-
-    if (matchedUser) {
-      userKey = `user_${matchedUser.id || matchedUser.uid || matchedUser.email}`;
-      resolvedReaction.userId = matchedUser.id || matchedUser.uid;
-      resolvedReaction.userEmail = matchedUser.email;
-      resolvedReaction.userName = matchedUser.name || matchedUser.displayName || matchedUser.username || formatEmailToName(matchedUser.email) || matchedUser.email;
-    } else if (rUemail || rEmail) {
-      userKey = `email_${rUemail || rEmail}`;
-      if (!resolvedReaction.userName || ["user", "anon", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(resolvedReaction.userName.toLowerCase().trim())) {
-        resolvedReaction.userName = formatEmailToName(rUemail || rEmail);
-      }
-    } else if (rUid && !rUid.startsWith("u-") && !rUid.startsWith("anon") && rUid !== "user") {
+    if (rUid && !rUid.startsWith("anon") && rUid !== "user") {
       userKey = `id_${rUid}`;
-      if (!resolvedReaction.userName) {
-        resolvedReaction.userName = userMap.get(rUid) || "";
-      }
-    } else if (rUname && !["anon", "user", "someone", "parish member", "church member", "anonymous", "undefined", "null"].includes(rUname)) {
-      userKey = `name_${rUname}`;
+    } else if (rUemail) {
+      userKey = `email_${rUemail}`;
+    } else if (rName && !["anon", "user", "someone", "parish member", "anonymous"].includes(rName.toLowerCase())) {
+      userKey = `name_${rName.toLowerCase()}`;
     } else {
-      userKey = `anon_user_${Math.random().toString(36).substring(2, 6)}`;
+      userKey = `reaction_${Math.random().toString(36).substring(2, 8)}`;
     }
 
-    // Key strictly by userKey so each user has strictly at most ONE reaction emoji per comment/reply
-    userReactionMap.set(userKey, resolvedReaction);
+    userReactionMap.set(userKey, r);
   }
 
   return Array.from(userReactionMap.values());
@@ -750,16 +806,8 @@ export function sanitizeCommentReactions(
 
 /**
  * Dedicated Pure Logic Handler for Reactions:
+ * When user reacts: records name, userDirectoryId, profilePicUrl, and reaction on comment schema data.
  * Enforces strictly ONE reaction per user per comment or reply.
- * 
- * Rules:
- * 1. Checks if the current user has a previous reaction on the target item.
- * 2. If the user clicks the SAME emoji (e.g. has 👍 and clicks 👍 again):
- *    -> Deletes the reaction (toggles OFF).
- * 3. If the user clicks a DIFFERENT emoji (e.g. has 👍 and clicks 👎, or has 👎 and clicks 👍):
- *    -> Deletes the previous reaction and adds the new reaction in a single atomic update.
- * 4. If the user has NO previous reaction:
- *    -> Adds the new reaction.
  */
 export function handleReactionLogic({
   item,
@@ -777,15 +825,31 @@ export function handleReactionLogic({
   previousEmoji?: string;
   newReactions: any[];
 } {
-  const currentUserId = currentUser?.id || currentUser?.uid || currentUser?.email || "anon";
+  const currentDirectoryId = currentUser?.id || currentUser?.uid || currentUser?.email || "anon";
   const userEmailName = formatEmailToName(currentUser?.email || "");
-  const currentUserName = currentUser?.name || (currentUser as any)?.displayName || (currentUser as any)?.username || resolveSenderName(currentUser, users) || userEmailName || currentUser?.email || "User";
+  const currentUserName = currentUser?.name || (currentUser as any)?.displayName || userEmailName || "User";
+  const currentUserEmail = currentUser?.email || "";
+  const currentUserRole = currentUser?.role || "";
+  
+  // Use the same profile picture as the user directory for that user
+  const directoryProfilePic = getUserDirectoryProfilePic(
+    { id: currentUser?.id, uid: currentUser?.uid, userDirectoryId: currentDirectoryId, email: currentUserEmail },
+    users
+  );
+  const currentProfilePic = directoryProfilePic || currentUser?.photoURL || (currentUser as any)?.avatarUrl || "";
 
-  // 1. Sanitize all current reactions (deduplicating to at most 1 reaction per user)
+  // 1. Sanitize all current reactions from comment schema
   const sanitized = sanitizeCommentReactions(item.reactions, currentUser, users);
 
-  // 2. Check if current user has a previous reaction
-  const previousReaction = sanitized.find((r: any) => isUserReactionMatch(r, currentUser, users));
+  // 2. Check if the current user has a previous reaction using their userDirectoryId/email
+  const previousReaction = sanitized.find((r: any) => {
+    const rUid = r.userDirectoryId || r.userId;
+    const rEmail = r.userEmail || r.email;
+    if (currentDirectoryId && (rUid === currentDirectoryId || rUid === currentUser?.id || rUid === currentUser?.uid)) return true;
+    if (currentUserEmail && rEmail && String(rEmail).toLowerCase() === String(currentUserEmail).toLowerCase()) return true;
+    return isUserReactionMatch(r, currentUser, users);
+  });
+
   const hasPreviousReaction = Boolean(previousReaction);
   const isSameEmoji = previousReaction?.emoji === targetEmoji;
 
@@ -793,51 +857,57 @@ export function handleReactionLogic({
   let action: "ADDED" | "REMOVED" | "SWITCHED";
   let previousEmoji: string | undefined = previousReaction?.emoji;
 
+  const isUserMatch = (r: any) => {
+    const rUid = r.userDirectoryId || r.userId;
+    const rEmail = r.userEmail || r.email;
+    if (currentDirectoryId && (rUid === currentDirectoryId || rUid === currentUser?.id || rUid === currentUser?.uid)) return true;
+    if (currentUserEmail && rEmail && String(rEmail).toLowerCase() === String(currentUserEmail).toLowerCase()) return true;
+    return isUserReactionMatch(r, currentUser, users);
+  };
+
   if (hasPreviousReaction && isSameEmoji) {
-    // Current user clicked the exact same emoji: delete reaction (toggle OFF)
-    newReactions = sanitized.filter((r: any) => !isUserReactionMatch(r, currentUser, users));
+    // User clicked the exact same emoji: delete reaction (toggle OFF)
+    newReactions = sanitized.filter((r: any) => !isUserMatch(r));
     action = "REMOVED";
-  } else if (hasPreviousReaction && !isSameEmoji) {
-    // Current user has a previous reaction and clicked a different emoji:
-    // Delete previous reaction and add new reaction to switch vote instantly
-    const newReactionObj = {
-      emoji: targetEmoji,
-      userId: currentUserId,
-      userEmail: currentUser?.email || "",
-      userName: currentUserName,
-      userRole: currentUser?.role || "",
-      userAvatar: currentUser?.photoURL || (currentUser as any)?.avatarUrl || "",
-      createdAt: new Date().toISOString(),
-      timestamp: new Date().toISOString()
-    };
-    newReactions = [
-      ...sanitized.filter((r: any) => !isUserReactionMatch(r, currentUser, users)),
-      newReactionObj
-    ];
-    action = "SWITCHED";
   } else {
-    // Current user does not have a previous reaction: add new reaction
-    const newReactionObj = {
+    // Record name, user directory ID, profile pic URL and reaction on the comment schema data
+    const newReactionObj: CommentReaction = {
       emoji: targetEmoji,
-      userId: currentUserId,
-      userEmail: currentUser?.email || "",
+      name: currentUserName,
       userName: currentUserName,
-      userRole: currentUser?.role || "",
-      userAvatar: currentUser?.photoURL || (currentUser as any)?.avatarUrl || "",
+      userDirectoryId: currentDirectoryId,
+      userId: currentDirectoryId,
+      profilePicUrl: currentProfilePic,
+      photoURL: currentProfilePic,
+      userAvatar: currentProfilePic,
+      userEmail: currentUserEmail,
+      email: currentUserEmail,
+      userRole: currentUserRole,
       createdAt: new Date().toISOString(),
       timestamp: new Date().toISOString()
     };
-    newReactions = [...sanitized, newReactionObj];
-    action = "ADDED";
+
+    if (hasPreviousReaction && !isSameEmoji) {
+      // User switched emoji
+      newReactions = [
+        ...sanitized.filter((r: any) => !isUserMatch(r)),
+        newReactionObj
+      ];
+      action = "SWITCHED";
+    } else {
+      // User added new reaction
+      newReactions = [...sanitized, newReactionObj];
+      action = "ADDED";
+    }
   }
 
-  // 3. Compute recalculated reaction counts, user IDs list, and summary
+  // 3. Compute recalculated reaction counts, user directory IDs list, and summary
   const reactionCounts: Record<string, number> = {};
   const reactedUserIds: string[] = [];
   newReactions.forEach((r: any) => {
     if (r && r.emoji) {
       reactionCounts[r.emoji] = (reactionCounts[r.emoji] || 0) + 1;
-      const uid = r.userId || r.userEmail;
+      const uid = r.userDirectoryId || r.userId || r.userEmail;
       if (uid && !reactedUserIds.includes(uid)) {
         reactedUserIds.push(uid);
       }
@@ -922,48 +992,18 @@ export function resolveReactorNames(
   const matching = sanitized.filter((r: any) => r && r.emoji === emoji);
   if (matching.length === 0) return [];
   
-  const userMap = buildUserLookupMap(allUsers);
   const names: string[] = [];
 
-  const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
-  const curUid = currentLoggedInUser?.uid ? String(currentLoggedInUser.uid).trim().toLowerCase() : "";
-  const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
-  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
-  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
-
   matching.forEach((r: any) => {
-    const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
-    const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
-    const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
-    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
-
-    // 1. Explicitly check if this is the currently logged in user -> returns their FirstName e.g. "John" or "You"
-    const isCurrent = Boolean(
-      (rUserId === "u-current") ||
-      (rUserId === "__current_user__") ||
-      (currentLoggedInUser && (
-        (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
-        (curUid && (rUserId === curUid || rUserEmail === curUid || rEmail === curUid)) ||
-        (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
-        (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
-        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
-      ))
-    );
-
-    if (isCurrent) {
-      const myFirstName = extractUserFirstName(currentLoggedInUser) || extractUserFirstName(rUserName) || "You";
-      names.push(myFirstName);
-      return;
-    }
-
-    // 2. Direct embedded and persisted userName from database record
-    if (rUserName && rUserName.trim().length > 0) {
+    // Fetch and display reactor user name recorded on database schema
+    const recordedName = r.name || r.userName;
+    if (recordedName && recordedName.trim().length > 0) {
       const isGeneric = [
-        "user", "anon", "anonymous", "someone", "unknown", "system user", "church group", "member", "parish member", "church member", "undefined", "null"
-      ].includes(rUserName.toLowerCase().trim());
+        "user", "anon", "anonymous", "someone", "unknown", "system user", "member", "parish member", "undefined", "null"
+      ].includes(recordedName.toLowerCase().trim());
 
       if (!isGeneric) {
-        const first = extractUserFirstName(rUserName);
+        const first = extractUserFirstName(recordedName);
         if (first) {
           names.push(first);
           return;
@@ -971,34 +1011,7 @@ export function resolveReactorNames(
       }
     }
 
-    // 3. Lookup in user map by ID, UID, email, or username
-    if (rUserId && userMap.has(rUserId)) {
-      const resolved = userMap.get(rUserId)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
-        const first = extractUserFirstName(resolved) || resolved.trim();
-        names.push(first);
-        return;
-      }
-    }
-    if (rUserEmail && userMap.has(rUserEmail)) {
-      const resolved = userMap.get(rUserEmail)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
-        const first = extractUserFirstName(resolved) || resolved.trim();
-        names.push(first);
-        return;
-      }
-    }
-    if (rEmail && userMap.has(rEmail)) {
-      const resolved = userMap.get(rEmail)!;
-      if (resolved && !["User", "Someone", "anon", "anonymous", "Parish Member", "Church Member"].includes(resolved.trim())) {
-        const first = extractUserFirstName(resolved) || resolved.trim();
-        names.push(first);
-        return;
-      }
-    }
-
-    // 4. Derive from email address (e.g. gichaumburu@gmail.com -> Gichau)
-    const emailToParse = rUserEmail || rEmail || (rUserId.includes("@") ? rUserId : "");
+    const emailToParse = r.userEmail || r.email || "";
     if (emailToParse && emailToParse.includes("@")) {
       const first = extractUserFirstName(emailToParse);
       if (first) {
@@ -1007,27 +1020,9 @@ export function resolveReactorNames(
       }
     }
 
-    // 5. Look in allUsers array for partial match
-    if (rUserId && Array.isArray(allUsers) && allUsers.length > 0) {
-      const matched = allUsers.find(u => 
-        u && (
-          (u.id && String(u.id).toLowerCase() === rUserId) ||
-          (u.uid && String(u.uid).toLowerCase() === rUserId) ||
-          (u.email && String(u.email).toLowerCase() === rUserId)
-        )
-      );
-      if (matched) {
-        const first = extractUserFirstName(matched);
-        if (first) {
-          names.push(first);
-          return;
-        }
-      }
-    }
-
-    // 6. Formatted user identity / Fallback
-    if (rUserId && !["anon", "user", "undefined", "null"].includes(rUserId)) {
-      names.push(rUserId.length > 10 ? `User ${rUserId.slice(0, 4)}` : rUserId);
+    const rUid = r.userDirectoryId || r.userId;
+    if (rUid && !["anon", "user", "undefined", "null"].includes(rUid)) {
+      names.push(rUid.length > 10 ? `User ${rUid.slice(0, 4)}` : rUid);
     } else {
       names.push("Someone");
     }
@@ -1060,71 +1055,46 @@ export function resolveReactorsProfiles(
   reactionsList: any[],
   allUsers: any[] = [],
   currentLoggedInUser: any = null
-): Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string }> {
+): Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string; userDirectoryId?: string }> {
   const sanitized = sanitizeCommentReactions(reactionsList, currentLoggedInUser, allUsers);
   if (!sanitized || sanitized.length === 0) return [];
 
-  const userMap = buildUserLookupMap(allUsers);
-  const profiles: Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string }> = [];
+  const profiles: Array<{ id: string; name: string; avatar?: string; emoji: string; isCurrent: boolean; email?: string; role?: string; userDirectoryId?: string }> = [];
   const seen = new Set<string>();
 
   const curId = currentLoggedInUser?.id ? String(currentLoggedInUser.id).trim().toLowerCase() : "";
-  const curUid = currentLoggedInUser?.uid ? String(currentLoggedInUser.uid).trim().toLowerCase() : "";
   const curEmail = currentLoggedInUser?.email ? String(currentLoggedInUser.email).trim().toLowerCase() : "";
-  const curName = currentLoggedInUser?.name ? String(currentLoggedInUser.name).trim().toLowerCase() : "";
-  const curUsername = (currentLoggedInUser as any)?.username ? String((currentLoggedInUser as any).username).trim().toLowerCase() : "";
 
   sanitized.forEach((r: any) => {
     if (!r || !r.emoji) return;
-    const rUserId = r.userId ? String(r.userId).trim().toLowerCase() : "";
-    const rUserEmail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
-    const rUserName = r.userName ? String(r.userName).trim() : (r.name ? String(r.name).trim() : "");
-    const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
+    const rDirId = r.userDirectoryId || r.userId || "";
+    const rEmail = r.userEmail || r.email || "";
 
     const isCurrent = Boolean(
-      (rUserId === "u-current") ||
-      (rUserId === "__current_user__") ||
-      (currentLoggedInUser && (
-        (curId && (rUserId === curId || rUserEmail === curId || rEmail === curId)) ||
-        (curUid && (rUserId === curUid || rUserEmail === curUid || rEmail === curUid)) ||
-        (curEmail && (rUserId === curEmail || rUserEmail === curEmail || rEmail === curEmail)) ||
-        (curUsername && (rUserId === curUsername || rUserName.toLowerCase() === curUsername)) ||
-        (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUserName.toLowerCase() === curName)
-      ))
+      currentLoggedInUser && (
+        (curId && (String(rDirId).toLowerCase() === curId || String(rEmail).toLowerCase() === curId)) ||
+        (curEmail && (String(rEmail).toLowerCase() === curEmail || String(rDirId).toLowerCase() === curEmail))
+      )
     );
 
-    const userObj = Array.isArray(allUsers) ? allUsers.find((u: any) =>
-      u && (
-        (u.id && r.userId && String(u.id).toLowerCase() === rUserId) ||
-        (u.email && (rUserEmail || rEmail) && String(u.email).toLowerCase() === (rUserEmail || rEmail))
-      )
-    ) : null;
+    // Fetch user info reactions as recorded on database schema
+    const recordedName = r.name || r.userName || (rEmail ? formatEmailToName(rEmail) : "Parish Member");
+    const recordedAvatar = r.profilePicUrl || r.photoURL || r.userAvatar || r.avatarUrl || "";
+    const recordedRole = r.userRole || r.role || "Member";
 
-    const emailName = formatEmailToName(rUserEmail || rEmail || "");
-    const resolvedName = isCurrent
-      ? (extractUserDisplayName(currentLoggedInUser) || "You")
-      : (extractUserDisplayName(userObj) || (rUserName && !["user", "anon", "someone", "member"].includes(rUserName.toLowerCase()) ? rUserName : "") || emailName || extractUserDisplayName(rUserEmail) || "Member");
-
-    const avatar = isCurrent
-      ? (currentLoggedInUser?.photoURL || (currentLoggedInUser as any)?.avatarUrl)
-      : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.userAvatar || r.userPhotoURL);
-
-    const role = isCurrent
-      ? (currentLoggedInUser?.role || (currentLoggedInUser as any)?.userRole)
-      : (userObj?.role || r.userRole || r.role);
-
-    const key = isCurrent ? "current_user" : (userObj?.id || r.userId || r.userEmail || resolvedName);
+    const key = rDirId || rEmail || recordedName;
 
     if (!seen.has(key)) {
       seen.add(key);
       profiles.push({
         id: key,
-        name: resolvedName,
-        avatar,
+        name: recordedName,
+        avatar: recordedAvatar,
         emoji: r.emoji,
         isCurrent,
-        email: isCurrent ? currentLoggedInUser?.email : (userObj?.email || r.userEmail || r.email || ""),
-        role
+        email: rEmail,
+        role: recordedRole,
+        userDirectoryId: rDirId
       });
     }
   });
@@ -1136,24 +1106,21 @@ export function hasUserReacted(reactionsList: any[], emoji: string, user: any, a
   if (!Array.isArray(reactionsList) || !user) return false;
   const sanitized = sanitizeCommentReactions(reactionsList, user, allUsers);
   const curId = user.id ? String(user.id).trim().toLowerCase() : "";
+  const curUid = user.uid ? String(user.uid).trim().toLowerCase() : "";
   const curEmail = user.email ? String(user.email).trim().toLowerCase() : "";
-  const curUsername = user.username ? String(user.username).trim().toLowerCase() : "";
-  const curName = user.name ? String(user.name).trim().toLowerCase() : "";
 
   return sanitized.some((r: any) => {
     if (!r || r.emoji !== emoji) return false;
-    if (r.userId === "u-current") return true;
+    const rDirId = r.userDirectoryId ? String(r.userDirectoryId).trim().toLowerCase() : "";
     const rUid = r.userId ? String(r.userId).trim().toLowerCase() : "";
     const rUemail = r.userEmail ? String(r.userEmail).trim().toLowerCase() : "";
     const rEmail = r.email ? String(r.email).trim().toLowerCase() : "";
-    const rUname = r.userName ? String(r.userName).trim().toLowerCase() : (r.name ? String(r.name).trim().toLowerCase() : "");
 
-    return (
-      (curId && (rUid === curId || rUemail === curId || rEmail === curId)) ||
-      (curEmail && (rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) ||
-      (curUsername && (rUid === curUsername || rUname === curUsername)) ||
-      (curName && !["user", "anon", "someone", "parish member", "anonymous"].includes(curName) && rUname === curName)
-    );
+    if (curId && (rDirId === curId || rUid === curId || rUemail === curId || rEmail === curId)) return true;
+    if (curUid && (rDirId === curUid || rUid === curUid || rUemail === curUid || rEmail === curUid)) return true;
+    if (curEmail && (rDirId === curEmail || rUid === curEmail || rUemail === curEmail || rEmail === curEmail)) return true;
+
+    return false;
   });
 }
 

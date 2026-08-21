@@ -1077,9 +1077,10 @@ export function resolveReactorsProfiles(
       )
     );
 
-    // Fetch user info reactions as recorded on database schema
+    // Fetch user info reactions as recorded on database schema, prioritizing user directory profile picture
     const recordedName = r.name || r.userName || (rEmail ? formatEmailToName(rEmail) : "Parish Member");
-    const recordedAvatar = r.profilePicUrl || r.photoURL || r.userAvatar || r.avatarUrl || "";
+    const directoryAvatar = getUserDirectoryProfilePic(r, allUsers);
+    const recordedAvatar = directoryAvatar || r.profilePicUrl || r.photoURL || r.userAvatar || r.avatarUrl || "";
     const recordedRole = r.userRole || r.role || "Member";
 
     const key = rDirId || rEmail || recordedName;
@@ -7684,9 +7685,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           (u.id && r.userId && u.id === r.userId) || 
                           (u.email && r.userEmail && u.email.toLowerCase() === r.userEmail.toLowerCase())
                         );
-                        const avatar = isCurrent 
+                        const directoryPic = getUserDirectoryProfilePic(r, users);
+                        const avatar = directoryPic || (isCurrent 
                           ? (currentUser?.photoURL || (currentUser as any)?.avatarUrl) 
-                          : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.userAvatar || r.userPhotoURL);
+                          : (userObj?.photoURL || (userObj as any)?.avatarUrl || r.profilePicUrl || r.photoURL || r.userAvatar || r.userPhotoURL));
 
                         return (
                           <div key={idx} className={cn("flex items-center justify-between gap-3 pt-2.5 first:pt-0", idx > 0 && "pt-2.5")}>

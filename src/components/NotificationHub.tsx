@@ -900,19 +900,19 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                               key={item.id}
                               onClick={() => setSelectedItemId(prev => prev === item.id ? null : item.id)}
                               className={cn(
-                                "group relative p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer select-none flex flex-col gap-2 shadow-xs",
+                                "group relative p-3.5 rounded-2xl border border-transparent transition-all duration-200 cursor-pointer select-none flex flex-col gap-2 shadow-xs",
                                 isSelected 
-                                  ? "bg-white dark:bg-slate-900 border-indigo-500/80 dark:border-indigo-500 ring-2 ring-indigo-500/20 shadow-md" 
+                                  ? "bg-white dark:bg-slate-900 ring-2 ring-indigo-500/40 shadow-md" 
                                   : isRead
-                                    ? "bg-white/80 dark:bg-slate-900/60 border-slate-200/70 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-900 hover:border-slate-300 opacity-90"
-                                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-800"
+                                    ? "bg-white/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 opacity-90"
+                                    : "bg-white dark:bg-slate-900 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
                               )}
                             >
                               {/* Header Row: User Directory Avatar, Sender Name, Muted Read/Unread Status Pill, Timestamp */}
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   {/* User Directory Photo or Fallback Gradient */}
-                                  <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-200/80 dark:border-slate-700">
+                                  <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 shadow-xs border border-transparent">
                                     {senderPhoto ? (
                                       <img 
                                         src={senderPhoto} 
@@ -935,10 +935,10 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   {/* Muted Read / Unread Status Badge */}
                                   <span className={cn(
-                                    "text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider border select-none",
+                                    "text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none",
                                     !isRead 
-                                      ? "bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border-indigo-200/80 dark:border-indigo-800" 
-                                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200/60 dark:border-slate-700/60"
+                                      ? "bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400" 
+                                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
                                   )}>
                                     {!isRead ? "Unread" : "Read"}
                                   </span>
@@ -961,22 +961,8 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                                 {item.snippet}
                               </p>
 
-                              {/* Tags & Card Quick Action Buttons */}
-                              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-0.5">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {item.tags.slice(0, 2).map((tag, tIdx) => (
-                                    <span key={tIdx} className="text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 uppercase">
-                                      {tag}
-                                    </span>
-                                  ))}
-                                  {item.tags.length > 2 && (
-                                    <span className="text-[9px] font-mono text-slate-400 font-bold">
-                                      +{item.tags.length - 2}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Quick Action Icons Row */}
+                              {/* Card Quick Action Buttons (Divider line and badges removed) */}
+                              <div className="flex items-center justify-end mt-1">
                                 <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                   <button
                                     type="button"

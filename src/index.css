@@ -200,8 +200,8 @@
 
 /* Dedicated Subtle Scrollbar Class */
 .subtle-scrollbar::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 3.5px;
+  height: 3.5px;
 }
 
 .subtle-scrollbar::-webkit-scrollbar-track {
@@ -209,29 +209,29 @@
 }
 
 .subtle-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(203, 213, 225, 0.4);
+  background: rgba(203, 213, 225, 0.25);
   border-radius: 9999px;
 }
 
 .subtle-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+  background: rgba(148, 163, 184, 0.5);
 }
 
 .dark .subtle-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.5);
+  background: rgba(51, 65, 85, 0.3);
 }
 
 .dark .subtle-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.8);
+  background: rgba(71, 85, 105, 0.6);
 }
 
 .subtle-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(203, 213, 225, 0.4) transparent;
+  scrollbar-color: rgba(203, 213, 225, 0.25) transparent;
 }
 
 .dark .subtle-scrollbar {
-  scrollbar-color: rgba(51, 65, 85, 0.5) transparent;
+  scrollbar-color: rgba(51, 65, 85, 0.3) transparent;
 }
 
 /* Subtle Active Mobile Tab Floater */

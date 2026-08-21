@@ -2123,60 +2123,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     checkL2ApprovedAlerts();
   }, [requisitions, alerts, currentUserId, addSystemLog]);
 
-  // Recurring Requisitions Watcher
-  useEffect(() => {
-    if (!currentUserId || requisitions.length === 0) return;
-
-    const checkRecurring = async () => {
-      const now = new Date();
-      
-      for (const req of requisitions) {
-        if (!req.recurrence || req.recurrence === RecurrenceType.NONE) continue;
-
-        // Check if we should generate a new one
-        const lastGenerated = req.lastRecurrenceGeneratedAt ? new Date(req.lastRecurrenceGeneratedAt) : new Date(req.submittedAt);
-        let shouldGenerate = false;
-        
-        if (req.recurrence === RecurrenceType.MONTHLY) {
-          const nextDate = new Date(lastGenerated);
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          if (now >= nextDate) shouldGenerate = true;
-        } else if (req.recurrence === RecurrenceType.QUARTERLY) {
-          const nextDate = new Date(lastGenerated);
-          nextDate.setMonth(nextDate.getMonth() + 3);
-          if (now >= nextDate) shouldGenerate = true;
-        }
-
-        if (shouldGenerate) {
-          const draftId = `req-auto-${req.id}-${Date.now()}`;
-          const expiryDays = systemSettings?.requisitionExpiryDays ?? 7;
-          const newDraft: Requisition = {
-            ...req,
-            id: draftId,
-            status: RequisitionStatus.DRAFT,
-            submittedAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-            expiresAt: new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000).toISOString(),
-            approvalHistory: [],
-            recurrence: RecurrenceType.NONE, // Spawned ones are one-off
-            lastRecurrenceGeneratedAt: undefined
-          };
-          
-          try {
-            await databaseService.saveRequisition(newDraft);
-            await databaseService.updateRequisition(req.id, {
-              lastRecurrenceGeneratedAt: now.toISOString()
-            });
-            await addSystemLog("AUTO_RECURRING", `Spawned recurring draft: ${req.title}`, { parentId: req.id });
-          } catch (e) {
-            console.error("Failed to spawn recurring draft:", e);
-          }
-        }
-      }
-    };
-
-    checkRecurring();
-  }, [requisitions, currentUserId, addSystemLog, systemSettings]);
+  // Recurring Requisitions Watcher - Disabled
+  // Auto-generation of recurring draft requisitions has been removed per system specification.
 
   // --- UNIFIED MONGODB DATA LOADER FOR ALL 15 DATASETS ---
   useEffect(() => {
@@ -2313,7 +2261,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               data = data.filter(req => req && ((req.groupId && (parsedGroups.includes(req.groupId) || parsedGroups.includes(req.groupName))) || (req.sharedGroups && Array.isArray(req.sharedGroups) && req.sharedGroups.some(sg => parsedGroups.includes(sg)))));
             }
             if (hidePrototype) {
-              data = data.filter(req => req && req.id && !req.id.startsWith("req-seed-"));
+              data = data.filter(req => req && req.id && !req.id.startsWith("req-seed-") && !req.id.startsWith("req-auto-"));
+            } else {
+              data = data.filter(req => req && req.id && !req.id.startsWith("req-auto-"));
             }
             setRequisitions(data);
           }

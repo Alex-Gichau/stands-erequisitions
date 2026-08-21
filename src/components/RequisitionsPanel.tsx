@@ -3241,12 +3241,12 @@ export const RequisitionsPanel: React.FC = () => {
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
-                    checked={activeList.length > 0 && activeList.every(r => selectedIds.has(r.id))}
+                    checked={activeItems.length > 0 && activeItems.every(r => selectedIds.has(r.id))}
                     onChange={() => {
-                      const allActiveInSelected = activeList.every(r => selectedIds.has(r.id));
+                      const allActivePageInSelected = activeItems.every(r => selectedIds.has(r.id));
                       const newSelected = new Set(selectedIds);
-                      activeList.forEach(r => {
-                        if (allActiveInSelected) newSelected.delete(r.id);
+                      activeItems.forEach(r => {
+                        if (allActivePageInSelected) newSelected.delete(r.id);
                         else newSelected.add(r.id);
                       });
                       setSelectedIds(newSelected);
@@ -3781,12 +3781,12 @@ export const RequisitionsPanel: React.FC = () => {
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 accent-blue-600 cursor-pointer"
-                    checked={disbursedList.length > 0 && disbursedList.every(r => selectedIds.has(r.id))}
+                    checked={disbursedItems.length > 0 && disbursedItems.every(r => selectedIds.has(r.id))}
                     onChange={() => {
-                      const allDisbursedInSelected = disbursedList.every(r => selectedIds.has(r.id));
+                      const allDisbursedPageInSelected = disbursedItems.every(r => selectedIds.has(r.id));
                       const newSelected = new Set(selectedIds);
-                      disbursedList.forEach(r => {
-                        if (allDisbursedInSelected) newSelected.delete(r.id);
+                      disbursedItems.forEach(r => {
+                        if (allDisbursedPageInSelected) newSelected.delete(r.id);
                         else newSelected.add(r.id);
                       });
                       setSelectedIds(newSelected);
@@ -4189,12 +4189,12 @@ export const RequisitionsPanel: React.FC = () => {
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500/20 accent-rose-600 cursor-pointer"
-                    checked={rejectedList.length > 0 && rejectedList.every(r => selectedIds.has(r.id))}
+                    checked={rejectedItems.length > 0 && rejectedItems.every(r => selectedIds.has(r.id))}
                     onChange={() => {
-                      const allRejectedInSelected = rejectedList.every(r => selectedIds.has(r.id));
+                      const allRejectedPageInSelected = rejectedItems.every(r => selectedIds.has(r.id));
                       const newSelected = new Set(selectedIds);
-                      rejectedList.forEach(r => {
-                        if (allRejectedInSelected) newSelected.delete(r.id);
+                      rejectedItems.forEach(r => {
+                        if (allRejectedPageInSelected) newSelected.delete(r.id);
                         else newSelected.add(r.id);
                       });
                       setSelectedIds(newSelected);

@@ -518,16 +518,6 @@ function AppContent() {
     setSelectedRequisition
   } = useRequisitions();
 
-  const handleNavigate = useCallback((view: string) => {
-    if (view === "requisitions") {
-      setSelectedRequisition(null);
-      window.dispatchEvent(new CustomEvent("reset_requisitions_home"));
-    } else if (view === "notifications") {
-      window.dispatchEvent(new CustomEvent("reset_notifications_home"));
-    }
-    setCurrentView(view);
-  }, [setSelectedRequisition]);
-
   // Clear login text fields whenever auth mode toggles or user is not logged in
   useEffect(() => {
     if (!currentUser) {
@@ -1868,12 +1858,12 @@ function AppContent() {
     }
 
     if (currentView !== "help" && !canAccess(currentView)) {
-      return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+      return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
     }
 
     const renderPanel = () => {
       switch (currentView) {
-        case "dashboard": return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+        case "dashboard": return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
         case "notifications": return <NotificationHub onSelectRequisition={(req) => { setSelectedRequisition(req); setCurrentView("requisitions"); }} />;
         case "requisitions": return <RequisitionsPanel />;
         case "vendors": return <VendorsPanel />;
@@ -2350,7 +2340,7 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <Sidebar currentView={currentView} onViewChange={handleNavigate} notificationsCount={unreadNotificationsCount} onLogout={handleLogout} />
+      <Sidebar currentView={currentView} onViewChange={setCurrentView} notificationsCount={unreadNotificationsCount} onLogout={handleLogout} />
 
       <main className="flex-1 flex flex-col min-w-0">
         <AnnouncementBanner />
@@ -2420,7 +2410,7 @@ function AppContent() {
                     const val = e.target.value;
                     setGlobalSearchTerm(val);
                     if (val.trim() !== "") {
-                      handleNavigate("requisitions");
+                      setCurrentView("requisitions");
                     }
                   }}
                   onFocus={() => setIsSearchFocused(true)}
@@ -2428,7 +2418,7 @@ function AppContent() {
                     if (e.key === "Enter") {
                       saveRecentSearch(globalSearchTerm);
                       setIsSearchFocused(false);
-                      handleNavigate("requisitions");
+                      setCurrentView("requisitions");
                       (e.target as HTMLInputElement).blur();
                     }
                   }}
@@ -3007,7 +2997,7 @@ function AppContent() {
 
                     {/* Footer */}
                     <div className={cn(
-                      "px-5 py-3.5 border-t flex items-center justify-between gap-2",
+                      "px-5 py-3.5 border-t flex items-center justify-between",
                       darkMode ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-white"
                     )}>
                       <button
@@ -3030,16 +3020,6 @@ function AppContent() {
                         className="text-xs font-black text-[#8b8df2] hover:text-[#7a7ce0] uppercase tracking-wider transition-colors cursor-pointer"
                       >
                         Mark all as read
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          handleNavigate("notifications");
-                          setIsNotificationsOpen(false);
-                        }}
-                        className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 uppercase tracking-wider transition-colors cursor-pointer"
-                      >
-                        Open Notification Hub
                       </button>
                     </div>
                   </motion.div>

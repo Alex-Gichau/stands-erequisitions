@@ -2509,21 +2509,6 @@ export const RequisitionsPanel: React.FC = () => {
   const [isDeletingReq, setIsDeletingReq] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [now, setNow] = useState(Date.now());
-
-  // Listen for navigation button clicks to always open home section of requisitions
-  useEffect(() => {
-    const handleResetHome = () => {
-      setViewingReq(null);
-      setIsAdding(false);
-      setEditingReq(null);
-      setFilterStatus("ALL");
-      setFilterPreset("ALL");
-      setDateRangePreset("ALL");
-      setSelectedIds(new Set());
-    };
-    window.addEventListener("reset_requisitions_home", handleResetHome);
-    return () => window.removeEventListener("reset_requisitions_home", handleResetHome);
-  }, [setViewingReq]);
   
   // Trending Searches Logic
   const [trendingSearches, setTrendingSearches] = useState<{term: string, count: number}[]>([]);

@@ -102,18 +102,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [successId, setSuccessId] = useState<string | null>(null);
 
-  // Listen for navigation button clicks to reset to home section of notifications
-  useEffect(() => {
-    const handleResetHome = () => {
-      setSelectedItemId(null);
-      setActiveTab("ALL");
-      setShowUnreadOnly(false);
-      setSearchQuery("");
-    };
-    window.addEventListener("reset_notifications_home", handleResetHome);
-    return () => window.removeEventListener("reset_notifications_home", handleResetHome);
-  }, []);
-
   const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
 
   // Lookup profile picture from user directory

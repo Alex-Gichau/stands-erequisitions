@@ -415,10 +415,13 @@ function AppContent() {
     };
   }, [clearAuthFields]);
 
-  // Standard best-practice pre-fetch: As soon as login page loads, warm up and fetch all dashboard data
+  // Standard best-practice pre-fetch: As soon as login page loads, warm up Valkey cache and fetch all dashboard data
   useEffect(() => {
     const prefetchDashboardData = async () => {
       try {
+        // Trigger Valkey cache warmup for frequent church group configs and active requisition IDs
+        fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
+
         const res = await fetch("/api/db-all");
         if (res.ok) {
           const data = await res.json();
@@ -514,6 +517,16 @@ function AppContent() {
     selectedRequisition,
     setSelectedRequisition
   } = useRequisitions();
+
+  const handleNavigate = useCallback((view: string) => {
+    if (view === "requisitions") {
+      setSelectedRequisition(null);
+      window.dispatchEvent(new CustomEvent("reset_requisitions_home"));
+    } else if (view === "notifications") {
+      window.dispatchEvent(new CustomEvent("reset_notifications_home"));
+    }
+    setCurrentView(view);
+  }, [setSelectedRequisition]);
 
   // Clear login text fields whenever auth mode toggles or user is not logged in
   useEffect(() => {
@@ -620,7 +633,7 @@ function AppContent() {
 
   const hasRedirectedRef = useRef(false);
 
-  // Redirect to dashboard upon successful login and trigger splash intro
+  // Redirect to dashboard upon successful login and trigger splash intro + Valkey cache warmup
   useEffect(() => {
     if (currentUser) {
       if (!hasRedirectedRef.current) {
@@ -631,6 +644,8 @@ function AppContent() {
         setShowSplash(true);
         hasShownSplashRef.current = true;
       }
+      // Automatically warm up Valkey cache with church group configs and active requisitions upon login
+      fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
     } else {
       hasRedirectedRef.current = false;
       hasShownSplashRef.current = false;
@@ -1853,12 +1868,12 @@ function AppContent() {
     }
 
     if (currentView !== "help" && !canAccess(currentView)) {
-      return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+      return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
     }
 
     const renderPanel = () => {
       switch (currentView) {
-        case "dashboard": return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
+        case "dashboard": return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
         case "notifications": return <NotificationHub onSelectRequisition={(req) => { setSelectedRequisition(req); setCurrentView("requisitions"); }} />;
         case "requisitions": return <RequisitionsPanel />;
         case "vendors": return <VendorsPanel />;
@@ -2335,7 +2350,7 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} notificationsCount={unreadNotificationsCount} onLogout={handleLogout} />
+      <Sidebar currentView={currentView} onViewChange={handleNavigate} notificationsCount={unreadNotificationsCount} onLogout={handleLogout} />
 
       <main className="flex-1 flex flex-col min-w-0">
         <AnnouncementBanner />
@@ -2405,7 +2420,7 @@ function AppContent() {
                     const val = e.target.value;
                     setGlobalSearchTerm(val);
                     if (val.trim() !== "") {
-                      setCurrentView("requisitions");
+                      handleNavigate("requisitions");
                     }
                   }}
                   onFocus={() => setIsSearchFocused(true)}
@@ -2413,7 +2428,7 @@ function AppContent() {
                     if (e.key === "Enter") {
                       saveRecentSearch(globalSearchTerm);
                       setIsSearchFocused(false);
-                      setCurrentView("requisitions");
+                      handleNavigate("requisitions");
                       (e.target as HTMLInputElement).blur();
                     }
                   }}
@@ -2992,7 +3007,7 @@ function AppContent() {
 
                     {/* Footer */}
                     <div className={cn(
-                      "px-5 py-3.5 border-t flex items-center justify-between",
+                      "px-5 py-3.5 border-t flex items-center justify-between gap-2",
                       darkMode ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-white"
                     )}>
                       <button
@@ -3015,6 +3030,16 @@ function AppContent() {
                         className="text-xs font-black text-[#8b8df2] hover:text-[#7a7ce0] uppercase tracking-wider transition-colors cursor-pointer"
                       >
                         Mark all as read
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          handleNavigate("notifications");
+                          setIsNotificationsOpen(false);
+                        }}
+                        className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        Open Notification Hub
                       </button>
                     </div>
                   </motion.div>

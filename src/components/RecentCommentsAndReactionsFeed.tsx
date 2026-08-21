@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { Requisition, Comment, UserRole, RequisitionStatus } from "../types";
 import { cn, resolveSenderName } from "../lib/utils";
@@ -345,20 +345,44 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
 
   // Ref for horizontal scroll container
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+  }, []);
+
+  const displayedCards = filteredComments;
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScroll, { passive: true });
+      window.addEventListener("resize", checkScroll);
+      return () => {
+        el.removeEventListener("scroll", checkScroll);
+        window.removeEventListener("resize", checkScroll);
+      };
+    }
+  }, [displayedCards, checkScroll]);
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -340, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: -360, behavior: "smooth" });
+      setTimeout(checkScroll, 350);
     }
   };
 
   const scrollRight = () => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 340, behavior: "smooth" });
+      scrollContainerRef.current.scrollBy({ left: 360, behavior: "smooth" });
+      setTimeout(checkScroll, 350);
     }
   };
-
-  const displayedCards = filteredComments;
 
   return (
     <div 
@@ -411,22 +435,24 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             )}
           </div>
 
-          {/* Left / Right Row Scroll Controls */}
+          {/* Left / Right Row Scroll Controls in Header */}
           {displayedCards.length > 0 && (
             <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
               <button
                 onClick={scrollLeft}
                 aria-label="Scroll left"
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Scroll comments left"
+                disabled={!canScrollLeft}
               >
                 <ChevronLeft size={16} />
               </button>
               <button
                 onClick={scrollRight}
                 aria-label="Scroll right"
-                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer"
+                className="p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Scroll comments right"
+                disabled={!canScrollRight}
               >
                 <ChevronRight size={16} />
               </button>
@@ -435,13 +461,44 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
         </div>
       </div>
 
-      {/* Single-Row Horizontal Cards Carousel */}
+      {/* Single-Row Horizontal Cards Carousel with Hidden Scrollbar & Edge Fades */}
       {displayedCards.length > 0 ? (
-        <div 
-          ref={scrollContainerRef}
-          className="flex flex-row overflow-x-auto gap-4 md:gap-5 pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory focus:outline-none"
-          style={{ scrollbarWidth: "thin" }}
-        >
+        <div className="relative group/carousel">
+          {/* Left Edge Fade & Floating Scroll Button */}
+          {canScrollLeft && (
+            <>
+              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-l-2xl" />
+              <button
+                onClick={scrollLeft}
+                aria-label="Scroll left"
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
+                title="Scroll comments left"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            </>
+          )}
+
+          {/* Right Edge Fade & Floating Scroll Button */}
+          {canScrollRight && (
+            <>
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-r-2xl" />
+              <button
+                onClick={scrollRight}
+                aria-label="Scroll right"
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
+                title="Scroll comments right"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </>
+          )}
+
+          <div 
+            ref={scrollContainerRef}
+            className="flex flex-row overflow-x-auto gap-4 md:gap-5 pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory focus:outline-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
           {displayedCards.map((card) => {
             const existingReactions = Object.entries(card.reactionCounts).filter(([_, count]) => count > 0);
 
@@ -584,6 +641,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             );
           })}
         </div>
+      </div>
       ) : (
         /* Empty State */
         <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400">

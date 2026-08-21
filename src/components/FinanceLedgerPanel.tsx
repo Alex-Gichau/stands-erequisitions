@@ -45,7 +45,15 @@ import {
   CreditCard,
   Layers,
   CalendarClock,
-  Split
+  Split,
+  Check,
+  History,
+  KeyRound,
+  Fingerprint,
+  FileSignature,
+  Activity,
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
 import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition, Project } from "../types";
@@ -54,7 +62,7 @@ import { getProjectRequisitions } from "../utils/budgetUtils";
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { motion, AnimatePresence } from "motion/react";
 import { databaseService } from "../lib/databaseService";
-import { printRequisitionVoucher } from "../utils/exportUtils";
+import { printRequisitionVoucher, printInstallmentVoucher } from "../utils/exportUtils";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { useBackgroundRefresh } from "../hooks/useBackgroundRefresh";
 
@@ -773,6 +781,7 @@ export const FinanceLedgerPanel: React.FC = () => {
   const [payoutNotes, setPayoutNotes] = useState("");
   const [isCommitingPayout, setIsCommitingPayout] = useState(false);
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>("ALL");
+  const [isVoucherTimelineCollapsed, setIsVoucherTimelineCollapsed] = useState(false);
 
   // Keep selectedInstallmentId in sync when disbursingReq changes
   React.useEffect(() => {
@@ -3239,6 +3248,180 @@ export const FinanceLedgerPanel: React.FC = () => {
           const percentDisbursed = disbursingReq.amount > 0 ? Math.round((disbursedAmt / disbursingReq.amount) * 100) : 0;
           const pendingInstallments = hasInstallments ? (disbursingReq.installments?.filter(i => i.status === "PENDING") || []) : [];
 
+          // Consolidated Timeline items for the Voucher
+          type VoucherTimelineEvent = {
+            id: string;
+            timestamp: string;
+            title: string;
+            subtitle?: string;
+            type: "CREATED" | "L1_APPROVED" | "L2_APPROVED" | "DISBURSED" | "REJECTED" | "ESCALATED" | "INSTALLMENT_PAID" | "GENERIC";
+            actorName: string;
+            role?: string;
+            email?: string;
+            note?: string;
+            method?: string;
+            approvalCode?: string;
+            amount?: number;
+            reference?: string;
+          };
+
+          const voucherTimeline: VoucherTimelineEvent[] = [];
+
+          // 1. Initial Creation / Submission
+          if (disbursingReq.submittedAt) {
+            voucherTimeline.push({
+              id: "voucher-sub",
+              timestamp: disbursingReq.submittedAt,
+              title: "Requisition Created & Submitted",
+              subtitle: `Expense request for ${disbursingReq.groupName} (${formatCurrency(disbursingReq.amount)})`,
+              type: "CREATED",
+              actorName: disbursingReq.requesterName,
+              role: requesterRole,
+              email: resolvedEmail,
+              note: disbursingReq.description ? `Purpose: ${disbursingReq.description}` : undefined,
+            });
+          }
+
+          // 2. Explicit History Array Items
+          if (historyList.length > 0) {
+            historyList.forEach((h, idx) => {
+              let type: VoucherTimelineEvent["type"] = "GENERIC";
+              let title = "Authorization Step Verified";
+              let subtitle = `Validated by ${h.approverName}`;
+
+              const decision = h.decision;
+              const roleStr = h.role || "";
+
+              if (decision === "APPROVE") {
+                if (roleStr.includes("L1") || roleStr.includes("APPROVER_L1") || roleStr.toLowerCase().includes("compliance")) {
+                  type = "L1_APPROVED";
+                  title = "Level 1 Compliance & Receipt Clearance";
+                  subtitle = "Verified receipt accuracy and line items";
+                } else if (roleStr.includes("L2") || roleStr.includes("APPROVER_L2") || roleStr.toLowerCase().includes("keymaster")) {
+                  type = "L2_APPROVED";
+                  title = "Level 2 Treasury & Budget Authorization";
+                  subtitle = "Validated departmental budget allocation";
+                } else if (roleStr.toLowerCase().includes("finance") || (h.note || "").toLowerCase().includes("disburs") || (h.note || "").toLowerCase().includes("payment")) {
+                  type = "DISBURSED";
+                  title = "Requisition Funds Disbursed";
+                  subtitle = "Financial transaction settled";
+                } else {
+                  type = "GENERIC";
+                  title = "Verification Step Authorized";
+                }
+              } else if (decision === "REJECT") {
+                type = "REJECTED";
+                title = "Requisition Returned / Rejected";
+                subtitle = "Review halted with feedback";
+              } else if (decision === "ESCALATE") {
+                type = "ESCALATED";
+                title = "Transaction Escalated";
+                subtitle = "Forwarded for executive review";
+              }
+
+              voucherTimeline.push({
+                id: h.id || `hist-${idx}`,
+                timestamp: h.timestamp,
+                title,
+                subtitle,
+                type,
+                actorName: h.approverName,
+                role: h.role,
+                note: h.note,
+                method: h.method,
+                approvalCode: h.approvalCode
+              });
+            });
+          }
+
+          // 3. Fallbacks for L1 and L2 if not in history
+          const l1Note = historyList.find(h => h.role === UserRole.APPROVER_L1 || h.role === UserRole.CHURCH_GROUP);
+          const l2Note = historyList.find(h => h.role === UserRole.APPROVER_L2 || h.role === UserRole.FINANCE || h.role === UserRole.ADMIN);
+
+          if (disbursingReq.approvedAtL1 && !voucherTimeline.some(t => t.type === "L1_APPROVED")) {
+            voucherTimeline.push({
+              id: "fallback-l1",
+              timestamp: disbursingReq.approvedAtL1,
+              title: "Level 1 Compliance & Receipt Clearance",
+              subtitle: "First level verification endorsed",
+              type: "L1_APPROVED",
+              actorName: l1Note?.approverName || "Presbytery Official (L1)",
+              role: "APPROVER_L1"
+            });
+          }
+
+          if (disbursingReq.approvedAtL2 && !voucherTimeline.some(t => t.type === "L2_APPROVED")) {
+            voucherTimeline.push({
+              id: "fallback-l2",
+              timestamp: disbursingReq.approvedAtL2,
+              title: "Level 2 Treasury & Budget Authorization",
+              subtitle: "Second level treasury clearance endorsed",
+              type: "L2_APPROVED",
+              actorName: l2Note?.approverName || "Finance Treasurer (L2)",
+              role: "APPROVER_L2"
+            });
+          }
+
+          // 4. Installments already disbursed
+          if (disbursingReq.enableInstallments && Array.isArray(disbursingReq.installments)) {
+            disbursingReq.installments.filter(i => i.status === "DISBURSED").forEach((inst) => {
+              if (!voucherTimeline.some(t => t.id === `inst-${inst.id}`)) {
+                voucherTimeline.push({
+                  id: `inst-${inst.id}`,
+                  timestamp: inst.disbursedAt || disbursingReq.updatedAt || new Date().toISOString(),
+                  title: `Milestone #${inst.installmentNumber} Disbursed (${inst.title})`,
+                  subtitle: `Disbursed ${formatCurrency(inst.amount)} via ${inst.disbursementMethod || "MPESA/EFT"} (Ref: ${inst.disbursementReference || "N/A"})`,
+                  type: "INSTALLMENT_PAID",
+                  actorName: inst.disbursedBy || "Finance Accounts Team",
+                  role: "FINANCE",
+                  amount: inst.amount,
+                  reference: inst.disbursementReference,
+                  note: inst.notes
+                });
+              }
+            });
+          }
+
+          voucherTimeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+          // Requisition Tracking Diagram Stepper Stages
+          const trackingStages = [
+            {
+              id: "submitted",
+              title: "Submitted",
+              desc: disbursingReq.requesterName || "Requisitioner",
+              date: disbursingReq.submittedAt ? new Date(disbursingReq.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : "Done",
+              icon: User,
+              status: "completed"
+            },
+            {
+              id: "l1",
+              title: "L1 Approved",
+              desc: "Receipt Verified",
+              date: disbursingReq.approvedAtL1 ? new Date(disbursingReq.approvedAtL1).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : "Verified",
+              icon: UserCheck,
+              status: "completed"
+            },
+            {
+              id: "l2",
+              title: "L2 Approved",
+              desc: "Budget Cleared",
+              date: disbursingReq.approvedAtL2 ? new Date(disbursingReq.approvedAtL2).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : "Authorized",
+              icon: ShieldCheck,
+              status: "completed"
+            },
+            {
+              id: "disbursed",
+              title: disbursingReq.status === RequisitionStatus.DISBURSED ? "Disbursed" : "Payout Release",
+              desc: hasInstallments 
+                ? (percentDisbursed === 100 ? "100% Settled" : `${percentDisbursed}% Paid`) 
+                : (disbursingReq.status === RequisitionStatus.DISBURSED ? "Funds Released" : "Ready for Release"),
+              date: disbursingReq.status === RequisitionStatus.DISBURSED ? "Settled" : "In Progress",
+              icon: Coins,
+              status: disbursingReq.status === RequisitionStatus.DISBURSED ? "completed" : "active"
+            }
+          ];
+
           return (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
               <motion.div
@@ -3255,7 +3438,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Disbursement & Settlement Voucher</h3>
-                      <p className="text-[11px] text-slate-400">Review requester & approver authorization details before funds release.</p>
+                      <p className="text-[11px] text-slate-400">Review authorization lifecycle and audit timeline before funds release.</p>
                     </div>
                   </div>
                   <button onClick={() => setDisbursingReq(null)} className="p-2 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-white cursor-pointer">
@@ -3318,7 +3501,248 @@ export const FinanceLedgerPanel: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 2. Installment Milestone Selection (if enabled) */}
+                  {/* 2. Requisition Tracking Diagram */}
+                  <div className="border border-slate-200 bg-slate-50/70 rounded-xl p-4 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity size={15} className="text-indigo-600" />
+                        <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Requisition Tracking Diagram
+                        </h5>
+                      </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Authorized for Release
+                      </span>
+                    </div>
+
+                    {/* Stepper Bar */}
+                    <div className="pt-2 pb-1">
+                      <div className="relative grid grid-cols-4 gap-2 items-start">
+                        {/* Connecting track line */}
+                        <div className="absolute left-6 right-6 top-4 sm:top-5 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{
+                              width: disbursingReq.status === RequisitionStatus.DISBURSED
+                                ? "100%"
+                                : hasInstallments && percentDisbursed > 0
+                                  ? `${75 + (percentDisbursed / 100) * 25}%`
+                                  : "75%"
+                            }}
+                            className="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                          />
+                        </div>
+
+                        {trackingStages.map((stage, idx) => {
+                          const StepIcon = stage.icon;
+                          const isCompleted = stage.status === "completed";
+                          const isActive = stage.status === "active";
+
+                          return (
+                            <div key={idx} className="flex flex-col items-center gap-1.5 z-10 w-full relative text-center">
+                              <div
+                                className={cn(
+                                  "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border-2 transition-all duration-500 shadow-xs shrink-0",
+                                  isCompleted
+                                    ? "bg-emerald-500 border-emerald-600 text-white shadow-emerald-200"
+                                    : isActive
+                                      ? "bg-white border-indigo-600 text-indigo-600 shadow-indigo-100 ring-4 ring-indigo-500/10 animate-pulse"
+                                      : "bg-slate-100 border-slate-200 text-slate-400"
+                                )}
+                              >
+                                {isCompleted ? (
+                                  <Check size={16} className="stroke-[3]" />
+                                ) : (
+                                  <StepIcon size={16} />
+                                )}
+                              </div>
+
+                              <div className="text-center space-y-0.5 max-w-full">
+                                <h6
+                                  className={cn(
+                                    "text-[9px] sm:text-[10px] font-black uppercase tracking-tight leading-tight truncate",
+                                    isCompleted ? "text-emerald-800" : isActive ? "text-indigo-700" : "text-slate-500"
+                                  )}
+                                >
+                                  {stage.title}
+                                </h6>
+                                <p className="text-[8px] font-medium text-slate-500 hidden sm:block truncate">
+                                  {stage.desc}
+                                </p>
+                                {stage.date && (
+                                  <span className="text-[7.5px] font-mono text-slate-400 block truncate">
+                                    {stage.date}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. History & Audit Timeline */}
+                  <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <History size={16} className="text-indigo-600" />
+                        <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          History & Audit Timeline
+                        </h5>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full uppercase">
+                          {voucherTimeline.length} Audit Events
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsVoucherTimelineCollapsed(!isVoucherTimelineCollapsed)}
+                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[9px] font-bold uppercase transition-colors flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <span>{isVoucherTimelineCollapsed ? "Expand" : "Collapse"}</span>
+                          {isVoucherTimelineCollapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!isVoucherTimelineCollapsed && (
+                      <div className="space-y-4 relative ml-1 pt-1 max-h-60 overflow-y-auto pr-1">
+                        {/* Vertical Connector Line */}
+                        <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
+
+                        {voucherTimeline.map((event) => {
+                          let StepIcon = Activity;
+                          let badgeColor = "blue";
+
+                          if (event.type === "CREATED") {
+                            StepIcon = User;
+                            badgeColor = "blue";
+                          } else if (event.type === "L1_APPROVED") {
+                            StepIcon = UserCheck;
+                            badgeColor = "teal";
+                          } else if (event.type === "L2_APPROVED") {
+                            StepIcon = ShieldCheck;
+                            badgeColor = "indigo";
+                          } else if (event.type === "DISBURSED" || event.type === "INSTALLMENT_PAID") {
+                            StepIcon = Coins;
+                            badgeColor = "emerald";
+                          } else if (event.type === "REJECTED") {
+                            StepIcon = XCircle;
+                            badgeColor = "rose";
+                          } else if (event.type === "ESCALATED") {
+                            StepIcon = AlertTriangle;
+                            badgeColor = "amber";
+                          }
+
+                          // Verification Method Info
+                          let methodLabel = "System Protocol";
+                          let MethodIcon = Activity;
+                          if (event.method === "CODE") {
+                            methodLabel = "Security PIN Code Verified";
+                            MethodIcon = KeyRound;
+                          } else if (event.method === "FINGERPRINT") {
+                            methodLabel = "Biometric Authenticated";
+                            MethodIcon = Fingerprint;
+                          } else if (event.method === "SIGNATURE") {
+                            methodLabel = "Cryptographic Digital Signature";
+                            MethodIcon = FileSignature;
+                          }
+
+                          return (
+                            <div key={event.id} className="relative pl-9 group">
+                              {/* Marker Circle */}
+                              <div
+                                className={cn(
+                                  "absolute left-0 top-0.5 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center ring-2 shadow-xs z-10 transition-transform group-hover:scale-105",
+                                  badgeColor === "blue" ? "bg-blue-50 text-blue-600 border-blue-200 ring-blue-100" :
+                                  badgeColor === "teal" ? "bg-teal-50 text-teal-600 border-teal-200 ring-teal-100" :
+                                  badgeColor === "indigo" ? "bg-indigo-50 text-indigo-600 border-indigo-200 ring-indigo-100" :
+                                  badgeColor === "emerald" ? "bg-emerald-50 text-emerald-600 border-emerald-200 ring-emerald-100" :
+                                  badgeColor === "rose" ? "bg-rose-50 text-rose-600 border-rose-200 ring-rose-100" :
+                                  badgeColor === "amber" ? "bg-amber-50 text-amber-600 border-amber-200 ring-amber-100" :
+                                  "bg-slate-50 text-slate-600 border-slate-200 ring-slate-100"
+                                )}
+                              >
+                                <StepIcon size={12} className="stroke-[2.5]" />
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[10px]">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <h6 className="font-bold text-slate-900 leading-tight uppercase tracking-tight text-[11px]">
+                                      {event.title}
+                                    </h6>
+                                    <span
+                                      className={cn(
+                                        "px-1.5 py-0.2 rounded text-[7.5px] font-black uppercase tracking-wider",
+                                        badgeColor === "blue" ? "bg-blue-100 text-blue-800" :
+                                        badgeColor === "teal" ? "bg-teal-100 text-teal-800" :
+                                        badgeColor === "indigo" ? "bg-indigo-100 text-indigo-800" :
+                                        badgeColor === "emerald" ? "bg-emerald-100 text-emerald-800" :
+                                        badgeColor === "rose" ? "bg-rose-100 text-rose-800" :
+                                        badgeColor === "amber" ? "bg-amber-100 text-amber-800" :
+                                        "bg-slate-100 text-slate-800"
+                                      )}
+                                    >
+                                      {event.type.replace(/_/g, " ")}
+                                    </span>
+                                  </div>
+                                  <span className="text-[9.5px] text-slate-400 font-mono">
+                                    {event.timestamp ? new Date(event.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
+                                  </span>
+                                </div>
+
+                                <div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 space-y-1.5 text-xs">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-900">{event.actorName}</span>
+                                      {event.role && (
+                                        <span className="text-slate-500 font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-[8.5px]">
+                                          {event.role}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {event.email && (
+                                      <span className="text-slate-400 font-mono text-[9px]">{event.email}</span>
+                                    )}
+                                  </div>
+
+                                  {event.subtitle && (
+                                    <p className="text-[10px] text-slate-600">{event.subtitle}</p>
+                                  )}
+
+                                  {/* Authentication method & code */}
+                                  {(event.method || event.approvalCode) && (
+                                    <div className="flex items-center justify-between text-[9px] text-slate-500 bg-white/70 px-2 py-1 rounded border border-slate-200/50">
+                                      <span className="flex items-center gap-1">
+                                        <MethodIcon size={11} className="text-slate-400" />
+                                        {methodLabel}
+                                      </span>
+                                      {event.approvalCode && (
+                                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 rounded">
+                                          PIN: ••••{event.approvalCode.slice(-2)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Note / Audit details */}
+                                  {event.note && (
+                                    <p className="text-[10.5px] text-slate-600 italic bg-white p-1.5 rounded border border-slate-100">
+                                      "{event.note}"
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. Installment Milestone Selection (if enabled) */}
                   {hasInstallments && (
                     <div className="border border-indigo-200 bg-indigo-50/30 rounded-xl p-4 space-y-3.5 shadow-2xs">
                       <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
@@ -3399,23 +3823,39 @@ export const FinanceLedgerPanel: React.FC = () => {
                                   </div>
                                 </div>
 
-                                <div className="text-right shrink-0">
+                                <div className="text-right shrink-0 flex flex-col items-end gap-1">
                                   <div className={cn(
                                     "font-mono font-bold text-sm",
                                     isPaid ? "text-emerald-700" : isSelected ? "text-indigo-700" : "text-slate-800"
                                   )}>
                                     {formatCurrency(inst.amount)}
                                   </div>
-                                  <span className={cn(
-                                    "text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full inline-block mt-0.5",
-                                    isPaid
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : isSelected
-                                        ? "bg-indigo-100 text-indigo-800"
-                                        : "bg-amber-100 text-amber-800"
-                                  )}>
-                                    {isPaid ? "Paid Out" : isSelected ? "Selected for Release" : "Pending"}
-                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    {isPaid && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          printInstallmentVoucher(disbursingReq, inst, currentUser);
+                                        }}
+                                        title={`Print Payment Voucher for Installment #${inst.installmentNumber}`}
+                                        className="px-1.5 py-0.5 text-[8px] font-bold bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded transition-colors inline-flex items-center gap-0.5"
+                                      >
+                                        <Printer size={8} />
+                                        <span>Voucher</span>
+                                      </button>
+                                    )}
+                                    <span className={cn(
+                                      "text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full inline-block",
+                                      isPaid
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : isSelected
+                                          ? "bg-indigo-100 text-indigo-800"
+                                          : "bg-amber-100 text-amber-800"
+                                    )}>
+                                      {isPaid ? "Paid Out" : isSelected ? "Selected for Release" : "Pending"}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -3480,132 +3920,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* 3. Requester Details */}
-                  <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <User size={15} className="text-indigo-600" />
-                        <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Requester Information</h5>
-                      </div>
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">
-                        {requesterRole}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Full Name</span>
-                        <p className="font-semibold text-slate-900">{disbursingReq.requesterName}</p>
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Contact Email</span>
-                        <div className="flex items-center gap-1.5 text-slate-700 font-mono text-[11px]">
-                          <Mail size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{resolvedEmail}</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ministry / Department</span>
-                        <p className="font-medium text-slate-800">{disbursingReq.groupName}</p>
-                      </div>
-
-                      <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Date Submitted</span>
-                        <div className="flex items-center gap-1 text-slate-700">
-                          <Clock size={12} className="text-slate-400 shrink-0" />
-                          <span>{disbursingReq.submittedAt ? new Date(disbursingReq.submittedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : "N/A"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4. Approvers & Authorization History */}
-                  <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck size={16} className="text-emerald-600" />
-                        <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Approvers & Authorization Trail</h5>
-                      </div>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                        <CheckCircle2 size={10} /> Fully Authorized
-                      </span>
-                    </div>
-
-                    {/* Milestones (L1 & L2) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div className="bg-slate-50 border border-slate-200/80 p-2.5 rounded-lg flex items-start gap-2.5">
-                        <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-md shrink-0 mt-0.5">
-                          <UserCheck size={14} />
-                        </div>
-                        <div className="space-y-0.5 text-xs">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase block">Level 1 (Group Leader / L1)</span>
-                          <p className="font-semibold text-slate-900">
-                            {historyList.find(h => h.role === UserRole.APPROVER_L1 || h.role === UserRole.CHURCH_GROUP)?.approverName || "Presbytery Official"}
-                          </p>
-                          <span className="text-[10px] text-slate-500 block">
-                            {disbursingReq.approvedAtL1 ? new Date(disbursingReq.approvedAtL1).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : "Verified & Endorsed"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-50 border border-slate-200/80 p-2.5 rounded-lg flex items-start gap-2.5">
-                        <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-md shrink-0 mt-0.5">
-                          <ShieldCheck size={14} />
-                        </div>
-                        <div className="space-y-0.5 text-xs">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase block">Level 2 (Finance / L2)</span>
-                          <p className="font-semibold text-slate-900">
-                            {historyList.find(h => h.role === UserRole.APPROVER_L2 || h.role === UserRole.FINANCE || h.role === UserRole.ADMIN)?.approverName || "Finance Treasurer"}
-                          </p>
-                          <span className="text-[10px] text-slate-500 block">
-                            {disbursingReq.approvedAtL2 ? new Date(disbursingReq.approvedAtL2).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : "Authorized for Payout"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Protocol Logs if available */}
-                    {historyList.length > 0 && (
-                      <div className="pt-2 space-y-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Audit Protocol History</span>
-                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                          {historyList.map((h, i) => (
-                            <div key={i} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs space-y-1">
-                              <div className="flex items-center justify-between text-[10px]">
-                                <div className="flex items-center gap-1.5 font-bold">
-                                  <span className="text-slate-900">{h.approverName}</span>
-                                  <span className="text-slate-400">•</span>
-                                  <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded font-semibold">{h.role}</span>
-                                </div>
-                                <span className="text-slate-400 font-mono">
-                                  {new Date(h.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center justify-between text-[10px] text-slate-500">
-                                <span className="font-medium">Method: <strong className="text-slate-700">{h.method || "VERIFIED"}</strong></span>
-                                <span className={cn(
-                                  "px-1.5 py-0.2 rounded font-bold uppercase",
-                                  h.decision === "APPROVE" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                                )}>
-                                  {h.decision}
-                                </span>
-                              </div>
-
-                              {h.note && (
-                                <p className="text-[11px] text-slate-600 italic bg-white p-1.5 rounded border border-slate-100 mt-1">
-                                  "{h.note}"
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* 5. Disbursement Settlement Details (Form inputs) */}
                   <div className="border border-slate-200 bg-slate-50/70 rounded-xl p-4 space-y-4">

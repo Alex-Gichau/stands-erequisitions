@@ -239,7 +239,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           senderName: r.requesterName || r.groupName || "Ministry Group",
           senderEmail: r.requesterEmail || "requisitions@pceastandrews.org",
           avatarGradient: "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500",
-          title: `Decision Required: Requisition #${r.id}`,
+          title: `Decision Required: "${r.title || "Untitled Requisition"}"`,
           message: `New expense requisition "${r.title}" for KES ${r.amount.toLocaleString()} has been submitted by ${r.groupName} (${r.requesterName}) and is awaiting Level 1 verification.`,
           snippet: `Amount: KES ${r.amount.toLocaleString()} • Group: ${r.groupName}. Needs audit signoff.`,
           actionLabel: "Verify Requisition",
@@ -269,7 +269,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
         senderName: (r.approvalHistory && r.approvalHistory.length > 0 ? r.approvalHistory[r.approvalHistory.length - 1].approverName : "") || "Church Treasury & Governance",
         senderEmail: "treasury@pceastandrews.org",
         avatarGradient: "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500",
-        title: `Requisition Authorized: #${r.id}`,
+        title: `Requisition Authorized: "${r.title || "Untitled Requisition"}"`,
         message: `Requisition "${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} has successfully cleared status level ${r.status.replace("_", " ")}.`,
         snippet: `Status updated to ${r.status.replace("_", " ")} for KES ${r.amount.toLocaleString()}.`,
         actionLabel: "Inspect Details",
@@ -293,7 +293,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           senderName: "Finance Payout Directives",
           senderEmail: "finance@pceastandrews.org",
           avatarGradient: "bg-gradient-to-tr from-blue-500 via-indigo-600 to-violet-600",
-          title: `Payout Directive Ready: #${r.id}`,
+          title: `Payout Directive Ready: "${r.title || "Untitled Requisition"}"`,
           message: `Requisition "${r.title}" (${r.groupName}) is L2 APPROVED and ready for immediate fund disbursement of KES ${r.amount.toLocaleString()}.`,
           snippet: `Disbursement pending for KES ${r.amount.toLocaleString()}. Click to execute payout.`,
           actionLabel: "Execute Payout",
@@ -1273,7 +1273,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                         <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 font-mono">
                           <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                            <span><strong>Requisition ID:</strong> #{selectedItem.requisition.id}</span>
+                            <span><strong>Requisition:</strong> {selectedItem.requisition.title}</span>
                           </li>
                           <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />

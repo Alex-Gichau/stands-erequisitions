@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Requisition, SystemLog } from "../types";
+import { Requisition, RequisitionInstallment, SystemLog } from "../types";
 import { formatCurrency, formatDate } from "../lib/utils";
+import { numberToWords } from "./numberUtils";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -817,9 +818,9 @@ export function downloadRequisitionsPdf(
 }
 
 /**
- * Generates a high-fidelity voucher for a single requisition including history and metadata.
+ * Generates a high-fidelity voucher for a single requisition or specific installment milestone.
  */
-export function generateVoucherHtml(req: Requisition, currentUser: any): string {
+export function generateVoucherHtml(req: Requisition, currentUser: any, targetInstallment?: RequisitionInstallment | null): string {
   const fileDate = new Date().toLocaleDateString("en-KE", {
     year: "numeric",
     month: "long",
@@ -829,6 +830,19 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const isInstallmentVoucher = Boolean(targetInstallment);
+  const voucherTitle = isInstallmentVoucher 
+    ? `INSTALLMENT PAYMENT VOUCHER • TRANCHE #${targetInstallment!.installmentNumber}` 
+    : "PAYMENT VOUCHER";
+  const voucherRef = isInstallmentVoucher && targetInstallment!.disbursementReference
+    ? targetInstallment!.disbursementReference
+    : (isInstallmentVoucher ? `INST-${req.id.toUpperCase()}-${targetInstallment!.installmentNumber}` : `REF: ${req.id.toUpperCase()}`);
+
+  const activeAmount = isInstallmentVoucher ? targetInstallment!.amount : req.amount;
+  const activeAmountWords = isInstallmentVoucher && (targetInstallment as any)?.amountWords
+    ? (targetInstallment as any).amountWords
+    : (isInstallmentVoucher ? numberToWords(activeAmount) : (req.amountWords || numberToWords(activeAmount) || "As stated above"));
 
   const historyArr = Array.isArray(req.approvalHistory) ? req.approvalHistory : [];
   const auditRowsHtml = historyArr.map((note, i) => {
@@ -847,12 +861,16 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
     `;
   }).join("");
 
+  const installments = Array.isArray(req.installments) ? req.installments : [];
+  const totalDisbursed = installments.filter(i => i.status === "DISBURSED").reduce((sum, i) => sum + (Number(i.amount) || 0), 0) || (req.disbursedAmount || 0);
+  const remainingBalance = req.remainingBalance !== undefined ? req.remainingBalance : Math.max(0, req.amount - totalDisbursed);
+
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Payment Voucher - ${req.id}</title>
+  <title>${isInstallmentVoucher ? `Installment #${targetInstallment!.installmentNumber} Voucher` : 'Payment Voucher'} - ${req.id}</title>
   <style>
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
@@ -879,7 +897,7 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
     .brand h1 { margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: -0.5px; }
     .brand p { margin: 5px 0 0 0; font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px; }
     .voucher-id { text-align: right; }
-    .voucher-id h2 { margin: 0; font-size: 18px; color: #0f172a; }
+    .voucher-id h2 { margin: 0; font-size: 16px; color: #0f172a; font-weight: 900; }
     .voucher-id p { margin: 2px 0 0 0; font-family: monospace; font-size: 10px; color: #64748b; }
     
     .status-badge {
@@ -924,6 +942,23 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
     .amount-val { font-size: 28px; font-weight: 900; color: #0f172a; font-family: monospace; }
     .amount-words { font-size: 11px; font-style: italic; color: #64748b; margin-top: 5px; }
     
+    .installment-summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 15px;
+      padding-top: 12px;
+      border-top: 1px dashed #cbd5e1;
+    }
+    .summary-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 10px;
+      border-radius: 6px;
+    }
+    .summary-card-label { font-size: 8px; font-weight: 800; text-transform: uppercase; color: #64748b; }
+    .summary-card-val { font-size: 13px; font-weight: 800; font-family: monospace; color: #0f172a; margin-top: 2px; }
+
     .audit-trail { width: 100%; border-collapse: collapse; margin-top: 10px; }
     .audit-trail th { text-align: left; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; font-size: 9px; text-transform: uppercase; }
     .audit-trail td { border: 1px solid #e2e8f0; vertical-align: top; }
@@ -942,9 +977,11 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
         <p>Finance & Expenditure Department</p>
       </div>
       <div class="voucher-id">
-        <h2>PAYMENT VOUCHER</h2>
-        <p>REF: ${req.id.toUpperCase()}</p>
-        <div class="status-badge">${req.status.replace(/_/g, " ")}</div>
+        <h2>${voucherTitle}</h2>
+        <p>${voucherRef}</p>
+        <div class="status-badge" style="${isInstallmentVoucher && targetInstallment!.status === 'DISBURSED' ? 'background: #dcfce7; color: #166534;' : ''}">
+          ${isInstallmentVoucher ? (targetInstallment!.status === 'DISBURSED' ? 'PAID OUT / DISBURSED' : `INSTALLMENT ${targetInstallment!.status}`) : req.status.replace(/_/g, " ")}
+        </div>
       </div>
     </div>
 
@@ -963,13 +1000,41 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
           <div class="info-label">Submitted On</div>
           <div class="info-value">${formatDate(req.submittedAt)}</div>
         </div>
+        ${req.payableTo ? `
+        <div class="info-item">
+          <div class="info-label">Beneficiary / Payable To</div>
+          <div class="info-value" style="color: #4338ca;">${req.payableTo}</div>
+        </div>
+        ` : ''}
       </div>
       <div>
         <div class="section-title">Transaction Details</div>
         <div class="info-item">
-          <div class="info-label">Purpose of Expenditure</div>
-          <div class="info-value" style="font-size: 11px;">${req.title}</div>
+          <div class="info-label">${isInstallmentVoucher ? 'Master Requisition Title' : 'Purpose of Expenditure'}</div>
+          <div class="info-value" style="font-size: 11px;">${req.title} <span style="font-family: monospace; font-size: 9px; color: #64748b;">(#${req.id})</span></div>
         </div>
+        ${isInstallmentVoucher ? `
+        <div class="info-item">
+          <div class="info-label">Installment Phase / Milestone</div>
+          <div class="info-value" style="font-size: 12px; color: #0f172a;">
+            ${targetInstallment!.title || `Installment #${targetInstallment!.installmentNumber}`}
+            ${targetInstallment!.description ? `<span style="display: block; font-weight: normal; font-size: 10px; color: #64748b;">${targetInstallment!.description}</span>` : ''}
+          </div>
+        </div>
+        ${targetInstallment!.disbursedAt ? `
+        <div class="info-item">
+          <div class="info-label">Disbursed On & Method</div>
+          <div class="info-value" style="font-size: 11px; font-family: monospace; color: #166534;">
+            ${formatDate(targetInstallment!.disbursedAt)} via ${targetInstallment!.paymentMethod || targetInstallment!.disbursementMethod || 'CHEQUE'} (Ref: ${targetInstallment!.disbursementReference || 'OK'})
+          </div>
+        </div>
+        ` : (targetInstallment!.dueDate ? `
+        <div class="info-item">
+          <div class="info-label">Milestone Due Date</div>
+          <div class="info-value" style="font-size: 11px; font-family: monospace;">${formatDate(targetInstallment!.dueDate)}</div>
+        </div>
+        ` : '')}
+        ` : ''}
         ${req.description ? `
         <div class="info-item">
           <div class="info-label">Narrative / Notes</div>
@@ -979,44 +1044,63 @@ export function generateVoucherHtml(req: Requisition, currentUser: any): string 
       </div>
     </div>
 
-    <div class="section-title">Financial Allotment</div>
+    <div class="section-title">${isInstallmentVoucher ? `Installment Financial Allotment (Tranche #${targetInstallment!.installmentNumber})` : 'Financial Allotment'}</div>
     <div class="amount-box">
-      <div class="amount-val">${formatCurrency(req.amount)}</div>
-      <div class="amount-words">Sum of Kenyan Shillings: ${req.amountWords || 'As stated above'} only.</div>
-      ${req.enableInstallments && Array.isArray(req.installments) && req.installments.length > 0 ? `
+      <div class="amount-val">${formatCurrency(activeAmount)}</div>
+      <div class="amount-words">Sum of Kenyan Shillings: ${activeAmountWords} only.</div>
+      
+      ${req.enableInstallments && installments.length > 0 ? `
+        <div class="installment-summary-grid">
+          <div class="summary-card">
+            <div class="summary-card-label">Master Requisition Total</div>
+            <div class="summary-card-val">${formatCurrency(req.amount)}</div>
+          </div>
+          <div class="summary-card" style="border-color: #bbf7d0; background: #f0fdf4;">
+            <div class="summary-card-label" style="color: #166534;">Total Settled (${installments.filter(i => i.status === 'DISBURSED').length}/${installments.length})</div>
+            <div class="summary-card-val" style="color: #166534;">${formatCurrency(totalDisbursed)}</div>
+          </div>
+          <div class="summary-card" style="border-color: #fed7aa; background: #fffbeb;">
+            <div class="summary-card-label" style="color: #9a3412;">Remaining Balance</div>
+            <div class="summary-card-val" style="color: #9a3412;">${formatCurrency(remainingBalance)}</div>
+          </div>
+        </div>
+
         <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed #cbd5e1; font-size: 11px;">
-          <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 6px; color: #475569; font-size: 9px; letter-spacing: 0.5px;">Phased Installment Schedule:</div>
+          <div style="font-weight: 800; text-transform: uppercase; margin-bottom: 6px; color: #475569; font-size: 9px; letter-spacing: 0.5px;">Phased Installment Milestone Schedule:</div>
           <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
             <thead>
               <tr style="color: #64748b; font-size: 8px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; text-align: left;">
                 <th style="padding: 4px;">#</th>
-                <th style="padding: 4px;">Milestone</th>
+                <th style="padding: 4px;">Milestone Phase</th>
                 <th style="padding: 4px;">Due Date</th>
                 <th style="padding: 4px; text-align: right;">Amount (%)</th>
-                <th style="padding: 4px; text-center;">Status</th>
+                <th style="padding: 4px; text-align: center;">Status</th>
               </tr>
             </thead>
             <tbody>
-              ${req.installments.map(inst => `
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 5px 4px; font-weight: bold; font-family: monospace;">#${inst.installmentNumber}</td>
+              ${installments.map(inst => {
+                const isThisInst = isInstallmentVoucher && inst.id === targetInstallment!.id;
+                return `
+                <tr style="border-bottom: 1px solid #f1f5f9; ${isThisInst ? 'background: #eef2ff; font-weight: bold;' : ''}">
+                  <td style="padding: 5px 4px; font-weight: bold; font-family: monospace;">#${inst.installmentNumber} ${isThisInst ? '👉' : ''}</td>
                   <td style="padding: 5px 4px;">${inst.title}</td>
                   <td style="padding: 5px 4px; font-family: monospace; font-size: 9px; color: #64748b;">${inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('en-GB') : 'On Demand'}</td>
-                  <td style="padding: 5px 4px; text-align: right; font-weight: bold; font-family: monospace;">${formatCurrency(inst.amount)} (${inst.percentage}%)</td>
+                  <td style="padding: 5px 4px; text-align: right; font-weight: bold; font-family: monospace;">${formatCurrency(inst.amount)} (${inst.percentage || Math.round((inst.amount / (req.amount || 1)) * 100)}%)</td>
                   <td style="padding: 5px 4px; text-align: center;">
                     <span style="display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold; text-transform: uppercase; background: ${inst.status === 'DISBURSED' ? '#dcfce7; color: #166534;' : '#fef3c7; color: #92400e;'}">
-                      ${inst.status === 'DISBURSED' ? `Paid (${inst.disbursementMethod || 'EFT'} #${inst.disbursementReference || 'OK'})` : 'Pending'}
+                      ${inst.status === 'DISBURSED' ? `Paid (${inst.disbursementMethod || inst.paymentMethod || 'EFT'} #${inst.disbursementReference || 'OK'})` : 'Pending'}
                     </span>
                   </td>
                 </tr>
-              `).join('')}
+              `;
+              }).join('')}
             </tbody>
           </table>
         </div>
       ` : ''}
     </div>
 
-    <div class="section-title">Digital Approval Audit Trail</div>
+    <div class="section-title">Digital Approval & Authorization Audit Trail</div>
     <table class="audit-trail">
       <thead>
         <tr>
@@ -1495,10 +1579,10 @@ export function printRequisitionReceipt(req: Requisition): void {
 }
 
 /**
- * Prints a detailed voucher for a single requisition.
+ * Prints a detailed voucher for a single requisition or specific installment tranche.
  */
-export function printRequisitionVoucher(req: Requisition, currentUser: any): void {
-  const html = generateVoucherHtml(req, currentUser);
+export function printRequisitionVoucher(req: Requisition, currentUser: any, targetInstallment?: RequisitionInstallment | null): void {
+  const html = generateVoucherHtml(req, currentUser, targetInstallment);
   const printWindow = window.open("", "_blank", "width=900,height=800");
   
   if (printWindow) {
@@ -1522,6 +1606,13 @@ export function printRequisitionVoucher(req: Requisition, currentUser: any): voi
   } else {
     alert("Please allow popups to print the voucher.");
   }
+}
+
+/**
+ * Prints a payment voucher specifically for a single installment tranche.
+ */
+export function printInstallmentVoucher(req: Requisition, installment: RequisitionInstallment, currentUser: any): void {
+  printRequisitionVoucher(req, currentUser, installment);
 }
 
 /**

@@ -1786,7 +1786,7 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
     </div>
   );
 };
-import { printRequisitions, downloadRequisitionsHtml, downloadRequisitionsCsv, downloadRequisitionsPdf, printRequisitionVoucher, printRequisitionReceipt } from "../utils/exportUtils";
+import { printRequisitions, downloadRequisitionsHtml, downloadRequisitionsCsv, downloadRequisitionsPdf, printRequisitionVoucher, printInstallmentVoucher, printRequisitionReceipt } from "../utils/exportUtils";
 import { NewRequisitionForm } from "./NewRequisitionForm";
 import { ReceiptTemplateGenerator } from "./ReceiptTemplateGenerator";
 import { ReceiptGallery } from "./ReceiptGallery";
@@ -2247,6 +2247,7 @@ const HighlightText = ({ text, highlight }: { text: string; highlight: string })
 };
 
 export const RequisitionInstallmentScheduleBreakdown: React.FC<{ req: Requisition; compact?: boolean }> = ({ req, compact = false }) => {
+  const { currentUser } = useRequisitions();
   const installments = req.installments || [];
   if (installments.length === 0) return null;
 
@@ -2362,6 +2363,7 @@ export const RequisitionInstallmentScheduleBreakdown: React.FC<{ req: Requisitio
               <th className="px-3.5 py-2.5">Scheduled Due Date</th>
               <th className="px-3.5 py-2.5 text-center">Status</th>
               <th className="px-3.5 py-2.5">Settlement Audit Trail</th>
+              <th className="px-3.5 py-2.5 text-right">Voucher</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/70 dark:divide-slate-800/80">
@@ -2435,6 +2437,17 @@ export const RequisitionInstallmentScheduleBreakdown: React.FC<{ req: Requisitio
                         Pending finance voucher clearance
                       </span>
                     )}
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right">
+                    <button
+                      type="button"
+                      onClick={() => printInstallmentVoucher(req, inst, currentUser)}
+                      title={`Print voucher for Installment #${inst.installmentNumber}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-[9px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-lg transition-colors"
+                    >
+                      <Printer size={10} />
+                      <span>Print</span>
+                    </button>
                   </td>
                 </tr>
               );

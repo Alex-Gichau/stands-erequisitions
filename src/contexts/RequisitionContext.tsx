@@ -110,148 +110,35 @@ export function normalizeUserProfile(u: any): UserProfile {
   };
 }
 
-// @ts-ignore
-const db = {}; // Dummy db to allow migration progress
-// Supabase Auth usages replaced.
-// auth stubs removed
-
-// Supabase as Firestore Stubs
-const collection = (db: any, table: string) => ({ table });
-const doc = (db: any, table: string, id?: string) => {
-  if (!id && typeof table !== 'string') {
-     return { table: db.table, id: table }; // doc(collectionRef, id) form
-  }
-  return { table, id };
-};
-
-const getDocFromServer = async (docRef: any) => getDoc(docRef);
-const deleteField = () => null;
-const getFirestore = () => ({});
-const initializeFirestore = (...args: any[]) => ({});
-
-const mapCamelToSnake = (data: any): any => {
-  if (data === null || data === undefined || typeof data !== "object" || Array.isArray(data)) {
-    return data;
-  }
-  const snakeData: any = {};
-  for (const [key, val] of Object.entries(data)) {
-    let snakeKey = key;
-    if (key === 'photoURL') {
-      snakeKey = 'photo_url';
-    } else {
-      snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-    }
-    snakeData[snakeKey] = val;
-  }
-  return snakeData;
-};
-
-const mapSnakeToCamel = (data: any): any => {
-  if (data === null || data === undefined) {
-    return data;
-  }
+export function cleanData<T = any>(data: T): T {
+  if (data === null || data === undefined) return data;
   if (Array.isArray(data)) {
-    return data.map(mapSnakeToCamel);
+    return data.map(item => cleanData(item)) as any;
   }
   if (typeof data === "object") {
-    const camelData: any = {};
+    const cleaned: any = {};
     for (const [key, val] of Object.entries(data)) {
-      let camelKey = key;
-      if (key === 'photo_url') {
-        camelKey = 'photoURL';
-      } else {
-        camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      if (val !== undefined) {
+        cleaned[key] = cleanData(val);
       }
-      let finalVal = mapSnakeToCamel(val);
-      if (
-        (camelKey === "amount" || 
-         camelKey === "allocatedBudget" || 
-         camelKey === "spentAmount" || 
-         camelKey === "committedAmount" || 
-         camelKey === "requisitionLimit" || 
-         camelKey === "budgetLimit" || 
-         camelKey === "allocated" || 
-         camelKey === "spent" || 
-         camelKey === "threshold") && 
-        typeof finalVal === "string"
-      ) {
-        const parsed = Number(finalVal);
-        if (!isNaN(parsed)) {
-          finalVal = parsed;
-        }
-      }
-      camelData[camelKey] = finalVal;
     }
-    return camelData;
+    return cleaned;
   }
   return data;
-};
+}
 
-const setDoc = async (docRef: any, data: any, options?: any) => {
-  let payload = mapCamelToSnake({ id: docRef.id, ...data });
-  try {
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${docRef.table}/${docRef.id}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      console.error(`setDoc error: table=${docRef.table}, id=${docRef.id}, status=${res.status}`);
-    }
-  } catch (err) {
-    console.error("setDoc failed:", err);
-  }
-};
+export const cleanFirestoreData = cleanData;
 
-const updateDoc = async (docRef: any, data: any) => {
-  let payload = mapCamelToSnake(data);
-  try {
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${docRef.table}/${docRef.id}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      if (res.status === 404) {
-        console.warn(`updateDoc: Document not found, skipping update: table=${docRef.table}, id=${docRef.id}`);
-        return;
-      }
-      console.error(`updateDoc error: table=${docRef.table}, id=${docRef.id}, status=${res.status}`);
-    }
-  } catch (err) {
-    console.error("updateDoc failed:", err);
+export function mapSnakeToCamel(obj: any): any {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(mapSnakeToCamel);
+  const camelObj: any = {};
+  for (const key of Object.keys(obj)) {
+    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    camelObj[camelKey] = mapSnakeToCamel(obj[key]);
   }
-};
-
-const deleteDoc = async (docRef: any) => {
-  try {
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${docRef.table}/${docRef.id}`, {
-      method: "DELETE",
-      headers
-    });
-    if (!res.ok) {
-      console.error(`deleteDoc error: table=${docRef.table}, id=${docRef.id}, status=${res.status}`);
-    }
-  } catch (err) {
-    console.error("deleteDoc failed:", err);
-  }
-};
-
-const getDoc = async (docRef: any) => {
-  try {
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${docRef.table}/${docRef.id}`, { headers });
-    if (!res.ok) return { exists: () => false, data: () => ({} as any), id: docRef.id };
-    const data = await res.json();
-    return { exists: () => true, data: () => mapSnakeToCamel(data), id: docRef.id };
-  } catch (err) {
-    console.error("getDoc failed:", err);
-    return { exists: () => false, data: () => ({} as any), id: docRef.id };
-  }
-};
+  return camelObj;
+}
 
 export function safeNormalizeAttachments(attachments: any): string[] {
   if (!attachments) return [];
@@ -436,116 +323,60 @@ export function safeNormalizeComments(comments: any): any[] {
   }).filter(Boolean);
 }
 
-const limit = (val: number) => ({ type: 'limit', value: val });
-const orderBy = (field: string, direction: string = 'asc') => ({ type: 'orderBy', field, direction });
-const where = (field: string, op: string, value: any) => ({ type: 'where', field, op, value });
-
-const query = (col: any, ...constraints: any[]) => {
-  let q = { ...col };
-  constraints.forEach(c => {
-    if (c.type === 'limit') q.limitCount = c.value;
-    if (c.type === 'orderBy') {
-      q.orderColumn = c.field;
-      q.ascending = c.direction !== 'desc';
-    }
-    if (c.type === 'where') {
-      q.whereColumn = c.field;
-      q.whereOp = c.op;
-      q.whereValue = c.value;
-    }
-  });
-  return q;
-};
-
-const getDocs = async (queryRef: any) => {
-  try {
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${queryRef.table}`, { headers });
-    if (!res.ok) return { docs: [], empty: true, forEach: (cb: any) => {} };
-    let data = await res.json();
-    
-    if (queryRef.whereColumn && queryRef.whereValue !== undefined) {
-      const col = queryRef.whereColumn;
-      const val = queryRef.whereValue;
-      if (queryRef.whereOp === "==") data = data.filter((x: any) => x[col] === val);
-      else if (queryRef.whereOp === ">") data = data.filter((x: any) => x[col] > val);
-      else if (queryRef.whereOp === "<") data = data.filter((x: any) => x[col] < val);
-    }
-    
-    const docs = data.map((d: any) => ({ data: () => mapSnakeToCamel(d), id: d.id, exists: () => true }));
-    return { docs, empty: docs.length === 0, forEach: (cb: any) => docs.forEach(cb) };
-  } catch (err) {
-    console.error("getDocs failed:", err);
-    return { docs: [], empty: true, forEach: (cb: any) => {} };
-  }
-};
-
-const addDoc = async (col: any, data: any) => {
-  try {
-    const id = data.id || `doc-${Math.random().toString(36).substring(2, 11)}`;
-    const payload = { ...data, id };
-    const headers = await getAuthHeaders();
-    const res = await fetch(`/api/db/${col.table}/${id}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      console.error(`addDoc error: table=${col.table}, status=${res.status}`);
-      return { id: "mock" };
-    }
-    return { id };
-  } catch (err) {
-    console.error("addDoc failed:", err);
-    return { id: "mock" };
-  }
-};
-
-const onSnapshot = (queryRef: any, callback: (snap: any) => void, errorCallback?: (err: any) => void) => {
-  const fetchData = async () => {
-    try {
-      if (queryRef.id) { 
-        const res = await getDoc(queryRef);
-        callback(res);
-      } else {
-        const res = await getDocs(queryRef);
-        callback(res);
+export function safeNormalizeInstallments(installments: any): RequisitionInstallment[] {
+  if (!installments) return [];
+  let parsed = installments;
+  if (typeof installments === 'string') {
+    const trimmed = installments.trim();
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        return [];
       }
-    } catch (err) {
-      if (errorCallback) errorCallback(err);
-      else console.warn("onSnapshot fetch failed:", err);
+    } else {
+      return [];
     }
-  };
-  
-  fetchData();
-  const interval = setInterval(fetchData, 5000);
-  return () => clearInterval(interval);
-};
-
-const handleFirestoreError = (a: any, b: any, c: any) => {};
-enum OperationType { READ, WRITE, DELETE, UPDATE, CREATE, LIST, GET }
-const initializeApp = (...args: any[]) => {};
-const deleteApp = async (a: any) => {};
-
-// Temporary fix until migration is fully cleaned up
-
-// Helper to recursively remove any fields with value undefined to prevent Firestore write/update failures
-function cleanFirestoreData(data: any): any {
-  if (data === null || data === undefined) return data;
-  if (Array.isArray(data)) {
-    return data.map(item => cleanFirestoreData(item));
   }
-  if (typeof data === "object") {
-    const cleaned: any = {};
-    for (const [key, val] of Object.entries(data)) {
-      if (val !== undefined) {
-        cleaned[key] = cleanFirestoreData(val);
+  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+    parsed = Object.values(parsed);
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((inst: any, idx: number) => {
+    if (typeof inst === 'string') {
+      try {
+        inst = JSON.parse(inst);
+      } catch (e) {
+        return null;
       }
     }
-    return cleaned;
-  }
-  return data;
+    if (!inst || typeof inst !== 'object') return null;
+    const amount = Number(inst.amount ?? inst.installment_amount) || 0;
+    const installmentNumber = Number(inst.installmentNumber ?? inst.installment_number) || (idx + 1);
+    const rawStatus = (inst.status || "PENDING").toString().toUpperCase();
+    const status: "PENDING" | "DISBURSED" | "CANCELLED" = (rawStatus === "DISBURSED" || rawStatus === "CANCELLED") ? rawStatus : "PENDING";
+
+    return {
+      id: String(inst.id || `inst-${idx + 1}`),
+      installmentNumber,
+      title: inst.title || `Installment #${installmentNumber}`,
+      amount,
+      percentage: Number(inst.percentage) || undefined,
+      dueDate: inst.dueDate || inst.due_date || undefined,
+      description: inst.description || "",
+      status,
+      disbursedAt: inst.disbursedAt || inst.disbursed_at || undefined,
+      disbursedBy: inst.disbursedBy || inst.disbursed_by || undefined,
+      disbursedByName: inst.disbursedByName || inst.disbursed_by_name || undefined,
+      disbursementReference: inst.disbursementReference || inst.disbursement_reference || undefined,
+      paymentMethod: inst.paymentMethod || inst.payment_method || undefined,
+      disbursementMethod: inst.disbursementMethod || inst.disbursement_method || undefined,
+      notes: inst.notes || undefined,
+    } as RequisitionInstallment;
+  }).filter(Boolean) as RequisitionInstallment[];
 }
+
+
 
 interface RequisitionContextType {
   requisitions: Requisition[];
@@ -829,7 +660,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setIsDbSaving(false);
     }
   }, []);
-  const skipFirestore = true; // Route exclusively to local MongoDB/Mongoose server endpoints
   const [activeSyncTargets, setActiveSyncTargets] = useState<Set<string>>(new Set(['settings', 'alerts']));
   const [syncingTargets, setSyncingTargets] = useState<Set<string>>(new Set());
 
@@ -849,8 +679,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   }, []);
 
-  const handleSyncError = useCallback((err: any, opType: OperationType, path: string) => {
-    handleFirestoreError(err, opType, path);
+  const handleSyncError = useCallback((err: any, opType?: string, path?: string) => {
+    console.warn(`[Sync Error] ${opType || 'OP'} ${path || ''}:`, err);
   }, []);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
@@ -1225,7 +1055,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               isSuspended: false
             };
             setCurrentUser(defaultUser as any);
-            await setDoc(doc(db, "users", firebaseUser.uid), defaultUser);
+            await databaseService.saveUserProfile(defaultUser as any);
           }
         } catch (err) {
           console.warn("Could not fetch user profile from backend database, setting default:", err);
@@ -1240,7 +1070,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             isSuspended: false
           };
           setCurrentUser(fallbackUser as any);
-          await setDoc(doc(db, "users", firebaseUser.uid), fallbackUser);
+          await databaseService.saveUserProfile(fallbackUser as any);
         }
         setAuthLoading(false);
       } else {
@@ -1387,22 +1217,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
 
     try {
-      if (!skipFirestore) {
-        await setDoc(doc(db, "settings", "system"), updates, { merge: true });
-      }
-
-      const headers = await getAuthHeaders();
-      await fetch(`/api/db/settings/system`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ id: "system", ...updates })
-      }).catch(e => console.warn("[DB Sync] Error updating system settings:", e));
-
+      await databaseService.saveSettings(updates);
       await addSystemLog("SYSTEM_SETTINGS_UPDATE", `System settings updated: ${JSON.stringify(updates)}`, { updates });
     } catch (err) {
       console.error("Failed to update system settings:", err);
     }
-  }, [addSystemLog, skipFirestore]);
+  }, [addSystemLog]);
 
   const updateRolePermissions = useCallback(async (roleId: string, updates: any) => {
     let updatedConfig: PermissionConfig | null = null;
@@ -1438,27 +1258,18 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
 
     try {
-      if (!skipFirestore) {
-        await setDoc(doc(db, "permissions", roleId), updates, { merge: true });
-      }
-
-      const headers = await getAuthHeaders();
-      await fetch(`/api/db/permissions/${roleId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({
-          id: roleId,
-          role: roleId,
-          access: updatedConfig?.access || updates.access,
-          actions: updatedConfig?.actions || updates.actions
-        })
-      }).catch(e => console.warn("[DB Sync] Error updating role permissions:", e));
+      await databaseService.savePermission(roleId, {
+        id: roleId,
+        role: roleId,
+        access: updatedConfig?.access || updates.access,
+        actions: updatedConfig?.actions || updates.actions
+      });
 
       await addSystemLog("PERMISSIONS_UPDATED", `Access rights modified for role: ${roleId}`, { roleId, updates });
     } catch (err) {
       console.error("Failed to update role permissions:", err);
     }
-  }, [db, addSystemLog, skipFirestore]);
+  }, [addSystemLog]);
 
   const allocateBudgetForGroup = useCallback(async (groupId: string, amount: number, fiscalYear: number, accountNumber?: string) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1507,7 +1318,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to allocate budget:", err);
       throw err;
     }
-  }, [currentUser, db, projects, addSystemLog, triggerToast]);
+  }, [currentUser, projects, addSystemLog, triggerToast]);
 
   const closeFinancialYear = useCallback(async (year: number) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1518,7 +1329,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       const yearProjects = projects.filter(p => !p.fiscalYear || p.fiscalYear === year);
       for (const p of yearProjects) {
-        await updateDoc(doc(db, "projects", p.id), { status: "CLOSED" });
+        await databaseService.updateProject(p.id, { status: "CLOSED" });
       }
 
       await updateSystemSettings({
@@ -1532,7 +1343,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to close financial year:", err);
       throw err;
     }
-  }, [currentUser, db, projects, updateSystemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, projects, updateSystemSettings, addSystemLog, triggerToast]);
 
   const openFinancialYear = useCallback(async (year: number) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1563,7 +1374,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               color: prevP.color || "bg-indigo-500",
               fiscalYear: year
             };
-            await setDoc(doc(db, "projects", nextProjId), nextProj);
+            await databaseService.saveProject(nextProj);
           }
         }
       } else {
@@ -1581,7 +1392,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               color: "bg-indigo-500",
               fiscalYear: year
             };
-            await setDoc(doc(db, "projects", nextProjId), nextProj);
+            await databaseService.saveProject(nextProj);
           }
         }
       }
@@ -1592,18 +1403,17 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to open financial year:", err);
       throw err;
     }
-  }, [currentUser, db, projects, churchGroups, updateSystemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, projects, churchGroups, updateSystemSettings, addSystemLog, triggerToast]);
 
   const updateProjectBudget = useCallback(async (id: string, amount: number) => {
     if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
       throw new Error("Unauthorized: Only Admins can modify budgets.");
     }
     try {
-      const projRef = doc(db, "projects", id);
-      await updateDoc(projRef, { allocatedBudget: amount });
+      await databaseService.updateProject(id, { allocatedBudget: amount });
       await addSystemLog("BUDGET_ADJUSTMENT", `Admin adjusted budget for project ID ${id} to KES ${amount}`, { projectId: id, amount });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `projects/${id}`);
+      console.error("Failed to update project budget:", err);
     }
   }, [currentUser, addSystemLog]);
 
@@ -1612,10 +1422,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error("Unauthorized: Only Admins can delete budgets.");
     }
     try {
-      await deleteDoc(doc(db, "projects", id));
+      await databaseService.deleteProject(id);
       await addSystemLog("BUDGET_DELETED", `Admin deleted budget line ID: ${id}`, { projectId: id });
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `projects/${id}`);
+      console.error("Failed to delete project:", err);
     }
   }, [currentUser, addSystemLog]);
 
@@ -1647,14 +1457,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         notes: notes || ""
       };
       
-      await setDoc(doc(db, "fiscal_years", yearId), cleanFirestoreData(newFiscalYear));
+      await databaseService.saveFiscalYear(newFiscalYear);
 
       await addSystemLog("FISCAL_YEAR_CREATED", `Admin defined new Financial Year ${year}: ${label}`, { year, label, status, startDate: sDate, endDate: eDate });
       triggerToast({ type: "SYSTEM_INFO", message: `Financial Year ${year} has been created.`, severity: "LOW", timestamp: new Date().toISOString() });
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `fiscal_years/${year}`);
+      console.error("Failed to create fiscal year:", err);
     }
-  }, [currentUser, db, addSystemLog, triggerToast]);
+  }, [currentUser, addSystemLog, triggerToast]);
 
   const updateFiscalYearDates = useCallback(async (year: number, startDate: string, endDate: string, label?: string, notes?: string) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1674,7 +1484,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (label !== undefined) updates.label = label;
       if (notes !== undefined) updates.notes = notes;
 
-      await setDoc(doc(db, "fiscal_years", yearId), updates, { merge: true });
+      await databaseService.updateFiscalYear(yearId, updates);
 
       if (systemSettings.currentFiscalYear === year || !systemSettings.currentFiscalYear) {
         await updateSystemSettings({
@@ -1686,9 +1496,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       await addSystemLog("FISCAL_YEAR_DATES_UPDATED", `Updated configuration for FY ${year}`, { year, startDate, endDate, label, notes });
       triggerToast({ type: "SYSTEM_INFO", message: `Fiscal Year ${year} configuration updated.`, severity: "LOW", timestamp: new Date().toISOString() });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `fiscal_years/${year}`);
+      console.error("Failed to update fiscal year dates:", err);
     }
-  }, [currentUser, db, systemSettings, updateSystemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, systemSettings, updateSystemSettings, addSystemLog, triggerToast]);
 
   const deleteFiscalYear = useCallback(async (id: string | number) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1704,13 +1514,13 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     try {
-      await deleteDoc(doc(db, "fiscal_years", yearId));
+      await databaseService.deleteFiscalYear(yearId);
       await addSystemLog("FISCAL_YEAR_DELETED", `Admin deleted Financial Year record for FY ${numericYear}`, { year: numericYear });
       triggerToast({ type: "SYSTEM_INFO", message: `Financial Year ${numericYear} deleted successfully.`, severity: "LOW", timestamp: new Date().toISOString() });
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `fiscal_years/${yearId}`);
+      console.error("Failed to delete fiscal year:", err);
     }
-  }, [currentUser, db, systemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, systemSettings, addSystemLog, triggerToast]);
 
   const toggleFiscalYearStatus = useCallback(async (id: string, status: "OPEN" | "CLOSED" | "ARCHIVED") => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1719,7 +1529,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     try {
-      await updateDoc(doc(db, "fiscal_years", id), { status });
+      await databaseService.updateFiscalYear(id, { status });
       
       // If of the same currently active year, sync system settings
       if (systemSettings.currentFiscalYear === parseInt(id)) {
@@ -1729,9 +1539,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       await addSystemLog("FISCAL_YEAR_STATUS_TOGGLED", `Admin toggled Financial Year ${id} status to ${status}`, { id, status });
       triggerToast({ type: "SYSTEM_INFO", message: `Financial Year ${id} status toggled to ${status}.`, severity: "MEDIUM", timestamp: new Date().toISOString() });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `fiscal_years/${id}`);
+      console.error("Failed to toggle fiscal year status:", err);
     }
-  }, [currentUser, db, systemSettings, updateSystemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, systemSettings, updateSystemSettings, addSystemLog, triggerToast]);
 
   const setActiveFiscalYear = useCallback(async (year: number) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1758,7 +1568,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const exists = projects.some(p => p.groupId === prevP.groupId && p.fiscalYear === year);
             if (!exists) {
               const nextProjId = "p-" + Math.random().toString(36).substring(2, 9);
-              await setDoc(doc(db, "projects", nextProjId), {
+              await databaseService.saveProject({
                 id: nextProjId,
                 name: prevP.name,
                 groupId: prevP.groupId,
@@ -1775,7 +1585,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const exists = projects.some(p => p.groupId === cg.name && p.fiscalYear === year);
             if (!exists) {
               const nextProjId = "p-" + Math.random().toString(36).substring(2, 9);
-              await setDoc(doc(db, "projects", nextProjId), {
+              await databaseService.saveProject({
                 id: nextProjId,
                 name: cg.name,
                 groupId: cg.name,
@@ -1796,7 +1606,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to switch active fiscal year:", err);
       throw err;
     }
-  }, [currentUser, db, fiscalYears, projects, churchGroups, updateSystemSettings, addSystemLog, triggerToast]);
+  }, [currentUser, fiscalYears, projects, churchGroups, updateSystemSettings, addSystemLog, triggerToast]);
 
   const cloneFiscalYearBudgets = useCallback(async (
     sourceYear: number, 
@@ -1823,7 +1633,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           createdAt: new Date().toISOString(),
           notes: targetNotes || ""
         };
-        await setDoc(doc(db, "fiscal_years", yearId), cleanFirestoreData(newFiscalYear));
+        await databaseService.saveFiscalYear(newFiscalYear);
       }
 
       // 2. Map existing active projects of source year to duplicate in target year
@@ -1846,13 +1656,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             color: p.color || "bg-indigo-500",
             fiscalYear: targetYear
           };
-          await setDoc(doc(db, "projects", nextProjId), cleanFirestoreData(nextProject));
+          await databaseService.saveProject(nextProject);
           clonedCount++;
           totalValueCloned += p.allocatedBudget;
         } else {
           // Overwrite existing budget for high consistency
-          const projRef = doc(db, "projects", targetProjMatch.id);
-          await updateDoc(projRef, {
+          await databaseService.updateProject(targetProjMatch.id, {
             allocatedBudget: p.allocatedBudget,
             status: "ACTIVE"
           });
@@ -1881,7 +1690,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to clone fiscal year budgets:", err);
       throw err;
     }
-  }, [currentUser, db, fiscalYears, projects, addSystemLog, triggerToast, updateSystemSettings]);
+  }, [currentUser, fiscalYears, projects, addSystemLog, triggerToast, updateSystemSettings]);
 
   const applySupplementaryBudget = useCallback(async (projectId: string, amount: number, justification: string) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -1892,6 +1701,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const projectName = proj ? proj.name : "Church Allocation";
       
       const requestData = {
+        id: budgetId,
         requesterId: currentUser.id,
         requesterName: currentUser.name,
         requesterEmail: currentUser.email,
@@ -1901,16 +1711,16 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         amount,
         justification,
         submittedAt: new Date().toISOString(),
-        status: "PENDING"
+        status: "PENDING" as const
       };
 
-      await setDoc(doc(db, "supplementary_budgets", budgetId), requestData);
+      await databaseService.saveSupplementaryBudget(requestData);
       
       // Add alert for Admin/Super Admin
       const alertId = "alert-" + Math.random().toString(36).substring(2, 9);
-      await setDoc(doc(db, "alerts", alertId), {
+      await databaseService.saveAlert({
         id: alertId,
-        type: "THRESHOLD_WARN",
+        type: "SYSTEM_INFO",
         severity: "MEDIUM",
         message: `Supplementary budget request (KES ${amount.toLocaleString()}) submitted by ${currentUser.name} for project: ${projectName}`,
         timestamp: new Date().toISOString(),
@@ -1923,7 +1733,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to submit supplementary budget:", err);
       throw err;
     }
-  }, [currentUser, db, projects, addSystemLog]);
+  }, [currentUser, projects, addSystemLog]);
 
   const addVendor = useCallback(async (vendor: Omit<Vendor, "id" | "createdAt" | "addedBy" | "status">) => {
     try {
@@ -1942,55 +1752,36 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         status
       };
 
-      await setDoc(doc(db, "vendors", vendorId), newVendor);
+      await databaseService.saveVendor(newVendor);
       await addSystemLog("VENDOR_CREATE", `${isAdminRole ? 'Registered' : 'Requested to add'} new STANDS vendor: ${vendor.name}`, { vendorId, ...vendor, status });
     } catch (err) {
       console.error("Failed to add vendor:", err);
       throw err;
     }
-  }, [currentUser, db, addSystemLog]);
+  }, [currentUser, addSystemLog]);
 
   const updateVendor = useCallback(async (id: string, updates: Partial<Omit<Vendor, "id" | "createdAt" | "addedBy">>) => {
     try {
-      const vendorRef = doc(db, "vendors", id);
-      await updateDoc(vendorRef, updates as any);
+      await databaseService.updateVendor(id, updates as any);
       await addSystemLog("VENDOR_UPDATE", `Updated vendor: ${id}`, { vendorId: id, updates });
     } catch (err) {
       console.error("Failed to update vendor:", err);
       throw err;
     }
-  }, [db, addSystemLog]);
+  }, [addSystemLog]);
 
   const deleteVendor = useCallback(async (id: string) => {
     try {
-      const vendorRef = doc(db, "vendors", id);
-      const vendorSnap = await getDoc(vendorRef);
-      const vendorName = vendorSnap.exists() ? (vendorSnap.data() as Vendor).name : id;
+      const existingVendor = vendors.find(v => v.id === id);
+      const vendorName = existingVendor ? existingVendor.name : id;
       
-      await deleteDoc(vendorRef);
+      await databaseService.deleteVendor(id);
       await addSystemLog("VENDOR_DELETE", `Deleted STANDS vendor: ${vendorName}`, { vendorId: id });
     } catch (err) {
       console.error("Failed to delete vendor:", err);
       throw err;
     }
-  }, [db, addSystemLog]);
-
-  // System Settings Sync
-  useEffect(() => {
-    if (skipFirestore) return;
-    const unsub = onSnapshot(doc(db, "settings", "system"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data && data.currentFiscalYear === undefined) {
-          setDoc(doc(db, "settings", "system"), { ...data, currentFiscalYear: 2026, fiscalYearStatus: "OPEN" }, { merge: true }).catch(() => {});
-        }
-        setSystemSettings(snap.data() as SystemSettings);
-      } else {
-        setDoc(doc(db, "settings", "system"), { currentFiscalYear: 2026, fiscalYearStatus: "OPEN" }).catch(() => {});
-      }
-    }, (err) => handleSyncError(err, OperationType.GET, "settings/system"));
-    return () => unsub();
-  }, [handleSyncError]);
+  }, [vendors, addSystemLog]);
 
   // background-refresh local caching strategy using localStorage
   useEffect(() => {
@@ -2094,351 +1885,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [currentUser, currentUserId, currentUserIsApproved, currentUserIsSuspended]);
 
-  // Lazy Requisitions Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('requisitions')) return;
-    const hidePrototype = true;
-    const isGroupUser = currentUserRole === UserRole.CHURCH_GROUP || currentUserRole === UserRole.APPROVER_L1 || currentUserRole === UserRole.APPROVER_L2;
-    const filterGroups = JSON.parse(currentUserGroupsJSON) as string[];
-    const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
-
-    let baseQuery = query(collection(db, "requisitions"), orderBy("submittedAt", "desc"), limit(250));
-
-    let isFirstSnap = true;
-
-    const unsubRequisitions = onSnapshot(baseQuery, (snap) => {
-      let data = snap.docs.map(doc => {
-        const r = doc.data() as any;
-        return {
-          id: doc.id,
-          ...r,
-          attachments: safeNormalizeAttachments(r?.attachments),
-          receipts: safeNormalizeReceipts(r?.receipts),
-          approvalHistory: safeNormalizeApprovalHistory(r?.approvalHistory || r?.approval_history),
-          comments: safeNormalizeComments(r?.comments),
-          notificationEmails: safeNormalizeNotificationEmails(r)
-        } as Requisition;
-      });
-      if (hidePrototype) data = data.filter(req => !req.id.startsWith("req-seed-"));
-
-      if (isFirstSnap) {
-        isFirstSnap = false;
-      } else {
-        let hasAdded = false;
-        let hasModified = false;
-        
-        snap.docChanges().forEach(change => {
-          if (change.type === "added") {
-            const reqId = change.doc.id;
-            if (!change.doc.metadata.hasPendingWrites && !reqId.startsWith("req-seed-")) {
-              hasAdded = true;
-            }
-          } else if (change.type === "modified") {
-            const reqId = change.doc.id;
-            if (!change.doc.metadata.hasPendingWrites && !reqId.startsWith("req-seed-")) {
-              hasModified = true;
-            }
-          }
-        });
-
-        if (hasAdded || hasModified) {
-          triggerToast({
-            type: "SYSTEM_INFO",
-            severity: "LOW",
-            message: `Data Updated: ${hasAdded && hasModified ? "New & Updated Requisitions Synced" : hasAdded ? "New Requisition Added" : "Requisitions Updated/Approved"}`,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-
-      setRequisitions(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "requisitions"));
-
-    return () => unsubRequisitions();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    currentUserRole,
-    currentUserGroup,
-    currentUserGroupsJSON,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError,
-    triggerToast
-  ]);
-
-  // Lazy Projects Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('projects')) return;
-    const hidePrototype = true;
-    const shouldFilter = currentUserRole === UserRole.CHURCH_GROUP || currentUserRole === UserRole.APPROVER_L1 || currentUserRole === UserRole.APPROVER_L2;
-    const filterGroups = JSON.parse(currentUserGroupsJSON) as string[];
-    const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
-
-    const unsubProjects = onSnapshot(collection(db, "projects"), (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-      if (hidePrototype) data = data.filter(p => !["p1", "p2", "p3", "p4", "p5"].includes(p.id));
-      setProjects(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "projects"));
-
-    return () => unsubProjects();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    currentUserRole,
-    currentUserGroup,
-    currentUserGroupsJSON,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy Alerts Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('alerts')) return;
-    const hidePrototype = true;
-    const shouldFilter = currentUserRole === UserRole.CHURCH_GROUP || currentUserRole === UserRole.APPROVER_L1 || currentUserRole === UserRole.APPROVER_L2;
-    const filterGroups = JSON.parse(currentUserGroupsJSON) as string[];
-    const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
-
-    const unsubAlerts = onSnapshot(query(collection(db, "alerts"), orderBy("timestamp", "desc"), limit(50)), (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as BudgetAlert));
-      if (shouldFilter && parsedGroups.length > 0) data = data.filter(a => parsedGroups.some(g => a.message.includes(g)));
-      if (hidePrototype) {
-        data = data.filter(a => !a.id.includes("req-seed-") && !a.id.match(/budget-p[0-9]+/));
-      }
-      setAlerts(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "alerts"));
-
-    return () => unsubAlerts();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    currentUserRole,
-    currentUserGroup,
-    currentUserGroupsJSON,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // One-time Fiscal Years Fetch
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('fiscal_years') || fetchedTargetsRef.current.has('fiscal_years')) return;
-    
-    const fetchFiscalYears = async () => {
-      try {
-        fetchedTargetsRef.current.add('fiscal_years');
-        const snap = await getDocs(collection(db, "fiscal_years"));
-        setFiscalYears(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as FiscalYear)));
-      } catch (err) {
-        fetchedTargetsRef.current.delete('fiscal_years');
-        handleSyncError(err, OperationType.LIST, "fiscal_years");
-      }
-    };
-    fetchFiscalYears();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy Transactions Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('transactions')) return;
-    const hidePrototype = true;
-
-    const unsubTransactions = onSnapshot(query(collection(db, "transactions"), orderBy("timestamp", "desc"), limit(50)), (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-      if (hidePrototype) data = data.filter(t => !t.id.startsWith("trans-seed-"));
-      setTransactions(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "transactions"));
-
-    return () => unsubTransactions();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy Forecast Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('forecast')) return;
-
-    const unsubForecast = onSnapshot(collection(db, "forecast"), (snap) => {
-      setForecastData(snap.docs.map(doc => doc.data() as ForecastMonth));
-    }, (err) => handleSyncError(err, OperationType.LIST, "forecast"));
-
-    return () => unsubForecast();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy Reports Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('reports')) return;
-    const hidePrototype = true;
-
-    const unsubReports = onSnapshot(query(collection(db, "reports"), orderBy("timestamp", "desc"), limit(50)), (snap) => {
-      let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedReport));
-      if (hidePrototype) data = data.filter(r => !r.id.startsWith("rep-seed-"));
-      setReports(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "reports"));
-
-    return () => unsubReports();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy System Logs Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('system_logs')) return;
-    const hidePrototype = true;
-    const shouldFilter = currentUserRole === UserRole.CHURCH_GROUP || currentUserRole === UserRole.APPROVER_L1 || currentUserRole === UserRole.APPROVER_L2;
-    const filterGroups = JSON.parse(currentUserGroupsJSON) as string[];
-    const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
-
-    let unsubLogs = () => {};
-    if (currentUserRole === UserRole.ADMIN || currentUserRole === UserRole.SUPER_ADMIN || currentUserRole === UserRole.FINANCE) {
-      unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(systemLogLimit)), (snap) => {
-        let data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SystemLog));
-        if (shouldFilter && parsedGroups.length > 0) data = data.filter(log => parsedGroups.includes(log.groupId || "") || parsedGroups.some(g => log.details.includes(g)));
-        if (hidePrototype) data = data.filter(log => !log.id.startsWith("log-seed-"));
-        setSystemLogs(data);
-      }, (err) => handleSyncError(err, OperationType.LIST, "system_logs"));
-    } else {
-      setSystemLogs([]);
-    }
-
-    return () => unsubLogs();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    currentUserRole,
-    currentUserGroup,
-    currentUserGroupsJSON,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError,
-    systemLogLimit
-  ]);
-
-  // Lazy Users Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('users')) return;
-    const hidePrototype = true;
-    const shouldFilter = currentUserRole === UserRole.CHURCH_GROUP || currentUserRole === UserRole.APPROVER_L1 || currentUserRole === UserRole.APPROVER_L2;
-    const filterGroups = JSON.parse(currentUserGroupsJSON) as string[];
-    const parsedGroups = filterGroups.length > 0 ? filterGroups : (currentUserGroup ? [currentUserGroup] : []);
-
-    let isFirstSnap = true;
-
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      let data = snap.docs.map(doc => normalizeUserProfile({ id: doc.id, ...doc.data() } as UserProfile));
-      if (shouldFilter && parsedGroups.length > 0) data = data.filter(u => parsedGroups.includes(u.group || "") || (u.groups && u.groups.some(g => parsedGroups.includes(g))));
-      if (hidePrototype) data = data.filter(u => !u.id.startsWith("u-"));
-
-      if (isFirstSnap) {
-        isFirstSnap = false;
-      } else {
-        let userChanges = false;
-        snap.docChanges().forEach(change => {
-          if ((change.type === "added" || change.type === "modified") && !change.doc.metadata.hasPendingWrites) {
-            if (!change.doc.id.startsWith("u-")) {
-              userChanges = true;
-            }
-          }
-        });
-
-        if (userChanges) {
-          triggerToast({
-            type: "SYSTEM_INFO",
-            severity: "LOW",
-            message: "Data Updated: User directories synced in real-time.",
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-
-      setUsers(data);
-    }, (err) => handleSyncError(err, OperationType.LIST, "users"));
-
-    return () => unsubUsers();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    currentUserRole,
-    currentUserGroup,
-    currentUserGroupsJSON,
-    systemSettings.prototypeDataEnabled,
-    syncTargetsKey,
-    handleSyncError,
-    triggerToast
-  ]);
-
-  // Lazy Permissions Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('permissions')) return;
-
-    const unsubPermissions = onSnapshot(collection(db, "permissions"), (snap) => {
-      setPermissionConfigs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PermissionConfig)));
-    }, (err) => handleSyncError(err, OperationType.LIST, "permissions"));
-
-    return () => unsubPermissions();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Lazy Thresholds Listener
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('thresholds')) return;
-    const unsubThresholds = onSnapshot(collection(db, "thresholds"), (snap) => {
-      setThresholds(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AlertThreshold)));
-    }, (err) => handleSyncError(err, OperationType.LIST, "thresholds"));
-    return () => unsubThresholds();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Real-time Presence Heartbeat (Supabase & Firestore Unified)
+  // Real-time Presence Heartbeat
   useEffect(() => {
     if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended) return;
 
@@ -2491,85 +1938,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [
     currentUserId,
     currentUserIsApproved,
-    currentUserIsSuspended,
-    skipFirestore
-  ]);
-
-  // Real-time Sync for Ledger Books
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended) return;
-    const unsubLedgers = !activeSyncTargets.has('ledger_books') ? () => {} : onSnapshot(
-      collection(db, "ledger_books"),
-      (snap) => {
-        setLedgerBooks(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LedgerBook)));
-      },
-      (err) => handleSyncError(err, OperationType.LIST, "ledger_books")
-    );
-    return () => unsubLedgers();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    db,
-    syncTargetsKey,
-    handleSyncError
-  ]);
-
-  // Real-time Sync for Supplementary Budget Requests
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended) return;
-    const unsubSupplementary = !activeSyncTargets.has('supplementary_budget_requests') ? () => {} : onSnapshot(
-      query(collection(db, "supplementary_budgets"), orderBy("submittedAt", "desc")),
-      (snap) => {
-        setSupplementaryRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SupplementaryBudgetRequest)));
-      },
-      (err) => {
-         console.log("Supplementary budget sync failed/not initialized:", err);
-      }
-    );
-    return () => unsubSupplementary();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    db,
-    syncTargetsKey
-  ]);
-
-  // One-time Fetch for Vendors
-  useEffect(() => {
-    if (skipFirestore) return;
-    if (!currentUserId || !currentUserIsApproved || currentUserIsSuspended || !activeSyncTargets.has('vendors') || fetchedTargetsRef.current.has('vendors')) return;
-    
-    const fetchVendors = async () => {
-      startSyncing('vendors');
-      try {
-        fetchedTargetsRef.current.add('vendors');
-        const snap = await getDocs(query(collection(db, "vendors"), orderBy("createdAt", "desc")));
-        setVendors(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Vendor)));
-      } catch (err) {
-        fetchedTargetsRef.current.delete('vendors');
-        console.log("Vendors fetch failed:", err);
-      } finally {
-        stopSyncing('vendors');
-      }
-    };
-    fetchVendors();
-  }, [
-    currentUserId,
-    currentUserIsApproved,
-    currentUserIsSuspended,
-    db,
-    syncTargetsKey,
-    startSyncing,
-    stopSyncing
+    currentUserIsSuspended
   ]);
 
   // Automated background expiry notifications watcher (Admin only for writing alerts)
   useEffect(() => {
-    if (skipFirestore) return;
     if (!currentUserId || (currentUserRole !== UserRole.ADMIN && currentUserRole !== UserRole.SUPER_ADMIN) || requisitions.length === 0 || thresholds.length === 0) return;
 
     const checkExpiryAlerts = async () => {
@@ -2598,10 +1971,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 isRead: false
               };
               try {
-                await setDoc(doc(db, "alerts", alertId), newAlert);
+                await databaseService.saveAlert(newAlert);
                 await addSystemLog("REQUISITION_EXPIRED", `Alert triggered: Requisition '${req.title}' is expired (pending ${diffDays} days)`, { requisitionId: req.id, diffDays });
               } catch (e) {
-                handleFirestoreError(e, OperationType.CREATE, `alerts/${alertId}`);
+                console.error("Failed to save expiry alert:", e);
               }
             }
           }
@@ -2630,10 +2003,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               isRead: false
             };
             try {
-              await setDoc(doc(db, "alerts", alertId), newAlert);
+              await databaseService.saveAlert(newAlert);
               await addSystemLog("BUDGET_OVERSHOOT", `Budget threshold reached for ${project.name}: ${usage.toFixed(1)}%`, { projectId: project.id, usage: usage.toFixed(1) });
             } catch (e) {
-              handleFirestoreError(e, OperationType.CREATE, `alerts/${alertId}`);
+              console.error("Failed to save overshoot alert:", e);
             }
           }
         }
@@ -2641,11 +2014,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     checkExpiryAlerts();
-  }, [requisitions, alerts, projects, thresholds, currentUserId, currentUserRole, db, addSystemLog]);
+  }, [requisitions, alerts, projects, thresholds, currentUserId, currentUserRole, addSystemLog]);
 
   // Automated background trigger for FINANCE alerts on L2 Approved status
   useEffect(() => {
-    if (skipFirestore) return;
     if (!currentUserId || requisitions.length === 0) return;
 
     const checkL2ApprovedAlerts = async () => {
@@ -2666,10 +2038,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               targetRole: UserRole.FINANCE
             };
             try {
-              await setDoc(doc(db, "alerts", alertId), newAlert);
+              await databaseService.saveAlert(newAlert);
               await addSystemLog("FINANCE_ALERT_TRIGGERED", `Automated alert dispatched to FINANCE team for L2 Approved requisition: '${req.title}'`, { requisitionId: req.id });
             } catch (e) {
-              handleFirestoreError(e, OperationType.CREATE, `alerts/${alertId}`);
+              console.error("Failed to save finance L2 alert:", e);
             }
           }
         }
@@ -2677,11 +2049,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     checkL2ApprovedAlerts();
-  }, [requisitions, alerts, currentUserId, db, addSystemLog]);
+  }, [requisitions, alerts, currentUserId, addSystemLog]);
 
   // Recurring Requisitions Watcher
   useEffect(() => {
-    if (skipFirestore) return;
     if (!currentUserId || requisitions.length === 0) return;
 
     const checkRecurring = async () => {
@@ -2720,20 +2091,20 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           };
           
           try {
-            await setDoc(doc(db, "requisitions", draftId), newDraft);
-            await updateDoc(doc(db, "requisitions", req.id), {
+            await databaseService.saveRequisition(newDraft);
+            await databaseService.updateRequisition(req.id, {
               lastRecurrenceGeneratedAt: now.toISOString()
             });
             await addSystemLog("AUTO_RECURRING", `Spawned recurring draft: ${req.title}`, { parentId: req.id });
           } catch (e) {
-            handleFirestoreError(e, OperationType.WRITE, `requisitions/${draftId}`);
+            console.error("Failed to spawn recurring draft:", e);
           }
         }
       }
     };
 
     checkRecurring();
-  }, [requisitions, currentUserId, db, addSystemLog, systemSettings]);
+  }, [requisitions, currentUserId, addSystemLog, systemSettings]);
 
   // --- UNIFIED MONGODB DATA LOADER FOR ALL 15 DATASETS ---
   useEffect(() => {
@@ -2858,7 +2229,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 flaggedForAudit: Boolean(r?.flagged_for_audit || r?.flaggedForAudit),
                 inProcurement: Boolean(r?.in_procurement || r?.inProcurement),
                 requiresMoreInfo: Boolean(r?.requires_more_info || r?.requiresMoreInfo),
-                fiscalYear: Number(r?.fiscal_year || r?.fiscalYear) || undefined
+                fiscalYear: Number(r?.fiscal_year || r?.fiscalYear) || undefined,
+                enableInstallments: Boolean(r?.enable_installments ?? r?.enableInstallments),
+                installments: safeNormalizeInstallments(r?.installments),
+                disbursedAmount: Number(r?.disbursed_amount ?? r?.disbursedAmount) || 0,
+                remainingBalance: r?.remaining_balance !== undefined ? Number(r?.remaining_balance) : (r?.remainingBalance !== undefined ? Number(r?.remainingBalance) : (Number(r?.amount) || 0))
               } as Requisition;
             }).filter(Boolean) as Requisition[];
 
@@ -3434,7 +2809,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     console.log("Creating ledger book with data:", cleanFirestoreData(newBook));
     try {
-      await setDoc(doc(db, "ledger_books", id), cleanFirestoreData(newBook));
+      await databaseService.saveLedgerBook(cleanFirestoreData(newBook));
+      setLedgerBooks(prev => [...prev, newBook]);
       await addSystemLog("LEDGER_BOOK_CREATED", `Created ledger book '${newBook.bookName}' for ministry '${newBook.ministryName}' with limit ${budgetLimit}`, {
         ledgerId: id,
         ministryName: newBook.ministryName,
@@ -3443,9 +2819,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
       triggerToast({ type: "SYSTEM_INFO", message: `Ledger book for ${newBook.ministryName} created successfully`, severity: "LOW", timestamp: new Date().toISOString() });
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `ledger_books/${id}`);
+      console.error("[addLedgerBook Error]:", err);
+      throw err;
     }
-  }, [currentUser, ledgerBooks, addSystemLog, triggerToast]);
+  }, [currentUser, ledgerBooks, addSystemLog, triggerToast, setLedgerBooks]);
 
   const updateLedgerBookBudget = useCallback(async (id: string, newLimit: number) => {
     if (!currentUser) throw new Error("Authentication required");
@@ -3455,14 +2832,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (newLimit < 0) throw new Error("Budget limit must be larger than or equal to 0.");
 
     try {
-      const ledgerRef = doc(db, "ledger_books", id);
-      const ledgerSnap = await getDoc(ledgerRef);
-      if (!ledgerSnap.exists()) throw new Error("Ledger book not found.");
-      const ledgerData = ledgerSnap.data() as LedgerBook;
+      const ledgerData = ledgerBooks.find(b => b.id === id);
+      if (!ledgerData) throw new Error("Ledger book not found.");
 
-      await updateDoc(ledgerRef, {
-        budgetLimit: newLimit
-      });
+      const updated = { ...ledgerData, budgetLimit: newLimit };
+      await databaseService.saveLedgerBook(updated);
+      setLedgerBooks(prev => prev.map(b => b.id === id ? updated : b));
 
       await addSystemLog("LEDGER_BOOK_UPDATED", `Updated budget limit of ledger book '${ledgerData.ministryName}' to KES ${newLimit.toLocaleString()}`, { ledgerId: id, ministryName: ledgerData.ministryName, newLimit });
       triggerToast({ type: "SYSTEM_INFO", message: `Ledger book budget for ${ledgerData.ministryName} updated.`, severity: "LOW", timestamp: new Date().toISOString() });
@@ -3470,7 +2845,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Failed to update ledger book budget:", err);
       throw err;
     }
-  }, [currentUser, db, addSystemLog, triggerToast]);
+  }, [currentUser, ledgerBooks, addSystemLog, triggerToast, setLedgerBooks]);
 
   const signupWithEmail = async (email: string, pass: string, name: string) => {
     try {
@@ -3552,12 +2927,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // 3. Dispatch background logging & notifications without blocking UI execution
     (async () => {
-      if (currentUserId && db) {
+      if (currentUserId) {
         try {
-          await updateDoc(doc(db, "users", currentUserId), {
-            isOnline: false,
-            lastSeen: new Date().toISOString()
-          });
+          const headers = await getAuthHeaders();
+          fetch(`/api/db/users/${currentUserId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...headers },
+            body: JSON.stringify({ is_online: false, last_seen: new Date().toISOString() })
+          }).catch(() => {});
         } catch (err) {
           console.warn("Failed to mark user offline on logout:", err);
         }
@@ -3769,7 +3146,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (approverCode) newProfile.approverCode = approverCode;
 
       // Store in users collection
-      await setDoc(doc(db, "users", tempId), newProfile);
+      await databaseService.saveUserProfile(newProfile as any);
+      setUsers(prev => [newProfile as any, ...prev.filter(u => u.id !== tempId)]);
       
       await addSystemLog("USER_PRE_PROVISIONED", `Admin pre-registered user (manual activation required): ${email} as ${role}`, {
         tempId,
@@ -3782,7 +3160,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("Admin user pre-provisioning failed:", error);
       throw error;
     }
-  }, [currentUser, db, users, addSystemLog]);
+  }, [currentUser, users, addSystemLog, setUsers]);
 
   const adminResetUserPassword = useCallback(async (email: string) => {
     if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
@@ -3821,12 +3199,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
 
     try {
-      deleteDoc(doc(db, "users", id)).catch(e => console.warn("[User Sync] Delete doc failed:", e));
-      const headers = await getAuthHeaders();
-      fetch(`/api/db/users/${id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json", ...headers }
-      }).catch(e => console.warn("[User Sync] Delete API failed:", e));
+      await databaseService.deleteUser(id);
 
       addSystemLog("USER_DELETED", `User deleted: ${userToDelete.email} (${userToDelete.role})`, { 
         userId: id, 
@@ -3836,31 +3209,32 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (err) {
       console.error("Error deleting user:", err);
     }
-  }, [currentUser, users, addSystemLog]);
+  }, [currentUser, users, addSystemLog, setUsers]);
 
   const adminForceLogoutUser = useCallback(async (id: string) => {
     if (!currentUser || currentUser.role !== UserRole.SUPER_ADMIN) {
       throw new Error("Unauthorized: Only Super Admins can force logout users.");
     }
     try {
-      await setDoc(doc(db, "users", id), { forceLogout: true }, { merge: true });
+      const headers = await getAuthHeaders();
+      await fetch(`/api/db/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ force_logout: true })
+      });
       await addSystemLog("USER_FORCE_LOGOUT", `Super Admin forced logout for user ID: ${id}`, { userId: id });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${id}`);
+      console.error("[adminForceLogoutUser Error]:", err);
     }
   }, [currentUser, addSystemLog]);
 
   const syncProjectAmounts = useCallback(async (projectId: string) => {
     if (!projectId) return;
     try {
-      const projectRef = doc(db, "projects", projectId);
-      const projectSnap = await getDoc(projectRef);
-      if (!projectSnap.exists()) return;
-      const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+      const project = projects.find(p => p.id === projectId);
+      if (!project) return;
 
-      const reqSnap = await getDocs(collection(db, "requisitions"));
-      const allReqs = reqSnap.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Requisition));
-      const projectReqs = getProjectRequisitions(project, allReqs);
+      const projectReqs = getProjectRequisitions(project, requisitions);
       
       let spentSum = 0;
       let committedSum = 0;
@@ -3884,14 +3258,15 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }
       });
       
-      await updateDoc(projectRef, {
+      await databaseService.updateProject(projectId, {
         spentAmount: spentSum,
         committedAmount: committedSum
       });
+      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, spentAmount: spentSum, committedAmount: committedSum } : p));
     } catch (err) {
       console.error("Error syncing project amounts:", err);
     }
-  }, [db]);
+  }, [projects, requisitions, setProjects]);
 
   const sendEmailNotification = useCallback(async (
     req: Requisition, 
@@ -4039,7 +3414,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (err) {
       // Rollback optimistic state if persistence fails
       setRequisitions(prev => prev.filter(r => r.id !== id));
-      handleFirestoreError(err, OperationType.CREATE, `requisitions/${id}`);
+      console.error("[addRequisition Error]:", err);
+      throw err;
     }
     });
   }, [addSystemLog, systemSettings, projects, syncProjectAmounts, setRequisitions, withDbLoading]);
@@ -4076,10 +3452,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
 
     try {
-      const reqRef = doc(db, "requisitions", id);
-      const reqSnap = await getDoc(reqRef);
-      if (!reqSnap.exists()) return;
-      const req = reqSnap.data() as Requisition;
+      const localReq = requisitions.find(r => r.id === id);
+      const req = localReq;
+      if (!req) return;
 
       // Security check: Verify permission rights for specific workflow transitions
       if (status === RequisitionStatus.APPROVED_L1 && !canPerform('canApproveL1')) {
@@ -4112,10 +3487,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // Requisition limit enforcement for disburse and final L2 approval (per-request limit instead of cumulative budget limit)
       if (status === RequisitionStatus.DISBURSED || status === RequisitionStatus.APPROVED_L2) {
         if (req.projectId) {
-          const projectRef = doc(db, "projects", req.projectId);
-          const projectSnap = await getDoc(projectRef);
-          if (projectSnap.exists()) {
-            const projData = projectSnap.data();
+          const projData = projects.find(p => p.id === req.projectId);
+          if (projData) {
             const requisitionLimit = projData.requisitionLimit || projData.allocatedBudget || 0;
             
             if (req.amount > requisitionLimit) {
@@ -4135,7 +3508,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (status === RequisitionStatus.APPROVED_L2) {
         updates.approvedAtL2 = new Date().toISOString();
         const alertId = `finance-l2-ready-${id}`;
-        const newAlert = {
+        const newAlert: BudgetAlert = {
           id: alertId,
           type: "L2_APPROVED",
           severity: "HIGH",
@@ -4145,10 +3518,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           targetRole: UserRole.FINANCE
         };
         try {
-          await setDoc(doc(db, "alerts", alertId), newAlert);
+          await databaseService.saveAlert(newAlert);
+          setAlerts(prev => [newAlert, ...prev.filter(a => a.id !== alertId)]);
           addSystemLog("FINANCE_ALERT_TRIGGERED", `Automated alert dispatched to FINANCE team for L2 Approved requisition: '${req.title}'`, { requisitionId: id, alertId }).catch(() => {});
         } catch (e) {
-          handleFirestoreError(e, OperationType.CREATE, `alerts/${alertId}`);
+          console.warn("Failed to create L2 alert:", e);
         }
       }
       if (status === RequisitionStatus.DISBURSED) {
@@ -4191,17 +3565,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setTransactions(prev => [transactionObj, ...prev.filter(t => t.id !== txId)]);
 
         // Asynchronous database write
-        if (!skipFirestore && db) {
-          setDoc(doc(db, "transactions", txId), cleanFirestoreData(transactionObj), { merge: true }).catch(() => {});
-        }
+        await databaseService.saveTransaction(transactionObj);
       }
 
-      const localReq = requisitions.find(r => r.id === id);
       const reqAttachments = safeNormalizeAttachments(req?.attachments);
       const localAttachments = safeNormalizeAttachments(localReq?.attachments);
       const finalAttachments = reqAttachments.length > 0 ? reqAttachments : localAttachments;
 
-      const updatedReq = {
+      const updatedReq: Requisition = {
         ...localReq,
         ...req,
         attachments: finalAttachments,
@@ -4213,7 +3584,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));
 
       // Asynchronous database write
-      await updateDoc(reqRef, cleanFirestoreData(updates));
       await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
       
       // Fire-and-forget background operations
@@ -4240,20 +3610,19 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       if (status === RequisitionStatus.APPROVED_L2 || (req.status !== RequisitionStatus.APPROVED_L2 && status === RequisitionStatus.DISBURSED)) {
-         getDocs(query(collection(db, "ledger_books"), where("ministryName", "==", req.groupName))).then(ledgerQuerySnap => {
-           if (!ledgerQuerySnap.empty) {
-             const ledgerDoc = ledgerQuerySnap.docs[0];
-             updateDoc(ledgerDoc.ref, {
-               spentAmount: (ledgerDoc.data().spentAmount || 0) + req.amount
-             }).catch(() => {});
-           }
-         }).catch(() => {});
+        const matchingBook = ledgerBooks.find(b => b.ministryName === req.groupName);
+        if (matchingBook) {
+          const newSpent = (matchingBook.spentAmount || 0) + req.amount;
+          databaseService.saveLedgerBook({ ...matchingBook, spentAmount: newSpent }).catch(() => {});
+          setLedgerBooks(prev => prev.map(b => b.id === matchingBook.id ? { ...b, spentAmount: newSpent } : b));
+        }
       }
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `requisitions/${id}`);
+      console.error("[updateRequisitionStatus Error]:", err);
+      throw err;
     }
     });
-  }, [currentUser, addSystemLog, systemSettings, syncProjectAmounts, setRequisitions, withDbLoading]);
+  }, [currentUser, requisitions, projects, ledgerBooks, setLedgerBooks, setAlerts, setTransactions, addSystemLog, systemSettings, syncProjectAmounts, setRequisitions, withDbLoading, canPerform, sendEmailNotification]);
 
   const disburseInstallment = useCallback(async (
     requisitionId: string,
@@ -4372,22 +3741,16 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setRequisitions(prev => prev.map(r => r.id === requisitionId ? updatedReq : r));
 
       // Asynchronous database writes
-      if (!skipFirestore && db) {
-        setDoc(doc(db, "transactions", txId), cleanFirestoreData(transactionObj), { merge: true }).catch(() => {});
-        const reqRef = doc(db, "requisitions", requisitionId);
-        updateDoc(reqRef, cleanFirestoreData(updates)).catch(() => {});
-      }
+      await databaseService.saveTransaction(transactionObj);
       await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
 
       // Update Ledger book spentAmount incrementally
-      getDocs(query(collection(db, "ledger_books"), where("ministryName", "==", req.groupName))).then(ledgerQuerySnap => {
-        if (!ledgerQuerySnap.empty) {
-          const ledgerDoc = ledgerQuerySnap.docs[0];
-          updateDoc(ledgerDoc.ref, {
-            spentAmount: (ledgerDoc.data().spentAmount || 0) + disburseAmount
-          }).catch(() => {});
-        }
-      }).catch(() => {});
+      const matchingBook = ledgerBooks.find(b => b.ministryName === req.groupName);
+      if (matchingBook) {
+        const newSpent = (matchingBook.spentAmount || 0) + disburseAmount;
+        databaseService.saveLedgerBook({ ...matchingBook, spentAmount: newSpent }).catch(() => {});
+        setLedgerBooks(prev => prev.map(b => b.id === matchingBook.id ? { ...b, spentAmount: newSpent } : b));
+      }
 
       // Logs & Notifications
       addSystemLog("INSTALLMENT_DISBURSED", `Installment #${targetInst.installmentNumber} (KES ${disburseAmount.toLocaleString()}) disbursed for '${req.title}' via ${details.paymentMethod || 'CHEQUE'} (Ref: ${details.referenceNum})`, {
@@ -4409,7 +3772,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         syncProjectAmounts(req.projectId).catch(() => {});
       }
     });
-  }, [requisitions, setRequisitions, currentUser, canPerform, systemSettings, addSystemLog, sendEmailNotification, syncProjectAmounts, withDbLoading]);
+  }, [requisitions, setRequisitions, currentUser, canPerform, systemSettings, addSystemLog, sendEmailNotification, syncProjectAmounts, withDbLoading, ledgerBooks, setLedgerBooks, setTransactions]);
 
   const enrollBiometric = useCallback((enabled: boolean = true) => {
     setBiometricEnrolled(enabled);
@@ -4432,22 +3795,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       try {
-        const reqRef = doc(db, "requisitions", id);
-        const reqSnap = await getDoc(reqRef);
-        let reqToDelete = targetReq;
-        if (reqSnap.exists()) {
-          const docData = { id: reqSnap.id, ...reqSnap.data() } as Requisition;
-          reqToDelete = reqToDelete ? { ...docData, ...reqToDelete } : docData;
-        }
-
-        const projectId = reqToDelete?.projectId || (reqSnap.exists() ? (reqSnap.data() as Requisition).projectId : null);
+        const projectId = targetReq?.projectId;
 
         await databaseService.deleteRequisition(id);
         addSystemLog("REQUISITION_DELETED", `Requisition ID '${id}' deleted`, { requisitionId: id }).catch(() => {});
 
-        if (reqToDelete) {
+        if (targetReq) {
           sendEmailNotification(
-            reqToDelete, 
+            targetReq, 
             "DELETED", 
             reason || "Requisition has been deleted from the portal", 
             currentUser?.name || currentUser?.email || "Reviewing Official"
@@ -4459,10 +3814,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         }
       } catch (err) {
         if (targetReq) setRequisitions(prev => [targetReq, ...prev]);
-        handleFirestoreError(err, OperationType.DELETE, `requisitions/${id}`);
+        console.error("[deleteRequisition Error]:", err);
+        throw err;
       }
     });
-  }, [requisitions, setRequisitions, addSystemLog, syncProjectAmounts, sendEmailNotification, currentUser, withDbLoading]);
+  }, [requisitions, setRequisitions, addSystemLog, syncProjectAmounts, sendEmailNotification, currentUser, withDbLoading, canPerform]);
 
   const updateRequisition = useCallback(async (id: string, updates: Partial<Requisition>) => {
     if (!navigator.onLine) {
@@ -4501,10 +3857,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       try {
         await databaseService.patchRequisition(id, updates);
-        if (!skipFirestore && db) {
-          const reqRef = doc(db, "requisitions", id);
-          await updateDoc(reqRef, cleanFirestoreData(updates)).catch(() => {});
-        }
       } catch (err) {
         console.error("[updateRequisition Lightweight Patch Error]:", err);
       }
@@ -4565,15 +3917,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       
       await databaseService.saveRequisition(cleanFirestoreData(updatedReq));
 
-      if (!skipFirestore && db) {
-        try {
-          const reqRef = doc(db, "requisitions", id);
-          await updateDoc(reqRef, cleanFirestoreData(updates));
-        } catch (fErr) {
-          console.log("[Firestore Sync] updateDoc failed or skipped:", fErr);
-        }
-      }
-
       await addSystemLog("REQUISITION_EDITED", `Requisition '${id}' updated`, { requisitionId: id, updates });
 
       if (updates.status === RequisitionStatus.SUBMITTED && updatedReq.status === RequisitionStatus.SUBMITTED) {
@@ -4587,7 +3930,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error("[updateRequisition Error]:", err);
     }
     });
-  }, [addSystemLog, db, systemSettings, syncProjectAmounts, requisitions, setRequisitions, withDbLoading]);
+  }, [addSystemLog, systemSettings, syncProjectAmounts, requisitions, setRequisitions, withDbLoading, sendEmailNotification]);
 
   const startBackgroundUploadTask = useCallback((params: {
     title: string;
@@ -4702,30 +4045,13 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         requisitionId: id,
         files: newReceipts,
         onComplete: async (uploadedReceipts) => {
-          if (!skipFirestore && db) {
-            const reqRef = doc(db, "requisitions", id);
-            const reqSnap = await getDoc(reqRef);
-            if (reqSnap.exists()) {
-              const data = reqSnap.data() as Requisition;
-              const currentReceipts = data.receipts || [];
-              const updatedReceipts = [...currentReceipts, ...uploadedReceipts];
-              const updatedAt = new Date().toISOString();
-              await updateDoc(reqRef, { receipts: updatedReceipts, updatedAt });
-              setRequisitions(prev => prev.map(r => r.id === id ? { ...r, receipts: updatedReceipts, updatedAt } : r));
-              await addSystemLog("RECEIPTS_UPLOADED", `Uploaded ${newReceipts.length} receipts to Requisition ID: ${id}`, { requisitionId: id, currentReceiptCount: updatedReceipts.length });
-              return;
-            }
-          }
-
+          const currentReceipts = existingReq?.receipts || [];
+          const updatedReceipts = [...currentReceipts, ...uploadedReceipts];
           const updatedAt = new Date().toISOString();
-          setRequisitions(prev => prev.map(r => {
-            if (r.id === id) {
-              const currentReceipts = r.receipts || [];
-              return { ...r, receipts: [...currentReceipts, ...uploadedReceipts], updatedAt };
-            }
-            return r;
-          }));
-          await addSystemLog("RECEIPTS_UPLOADED", `Uploaded ${newReceipts.length} receipts to Requisition ID: ${id}`, { requisitionId: id });
+
+          await databaseService.updateRequisition(id, { receipts: updatedReceipts, updatedAt });
+          setRequisitions(prev => prev.map(r => r.id === id ? { ...r, receipts: updatedReceipts, updatedAt } : r));
+          await addSystemLog("RECEIPTS_UPLOADED", `Uploaded ${newReceipts.length} receipts to Requisition ID: ${id}`, { requisitionId: id, currentReceiptCount: updatedReceipts.length });
         }
       });
 
@@ -4736,18 +4062,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         timestamp: new Date().toISOString()
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `requisitions/${id}`);
+      console.error("Failed to upload receipts:", err);
     }
-  }, [addSystemLog, db, requisitions, setRequisitions, skipFirestore, startBackgroundUploadTask, triggerToast]);
+  }, [addSystemLog, requisitions, setRequisitions, startBackgroundUploadTask, triggerToast]);
 
   const clearWebTransactions = useCallback(async () => {
     return withDbLoading("Clearing web transactions from database...", async () => {
       try {
-        if (!skipFirestore && db) {
-          const snap = await getDocs(collection(db, "transactions"));
-          const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
-          await Promise.all(deletePromises);
-        }
+        await Promise.all(transactions.map(t => databaseService.deleteTransaction(t.id).catch(() => {})));
         setTransactions([]);
         await addSystemLog("WEB_TRANSACTIONS_CLEARED", "Cleared web transaction records from the database.");
         triggerToast({
@@ -4760,7 +4082,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.error("Error clearing web transactions:", err);
       }
     });
-  }, [db, skipFirestore, addSystemLog, triggerToast, withDbLoading]);
+  }, [transactions, addSystemLog, triggerToast, withDbLoading]);
 
   const syncRealDisbursedTransactions = useCallback(async (): Promise<number> => {
     return withDbLoading("Storing disbursed funds transactions on website...", async () => {
@@ -4790,9 +4112,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           };
         });
 
-        if (!skipFirestore && db && realTxs.length > 0) {
+        if (realTxs.length > 0) {
           for (const tx of realTxs) {
-            await setDoc(doc(db, "transactions", tx.id), tx, { merge: true });
+            await databaseService.saveTransaction(tx);
           }
         }
 
@@ -4814,14 +4136,15 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return 0;
       }
     });
-  }, [requisitions, db, skipFirestore, addSystemLog, triggerToast, withDbLoading]);
+  }, [requisitions, addSystemLog, triggerToast, withDbLoading]);
 
   const markAlertAsRead = useCallback(async (id: string) => {
     try {
-      await updateDoc(doc(db, "alerts", id), { isRead: true });
+      await databaseService.updateAlert(id, { isRead: true });
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, isRead: true } : a));
       await addSystemLog("ALERT_READ", `Alert ID '${id}' marked as read`, { alertId: id });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `alerts/${id}`);
+      console.error("Failed to mark alert as read:", err);
     }
   }, [addSystemLog]);
 
@@ -4834,30 +4157,33 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isRead: false,
         timestamp: new Date().toISOString()
       };
-      await setDoc(doc(db, "alerts", alertId), newAlert);
+      await databaseService.saveAlert(newAlert);
+      setAlerts(prev => [newAlert, ...prev]);
       await addSystemLog("ALERT_CREATE", `Created notification alert: ${alertId}`, { alertId });
     } catch (err) {
       console.error("Failed to add alert:", err);
       throw err;
     }
-  }, [db, addSystemLog]);
+  }, [addSystemLog]);
 
   const deleteAlert = useCallback(async (id: string) => {
     try {
-      await deleteDoc(doc(db, "alerts", id));
+      await databaseService.deleteAlert(id);
+      setAlerts(prev => prev.filter(a => a.id !== id));
       await addSystemLog("ALERT_DELETE", `Deleted system notification: ${id}`, { alertId: id });
     } catch (err) {
       console.error("Failed to delete alert:", err);
       throw err;
     }
-  }, [db, addSystemLog]);
+  }, [addSystemLog]);
 
   const updateThreshold = useCallback(async (id: string, updates: Partial<AlertThreshold>) => {
     try {
-      await updateDoc(doc(db, "thresholds", id), updates);
+      await databaseService.updateThreshold(id, updates);
+      setThresholds(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
       await addSystemLog("THRESHOLD_UPDATED", `Budget threshold ID '${id}' updated`, { thresholdId: id, updates });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `thresholds/${id}`);
+      console.error("Failed to update threshold:", err);
     }
   }, [addSystemLog]);
 
@@ -4872,10 +4198,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       generatedById: currentUser.id
     };
     try {
-      await setDoc(doc(db, "reports", id), report);
+      await databaseService.saveReport(report);
+      setReports(prev => [report, ...prev]);
       await addSystemLog("REPORT_SAVED", `Audit report saved: ${report.title}`, { reportId: id, title: report.title, period: report.period });
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `reports/${id}`);
+      console.error("Failed to save report:", err);
     }
   }, [currentUser, addSystemLog]);
 

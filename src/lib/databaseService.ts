@@ -87,12 +87,35 @@ export const databaseService = {
       group_id: project.groupId,
       allocated_budget: project.allocatedBudget,
       spent_amount: project.spentAmount,
+      committed_amount: project.committedAmount || 0,
       status: project.status,
       color: project.color || null,
       fiscal_year: project.fiscalYear || null,
       requisition_limit: project.requisitionLimit || null,
       account_number: project.accountNumber || null
     });
+  },
+
+  async updateProject(id: string, updates: Partial<Project>): Promise<void> {
+    console.log(`[DatabaseService] Updating project in MongoDB: ${id}`);
+    const mapped: any = {};
+    if (updates.name !== undefined) mapped.name = updates.name;
+    if (updates.groupId !== undefined) mapped.group_id = updates.groupId;
+    if (updates.allocatedBudget !== undefined) mapped.allocated_budget = updates.allocatedBudget;
+    if (updates.spentAmount !== undefined) mapped.spent_amount = updates.spentAmount;
+    if (updates.committedAmount !== undefined) mapped.committed_amount = updates.committedAmount;
+    if (updates.status !== undefined) mapped.status = updates.status;
+    if (updates.color !== undefined) mapped.color = updates.color;
+    if (updates.fiscalYear !== undefined) mapped.fiscal_year = updates.fiscalYear;
+    if (updates.requisitionLimit !== undefined) mapped.requisition_limit = updates.requisitionLimit;
+    if (updates.accountNumber !== undefined) mapped.account_number = updates.accountNumber;
+    mapped.updated_at = new Date().toISOString();
+    await apiCall(`/api/db/projects/${id}`, "PATCH", mapped);
+  },
+
+  async deleteProject(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting project from MongoDB: ${id}`);
+    await apiCall(`/api/db/projects/${id}`, "DELETE");
   },
 
   async saveChurchGroup(group: ChurchGroup): Promise<void> {
@@ -244,9 +267,255 @@ export const databaseService = {
     await apiCall(`/api/db/requisitions/${id}`, "DELETE");
   },
 
-  async updateProject(id: string, data: any): Promise<void> {
-    console.log(`[DatabaseService] Updating project in MongoDB: ${id}`);
-    await apiCall(`/api/db/projects/${id}`, "PATCH", data);
+  // --- FISCAL YEAR OPERATIONS ---
+  async saveFiscalYear(fy: FiscalYear): Promise<void> {
+    console.log(`[DatabaseService] Saving fiscal year to MongoDB: ${fy.year}`);
+    await apiCall(`/api/db/fiscal_years/${fy.id || fy.year}`, "POST", {
+      id: String(fy.id || fy.year),
+      year: fy.year,
+      label: fy.label,
+      start_date: fy.startDate ? new Date(fy.startDate).toISOString() : null,
+      end_date: fy.endDate ? new Date(fy.endDate).toISOString() : null,
+      status: fy.status,
+      notes: fy.notes || null,
+      created_at: fy.createdAt ? new Date(fy.createdAt).toISOString() : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+  },
+
+  async updateFiscalYear(id: string, updates: Partial<FiscalYear>): Promise<void> {
+    console.log(`[DatabaseService] Updating fiscal year in MongoDB: ${id}`);
+    const mapped: any = {};
+    if (updates.status !== undefined) mapped.status = updates.status;
+    if (updates.label !== undefined) mapped.label = updates.label;
+    if (updates.notes !== undefined) mapped.notes = updates.notes;
+    if (updates.startDate !== undefined) mapped.start_date = updates.startDate ? new Date(updates.startDate).toISOString() : null;
+    if (updates.endDate !== undefined) mapped.end_date = updates.endDate ? new Date(updates.endDate).toISOString() : null;
+    mapped.updated_at = new Date().toISOString();
+    await apiCall(`/api/db/fiscal_years/${id}`, "PATCH", mapped);
+  },
+
+  async deleteFiscalYear(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting fiscal year from MongoDB: ${id}`);
+    await apiCall(`/api/db/fiscal_years/${id}`, "DELETE");
+  },
+
+  // --- VENDOR OPERATIONS ---
+  async saveVendor(vendor: Vendor): Promise<void> {
+    console.log(`[DatabaseService] Saving vendor to MongoDB: ${vendor.name}`);
+    await apiCall(`/api/db/vendors/${vendor.id}`, "POST", {
+      id: vendor.id,
+      name: vendor.name,
+      contact: vendor.contact || null,
+      location: vendor.location || null,
+      offerings: vendor.offerings || null,
+      status: vendor.status || "APPROVED",
+      added_by: vendor.addedBy || "Admin",
+      created_at: vendor.createdAt ? new Date(vendor.createdAt).toISOString() : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+  },
+
+  async updateRequisition(id: string, updates: Partial<Requisition>): Promise<void> {
+    return this.patchRequisition(id, updates);
+  },
+
+  async updateVendor(id: string, updates: Partial<Vendor>): Promise<void> {
+    console.log(`[DatabaseService] Updating vendor in MongoDB: ${id}`);
+    const mapped: any = {};
+    if (updates.name !== undefined) mapped.name = updates.name;
+    if (updates.contact !== undefined) mapped.contact = updates.contact;
+    if (updates.location !== undefined) mapped.location = updates.location;
+    if (updates.offerings !== undefined) mapped.offerings = updates.offerings;
+    if (updates.status !== undefined) mapped.status = updates.status;
+    if (updates.addedBy !== undefined) mapped.added_by = updates.addedBy;
+    mapped.updated_at = new Date().toISOString();
+    await apiCall(`/api/db/vendors/${id}`, "PATCH", mapped);
+  },
+
+  async deleteVendor(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting vendor from MongoDB: ${id}`);
+    await apiCall(`/api/db/vendors/${id}`, "DELETE");
+  },
+
+  // --- SUPPLEMENTARY BUDGET OPERATIONS ---
+  async saveSupplementaryBudget(sb: SupplementaryBudgetRequest): Promise<void> {
+    console.log(`[DatabaseService] Saving supplementary budget to MongoDB: ${sb.id}`);
+    await apiCall(`/api/db/supplementary_budgets/${sb.id}`, "POST", {
+      id: sb.id,
+      project_id: sb.projectId,
+      project_name: sb.projectName,
+      amount: sb.amount,
+      justification: sb.justification,
+      status: sb.status,
+      requester_id: sb.requesterId,
+      requester_name: sb.requesterName,
+      requester_email: sb.requesterEmail,
+      role: sb.role,
+      submitted_at: sb.submittedAt ? new Date(sb.submittedAt).toISOString() : new Date().toISOString()
+    });
+  },
+
+  // --- ALERT OPERATIONS ---
+  async saveAlert(alert: BudgetAlert): Promise<void> {
+    console.log(`[DatabaseService] Saving budget alert to MongoDB: ${alert.id}`);
+    await apiCall(`/api/db/alerts/${alert.id}`, "POST", {
+      id: alert.id,
+      message: alert.message,
+      type: alert.type,
+      severity: alert.severity,
+      timestamp: alert.timestamp ? new Date(alert.timestamp).toISOString() : new Date().toISOString(),
+      is_read: alert.isRead || false,
+      isRead: alert.isRead || false,
+      target_role: alert.targetRole || null,
+      targetRole: alert.targetRole || null,
+      target_user_id: alert.targetUserId || null,
+      targetUserId: alert.targetUserId || null
+    });
+  },
+
+  async updateAlert(id: string, updates: Partial<BudgetAlert>): Promise<void> {
+    const mapped: any = {};
+    if (updates.isRead !== undefined) {
+      mapped.is_read = updates.isRead;
+      mapped.isRead = updates.isRead;
+    }
+    if (updates.message !== undefined) mapped.message = updates.message;
+    await apiCall(`/api/db/alerts/${id}`, "PATCH", mapped);
+  },
+
+  async deleteAlert(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting alert from MongoDB: ${id}`);
+    await apiCall(`/api/db/alerts/${id}`, "DELETE");
+  },
+
+  // --- THRESHOLD OPERATIONS ---
+  async updateThreshold(id: string, updates: Partial<AlertThreshold>): Promise<void> {
+    console.log(`[DatabaseService] Updating alert threshold in MongoDB: ${id}`);
+    const mapped: any = {};
+    if (updates.threshold !== undefined) mapped.threshold = updates.threshold;
+    if (updates.isEnabled !== undefined) {
+      mapped.is_enabled = updates.isEnabled;
+      mapped.isEnabled = updates.isEnabled;
+    }
+    if (updates.notifyEmail !== undefined) {
+      mapped.notify_email = updates.notifyEmail;
+      mapped.notifyEmail = updates.notifyEmail;
+    }
+    if (updates.type !== undefined) mapped.type = updates.type;
+    await apiCall(`/api/db/thresholds/${id}`, "PATCH", mapped);
+  },
+
+  // --- REPORT OPERATIONS ---
+  async saveReport(report: SavedReport): Promise<void> {
+    console.log(`[DatabaseService] Saving report to MongoDB: ${report.title}`);
+    await apiCall(`/api/db/reports/${report.id}`, "POST", {
+      id: report.id,
+      title: report.title,
+      description: report.description || null,
+      period: report.period,
+      stats: report.stats || {},
+      filters: report.filters || {},
+      item_count: report.itemCount,
+      itemCount: report.itemCount,
+      generated_by: report.generatedBy,
+      generatedBy: report.generatedBy,
+      generated_by_id: report.generatedById,
+      generatedById: report.generatedById,
+      timestamp: report.timestamp ? new Date(report.timestamp).toISOString() : new Date().toISOString()
+    });
+  },
+
+  // --- SETTINGS & PERMISSION OPERATIONS ---
+  async saveSettings(settings: any): Promise<void> {
+    console.log(`[DatabaseService] Saving settings to MongoDB`);
+    await apiCall(`/api/db/settings/system`, "POST", {
+      id: "system",
+      ...settings,
+      updated_at: new Date().toISOString()
+    });
+  },
+
+  async savePermission(roleId: string, permissions: any): Promise<void> {
+    console.log(`[DatabaseService] Saving permissions to MongoDB for role: ${roleId}`);
+    await apiCall(`/api/db/permissions/${roleId}`, "POST", {
+      id: roleId,
+      ...permissions,
+      updated_at: new Date().toISOString()
+    });
+  },
+
+  // --- TRANSACTION OPERATIONS ---
+  async saveTransaction(tx: Transaction): Promise<void> {
+    console.log(`[DatabaseService] Saving transaction to MongoDB: ${tx.id}`);
+    await apiCall(`/api/db/transactions/${tx.id}`, "POST", {
+      id: tx.id,
+      external_ref: tx.externalRef,
+      externalRef: tx.externalRef,
+      source_system: tx.sourceSystem,
+      sourceSystem: tx.sourceSystem,
+      amount: tx.amount,
+      type: tx.type,
+      status: tx.status,
+      description: tx.description || null,
+      category: tx.category || null,
+      performed_by: tx.performedBy || null,
+      performedBy: tx.performedBy || null,
+      metadata: tx.metadata || {},
+      timestamp: tx.timestamp ? new Date(tx.timestamp).toISOString() : new Date().toISOString()
+    });
+  },
+
+  async deleteTransaction(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting transaction from MongoDB: ${id}`);
+    await apiCall(`/api/db/transactions/${id}`, "DELETE");
+  },
+
+  // --- USER OPERATIONS ---
+  async saveUser(user: Partial<UserProfile> & { id: string }): Promise<void> {
+    console.log(`[DatabaseService] Saving user to MongoDB: ${user.email || user.id}`);
+    await apiCall(`/api/db/users/${user.id}`, "POST", {
+      id: user.id,
+      name: user.name || "",
+      email: user.email || "",
+      role: user.role || "CHURCH_GROUP",
+      group: user.group || null,
+      groups: user.groups || [],
+      temp_password: user.tempPassword || null,
+      tempPassword: user.tempPassword || null,
+      approver_code: user.approverCode || null,
+      approverCode: user.approverCode || null,
+      is_active: user.isActive !== undefined ? user.isActive : true,
+      isActive: user.isActive !== undefined ? user.isActive : true,
+      is_approved: user.isApproved !== undefined ? user.isApproved : true,
+      isApproved: user.isApproved !== undefined ? user.isApproved : true,
+      is_suspended: user.isSuspended !== undefined ? user.isSuspended : false,
+      isSuspended: user.isSuspended !== undefined ? user.isSuspended : false,
+      updated_at: new Date().toISOString()
+    });
+  },
+
+  async updateUser(id: string, updates: Partial<UserProfile>): Promise<void> {
+    console.log(`[DatabaseService] Updating user in MongoDB: ${id}`);
+    const mapped: any = {};
+    if (updates.name !== undefined) mapped.name = updates.name;
+    if (updates.email !== undefined) mapped.email = updates.email;
+    if (updates.role !== undefined) mapped.role = updates.role;
+    if (updates.group !== undefined) mapped.group = updates.group;
+    if (updates.groups !== undefined) mapped.groups = updates.groups;
+    if (updates.approverCode !== undefined) mapped.approver_code = updates.approverCode;
+    if (updates.isActive !== undefined) mapped.is_active = updates.isActive;
+    if (updates.isApproved !== undefined) mapped.is_approved = updates.isApproved;
+    if (updates.isSuspended !== undefined) mapped.is_suspended = updates.isSuspended;
+    if (updates.forceLogout !== undefined) mapped.force_logout = updates.forceLogout;
+    mapped.updated_at = new Date().toISOString();
+    await apiCall(`/api/db/users/${id}`, "PATCH", mapped);
+  },
+
+  // --- DELETE USER ---
+  async deleteUser(id: string): Promise<void> {
+    console.log(`[DatabaseService] Deleting user from MongoDB: ${id}`);
+    await apiCall(`/api/db/users/${id}`, "DELETE");
   },
 
   // --- SYSTEM LOGS OPERATIONS ---

@@ -1789,7 +1789,6 @@ const AttachmentViewer = ({ uri, fileName }: { uri: string; fileName: string }) 
 import { printRequisitions, downloadRequisitionsHtml, downloadRequisitionsCsv, downloadRequisitionsPdf, printRequisitionVoucher, printRequisitionReceipt } from "../utils/exportUtils";
 import { NewRequisitionForm } from "./NewRequisitionForm";
 import { ReceiptTemplateGenerator } from "./ReceiptTemplateGenerator";
-import { EditRequisitionModal } from "./EditRequisitionModal";
 import { ReceiptGallery } from "./ReceiptGallery";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
@@ -2919,8 +2918,8 @@ export const RequisitionsPanel: React.FC = () => {
 
   if (editingReq) {
     return (
-      <EditRequisitionModal 
-        req={editingReq} 
+      <NewRequisitionForm 
+        editReq={editingReq} 
         onClose={() => setEditingReq(null)} 
         isPage={true}
       />
@@ -4612,8 +4611,8 @@ export const RequisitionsPanel: React.FC = () => {
       {/* Modal for Editing */}
       <AnimatePresence>
         {editingReq && (
-          <EditRequisitionModal 
-            req={editingReq} 
+          <NewRequisitionForm 
+            editReq={editingReq} 
             onClose={() => setEditingReq(null)} 
           />
         )}

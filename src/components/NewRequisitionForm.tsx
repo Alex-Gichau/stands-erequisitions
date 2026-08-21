@@ -6,50 +6,88 @@
 import React, { useState, useEffect } from "react";
 import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionContext";
 import { numberToWords } from "../utils/numberUtils";
-import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError } from "../lib/utils";
+import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError, getAttachmentFileName, getAbsoluteAttachmentUrl } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
 import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { RecurrenceType, UserRole, RequisitionInstallment } from "../types";
+import { RecurrenceType, UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
-import { RequisitionStatus } from "../types";
 
 interface NewRequisitionFormProps {
   onClose: () => void;
+  editReq?: Requisition;
+  req?: Requisition;
+  isPage?: boolean;
 }
 
-export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose }) => {
+export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose, editReq, req, isPage }) => {
+  const targetReq = editReq || req;
+  const isEditMode = Boolean(targetReq);
   const { addRequisition, updateRequisition, startBackgroundUploadTask, currentUser, users, projects, churchGroups, addChurchGroup, vendors, addVendor, triggerToast } = useRequisitions();
   const activeYear = getActiveFiscalYear();
-  const [amount, setAmount] = useState<string>("");
-  const [amountWords, setAmountWords] = useState<string>("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [recurrence, setRecurrence] = useState<RecurrenceType>(RecurrenceType.NONE);
+  const [amount, setAmount] = useState<string>(targetReq?.amount !== undefined ? targetReq.amount.toString() : "");
+  const [amountWords, setAmountWords] = useState<string>(targetReq?.amountWords || (targetReq?.amount ? numberToWords(targetReq.amount) : ""));
+  const [title, setTitle] = useState(targetReq?.title || "");
+  const [description, setDescription] = useState(targetReq?.description || "");
+  const [recurrence, setRecurrence] = useState<RecurrenceType>(targetReq?.recurrence || RecurrenceType.NONE);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<string[]>(() => {
+    if (!targetReq?.attachments) return [];
+    return Array.isArray(targetReq.attachments) ? targetReq.attachments : [targetReq.attachments];
+  });
   const [loading, setLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   // Installment Disbursement State
-  const [enableInstallments, setEnableInstallments] = useState<boolean>(false);
+  const [enableInstallments, setEnableInstallments] = useState<boolean>(() => {
+    return Boolean(targetReq?.enableInstallments && Array.isArray(targetReq?.installments) && targetReq.installments.length > 0);
+  });
   const [installments, setInstallments] = useState<Array<{
     id: string;
     installmentNumber: number;
     amount: string;
     description: string;
     dueDate?: string;
-  }>>([
-    { id: "inst-1", installmentNumber: 1, amount: "", description: "Initial Advance / Mobilization Deposit" },
-    { id: "inst-2", installmentNumber: 2, amount: "", description: "Final Balance / Completion" }
-  ]);
+    status?: "PENDING" | "DISBURSED" | "CANCELLED";
+    disbursedAt?: string;
+    disbursedBy?: string;
+    disbursedByName?: string;
+    disbursementReference?: string;
+    paymentMethod?: "CHEQUE" | "CASH" | "MPESA" | "BANK_TRANSFER" | "EFT";
+    notes?: string;
+  }>>(() => {
+    if (targetReq?.installments && Array.isArray(targetReq.installments) && targetReq.installments.length > 0) {
+      return targetReq.installments.map((inst, idx) => ({
+        id: inst.id || `inst-${idx + 1}`,
+        installmentNumber: inst.installmentNumber || idx + 1,
+        amount: inst.amount !== undefined && inst.amount !== null ? inst.amount.toString() : "",
+        description: inst.description || (inst as any).title || `Milestone #${idx + 1}`,
+        dueDate: inst.dueDate || "",
+        status: inst.status || "PENDING",
+        disbursedAt: inst.disbursedAt,
+        disbursedBy: inst.disbursedBy,
+        disbursedByName: inst.disbursedByName,
+        disbursementReference: inst.disbursementReference,
+        paymentMethod: inst.paymentMethod,
+        notes: inst.notes
+      }));
+    }
+    return [
+      { id: "inst-1", installmentNumber: 1, amount: "", description: "Initial Advance / Mobilization Deposit" },
+      { id: "inst-2", installmentNumber: 2, amount: "", description: "Final Balance / Completion" }
+    ];
+  });
 
-  const [notificationEmails, setNotificationEmails] = useState<string[]>([]);
+  const [notificationEmails, setNotificationEmails] = useState<string[]>(() => {
+    if (!targetReq?.notificationEmails) return [];
+    return Array.isArray(targetReq.notificationEmails) ? targetReq.notificationEmails : [];
+  });
   const [customNotifyEmail, setCustomNotifyEmail] = useState("");
 
-  const [payableTo, setPayableTo] = useState<string>("");
+  const [payableTo, setPayableTo] = useState<string>(targetReq?.payableTo || "");
   const [isVendorDropdownOpen, setIsVendorDropdownOpen] = useState(false);
   const [vendorHighlightIndex, setVendorHighlightIndex] = useState<number>(-1);
   const vendorDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -98,7 +136,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
   const [activeTab, setActiveTab] = useState<"SEARCH" | "CREATE">("SEARCH");
 
   const isAdminOrFinance = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.FINANCE;
-  const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const [selectedGroup, setSelectedGroup] = useState<string>(targetReq?.groupName || "");
 
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -152,8 +190,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
   const [draftRestoredTime, setDraftRestoredTime] = useState<string | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
-  const [isSharedRequisition, setIsSharedRequisition] = useState<boolean>(false);
-  const [sharedGroups, setSharedGroups] = useState<string[]>([]);
+  const [isSharedRequisition, setIsSharedRequisition] = useState<boolean>(Boolean(targetReq?.isSharedRequisition));
+  const [sharedGroups, setSharedGroups] = useState<string[]>(Array.isArray(targetReq?.sharedGroups) ? targetReq.sharedGroups : []);
 
   // Compute available co-share groups (excluding primary selected group)
   const availableCoShareGroups = React.useMemo(() => {
@@ -215,8 +253,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     });
   }, [users, selectedGroup]);
 
-  const currentGroupDefaultedRef = React.useRef<string>("");
-  const currentSharedGroupsRef = React.useRef<string>("");
+  const currentGroupDefaultedRef = React.useRef<string>(targetReq?.groupName || "");
+  const currentSharedGroupsRef = React.useRef<string>(targetReq?.sharedGroups?.slice()?.sort()?.join(",") || "");
 
   useEffect(() => {
     if (!selectedGroup || ministryMembers.length === 0) return;
@@ -265,9 +303,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     setCustomNotifyEmail("");
   };
 
-  // Synchronous draft persistence function
+  // Synchronous draft persistence function (only in creation mode)
   const saveDraftToStorage = React.useCallback(() => {
-    if (!currentUser?.id) return;
+    if (isEditMode || !currentUser?.id) return;
     const draftKey = `stands_requisition_draft_${currentUser.id}`;
 
     // If completely empty, remove any existing draft from storage
@@ -306,6 +344,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
       console.error("Auto-save to localStorage failed:", err);
     }
   }, [
+    isEditMode,
     currentUser,
     title,
     description,
@@ -324,9 +363,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     installments
   ]);
 
-  // Load draft from localStorage on initial render
+  // Load draft from localStorage on initial render (only in creation mode)
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (isEditMode || !currentUser?.id) return;
     const draftKey = `stands_requisition_draft_${currentUser.id}`;
     const savedDraft = localStorage.getItem(draftKey);
     if (savedDraft) {
@@ -361,7 +400,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         console.error("Failed to restore draft:", err);
       }
     }
-  }, [currentUser]);
+  }, [currentUser, isEditMode]);
 
   // Installment Preset Calculation Helpers
   const handleApplySplitPreset = (preset: "50-50" | "40-30-30" | "EVEN-3" | "EVEN-4") => {
@@ -659,7 +698,15 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const removeExistingAttachment = (index: number) => {
+    setExistingAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleCloseAttempt = () => {
+    if (isEditMode) {
+      onClose();
+      return;
+    }
     if (title.trim() || description.trim() || amount.trim() || attachments.length > 0) {
       setShowDraftConfirm(true);
     } else {
@@ -713,7 +760,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!navigator.onLine) {
-      alert("Submission Blocked: You are currently offline. Please connect to the internet to submit new requisitions.");
+      alert("Submission Blocked: You are currently offline. Please connect to the internet to save requisitions.");
       return;
     }
     setLoading(true);
@@ -743,7 +790,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         }
       }
 
-      const reqTitle = title.trim() || "Untitled Requisition";
+      const reqTitle = title.trim() || (isEditMode ? targetReq?.title || "Requisition" : "Untitled Requisition");
 
       // Process and validate installments if enabled
       let finalInstallments: RequisitionInstallment[] | undefined = undefined;
@@ -759,7 +806,13 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
           amount: parseFloat(inst.amount) || 0,
           description: inst.description.trim() || `Installment #${idx + 1}`,
           dueDate: inst.dueDate || undefined,
-          status: "PENDING" as const,
+          status: (inst.status as any) || "PENDING",
+          disbursedAt: inst.disbursedAt,
+          disbursedBy: inst.disbursedBy,
+          disbursedByName: inst.disbursedByName,
+          disbursementReference: inst.disbursementReference,
+          paymentMethod: inst.paymentMethod,
+          notes: inst.notes,
         }));
       }
 
@@ -768,33 +821,74 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
         ? await uploadAttachmentsToLocalServer(encodedAttachments)
         : [];
 
-      // 2. Create requisition with clean server attachment URLs
-      const createdReq = await addRequisition({
-        projectId: matchingProject ? matchingProject.id : "",
-        title: reqTitle,
-        description: description.trim() || "No description provided",
-        payableTo: payableTo.trim() || undefined,
-        amount: parsedAmount,
-        amountWords: amountWords || "",
-        recurrence,
-        groupId: groupVal,
-        groupName: groupVal,
-        requesterId: currentUser?.id || "u-anon",
-        requesterName: currentUser?.name || "Anonymous",
-        requesterEmail: currentUser?.email || "",
-        notificationEmails: finalNotificationEmails,
-        isSharedRequisition,
-        sharedGroups: isSharedRequisition ? sharedGroups : [],
-        enableInstallments,
-        installments: finalInstallments,
-        disbursedAmount: 0,
-        remainingBalance: parsedAmount,
-        attachments: uploadedAttachmentUrls,
-      });
+      const allAttachments = [...existingAttachments, ...uploadedAttachmentUrls];
 
-      // Clear the local draft from storage upon successful submission
-      if (currentUser?.id) {
-        localStorage.removeItem(`stands_requisition_draft_${currentUser.id}`);
+      if (isEditMode && targetReq) {
+        // Calculate disbursed sum and remaining balance
+        const disbursedSum = (finalInstallments || targetReq.installments || [])
+          .filter(i => i.status === "DISBURSED")
+          .reduce((sum, i) => sum + (i.amount || 0), 0) || (targetReq.disbursedAmount || 0);
+
+        const remainingBalance = Math.max(0, parsedAmount - disbursedSum);
+
+        await updateRequisition(targetReq.id, {
+          title: reqTitle,
+          description: description.trim() || "No description provided",
+          payableTo: payableTo.trim() || undefined,
+          amount: parsedAmount,
+          amountWords: amountWords || (parsedAmount ? numberToWords(parsedAmount) : ""),
+          recurrence,
+          groupId: groupVal,
+          groupName: groupVal,
+          projectId: matchingProject ? matchingProject.id : (targetReq.projectId || undefined),
+          notificationEmails: finalNotificationEmails,
+          isSharedRequisition,
+          sharedGroups: isSharedRequisition ? sharedGroups : [],
+          enableInstallments,
+          installments: finalInstallments,
+          disbursedAmount: disbursedSum,
+          remainingBalance: remainingBalance,
+          attachments: allAttachments,
+          status: targetReq.status === RequisitionStatus.DRAFT ? RequisitionStatus.SUBMITTED : targetReq.status,
+        });
+
+        if (triggerToast) {
+          triggerToast({
+            type: "SYSTEM_INFO",
+            message: "Requisition updated successfully.",
+            severity: "LOW",
+            timestamp: new Date().toISOString()
+          });
+        }
+      } else {
+        // 2. Create requisition with clean server attachment URLs
+        const createdReq = await addRequisition({
+          projectId: matchingProject ? matchingProject.id : "",
+          title: reqTitle,
+          description: description.trim() || "No description provided",
+          payableTo: payableTo.trim() || undefined,
+          amount: parsedAmount,
+          amountWords: amountWords || "",
+          recurrence,
+          groupId: groupVal,
+          groupName: groupVal,
+          requesterId: currentUser?.id || "u-anon",
+          requesterName: currentUser?.name || "Anonymous",
+          requesterEmail: currentUser?.email || "",
+          notificationEmails: finalNotificationEmails,
+          isSharedRequisition,
+          sharedGroups: isSharedRequisition ? sharedGroups : [],
+          enableInstallments,
+          installments: finalInstallments,
+          disbursedAmount: 0,
+          remainingBalance: parsedAmount,
+          attachments: allAttachments,
+        });
+
+        // Clear the local draft from storage upon successful submission
+        if (currentUser?.id) {
+          localStorage.removeItem(`stands_requisition_draft_${currentUser.id}`);
+        }
       }
 
       onClose();
@@ -815,23 +909,38 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
       >
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">New Requisition Hub</h3>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">
+                {isEditMode ? "Edit Requisition Hub" : "New Requisition Hub"}
+              </h3>
+              {isEditMode && targetReq && (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                    ID: {targetReq.id}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">•</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase">
+                    {targetReq.status}
+                  </span>
+                </div>
+              )}
+            </div>
             
-            {/* Live Auto-Save Status Badge */}
-            {autoSaveStatus === 'saving' && (
+            {/* Live Auto-Save Status Badge (New Requisition Only) */}
+            {!isEditMode && autoSaveStatus === 'saving' && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
                 <Loader2 size={11} className="animate-spin text-amber-500" />
                 Auto-saving...
               </span>
             )}
-            {autoSaveStatus === 'saved' && lastAutoSavedAt && (
+            {!isEditMode && autoSaveStatus === 'saved' && lastAutoSavedAt && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/80">
                 <Check size={11} className="text-emerald-500" />
                 Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </span>
             )}
           </div>
-          <button onClick={handleCloseAttempt} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+          <button onClick={handleCloseAttempt} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer">
             <X size={20} className="text-slate-500 dark:text-slate-400" />
           </button>
         </div>
@@ -1939,11 +2048,63 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 scrollbar-hide">
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 scrollbar-hide">
                 <AnimatePresence>
+                  {/* Existing Attachments in Edit Mode */}
+                  {existingAttachments.map((attUrl, idx) => {
+                    const fileName = getAttachmentFileName(attUrl);
+                    const isPdf = attUrl.toLowerCase().endsWith(".pdf") || attUrl.startsWith("data:application/pdf");
+                    const isImg = attUrl.startsWith("data:image/") || /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(attUrl);
+                    const isExcel = /\.(xlsx|xls|csv)$/i.test(attUrl) || attUrl.includes("spreadsheet");
+                    return (
+                      <motion.div 
+                        key={`existing-${idx}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/50 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-950 flex items-center justify-center border border-slate-100 dark:border-slate-800 text-slate-400 font-black text-[10px] uppercase font-mono overflow-hidden shrink-0 shadow-sm">
+                            {isImg ? (
+                              <img 
+                                src={getAbsoluteAttachmentUrl(attUrl)} 
+                                alt="preview" 
+                                className="w-full h-full object-cover" 
+                                referrerPolicy="no-referrer"
+                                onError={(e) => handleImageError(e)}
+                              />
+                            ) : isPdf ? (
+                              <PdfThumbnailPreview url={attUrl} title={fileName} />
+                            ) : isExcel ? (
+                              <div className="flex items-center justify-center w-full h-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold">
+                                <FileSpreadsheet size={18} />
+                              </div>
+                            ) : (
+                              <span>{fileName.split('.').pop()?.slice(0, 3) || "DOC"}</span>
+                            )}
+                          </div>
+                          <div className="overflow-hidden max-w-[200px]">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{fileName}</p>
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Existing on file</span>
+                          </div>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => removeExistingAttachment(idx)}
+                          className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
+                          title="Remove file"
+                        >
+                          <X size={14} />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+
+                  {/* New Attachments */}
                   {attachments.map((file, idx) => (
                     <motion.div 
-                      key={idx}
+                      key={`new-${idx}`}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
@@ -1969,7 +2130,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                             <span>{file.name.split('.').pop()?.slice(0, 3)}</span>
                           )}
                         </div>
-                        <div className="overflow-hidden max-w-[150px]">
+                        <div className="overflow-hidden max-w-[200px]">
                           <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{file.name}</p>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
@@ -1977,13 +2138,14 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
                       <button 
                         type="button"
                         onClick={() => removeFile(idx)}
-                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer"
+                        title="Remove file"
                       >
                         <X size={14} />
                       </button>
                     </motion.div>
                   ))}
-                  {attachments.length === 0 && (
+                  {attachments.length === 0 && existingAttachments.length === 0 && (
                     <div className="h-full flex flex-col items-center justify-center text-slate-300 py-8">
                       <p className="text-[10px] font-black uppercase tracking-widest">No Documents Attached</p>
                     </div>
@@ -2010,10 +2172,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
             onClick={handleCloseAttempt}
             className="w-full md:w-auto px-6 py-3 md:py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-350 rounded-xl text-[10px] md:text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer"
           >
-            DISCARD DRAFT
+            {isEditMode ? "CANCEL / CLOSE" : "DISCARD DRAFT"}
           </button>
           <button 
-            disabled={loading || !amount || !attachments.length || !navigator.onLine}
+            disabled={loading || !amount || (attachments.length === 0 && existingAttachments.length === 0) || !navigator.onLine}
             type="submit"
             form="new-req-form" 
             className="w-full md:w-auto btn-primary disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2 px-6 py-3 md:py-2.5 rounded-xl text-center"
@@ -2028,7 +2190,11 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose 
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
             <span className="uppercase tracking-widest text-[10px] md:text-xs">
-              {!navigator.onLine ? "OFFLINE: READ-ONLY MODE" : (loading ? "INITIALIZING LEDGER..." : "SUBMIT FOR L1 APPROVAL")}
+              {!navigator.onLine 
+                ? "OFFLINE: READ-ONLY MODE" 
+                : (loading 
+                    ? (isEditMode ? "SAVING CHANGES..." : "INITIALIZING LEDGER...") 
+                    : (isEditMode ? "SAVE REQUISITION CHANGES" : "SUBMIT FOR L1 APPROVAL"))}
             </span>
           </button>
         </div>

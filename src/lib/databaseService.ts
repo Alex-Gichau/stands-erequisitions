@@ -179,6 +179,13 @@ export const databaseService = {
       notificationEmails: Array.isArray(req.notificationEmails) ? req.notificationEmails : (typeof req.notificationEmails === 'object' && req.notificationEmails ? Object.values(req.notificationEmails) : []),
       is_shared_requisition: req.isSharedRequisition || false,
       shared_groups: req.sharedGroups || [],
+      enable_installments: req.enableInstallments || false,
+      enableInstallments: req.enableInstallments || false,
+      installments: Array.isArray(req.installments) ? req.installments : [],
+      disbursed_amount: req.disbursedAmount !== undefined ? req.disbursedAmount : 0,
+      disbursedAmount: req.disbursedAmount !== undefined ? req.disbursedAmount : 0,
+      remaining_balance: req.remainingBalance !== undefined ? req.remainingBalance : (req.amount || 0),
+      remainingBalance: req.remainingBalance !== undefined ? req.remainingBalance : (req.amount || 0),
       flagged_for_audit: req.flaggedForAudit || false,
       in_procurement: req.inProcurement || false,
       requires_more_info: req.requiresMoreInfo || false,
@@ -197,6 +204,37 @@ export const databaseService = {
     if (updates.requiresMoreInfo !== undefined) payload.requires_more_info = updates.requiresMoreInfo;
     if (updates.flaggedForAudit !== undefined) payload.flagged_for_audit = updates.flaggedForAudit;
     if (updates.additionalInfo !== undefined) payload.additional_info = updates.additionalInfo;
+    if (updates.enableInstallments !== undefined) {
+      payload.enable_installments = updates.enableInstallments;
+      payload.enableInstallments = updates.enableInstallments;
+    }
+    if (updates.installments !== undefined) {
+      payload.installments = updates.installments;
+    }
+    if (updates.disbursedAmount !== undefined) {
+      payload.disbursed_amount = updates.disbursedAmount;
+      payload.disbursedAmount = updates.disbursedAmount;
+    }
+    if (updates.remainingBalance !== undefined) {
+      payload.remaining_balance = updates.remainingBalance;
+      payload.remainingBalance = updates.remainingBalance;
+    }
+    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.amount !== undefined) payload.amount = updates.amount;
+    if (updates.amountWords !== undefined) payload.amount_words = updates.amountWords;
+    if (updates.payableTo !== undefined) payload.payable_to = updates.payableTo;
+    if (updates.groupName !== undefined) {
+      payload.group_name = updates.groupName;
+      payload.groupName = updates.groupName;
+    }
+    if (updates.groupId !== undefined) {
+      payload.group_id = updates.groupId;
+      payload.groupId = updates.groupId;
+    }
+    if (updates.attachments !== undefined) payload.attachments = updates.attachments;
+    if (updates.receipts !== undefined) payload.receipts = updates.receipts;
+    if (updates.status !== undefined) payload.status = updates.status;
     payload.updated_at = new Date().toISOString();
     await apiCall(`/api/db/requisitions/${id}`, "PATCH", payload);
   },

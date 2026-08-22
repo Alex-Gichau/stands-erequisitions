@@ -1922,7 +1922,9 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       const summary = {
         dbAllCached: false,
         churchGroupsCount: 0,
-        activeReqsCount: 0
+        activeReqsCount: 0,
+        totalCollectionsCached: collectionsList.length,
+        collectionBreakdown: {} as Record<string, number>
       };
 
       // 1. Warm up db-all cache
@@ -1951,6 +1953,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
               return { id: snakeRest.id || String(_id), ...snakeRest };
             });
           }
+          summary.collectionBreakdown[col] = Array.isArray(dataMap[col]) ? dataMap[col].length : 0;
         }
         return dataMap;
       }, 600);
@@ -2043,7 +2046,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
 
     try {
       if (mongoose.connection.readyState === 1) {
-        for (const col of ["users", "requisitions", "church_groups"]) {
+        for (const col of collectionsList) {
           const Model = modelMappings[col];
           if (Model) {
             const ct = await Model.countDocuments();
@@ -2053,8 +2056,9 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
           }
         }
       } else {
-        for (const col of ["users", "requisitions", "church_groups"]) {
-          report.mongodb.counts[col] = 0;
+        for (const col of collectionsList) {
+          const data = readJsonCollection(col);
+          report.mongodb.counts[col] = Array.isArray(data) ? data.length : 0;
         }
       }
     } catch (e: any) {

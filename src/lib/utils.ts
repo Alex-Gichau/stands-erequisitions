@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { RequisitionStatus } from "../types";
+import { generateInitialAvatarSvg, resolveUserAvatarUrl } from "./avatarUtils";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -40,11 +41,31 @@ export function getNamedImagePlaceholder(fileName: string = "Image"): string {
 `);
 }
 
-export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, fallbackUrl: string = DEFAULT_IMAGE_PLACEHOLDER) {
+export function handleImageError(e: React.SyntheticEvent<HTMLImageElement, Event>, fallbackUrl?: string) {
   const target = e.currentTarget;
-  if (target && target.src !== fallbackUrl) {
+  if (!target) return;
+
+  // Determine appropriate fallback
+  let resolvedFallback = fallbackUrl;
+  if (!resolvedFallback) {
+    const isLikelyAvatar = 
+      target.className?.includes("rounded-full") || 
+      target.className?.includes("rounded-xl") ||
+      target.width < 100 || 
+      target.height < 100 ||
+      target.alt?.toLowerCase().includes("user") ||
+      target.alt?.toLowerCase().includes("avatar");
+
+    if (isLikelyAvatar) {
+      resolvedFallback = generateInitialAvatarSvg(target.alt || "User", 96);
+    } else {
+      resolvedFallback = DEFAULT_IMAGE_PLACEHOLDER;
+    }
+  }
+
+  if (target.src !== resolvedFallback) {
     target.onerror = null;
-    target.src = fallbackUrl;
+    target.src = resolvedFallback;
   }
 }
 

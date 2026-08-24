@@ -36,9 +36,14 @@ import {
   Send,
   Check,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Camera,
+  Sparkles,
+  RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { UserAvatar } from "./UserAvatar";
+import { AvatarPickerModal } from "./AvatarPickerModal";
 
 export const UsersPanel: React.FC = () => {
   const { 
@@ -219,6 +224,7 @@ export const UsersPanel: React.FC = () => {
   // Custom states for group selection & admin password reset overrides
   const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<any | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [avatarPickerTargetUser, setAvatarPickerTargetUser] = useState<UserProfile | null>(null);
 
   const handleResetPassword = async (email: string) => {
     setEditError(null);
@@ -521,13 +527,11 @@ export const UsersPanel: React.FC = () => {
                     className="relative inline-block transition-transform hover:z-20 hover:scale-110"
                     title={`${onlineUser.name} (${onlineUser.role ? onlineUser.role.replace(/_/g, " ") : "Member"}) • Online now`}
                   >
-                    <div className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-slate-900 overflow-hidden shadow-2xs flex items-center justify-center bg-gradient-to-tr from-indigo-500 to-sky-400 text-white font-black text-[9px] uppercase">
-                      {onlineUser.photoURL ? (
-                        <img src={onlineUser.photoURL} alt={onlineUser.name} className="w-full h-full object-cover" />
-                      ) : (
-                        onlineUser.name.charAt(0)
-                      )}
-                    </div>
+                    <UserAvatar 
+                      user={onlineUser} 
+                      size="2xs" 
+                      ring="ring-2 ring-white dark:ring-slate-900 shadow-2xs" 
+                    />
                   </div>
                 ))}
                 
@@ -725,20 +729,13 @@ export const UsersPanel: React.FC = () => {
                   >
                     <td className="px-3 md:px-8 py-2 md:py-5">
                       <div className="flex items-center gap-2.5 md:gap-4">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full p-[2px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-sm shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
-                          <div className="w-full h-full rounded-full overflow-hidden bg-slate-200 dark:bg-slate-900 flex items-center justify-center text-primary font-black text-[10px] md:text-sm">
-                            {user.photoURL ? (
-                              <img 
-                                src={user.photoURL} 
-                                alt={user.name} 
-                                className="w-full h-full object-cover" 
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              user.name.charAt(0)
-                            )}
-                          </div>
-                        </div>
+                        <UserAvatar 
+                          user={user} 
+                          size="lg" 
+                          rounded="xl" 
+                          ring="ring-1 ring-slate-200/80 dark:ring-slate-700 shadow-xs" 
+                          className="group-hover:scale-105 transition-transform"
+                        />
                         <div className="min-w-0">
                           <p className="text-[11px] md:text-sm font-bold text-slate-800 dark:text-slate-205 leading-tight truncate">{user.name}</p>
                           <div className="flex items-center gap-1 mt-0.5 md:mt-1 truncate">
@@ -1607,6 +1604,36 @@ export const UsersPanel: React.FC = () => {
                   </div>
                 )}
 
+                {/* USER AVATAR & PHOTO MANAGEMENT HEADER */}
+                <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700">
+                  <UserAvatar 
+                    user={isModalOpen ? { name, email } : editingUser} 
+                    size="xl" 
+                    rounded="xl" 
+                    ring="ring-2 ring-primary/20 shadow-xs" 
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight truncate">
+                        {isModalOpen ? (name || "New Member") : (editName || editingUser?.name)}
+                      </h4>
+                      {!isModalOpen && editingUser && (
+                        <button
+                          type="button"
+                          onClick={() => setAvatarPickerTargetUser(editingUser)}
+                          className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-primary dark:text-sky-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
+                        >
+                          <Camera size={12} />
+                          <span>Change Photo / Avatar</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
+                      {isModalOpen ? (email || "email@church.com") : editingUser?.email}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <div className="space-y-1.5">
                     <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
@@ -2092,18 +2119,12 @@ export const UsersPanel: React.FC = () => {
                     {users.filter(u => u.group === selectedGroupForMembers.name).map((user, uIdx) => (
                       <div key={`group-member-${user.id || uIdx}-${uIdx}`} className="p-4 flex items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-3">
-                          {user.photoURL ? (
-                            <img
-                              src={user.photoURL}
-                              alt={user.name}
-                              referrerPolicy="no-referrer"
-                              className="w-10 h-10 rounded-xl object-cover border border-slate-200"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-sm border border-slate-200">
-                              {user.name.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <UserAvatar 
+                            user={user} 
+                            size="lg" 
+                            rounded="xl" 
+                            ring="ring-1 ring-slate-200" 
+                          />
                           <div>
                             <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
                             <div className="text-[10px] text-slate-400 font-mono">{user.email}</div>
@@ -2160,6 +2181,25 @@ export const UsersPanel: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Avatar Picker / Photo Upload Modal for Editing User */}
+      {avatarPickerTargetUser && (
+        <AvatarPickerModal
+          isOpen={!!avatarPickerTargetUser}
+          onClose={() => setAvatarPickerTargetUser(null)}
+          currentPhotoURL={avatarPickerTargetUser.photoURL}
+          userName={avatarPickerTargetUser.name}
+          userEmail={avatarPickerTargetUser.email}
+          onSave={async (newPhotoURL) => {
+            await updateUserProfile(avatarPickerTargetUser.id, { photoURL: newPhotoURL });
+            // Update local editing user state if currently editing
+            if (editingUser?.id === avatarPickerTargetUser.id) {
+              setEditingUser(prev => prev ? { ...prev, photoURL: newPhotoURL } : null);
+            }
+            setAvatarPickerTargetUser(null);
+          }}
+        />
+      )}
     </div>
   );
 };

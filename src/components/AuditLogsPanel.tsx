@@ -32,7 +32,7 @@ export const AuditLogsPanel: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedActionFilter, setSelectedActionFilter] = useState("ALL");
   const [selectedLevelFilter, setSelectedLevelFilter] = useState("ALL");
-  const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
+  const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('TODAY');
   const [activeTab, setActiveTab] = useState<'LOGS' | 'EMAILS'>('LOGS');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -183,7 +183,14 @@ export const AuditLogsPanel: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date Window</label>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date Window</label>
+                {dateRangeFilter === 'TODAY' && (
+                  <span className="text-[9px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                    Default 24h
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: 'ALL', label: 'All Time' },
@@ -203,6 +210,17 @@ export const AuditLogsPanel: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {dateRangeFilter === 'TODAY' && (
+                <button
+                  type="button"
+                  onClick={() => setDateRangeFilter('ALL')}
+                  className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                >
+                  <History size={12} className="text-indigo-600" />
+                  Load Logs &gt;24 Hours Ago
+                </button>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -257,7 +275,33 @@ export const AuditLogsPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 space-y-4">
+          {dateRangeFilter === 'TODAY' && (
+            <div className="bg-indigo-50/80 border border-indigo-100 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-600 text-white rounded-2xl shrink-0">
+                  <Clock size={16} />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="text-[11px] font-black text-indigo-950 uppercase tracking-wide">
+                    Defaulting to Last 24 Hours
+                  </div>
+                  <p className="text-[10px] font-semibold text-indigo-700">
+                    Displaying {filteredLogs.length} audit trail event{filteredLogs.length === 1 ? '' : 's'} from the past 24 hours.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDateRangeFilter('ALL')}
+                className="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              >
+                <History size={13} />
+                Load Logs Older Than 24h
+              </button>
+            </div>
+          )}
+
           <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -330,24 +374,50 @@ export const AuditLogsPanel: React.FC = () => {
               )}
 
               {filteredLogs.length === 0 && !syncingTargets.has("system_logs") && (
-                <div className="py-32 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
-                    <History size={40} />
+                <div className="py-24 flex flex-col items-center justify-center text-center space-y-4 px-6">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                    <History size={36} />
                   </div>
                   <div>
-                    <h3 className="text-[11px] font-black uppercase text-slate-600">No logs found</h3>
-                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">The trail is empty for current filter criteria</p>
+                    <h3 className="text-[12px] font-black uppercase text-slate-700">
+                      {dateRangeFilter === 'TODAY' ? "No Logs in the Last 24 Hours" : "No logs found"}
+                    </h3>
+                    <p className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mt-1 max-w-sm">
+                      {dateRangeFilter === 'TODAY' 
+                        ? "Logs older than 24 hours can be loaded by clicking below or changing the date window filter." 
+                        : "The audit trail is empty for current filter criteria."}
+                    </p>
                   </div>
+                  {dateRangeFilter === 'TODAY' && (
+                    <button
+                      type="button"
+                      onClick={() => setDateRangeFilter('ALL')}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <History size={14} />
+                      Load Logs Older Than 24 Hours (All Time)
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
             {filteredLogs.length > 0 && (
               <div className="flex flex-col sm:flex-row justify-between items-center p-6 border-t border-slate-100 bg-slate-50/50 gap-4">
-                <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
                     Showing <span className="font-mono text-slate-900 font-black">{(currentPage - 1) * ROWS_PER_PAGE + 1}</span> to <span className="font-mono text-slate-900 font-black">{Math.min(currentPage * ROWS_PER_PAGE, filteredLogs.length)}</span> of <span className="font-mono text-slate-900 font-black">{filteredLogs.length}</span> audit logs
                   </span>
+
+                  {dateRangeFilter === 'TODAY' && (
+                    <button
+                      onClick={() => setDateRangeFilter('ALL')}
+                      className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-[9px] font-black uppercase tracking-wider text-indigo-700 shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <History size={11} className="text-indigo-600" />
+                      Load Older Logs (&gt;24h)
+                    </button>
+                  )}
 
                   {systemLogs.length >= systemLogLimit && (
                     <button

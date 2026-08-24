@@ -41,7 +41,9 @@ import {
   Compass,
   MessageSquare,
   Users,
-  CheckCircle2
+  CheckCircle2,
+  Camera,
+  Sparkles
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { cn } from "../lib/utils";
@@ -49,6 +51,8 @@ import { UserRole } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { SystemHealth } from "./SystemHealth";
 import { AutosendBackupMonitoringPanel } from "./AutosendBackupMonitoringPanel";
+import { UserAvatar } from "./UserAvatar";
+import { AvatarPickerModal } from "./AvatarPickerModal";
 
 export const SettingsPanel: React.FC = () => {
   const { 
@@ -99,6 +103,7 @@ export const SettingsPanel: React.FC = () => {
   }, [currentUser?.activeDevices]);
 
   const devices = Array.isArray(localActiveDevices) ? localActiveDevices : [];
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = React.useState(false);
 
   // Slack Notification States and Live Dispatchers
   const [slackActionLoading, setSlackActionLoading] = React.useState<{ [key: string]: boolean }>({});
@@ -683,25 +688,23 @@ export const SettingsPanel: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* SECTION 1: NON-EDITABLE PROFILE PICTURE & ACCOUNT CARD */}
+                  {/* SECTION 1: PROFILE PICTURE & ACCOUNT CARD */}
                   <div className="p-6 rounded-3xl bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 flex flex-col md:flex-row items-center md:items-start gap-6">
                     <div className="relative group shrink-0">
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden bg-slate-900 text-white flex items-center justify-center font-black text-2xl border-4 border-white dark:border-slate-700 shadow-lg">
-                        {currentUser?.photoURL ? (
-                          <img 
-                            src={currentUser.photoURL} 
-                            alt={currentUser.name || "User Avatar"} 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="tracking-wider">
-                            {currentUser?.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="absolute -bottom-2 -right-2 bg-slate-900 text-amber-400 p-1.5 rounded-xl border-2 border-white dark:border-slate-800 shadow-md" title="Profile picture is non-editable">
-                        <Lock size={13} />
-                      </div>
+                      <UserAvatar 
+                        user={currentUser} 
+                        size="3xl" 
+                        rounded="2xl" 
+                        ring="ring-4 ring-indigo-500/20 shadow-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setIsAvatarModalOpen(true)}
+                        className="absolute -bottom-2 -right-2 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl border-2 border-white dark:border-slate-800 shadow-md transition-transform hover:scale-110 cursor-pointer"
+                        title="Change Profile Picture"
+                      >
+                        <Camera size={14} />
+                      </button>
                     </div>
 
                     <div className="flex-1 text-center md:text-left space-y-3">
@@ -719,10 +722,19 @@ export const SettingsPanel: React.FC = () => {
                         </p>
                       </div>
 
-                      {/* NON-EDITABLE NOTICE BADGE */}
-                      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-bold border border-amber-500/20">
-                        <Lock size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>Profile Picture: System Managed (Non-Editable)</span>
+                      {/* AVATAR ACTIONS */}
+                      <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsAvatarModalOpen(true)}
+                          className="btn-primary px-3.5 py-1.5 text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Camera size={13} />
+                          <span>Update Profile Picture</span>
+                        </button>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Upload custom photo or pick emblem
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1509,6 +1521,26 @@ sudo systemctl enable mongod`}
         </div>
 
       </div>
+
+      {/* Avatar Picker / Photo Upload Modal */}
+      {isAvatarModalOpen && currentUser && (
+        <AvatarPickerModal
+          isOpen={isAvatarModalOpen}
+          onClose={() => setIsAvatarModalOpen(false)}
+          currentPhotoURL={currentUser.photoURL}
+          userName={currentUser.name}
+          userEmail={currentUser.email}
+          onSave={async (newPhotoURL) => {
+            await updateUserProfile(currentUser.id, { photoURL: newPhotoURL });
+            triggerToast({
+              type: "SYSTEM_INFO",
+              severity: "LOW",
+              message: "Profile Picture Updated: Your profile photo has been refreshed successfully.",
+              timestamp: new Date().toISOString()
+            });
+          }}
+        />
+      )}
 
     </div>
   );

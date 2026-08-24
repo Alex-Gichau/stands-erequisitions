@@ -27,6 +27,7 @@ import { useRequisitions } from "../contexts/RequisitionContext";
 import { UserRole } from "../types";
 import { cn } from "../lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { UserAvatar } from "./UserAvatar";
 
 interface SidebarProps {
   currentView: string;
@@ -230,25 +231,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer Profile */}
-      <div className="p-4 border-t border-slate-100 dark:border-white/5">
+      <div className={cn(
+        "border-t border-slate-100 dark:border-white/5 transition-all",
+        isCollapsed ? "p-2 py-3 flex flex-col items-center justify-center" : "p-4"
+      )}>
         <div className={cn(
-          "bg-slate-50 dark:bg-white/5 rounded-2xl p-3 transition-all",
-          isCollapsed ? "flex flex-col items-center gap-4" : "flex items-center gap-4 px-4"
+          "transition-all",
+          isCollapsed 
+            ? "flex flex-col items-center justify-center bg-transparent p-0" 
+            : "bg-slate-50 dark:bg-white/5 rounded-2xl p-3 flex items-center gap-4 px-4"
         )}>
            <div className="relative">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 overflow-hidden flex items-center justify-center text-primary font-bold shadow-inner">
-              {currentUser?.photoURL ? (
-                <img 
-                  src={currentUser.photoURL} 
-                  alt={currentUser.name} 
-                  className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                currentUser?.name?.charAt(0) || "U"
-              )}
-            </div>
-            
+            <UserAvatar 
+              user={currentUser} 
+              size="lg" 
+              rounded="xl" 
+              showStatus={true} 
+              isOnline={true}
+            />
           </div>
 
           {!isCollapsed && (

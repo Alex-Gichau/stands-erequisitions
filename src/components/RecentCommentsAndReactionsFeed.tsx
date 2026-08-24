@@ -6,6 +6,7 @@ import { renderFormattedCommentText } from "../lib/commentFormatUtils";
 import { databaseService } from "../lib/databaseService";
 import { handleReactionLogic } from "./RequisitionsPanel";
 import { motion, AnimatePresence } from "motion/react";
+import { UserAvatar } from "./UserAvatar";
 import { 
   MessageSquare, 
   CheckCircle, 
@@ -516,25 +517,12 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 min-w-0">
                       {/* Avatar Photo or Initial Circle */}
-                      <div className="shrink-0 relative">
-                        {card.authorAvatar ? (
-                          <img
-                            src={card.authorAvatar}
-                            alt={card.authorName}
-                            className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className={cn(
-                            "w-10 h-10 rounded-full ring-2 ring-slate-100 dark:ring-slate-800 font-bold text-xs flex items-center justify-center shadow-2xs",
-                            getAvatarBgColor(card.authorName)
-                          )}>
-                            {getAvatarInitials(card.authorName)}
-                          </div>
-                        )}
-                      </div>
+                      <UserAvatar 
+                        user={{ name: card.authorName, email: card.authorEmail, photoURL: card.authorAvatar }} 
+                        size="md" 
+                        ring="ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs" 
+                        className="shrink-0"
+                      />
 
                       {/* Name & Access Level */}
                       <div className="min-w-0">

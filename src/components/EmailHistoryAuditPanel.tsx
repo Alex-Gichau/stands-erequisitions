@@ -24,7 +24,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Server
+  Server,
+  Users,
+  UserCheck
 } from 'lucide-react';
 import { EmailAuditLog, SystemLog } from '../types';
 import { cn } from '../lib/utils';
@@ -189,6 +191,14 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
 
     const successRate = total > 0 ? Math.round(((delivered + simulated) / total) * 100) : 100;
 
+    // Calculate unique users receiving emails across all merged logs
+    const uniqueRecipientEmails = new Set(
+      allMergedLogs
+        .map(l => (l.recipientEmail || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    const uniqueUsersCount = uniqueRecipientEmails.size;
+
     return {
       total,
       delivered,
@@ -199,7 +209,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       backupEmails,
       securityEmails,
       otherEmails,
-      successRate
+      successRate,
+      uniqueUsersCount
     };
   }, [allMergedLogs]);
 
@@ -216,6 +227,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       backups: number;
       security: number;
       others: number;
+      recipientsCount: number;
     }[] = [];
 
     // If there are no merged email logs, generate real-looking mock trends so the user is greeted with a highly professional chart visual right away
@@ -231,6 +243,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const total = idx % 4 === 0 ? 3 : (idx % 3 === 0 ? 1 : 2);
           const success = total - (idx % 6 === 0 ? 1 : 0);
           const failed = total - success;
+          const recipientsCount = Math.max(1, Math.ceil(total * 0.8));
           
           dataPoints.push({
             label: hourLabel,
@@ -241,7 +254,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions: success > 0 ? Math.ceil(success * 0.7) : 0,
             backups: idx % 3 === 0 ? 1 : 0,
             security: idx % 5 === 0 ? 1 : 0,
-            others: 0
+            others: 0,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '24H') {
@@ -253,6 +267,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const total = idx % 5 === 0 ? 4 : (idx % 3 === 0 ? 2 : 1);
           const success = total - (idx % 8 === 0 ? 1 : 0);
           const failed = total - success;
+          const recipientsCount = Math.max(1, Math.ceil(total * 0.75));
 
           dataPoints.push({
             label: hourLabel,
@@ -263,7 +278,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions: success > 0 ? Math.ceil(success * 0.7) : 0,
             backups: idx % 4 === 0 ? 1 : 0,
             security: idx % 6 === 0 ? 1 : 0,
-            others: 0
+            others: 0,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1D') {
@@ -278,6 +294,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const total = 5 + (idx * 3) % 7;
           const success = total - (idx % 5 === 0 ? 1 : 0);
           const failed = total - success;
+          const recipientsCount = Math.max(1, Math.ceil(total * 0.8));
 
           dataPoints.push({
             label: `${startLabel}-${endLabel}`,
@@ -288,7 +305,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions: Math.max(1, success - 2),
             backups: 1,
             security: idx % 3 === 0 ? 1 : 0,
-            others: 0
+            others: 0,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1M') {
@@ -303,6 +321,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const total = isWeekend ? (1 + idx % 3) : (8 + idx % 8);
           const success = total - (idx % 9 === 0 ? 1 : 0);
           const failed = total - success;
+          const recipientsCount = Math.max(1, Math.ceil(total * 0.7));
 
           dataPoints.push({
             label: dayLabel,
@@ -313,7 +332,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions: Math.max(0, success - 3),
             backups: 1,
             security: isWeekend ? 0 : 1,
-            others: 0
+            others: 0,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1Y') {
@@ -325,6 +345,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const total = 120 + idx * 22 + (idx % 3) * 30;
           const success = Math.floor(total * 0.97);
           const failed = total - success;
+          const recipientsCount = Math.max(5, Math.ceil(total * 0.45));
 
           dataPoints.push({
             label: monthLabel,
@@ -335,7 +356,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions: Math.floor(success * 0.72),
             backups: Math.floor(success * 0.16),
             security: Math.floor(success * 0.09),
-            others: Math.floor(success * 0.03)
+            others: Math.floor(success * 0.03),
+            recipientsCount
           });
         }
       }
@@ -361,6 +383,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const security = logsInHour.filter(l => l.category === 'PASSWORD_RESET').length;
           const others = total - (requisitions + backups + security);
 
+          const recipientsCount = new Set(
+            logsInHour
+              .map(l => (l.recipientEmail || '').trim().toLowerCase())
+              .filter(Boolean)
+          ).size;
+
           const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
           dataPoints.push({
             label: hourLabel,
@@ -371,7 +399,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions,
             backups,
             security,
-            others
+            others,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '24H') {
@@ -395,6 +424,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const security = logsInHour.filter(l => l.category === 'PASSWORD_RESET').length;
           const others = total - (requisitions + backups + security);
 
+          const recipientsCount = new Set(
+            logsInHour
+              .map(l => (l.recipientEmail || '').trim().toLowerCase())
+              .filter(Boolean)
+          ).size;
+
           const hourLabel = d.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
           dataPoints.push({
             label: hourLabel,
@@ -405,7 +440,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions,
             backups,
             security,
-            others
+            others,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1D') {
@@ -429,6 +465,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const security = logsInBlock.filter(l => l.category === 'PASSWORD_RESET').length;
           const others = total - (requisitions + backups + security);
 
+          const recipientsCount = new Set(
+            logsInBlock
+              .map(l => (l.recipientEmail || '').trim().toLowerCase())
+              .filter(Boolean)
+          ).size;
+
           const startLabel = blockStart.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
           const endLabel = blockEnd.toLocaleTimeString('en-KE', { hour: 'numeric', hour12: true });
           dataPoints.push({
@@ -440,7 +482,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions,
             backups,
             security,
-            others
+            others,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1M') {
@@ -464,6 +507,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const security = logsInDay.filter(l => l.category === 'PASSWORD_RESET').length;
           const others = total - (requisitions + backups + security);
 
+          const recipientsCount = new Set(
+            logsInDay
+              .map(l => (l.recipientEmail || '').trim().toLowerCase())
+              .filter(Boolean)
+          ).size;
+
           const dayLabel = d.toLocaleDateString('en-KE', { month: 'short', day: 'numeric' });
           dataPoints.push({
             label: dayLabel,
@@ -474,7 +523,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions,
             backups,
             security,
-            others
+            others,
+            recipientsCount
           });
         }
       } else if (graphTimeframe === '1Y') {
@@ -498,6 +548,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
           const security = logsInMonth.filter(l => l.category === 'PASSWORD_RESET').length;
           const others = total - (requisitions + backups + security);
 
+          const recipientsCount = new Set(
+            logsInMonth
+              .map(l => (l.recipientEmail || '').trim().toLowerCase())
+              .filter(Boolean)
+          ).size;
+
           const monthLabel = d.toLocaleDateString('en-KE', { month: 'short', year: '2-digit' });
           dataPoints.push({
             label: monthLabel,
@@ -508,7 +564,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             requisitions,
             backups,
             security,
-            others
+            others,
+            recipientsCount
           });
         }
       }
@@ -745,7 +802,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
   return (
     <div className="space-y-6">
       {/* 1. Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Email Logs</span>
@@ -758,6 +815,20 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             <span className="text-[10px] font-bold text-slate-500">records</span>
           </div>
           <p className="text-[10px] text-slate-400 font-medium">All logged dispatch events</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recipient Users</span>
+            <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
+              <Users size={16} />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-black text-sky-600">{stats.uniqueUsersCount}</span>
+            <span className="text-[10px] font-bold text-slate-500">recipients</span>
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">Distinct users receiving emails</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
@@ -823,8 +894,12 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">Email Dispatch Audit Volume</h3>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-sky-50 text-sky-700 border border-sky-200">
+                <Users size={10} className="text-sky-600" />
+                {stats.uniqueUsersCount} Recipient User{stats.uniqueUsersCount === 1 ? '' : 's'}
+              </span>
               {chartData.isMock && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 animate-pulse">
                   <Sparkles size={10} />
@@ -832,7 +907,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 font-medium">Real-time mailer analytics & network traffic visualization</p>
+            <p className="text-[10px] text-slate-400 font-medium">Real-time mailer analytics, recipient user activity & network traffic visualization</p>
           </div>
 
           {/* Timeframe Selectors & Breakdown Modes */}
@@ -944,6 +1019,10 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
                               <span className="font-bold text-amber-400 font-sans">SKIPPED:</span>
                               <span className="font-black font-mono text-amber-300">{data.skipped}</span>
                             </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-sky-400 font-sans">RECIPIENT USERS:</span>
+                              <span className="font-black font-mono text-sky-300">{data.recipientsCount} {data.recipientsCount === 1 ? 'user' : 'users'}</span>
+                            </div>
                             <div className="py-1 pt-1.5 flex justify-between gap-6 font-bold border-t border-slate-800">
                               <span className="text-slate-200">TOTAL VOLUME:</span>
                               <span className="font-black font-mono text-white text-xs">{data.total}</span>
@@ -998,6 +1077,10 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
                               <span className="font-bold text-slate-400 font-sans">OTHERS:</span>
                               <span className="font-black font-mono text-slate-300">{data.others}</span>
                             </div>
+                            <div className="py-1 flex justify-between gap-6">
+                              <span className="font-bold text-sky-400 font-sans">RECIPIENT USERS:</span>
+                              <span className="font-black font-mono text-sky-300">{data.recipientsCount} {data.recipientsCount === 1 ? 'user' : 'users'}</span>
+                            </div>
                             <div className="py-1 pt-1.5 flex justify-between gap-6 font-bold border-t border-slate-800">
                               <span className="text-slate-200">TOTAL VOLUME:</span>
                               <span className="font-black font-mono text-white text-xs">{data.total}</span>
@@ -1030,6 +1113,10 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
                 <span className="w-3 h-1.5 bg-rose-500 rounded-sm" />
                 <span className="text-slate-600">Failed Dispatches</span>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-sky-500 rounded-sm" />
+                <span className="text-slate-600">Users Receiving Emails: {stats.uniqueUsersCount} Unique</span>
+              </div>
             </>
           ) : (
             <>
@@ -1048,6 +1135,10 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
               <div className="flex items-center gap-2">
                 <span className="w-3 h-1.5 bg-slate-500 rounded-sm" />
                 <span className="text-slate-600">Others</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-1.5 bg-sky-500 rounded-sm" />
+                <span className="text-slate-600">Users Receiving Emails: {stats.uniqueUsersCount} Unique</span>
               </div>
             </>
           )}

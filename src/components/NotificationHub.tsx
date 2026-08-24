@@ -51,6 +51,7 @@ import {
   ArchiveRestore
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { UserAvatar } from "./UserAvatar";
 
 interface NotificationHubProps {
   onSelectRequisition: (req: Requisition) => void;
@@ -924,20 +925,11 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5 min-w-0">
                                   {/* User Directory Photo or Fallback Gradient */}
-                                  <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 shadow-xs border border-transparent">
-                                    {senderPhoto ? (
-                                      <img 
-                                        src={senderPhoto} 
-                                        alt={item.senderName} 
-                                        className="w-full h-full object-cover rounded-full" 
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className={cn("w-full h-full rounded-full flex items-center justify-center text-white font-black text-[10px] uppercase", item.avatarGradient)}>
-                                        {item.senderName.charAt(0)}
-                                      </div>
-                                    )}
-                                  </div>
+                                  <UserAvatar 
+                                    user={{ name: item.senderName, photoURL: senderPhoto }} 
+                                    size="xs" 
+                                    className="shrink-0 shadow-xs" 
+                                  />
 
                                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                                     {item.senderName}
@@ -1160,20 +1152,11 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                   <div className="space-y-4 pb-6 border-b border-slate-200/80 dark:border-slate-800">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3.5">
-                        <div className="relative w-11 h-11 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-200 dark:border-slate-700">
-                          {detailSenderPhoto ? (
-                            <img 
-                              src={detailSenderPhoto} 
-                              alt={selectedItem.senderName} 
-                              className="w-full h-full object-cover rounded-full" 
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className={cn("w-full h-full rounded-full flex items-center justify-center text-white font-black text-sm uppercase shadow-sm", selectedItem.avatarGradient)}>
-                              {selectedItem.senderName.charAt(0)}
-                            </div>
-                          )}
-                        </div>
+                        <UserAvatar 
+                          user={{ name: selectedItem.senderName, email: selectedItem.senderEmail, photoURL: detailSenderPhoto }} 
+                          size="xl" 
+                          className="shrink-0 shadow-xs" 
+                        />
 
                         <div>
                           <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-100">

@@ -106,6 +106,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PerformanceTracker } from "./components/PerformanceTracker";
+import { UserAvatar } from "./components/UserAvatar";
 
 import { AlertCircle as AlertCircleIcon } from "lucide-react"; // alias if needed or rely on main imports
 
@@ -3056,20 +3057,12 @@ function AppContent() {
                   <span className="text-[10px] font-black text-white uppercase tracking-tight">{(currentUser?.name || "User").split(' ')[0]}</span>
                   <span className="text-[8px] text-primary font-bold uppercase tracking-widest leading-tight">{(currentUser?.role || "USER").split('_')[0]}</span>
                 </div>
-                <div className="w-8 h-8 rounded-full p-[2px] bg-white/10 border border-white/20 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform overflow-hidden">
-                  <div className="w-full h-full rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-primary font-black text-[10px] border border-black/20">
-                    {currentUser?.photoURL ? (
-                      <img
-                        src={currentUser.photoURL}
-                        alt={currentUser?.name || "User"}
-                        className="w-full h-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      (currentUser?.name || "User").charAt(0)
-                    )}
-                  </div>
-                </div>
+                <UserAvatar 
+                  user={currentUser} 
+                  size="sm" 
+                  ring="ring-1 ring-white/20 shadow-xs" 
+                  className="group-hover:scale-110 transition-transform" 
+                />
               </button>
 
               <AnimatePresence>

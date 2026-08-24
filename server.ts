@@ -1534,7 +1534,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
     "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
-    "user_reaction_histories", "notification_states"
+    "user_reaction_histories", "notification_states", "notificationstates"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -1558,18 +1558,24 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "settings": (models as any).Settings,
     "user_reaction_histories": (models as any).UserReactionHistory,
     "user_reaction_history": (models as any).UserReactionHistory,
-    "notification_states": StrictNotificationStateModel
+    "notification_states": StrictNotificationStateModel,
+    "notificationstates": StrictNotificationStateModel
   };
 
   // Bulk get (load all 15 datasets at once)
   /**
    * Fetches all documents from all collections with Valkey in-memory acceleration.
+   * Note: Audit logs are explicitly exempted from cache and always fetched live from DB.
    */
   app.get("/api/db-all", async (req, res) => {
     try {
-      const result = await getCachedJson("col:db-all", async () => {
+      // 1. Fetch cached collections from Valkey (excluding audit_logs)
+      const cachedData = await getCachedJson("col:db-all", async () => {
         const dataMap: any = {};
         for (const col of collectionsList) {
+          if (col === "audit_logs" || col === "system_logs") {
+            continue; // Skip caching audit logs in Valkey
+          }
           if (mongoose.connection.readyState === 1) {
             const Model = modelMappings[col];
             if (Model) {
@@ -1595,6 +1601,37 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         }
         return dataMap;
       }, 300);
+
+      // 2. Always fetch audit_logs and system_logs fresh from live DB / server storage
+      let liveAuditLogs: any[] = [];
+      try {
+        if (mongoose.connection.readyState === 1) {
+          const AuditModel = modelMappings["audit_logs"];
+          if (AuditModel) {
+            const rawLogs = await AuditModel.find({}).sort({ timestamp: -1, createdAt: -1 }).lean();
+            liveAuditLogs = rawLogs.map((item: any) => {
+              const { _id, __v, ...rest } = item;
+              const snakeRest = toSnakeCase(rest);
+              return { id: snakeRest.id || String(_id), ...snakeRest };
+            });
+          }
+        } else {
+          const diskLogs = readJsonCollection("audit_logs");
+          liveAuditLogs = diskLogs.map((item: any) => {
+            const { _id, __v, ...rest } = item;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        }
+      } catch (logErr) {
+        console.error("[db-all] Live audit logs fetch error:", logErr);
+      }
+
+      const result = {
+        ...cachedData,
+        audit_logs: liveAuditLogs,
+        system_logs: liveAuditLogs
+      };
 
       const jsonString = JSON.stringify(result);
       const etag = `"${crypto.createHash("md5").update(jsonString).digest("hex")}"`;
@@ -1692,10 +1729,39 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   // Get all documents in a collection
   /**
    * Fetches all documents in a specific collection with Valkey cache.
+   * Note: Audit logs are explicitly exempted from Valkey cache and fetched live with no-cache headers.
    */
   app.get("/api/db/:collection", async (req, res) => {
     const { collection } = req.params;
     try {
+      if (collection === "audit_logs" || collection === "system_logs") {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings["audit_logs"];
+          if (!Model) {
+            throw new Error(`Unknown collection: ${collection}`);
+          }
+          const data = await Model.find({}).sort({ timestamp: -1, createdAt: -1 }).lean();
+          const clean = data.map((item: any) => {
+            const { _id, __v, ...rest } = item;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+          return res.json(clean);
+        } else {
+          const data = readJsonCollection("audit_logs");
+          const clean = data.map((item: any) => {
+            const { _id, __v, ...rest } = item;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+          return res.json(clean);
+        }
+      }
+
       const cleanData = await getCachedJson(`col:${collection}`, async () => {
         if (mongoose.connection.readyState === 1) {
           const Model = modelMappings[collection];
@@ -1731,6 +1797,31 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   app.get("/api/db/:collection/:id", async (req, res) => {
     const { collection, id } = req.params;
     try {
+      if (collection === "audit_logs" || collection === "system_logs") {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings["audit_logs"];
+          if (!Model) {
+            throw new Error(`Unknown collection: ${collection}`);
+          }
+          const item = await Model.findOne({ id }).lean();
+          if (!item) return res.status(404).json({ error: "Document not found" });
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return res.json({ id: snakeRest.id || String(_id), ...snakeRest });
+        } else {
+          const data = readJsonCollection("audit_logs");
+          const item = data.find((d: any) => d.id === id);
+          if (!item) return res.status(404).json({ error: "Document not found" });
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return res.json({ id: snakeRest.id || String(_id), ...snakeRest });
+        }
+      }
+
       const itemData = await getCachedJson(`col:${collection}:${id}`, async () => {
         if (mongoose.connection.readyState === 1) {
           const Model = modelMappings[collection];

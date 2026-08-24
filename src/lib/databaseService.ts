@@ -519,6 +519,21 @@ export const databaseService = {
   },
 
   // --- SYSTEM LOGS OPERATIONS ---
+  async getAuditLogs(): Promise<SystemLog[]> {
+    console.log(`[DatabaseService] Fetching live audit logs from server (cache-exempt)`);
+    const raw = await apiCall(`/api/db/audit_logs?_t=${Date.now()}`, "GET");
+    if (!Array.isArray(raw)) return [];
+    return raw.map((l: any) => ({
+      id: l?.id?.toString() || `log-${Math.random()}`,
+      action: l?.action || "",
+      details: l?.details || "",
+      performedBy: l?.performed_by || l?.performedBy || "",
+      timestamp: l?.timestamp || "",
+      groupId: l?.group_id || l?.groupId || "",
+      metadata: l?.metadata || null
+    })).filter(Boolean) as SystemLog[];
+  },
+
   async saveAuditLog(log: SystemLog): Promise<void> {
     console.log(`[DatabaseService] Saving audit log to MongoDB`);
     const id = log.id || (log as any)._id || `log-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;

@@ -490,6 +490,7 @@ interface RequisitionContextType {
   deleteUser: (id: string) => Promise<void>;
   adminForceLogoutUser: (id: string) => Promise<void>;
   systemLogs: SystemLog[];
+  refreshAuditLogs: () => Promise<void>;
   addSystemLog: (action: string, details: string, metadata?: any) => Promise<void>;
   churchGroups: ChurchGroup[];
   lastGroupsSync: Date | null;
@@ -1200,6 +1201,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
       
       await databaseService.saveAuditLog(logDoc);
+      setSystemLogs(prev => [logDoc as SystemLog, ...prev]);
 
       // Notify Slack via our internal API proxy
       if (action !== "FINANCE_ALERT_TRIGGERED") {
@@ -1231,6 +1233,17 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.log("Failed to add system log:", err.message);
     }
   }, [currentUser]);
+
+  const refreshAuditLogs = useCallback(async () => {
+    try {
+      const liveLogs = await databaseService.getAuditLogs();
+      if (Array.isArray(liveLogs)) {
+        setSystemLogs(liveLogs);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch live audit logs from server:", err);
+    }
+  }, []);
 
   const dispatchLoginSlackAlert = useCallback(async (userEmail: string, authProvider: string, userId?: string) => {
     try {
@@ -4530,6 +4543,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updateVendor,
       deleteVendor,
       systemLogs,
+      refreshAuditLogs,
       addSystemLog,
       systemLogLimit,
       setSystemLogLimit,

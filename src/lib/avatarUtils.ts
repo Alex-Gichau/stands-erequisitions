@@ -181,8 +181,10 @@ export function resolveUserAvatarUrl(
   let photo = "";
   let name = fallbackName || "";
 
+  let userEmail = "";
   if (typeof userOrUrl === "string") {
     photo = userOrUrl.trim();
+    if (photo.includes("@")) userEmail = photo.toLowerCase();
   } else if (userOrUrl && typeof userOrUrl === "object") {
     photo = (
       userOrUrl.photoURL ||
@@ -194,7 +196,17 @@ export function resolveUserAvatarUrl(
       ""
     ).trim();
 
+    userEmail = (userOrUrl.email || "").toLowerCase().trim();
     name = userOrUrl.name || userOrUrl.displayName || userOrUrl.email || fallbackName || "User";
+  }
+
+  if (!userEmail && fallbackName && fallbackName.includes("@")) {
+    userEmail = fallbackName.toLowerCase().trim();
+  }
+
+  // If no custom photo URL is present, but we have a Google/Gmail login email, fetch Google avatar
+  if (!photo && userEmail && (userEmail.endsWith("@gmail.com") || userEmail.includes("google"))) {
+    photo = `https://unavatar.io/google/${userEmail}`;
   }
 
   const initials = getInitials(name || photo || "User");

@@ -1102,6 +1102,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               dbUser.id = firebaseUser.uid;
             }
 
+            const googlePhoto = firebaseUser.photoURL || (userEmail && userEmail.endsWith("@gmail.com") ? `https://unavatar.io/google/${userEmail}` : "");
+            const currentPhoto = dbUser.photoURL || dbUser.photo_url || "";
+            if (googlePhoto && currentPhoto !== googlePhoto) {
+              dbUser.photoURL = googlePhoto;
+              dbUser.photo_url = googlePhoto;
+              databaseService.saveUserProfile({ ...dbUser, photo_url: googlePhoto, photoURL: googlePhoto }).catch(() => {});
+            }
+
             const isSuperAdmin = dbUser.role === UserRole.SUPER_ADMIN || dbUser.role === "SUPER_ADMIN";
             setCurrentUser(normalizeUserProfile({
               ...dbUser,
@@ -1109,7 +1117,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               isActive: isSuperAdmin ? true : (dbUser.isActive !== undefined ? dbUser.isActive : (dbUser.is_active !== undefined ? dbUser.is_active : true)),
               isApproved: isSuperAdmin ? true : (dbUser.isApproved !== undefined ? dbUser.isApproved : (dbUser.is_approved !== undefined ? dbUser.is_approved : true)),
               isSuspended: dbUser.isSuspended !== undefined ? dbUser.isSuspended : (dbUser.is_suspended !== undefined ? dbUser.is_suspended : false),
-              photoURL: dbUser.photoURL || dbUser.photo_url,
+              photoURL: googlePhoto || dbUser.photoURL || dbUser.photo_url || "",
               tempPassword: dbUser.tempPassword || dbUser.temp_password,
               isOnline: dbUser.isOnline !== undefined ? dbUser.isOnline : (dbUser.is_online !== undefined ? dbUser.is_online : false),
               lastSeen: dbUser.lastSeen || dbUser.last_seen,
@@ -1117,10 +1125,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             } as UserProfile));
           } else {
             const isSuperAdminEmail = userEmail === "gichaumburu@gmail.com";
+            const googlePhoto = firebaseUser.photoURL || (userEmail && userEmail.endsWith("@gmail.com") ? `https://unavatar.io/google/${userEmail}` : "");
             const defaultUser = {
               id: firebaseUser.uid,
               name: firebaseUser.displayName || userEmail || "Alex Gichau",
               email: userEmail || "",
+              photoURL: googlePhoto,
               role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : "CHURCH_GROUP") as UserRole,
               isActive: true,
               isApproved: true,
@@ -1132,10 +1142,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         } catch (err) {
           console.warn("Could not fetch user profile from backend database, setting default:", err);
           const isSuperAdminEmail = userEmail === "gichaumburu@gmail.com";
+          const googlePhoto = firebaseUser.photoURL || (userEmail && userEmail.endsWith("@gmail.com") ? `https://unavatar.io/google/${userEmail}` : "");
           const fallbackUser = {
             id: firebaseUser.uid,
             name: firebaseUser.displayName || userEmail || "Alex Gichau",
             email: userEmail || "",
+            photoURL: googlePhoto,
             role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : "CHURCH_GROUP") as UserRole,
             isActive: true,
             isApproved: true,

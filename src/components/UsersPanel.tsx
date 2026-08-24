@@ -43,7 +43,6 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
-import { AvatarPickerModal } from "./AvatarPickerModal";
 
 export const UsersPanel: React.FC = () => {
   const { 
@@ -224,7 +223,6 @@ export const UsersPanel: React.FC = () => {
   // Custom states for group selection & admin password reset overrides
   const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<any | null>(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
-  const [avatarPickerTargetUser, setAvatarPickerTargetUser] = useState<UserProfile | null>(null);
 
   const handleResetPassword = async (email: string) => {
     setEditError(null);
@@ -1617,16 +1615,6 @@ export const UsersPanel: React.FC = () => {
                       <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-tight truncate">
                         {isModalOpen ? (name || "New Member") : (editName || editingUser?.name)}
                       </h4>
-                      {!isModalOpen && editingUser && (
-                        <button
-                          type="button"
-                          onClick={() => setAvatarPickerTargetUser(editingUser)}
-                          className="px-2.5 py-1 bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 border border-slate-200 dark:border-slate-600 text-primary dark:text-sky-400 text-[10px] font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer shrink-0"
-                        >
-                          <Camera size={12} />
-                          <span>Change Photo / Avatar</span>
-                        </button>
-                      )}
                     </div>
                     <p className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
                       {isModalOpen ? (email || "email@church.com") : editingUser?.email}
@@ -2181,25 +2169,6 @@ export const UsersPanel: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Avatar Picker / Photo Upload Modal for Editing User */}
-      {avatarPickerTargetUser && (
-        <AvatarPickerModal
-          isOpen={!!avatarPickerTargetUser}
-          onClose={() => setAvatarPickerTargetUser(null)}
-          currentPhotoURL={avatarPickerTargetUser.photoURL}
-          userName={avatarPickerTargetUser.name}
-          userEmail={avatarPickerTargetUser.email}
-          onSave={async (newPhotoURL) => {
-            await updateUserProfile(avatarPickerTargetUser.id, { photoURL: newPhotoURL });
-            // Update local editing user state if currently editing
-            if (editingUser?.id === avatarPickerTargetUser.id) {
-              setEditingUser(prev => prev ? { ...prev, photoURL: newPhotoURL } : null);
-            }
-            setAvatarPickerTargetUser(null);
-          }}
-        />
-      )}
     </div>
   );
 };

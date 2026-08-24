@@ -6270,10 +6270,10 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             return acc;
                           }, {});
 
-                          // Attachments for this comment or requisition
+                          // Attachments for this comment
                           const commentAttachments = Array.isArray(comment.attachments) && comment.attachments.length > 0
                             ? comment.attachments
-                            : (comment === topLevelComments[0] && Array.isArray(req.attachments) && req.attachments.length > 0 ? req.attachments : []);
+                            : [];
 
                           return (
                             <div key={comment.id} className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4 relative transition-all group">

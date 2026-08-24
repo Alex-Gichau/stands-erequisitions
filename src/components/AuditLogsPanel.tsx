@@ -18,8 +18,7 @@ import {
   Zap,
   CheckCircle2,
   ChevronLeft,
-  ChevronRight,
-  RefreshCw
+  ChevronRight
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { SystemLog, UserRole } from "../types";
@@ -29,27 +28,12 @@ import { AuditSummaryWidget } from "./AuditSummaryWidget";
 import { EmailHistoryAuditPanel } from "./EmailHistoryAuditPanel";
 
 export const AuditLogsPanel: React.FC = () => {
-  const { systemLogs, refreshAuditLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets, canAccess } = useRequisitions();
+  const { systemLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets, canAccess } = useRequisitions();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedActionFilter, setSelectedActionFilter] = useState("ALL");
   const [selectedLevelFilter, setSelectedLevelFilter] = useState("ALL");
   const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
   const [activeTab, setActiveTab] = useState<'LOGS' | 'EMAILS'>('LOGS');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Always fetch live audit logs from server on panel load
-  useEffect(() => {
-    refreshAuditLogs();
-  }, [refreshAuditLogs]);
-
-  const handleManualRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await refreshAuditLogs();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 400);
-    }
-  };
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 15;
@@ -162,15 +146,6 @@ export const AuditLogsPanel: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleManualRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 text-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-            title="Fetch live audit logs directly from server"
-          >
-            <RefreshCw size={14} className={cn("text-emerald-500", isRefreshing && "animate-spin")} />
-            {isRefreshing ? "Fetching..." : "Live Refresh"}
-          </button>
           <button
             onClick={exportLogsCsv}
             className="flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm cursor-pointer"

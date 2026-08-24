@@ -576,6 +576,45 @@ export const SystemHealth: React.FC<{ updateInterval?: number }> = ({ updateInte
                 </div>
               </div>
 
+              {/* Valkey In-Memory Cache Status Card */}
+              {realHealth.valkey && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-slate-950 border border-slate-800 rounded-lg">
+                  <div className="space-y-1">
+                    <div className="text-[8px] text-slate-500 uppercase font-black">⚡ Valkey In-Memory Cache</div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${realHealth.valkey?.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                      <span className="text-[10px] font-bold text-slate-200">
+                        {realHealth.valkey?.connected ? `ACTIVE (${realHealth.valkey?.latencyMs}ms)` : 'STANDBY (DISK FALLBACK)'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[8px] text-slate-500 uppercase font-black">Keys / Hit Rate</div>
+                    <div className="text-[10px] font-bold text-slate-200">
+                      {realHealth.valkey?.keysCount || 0} KEYS | HIT RATE: {realHealth.valkey?.hitRate || "0%"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch("/api/valkey/flush", { method: "POST" });
+                          const data = await res.json();
+                          alert(data.message || "Flushed cache");
+                          fetchRealHealth();
+                        } catch (err: any) {
+                          alert("Failed to flush Valkey: " + err.message);
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                    >
+                      Flush Cache
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {realHealth.mongodb?.status === 'ok' && realHealth.mongodb?.counts?.church_groups === 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-200 text-[9px] leading-relaxed">
                   <span className="font-bold block mb-1">⚠️ DATABASE IS EMPTY</span>

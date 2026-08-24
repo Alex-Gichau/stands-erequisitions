@@ -490,7 +490,6 @@ interface RequisitionContextType {
   deleteUser: (id: string) => Promise<void>;
   adminForceLogoutUser: (id: string) => Promise<void>;
   systemLogs: SystemLog[];
-  refreshAuditLogs: () => Promise<void>;
   addSystemLog: (action: string, details: string, metadata?: any) => Promise<void>;
   churchGroups: ChurchGroup[];
   lastGroupsSync: Date | null;
@@ -708,6 +707,15 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [customCalendarEvents]);
   const [permissionConfigs, setPermissionConfigs] = useState<PermissionConfig[]>(() => {
+    try {
+      const cached = localStorage.getItem("stands_cache_permissions");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizePermissionConfig).filter(Boolean);
+        }
+      }
+    } catch (e) {}
     return DEFAULT_PERMISSIONS;
   });
   const [loading, setLoading] = useState(true);
@@ -1192,7 +1200,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
       
       await databaseService.saveAuditLog(logDoc);
-      setSystemLogs(prev => [logDoc as SystemLog, ...prev]);
 
       // Notify Slack via our internal API proxy
       if (action !== "FINANCE_ALERT_TRIGGERED") {
@@ -1224,17 +1231,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.log("Failed to add system log:", err.message);
     }
   }, [currentUser]);
-
-  const refreshAuditLogs = useCallback(async () => {
-    try {
-      const liveLogs = await databaseService.getAuditLogs();
-      if (Array.isArray(liveLogs)) {
-        setSystemLogs(liveLogs);
-      }
-    } catch (err) {
-      console.warn("Failed to fetch live audit logs from server:", err);
-    }
-  }, []);
 
   const dispatchLoginSlackAlert = useCallback(async (userEmail: string, authProvider: string, userId?: string) => {
     try {
@@ -1284,7 +1280,13 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const updateSystemSettings = useCallback(async (updates: Partial<SystemSettings>) => {
-    setSystemSettings(prev => ({ ...prev, ...updates }));
+    setSystemSettings(prev => {
+      const nextSettings = { ...prev, ...updates };
+      try {
+        localStorage.setItem("stands_cache_system_settings", JSON.stringify(nextSettings));
+      } catch (e) {}
+      return nextSettings;
+    });
 
     try {
       await databaseService.saveSettings(updates);
@@ -1308,6 +1310,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           actions: { ...(next[idx].actions || {}), ...(updates.actions || {}) }
         };
         next[idx] = updatedConfig;
+        try {
+          localStorage.setItem("stands_cache_permissions", JSON.stringify(next));
+        } catch (e) {}
         return next;
       }
       updatedConfig = {
@@ -1317,7 +1322,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         actions: { ...(updates.actions || {}) },
         ...updates
       };
-      return [...prev, updatedConfig];
+      const next = [...prev, updatedConfig];
+      try {
+        localStorage.setItem("stands_cache_permissions", JSON.stringify(next));
+      } catch (e) {}
+      return next;
     });
 
     try {
@@ -1845,6 +1854,86 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw err;
     }
   }, [vendors, addSystemLog]);
+
+  // background-refresh local caching strategy using localStorage
+  useEffect(() => {
+    if (currentUser && currentUser.id) {
+      if (typeof window !== "undefined") {
+        try {
+          const cachedReqs = localStorage.getItem(`stands_cache_reqs_${currentUser.id}`);
+          if (cachedReqs) {
+            const parsed = JSON.parse(cachedReqs);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setRequisitions(parsed);
+            }
+          }
+
+          const cachedProjects = localStorage.getItem(`stands_cache_projects_${currentUser.id}`);
+          if (cachedProjects) {
+            const parsed = JSON.parse(cachedProjects);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setProjects(parsed);
+            }
+          }
+
+          const cachedVendors = localStorage.getItem(`stands_cache_vendors_${currentUser.id}`);
+          if (cachedVendors) {
+            const parsed = JSON.parse(cachedVendors);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setVendors(parsed);
+            }
+          }
+
+          const cachedSettings = localStorage.getItem("stands_cache_system_settings");
+          if (cachedSettings) {
+            setSystemSettings(JSON.parse(cachedSettings));
+          }
+        } catch (err) {
+          console.log("[Cache] Failed to load cached data:", err);
+        }
+      }
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (currentUser && currentUser.id && requisitions.length > 0) {
+      try {
+        localStorage.setItem(`stands_cache_reqs_${currentUser.id}`, JSON.stringify(requisitions));
+      } catch (err) {
+        console.log("[Cache] Failed to cache requisitions:", err);
+      }
+    }
+  }, [requisitions, currentUser?.id]);
+
+  useEffect(() => {
+    if (currentUser && currentUser.id && projects.length > 0) {
+      try {
+        localStorage.setItem(`stands_cache_projects_${currentUser.id}`, JSON.stringify(projects));
+      } catch (err) {
+        console.log("[Cache] Failed to cache projects:", err);
+      }
+    }
+  }, [projects, currentUser?.id]);
+
+  useEffect(() => {
+    if (currentUser && currentUser.id && vendors.length > 0) {
+      try {
+        localStorage.setItem(`stands_cache_vendors_${currentUser.id}`, JSON.stringify(vendors));
+      } catch (err) {
+        console.log("[Cache] Failed to cache vendors:", err);
+      }
+    }
+  }, [vendors, currentUser?.id]);
+
+  useEffect(() => {
+    if (systemSettings) {
+      try {
+        localStorage.setItem("stands_cache_system_settings", JSON.stringify(systemSettings));
+      } catch (err) {
+        console.log("[Cache] Failed to cache system settings:", err);
+      }
+    }
+  }, [systemSettings]);
 
   // Stable properties of currentUser to avoid redundant subscription triggers
   const currentUserId = currentUser?.id || "";
@@ -2413,6 +2502,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                   }));
                 });
                 const result = Array.from(map.values());
+                try {
+                  localStorage.setItem("stands_cache_permissions", JSON.stringify(result));
+                } catch (e) {}
                 return result;
               });
             }
@@ -2435,6 +2527,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                   requisitionExpiryDays: Number(systemDoc.requisition_expiry_days || systemDoc.requisitionExpiryDays) || prev.requisitionExpiryDays,
                   isSystemOffline: Boolean(systemDoc.is_system_offline !== undefined ? systemDoc.is_system_offline : (systemDoc.isSystemOffline !== undefined ? systemDoc.isSystemOffline : prev.isSystemOffline))
                 };
+                try {
+                  localStorage.setItem("stands_cache_system_settings", JSON.stringify(nextSettings));
+                } catch (e) {}
                 return nextSettings;
               });
             }
@@ -2841,10 +2936,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const userGroup = currentUser?.group || "General Ministry";
     const currentUserId = currentUser?.id || auth.currentUser?.uid;
 
-    // 1. Immediately reset state for instant UI response
+    // 1. Immediately reset state and local cache for instant UI response
     setCurrentUser(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("override_authorized_user_email");
+      localStorage.removeItem("stands_cache_user");
       sessionStorage.removeItem("slack_session_");
     }
 
@@ -2899,7 +2995,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const updatedUser = { ...existingUser, isApproved: true };
         
         // Optimistic local state update
-        setUsers(prev => prev.map(u => u.id === id ? updatedUser : u));
+        setUsers(prev => {
+          const next = prev.map(u => u.id === id ? updatedUser : u);
+          try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
         if (currentUser?.id === id) {
           setCurrentUser(prev => prev ? { ...prev, isApproved: true } : prev);
         }
@@ -2920,7 +3020,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const updatedUser = { ...existingUser, isSuspended };
         
         // Optimistic local state update
-        setUsers(prev => prev.map(u => u.id === id ? updatedUser : u));
+        setUsers(prev => {
+          const next = prev.map(u => u.id === id ? updatedUser : u);
+          try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
         if (currentUser?.id === id) {
           setCurrentUser(prev => prev ? { ...prev, isSuspended } : prev);
         }
@@ -2941,7 +3045,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const updatedUser = { ...existingUser, role };
         
         // Optimistic local state update
-        setUsers(prev => prev.map(u => u.id === id ? updatedUser : u));
+        setUsers(prev => {
+          const next = prev.map(u => u.id === id ? updatedUser : u);
+          try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
         if (currentUser?.id === id) {
           setCurrentUser(prev => prev ? { ...prev, role } : prev);
         }
@@ -2970,9 +3078,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // 1. Optimistic update: Update React state immediately (0ms UI lag)
       setUsers(prev => {
         const exists = prev.some(u => u.id === id);
-        return exists 
+        const next = exists 
           ? prev.map(u => u.id === id ? { ...u, ...updates } : u)
           : [...prev, updatedUser];
+        try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
+        return next;
       });
 
       if (currentUser?.id === id) {
@@ -3103,8 +3213,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error("Unauthorized: Only Super Admins can delete other Super Admins.");
     }
 
-    // Optimistic removal from React state
-    setUsers(prev => prev.filter(u => u.id !== id));
+    // Optimistic removal from React state & localStorage
+    setUsers(prev => {
+      const next = prev.filter(u => u.id !== id);
+      try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
 
     try {
       await databaseService.deleteUser(id);
@@ -4416,7 +4530,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       updateVendor,
       deleteVendor,
       systemLogs,
-      refreshAuditLogs,
       addSystemLog,
       systemLogLimit,
       setSystemLogLimit,

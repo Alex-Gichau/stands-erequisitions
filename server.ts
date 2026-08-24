@@ -14,6 +14,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import uploadsRouter from "./uploads.ts";
 import mime from "mime-types";
+import { getCachedJson, invalidateCollectionCache, getValkeyStatus, flushValkeyCache, setValkeyKey } from "./server/valkey.ts";
 
 dotenv.config();
 
@@ -1533,7 +1534,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
     "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
-    "user_reaction_histories", "notification_states", "notificationstates"
+    "user_reaction_histories", "notification_states"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -1557,48 +1558,56 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     "settings": (models as any).Settings,
     "user_reaction_histories": (models as any).UserReactionHistory,
     "user_reaction_history": (models as any).UserReactionHistory,
-    "notification_states": StrictNotificationStateModel,
-    "notificationstates": StrictNotificationStateModel
+    "notification_states": StrictNotificationStateModel
   };
 
-  // Bulk get (load all datasets at once directly from DB/disk)
+  // Bulk get (load all 15 datasets at once)
+  /**
+   * Fetches all documents from all collections with Valkey in-memory acceleration.
+   */
   app.get("/api/db-all", async (req, res) => {
     try {
-      const dataMap: any = {};
-      for (const col of collectionsList) {
-        if (mongoose.connection.readyState === 1) {
-          const Model = modelMappings[col];
-          if (Model) {
-            const data = await Model.find({}).lean();
+      const result = await getCachedJson("col:db-all", async () => {
+        const dataMap: any = {};
+        for (const col of collectionsList) {
+          if (mongoose.connection.readyState === 1) {
+            const Model = modelMappings[col];
+            if (Model) {
+              const data = await Model.find({}).lean();
+              dataMap[col] = data.map((item: any) => {
+                const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+                const { _id, __v, ...rest } = sanitized;
+                const snakeRest = toSnakeCase(rest);
+                return { id: snakeRest.id || String(_id), ...snakeRest };
+              });
+            } else {
+              dataMap[col] = [];
+            }
+          } else {
+            const data = readJsonCollection(col);
             dataMap[col] = data.map((item: any) => {
               const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
               const { _id, __v, ...rest } = sanitized;
               const snakeRest = toSnakeCase(rest);
               return { id: snakeRest.id || String(_id), ...snakeRest };
             });
-          } else {
-            dataMap[col] = [];
           }
-        } else {
-          const data = readJsonCollection(col);
-          dataMap[col] = data.map((item: any) => {
-            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-            const { _id, __v, ...rest } = sanitized;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
         }
+        return dataMap;
+      }, 300);
+
+      const jsonString = JSON.stringify(result);
+      const etag = `"${crypto.createHash("md5").update(jsonString).digest("hex")}"`;
+
+      res.setHeader("ETag", etag);
+      res.setHeader("Cache-Control", "private, no-cache, must-revalidate");
+
+      const ifNoneMatch = req.headers["if-none-match"];
+      if (ifNoneMatch && (ifNoneMatch === etag || ifNoneMatch === etag.replace(/"/g, ''))) {
+        return res.status(304).end();
       }
 
-      if (dataMap.audit_logs && !dataMap.system_logs) {
-        dataMap.system_logs = dataMap.audit_logs;
-      }
-
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-
-      res.json(dataMap);
+      res.type("application/json").send(jsonString);
     } catch (err: any) {
       console.error("[MongoDB Bulk Get] Error:", err);
       res.status(500).json({ error: err.message || err });
@@ -1608,30 +1617,30 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   // --- EXPLICIT REQUISITIONS ENDPOINTS ---
   /**
    * @route   GET /api/requisitions
-   * @desc    Retrieve all requisitions directly from DB / JSON
+   * @desc    Retrieve all requisitions with Valkey in-memory acceleration
    */
   app.get("/api/requisitions", async (req, res) => {
     try {
-      let cleanData: any[] = [];
-      if (mongoose.connection.readyState === 1) {
-        const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
-        cleanData = data.map((item: any) => {
-          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-          const { _id, __v, ...rest } = sanitized;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
-        });
-      } else {
-        const data = readJsonCollection("requisitions");
-        cleanData = data.map((item: any) => {
-          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-          const { _id, __v, ...rest } = sanitized;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
-        });
-      }
+      const cleanData = await getCachedJson("col:requisitions", async () => {
+        if (mongoose.connection.readyState === 1) {
+          const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
+          return data.map((item: any) => {
+            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+            const { _id, __v, ...rest } = sanitized;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        } else {
+          const data = readJsonCollection("requisitions");
+          return data.map((item: any) => {
+            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+            const { _id, __v, ...rest } = sanitized;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        }
+      }, 300);
 
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
       res.json(cleanData);
     } catch (err: any) {
       console.error("[GET /api/requisitions Error]:", err);
@@ -1641,7 +1650,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
 
   /**
    * @route   POST /api/requisitions
-   * @desc    Create or update a requisition in MongoDB / JSON
+   * @desc    Create or update a requisition in MongoDB / JSON and invalidate Valkey cache
    */
   app.post("/api/requisitions", express.json({ limit: "50mb" }), async (req, res) => {
     try {
@@ -1672,6 +1681,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         resultData = payload;
       }
 
+      await invalidateCollectionCache("requisitions");
       res.status(201).json(resultData);
     } catch (err: any) {
       console.error("[POST /api/requisitions Error]:", err);
@@ -1680,36 +1690,35 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   });
 
   // Get all documents in a collection
+  /**
+   * Fetches all documents in a specific collection with Valkey cache.
+   */
   app.get("/api/db/:collection", async (req, res) => {
     const { collection } = req.params;
     try {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-
-      if (mongoose.connection.readyState === 1) {
-        const Model = modelMappings[collection];
-        if (!Model) {
-          throw new Error(`Unknown collection: ${collection}`);
+      const cleanData = await getCachedJson(`col:${collection}`, async () => {
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings[collection];
+          if (!Model) {
+            throw new Error(`Unknown collection: ${collection}`);
+          }
+          const data = await Model.find({}).lean();
+          return data.map((item: any) => {
+            const { _id, __v, ...rest } = item;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        } else {
+          const data = readJsonCollection(collection);
+          return data.map((item: any) => {
+            const { _id, __v, ...rest } = item;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
         }
-        const data = await Model.find({}).sort(collection === "audit_logs" || collection === "system_logs" ? { timestamp: -1, createdAt: -1 } : {}).lean();
-        const clean = data.map((item: any) => {
-          const sanitized = collection === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-          const { _id, __v, ...rest } = sanitized;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
-        });
-        return res.json(clean);
-      } else {
-        const data = readJsonCollection(collection);
-        const clean = data.map((item: any) => {
-          const sanitized = collection === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-          const { _id, __v, ...rest } = sanitized;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
-        });
-        return res.json(clean);
-      }
+      }, 300);
+
+      res.json(cleanData);
     } catch (err: any) {
       if (err.message?.startsWith("Unknown collection")) {
         return res.status(400).json({ error: err.message });
@@ -1722,30 +1731,32 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   app.get("/api/db/:collection/:id", async (req, res) => {
     const { collection, id } = req.params;
     try {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-
-      if (mongoose.connection.readyState === 1) {
-        const Model = modelMappings[collection];
-        if (!Model) {
-          throw new Error(`Unknown collection: ${collection}`);
+      const itemData = await getCachedJson(`col:${collection}:${id}`, async () => {
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings[collection];
+          if (!Model) {
+            throw new Error(`Unknown collection: ${collection}`);
+          }
+          const item = await Model.findOne({ id }).lean();
+          if (!item) return null;
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
+        } else {
+          const data = readJsonCollection(collection);
+          const item = data.find((d: any) => d.id === id);
+          if (!item) return null;
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
         }
-        const item = await Model.findOne({ id }).lean();
-        if (!item) return res.status(404).json({ error: "Document not found" });
-        const sanitized = collection === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-        const { _id, __v, ...rest } = sanitized;
-        const snakeRest = toSnakeCase(rest);
-        return res.json({ id: snakeRest.id || String(_id), ...snakeRest });
-      } else {
-        const data = readJsonCollection(collection);
-        const item = data.find((d: any) => d.id === id);
-        if (!item) return res.status(404).json({ error: "Document not found" });
-        const sanitized = collection === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-        const { _id, __v, ...rest } = sanitized;
-        const snakeRest = toSnakeCase(rest);
-        return res.json({ id: snakeRest.id || String(_id), ...snakeRest });
+      }, 300);
+
+      if (!itemData) {
+        return res.status(404).json({ error: "Document not found" });
       }
+
+      res.json(itemData);
     } catch (err: any) {
       if (err.message?.startsWith("Unknown collection")) {
         return res.status(400).json({ error: err.message });
@@ -1787,6 +1798,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         responsePayload = { success: true, id, data: payload };
       }
 
+      await invalidateCollectionCache(collection);
       res.json(responsePayload);
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -1825,6 +1837,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         writeJsonCollection(collection, list);
       }
 
+      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -1862,6 +1875,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         writeJsonCollection(collection, list);
       }
 
+      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -1884,14 +1898,126 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         writeJsonCollection(collection, filtered);
       }
 
+      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
     }
   });
 
+  // Dedicated Valkey Diagnostic Endpoints
+  app.get("/api/valkey/status", async (req, res) => {
+    const status = await getValkeyStatus();
+    res.json(status);
+  });
+
+  app.post("/api/valkey/flush", async (req, res) => {
+    const success = await flushValkeyCache();
+    res.json({ success, message: success ? "Valkey in-memory cache flushed successfully." : "Failed to flush Valkey cache or Valkey server offline." });
+  });
+
+  // Valkey Cache Warmup Endpoint for Frequent Church Groups and Active Requisitions
+  app.all("/api/valkey/warmup", async (req, res) => {
+    try {
+      const summary = {
+        dbAllCached: false,
+        churchGroupsCount: 0,
+        activeReqsCount: 0
+      };
+
+      // 1. Warm up db-all cache
+      await getCachedJson("col:db-all", async () => {
+        const dataMap: any = {};
+        for (const col of collectionsList) {
+          if (mongoose.connection.readyState === 1) {
+            const Model = modelMappings[col];
+            if (Model) {
+              const data = await Model.find({}).lean();
+              dataMap[col] = data.map((item: any) => {
+                const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+                const { _id, __v, ...rest } = sanitized;
+                const snakeRest = toSnakeCase(rest);
+                return { id: snakeRest.id || String(_id), ...snakeRest };
+              });
+            } else {
+              dataMap[col] = [];
+            }
+          } else {
+            const data = readJsonCollection(col);
+            dataMap[col] = data.map((item: any) => {
+              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+              const { _id, __v, ...rest } = sanitized;
+              const snakeRest = toSnakeCase(rest);
+              return { id: snakeRest.id || String(_id), ...snakeRest };
+            });
+          }
+        }
+        return dataMap;
+      }, 600);
+      summary.dbAllCached = true;
+
+      // 2. Fetch & warm up church group configurations into Valkey individually
+      const groups = await getCachedJson("col:church_groups", async () => {
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings["church_groups"];
+          return Model ? (await Model.find({}).lean()) : [];
+        } else {
+          return readJsonCollection("church_groups");
+        }
+      }, 600);
+
+      if (Array.isArray(groups)) {
+        for (const g of groups) {
+          const gId = g.id || g.groupId || String(g._id);
+          if (gId) {
+            const snakeGroup = toSnakeCase(g);
+            await setValkeyKey(`col:church_groups:${gId}`, { id: gId, ...snakeGroup }, 600);
+            summary.churchGroupsCount++;
+          }
+        }
+      }
+
+      // 3. Fetch & warm up active requisitions into Valkey individually
+      const reqs = await getCachedJson("col:requisitions", async () => {
+        if (mongoose.connection.readyState === 1) {
+          const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
+          return data.map((item: any) => {
+            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+            const { _id, __v, ...rest } = sanitized;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        } else {
+          const data = readJsonCollection("requisitions");
+          return data.map((item: any) => {
+            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+            const { _id, __v, ...rest } = sanitized;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
+        }
+      }, 600);
+
+      if (Array.isArray(reqs)) {
+        for (const r of reqs) {
+          if (r && r.id && r.status !== "DISBURSED" && r.status !== "REJECTED" && r.status !== "CANCELLED") {
+            await setValkeyKey(`col:requisitions:${r.id}`, r, 600);
+            summary.activeReqsCount++;
+          }
+        }
+      }
+
+      res.json({ success: true, message: "Valkey cache successfully warmed up with church group configurations and active requisition IDs.", summary });
+    } catch (err: any) {
+      console.error("[Valkey Warmup Endpoint Error]:", err);
+      res.status(500).json({ error: err.message || err });
+    }
+  });
+
   // GET health endpoint for periodic status checks in UI
   app.get("/api/system-health", async (req, res) => {
+    const valkeyInfo = await getValkeyStatus();
+
     const report: any = {
       mongodb: {
         status: mongoose.connection.readyState === 1 ? "ok" : "disconnected",
@@ -1899,6 +2025,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         database: mongoose.connection.db ? mongoose.connection.db.databaseName : "None",
         counts: {}
       },
+      valkey: valkeyInfo,
       recommendations: []
     };
 
@@ -1908,9 +2035,15 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       report.recommendations.push("🟢 LOCAL MONGO CONNECTED: Successfully verified live communication with local MongoDB server.");
     }
 
+    if (valkeyInfo.connected) {
+      report.recommendations.push(`⚡ VALKEY CACHE ACTIVE: Valkey key-value store connected at ${valkeyInfo.endpoint} (Latency: ${valkeyInfo.latencyMs}ms, Keys: ${valkeyInfo.keysCount}, Hit Rate: ${valkeyInfo.hitRate}).`);
+    } else {
+      report.recommendations.push(`ℹ️ VALKEY CACHE STANDBY: Valkey key-value store is not running at ${valkeyInfo.endpoint}. System is operating on disk/DB fallback mode.`);
+    }
+
     try {
       if (mongoose.connection.readyState === 1) {
-        for (const col of collectionsList) {
+        for (const col of ["users", "requisitions", "church_groups"]) {
           const Model = modelMappings[col];
           if (Model) {
             const ct = await Model.countDocuments();
@@ -1920,9 +2053,8 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
           }
         }
       } else {
-        for (const col of collectionsList) {
-          const data = readJsonCollection(col);
-          report.mongodb.counts[col] = Array.isArray(data) ? data.length : 0;
+        for (const col of ["users", "requisitions", "church_groups"]) {
+          report.mongodb.counts[col] = 0;
         }
       }
     } catch (e: any) {

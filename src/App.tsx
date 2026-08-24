@@ -415,7 +415,34 @@ function AppContent() {
     };
   }, [clearAuthFields]);
 
+  // Standard best-practice pre-fetch: As soon as login page loads, warm up Valkey cache and fetch all dashboard data
+  useEffect(() => {
+    const prefetchDashboardData = async () => {
+      try {
+        // Trigger Valkey cache warmup for frequent church group configs and active requisition IDs
+        fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
 
+        const res = await fetch("/api/db-all");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === "object") {
+            if (data.system_settings) {
+              localStorage.setItem("stands_cache_system_settings", JSON.stringify(data.system_settings));
+            }
+            if (data.church_groups) {
+              localStorage.setItem("stands_cache_church_groups", JSON.stringify(data.church_groups));
+            }
+            if (data.requisitions) {
+              localStorage.setItem("stands_cache_reqs_global", JSON.stringify(data.requisitions));
+            }
+          }
+        }
+      } catch (err) {
+        // Silently handle background prefetch warmup
+      }
+    };
+    prefetchDashboardData();
+  }, []);
 
   useEffect(() => {
     const inviteStr = sessionStorage.getItem("requisition_invite");
@@ -606,7 +633,7 @@ function AppContent() {
 
   const hasRedirectedRef = useRef(false);
 
-  // Redirect to dashboard upon successful login and trigger splash intro
+  // Redirect to dashboard upon successful login and trigger splash intro + Valkey cache warmup
   useEffect(() => {
     if (currentUser) {
       if (!hasRedirectedRef.current) {
@@ -617,6 +644,8 @@ function AppContent() {
         setShowSplash(true);
         hasShownSplashRef.current = true;
       }
+      // Automatically warm up Valkey cache with church group configs and active requisitions upon login
+      fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
     } else {
       hasRedirectedRef.current = false;
       hasShownSplashRef.current = false;
@@ -647,7 +676,26 @@ function AppContent() {
           r.id.replace(/^req-/, "") === targetReqId.replace(/^req-/, "")
         );
 
-        // Step B: Direct fallback to backend endpoint if not found in current state array
+        // Step B: Search local storage cache if not found in current state array
+        if (!reqData && currentUser?.id) {
+          try {
+            const cachedStr = localStorage.getItem(`stands_cache_reqs_${currentUser.id}`);
+            if (cachedStr) {
+              const cachedArr = JSON.parse(cachedStr);
+              if (Array.isArray(cachedArr)) {
+                reqData = cachedArr.find((r: any) => 
+                  r.id === targetReqId || 
+                  r.id.toLowerCase() === targetReqId.toLowerCase() ||
+                  r.id.replace(/^req-/, "") === targetReqId.replace(/^req-/, "")
+                );
+              }
+            }
+          } catch (cacheErr) {
+            console.warn("Failed parsing cached requisitions from local storage:", cacheErr);
+          }
+        }
+
+        // Step C: Fallback to backend endpoint if available
         if (!reqData) {
           try {
             const res = await fetch(`/api/db/requisitions/${targetReqId}`);
@@ -1157,7 +1205,7 @@ function AppContent() {
         >
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-xl font-black uppercase tracking-widest text-primary/80">STANDS FINANCE</h2>
-          <p className="text-slate-400 text-[10px] mt-2 font-mono tracking-tighter uppercase">We Are Setting You Up!</p>
+          <p className="text-slate-400 text-[10px] mt-2 font-mono tracking-tighter uppercase">Logging in.</p>
         </motion.div>
       </div>
     );

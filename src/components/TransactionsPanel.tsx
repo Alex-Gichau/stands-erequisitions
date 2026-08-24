@@ -260,6 +260,11 @@ const TransactionsPanel: React.FC = () => {
                 placeholder="Search history by Reference ID, Vendor, or Amount (e.g. MPESA-123, John, 5000)..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setTimeout(() => setSearchTerm(""), 1000);
+                  }
+                }}
                 className="w-full bg-white border-2 border-slate-100 rounded-2xl py-2.5 pl-11 pr-10 text-sm focus:outline-none focus:ring-4 focus:ring-sky-50 focus:border-sky-600 transition-all font-medium text-slate-800 placeholder:text-slate-400"
               />
               {searchTerm && (

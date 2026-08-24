@@ -1987,8 +1987,23 @@ export const FinanceLedgerPanel: React.FC = () => {
                   placeholder="Filter key words or voucher..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setTimeout(() => setSearchTerm(""), 1000);
+                    }
+                  }}
+                  className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="Clear search"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
 
               {/* Project selector */}

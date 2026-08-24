@@ -1003,8 +1003,23 @@ export const VendorsPanel: React.FC = () => {
                   placeholder="Filter by name, offerings or contact details..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-14 pr-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[11px] md:text-xs font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 tracking-wider focus:outline-none focus:border-primary/30 focus:bg-white shadow-sm transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setTimeout(() => setSearchTerm(""), 1000);
+                    }
+                  }}
+                  className="w-full pl-14 pr-10 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[11px] md:text-xs font-bold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 tracking-wider focus:outline-none focus:border-primary/30 focus:bg-white shadow-sm transition-all"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                    title="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl overflow-x-auto no-scrollbar whitespace-nowrap">

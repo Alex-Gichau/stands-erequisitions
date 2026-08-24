@@ -2431,6 +2431,9 @@ function AppContent() {
                       setIsSearchFocused(false);
                       handleNavigate("requisitions");
                       (e.target as HTMLInputElement).blur();
+                      setTimeout(() => {
+                        setGlobalSearchTerm("");
+                      }, 1000);
                     }
                   }}
                 />

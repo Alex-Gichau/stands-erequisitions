@@ -2512,6 +2512,12 @@ export const RequisitionsPanel: React.FC = () => {
 
   // Listen for navigation button clicks to always open home section of requisitions
   useEffect(() => {
+    if (viewingReq) {
+      setGlobalSearchTerm("");
+    }
+  }, [viewingReq, setGlobalSearchTerm]);
+
+  useEffect(() => {
     const handleResetHome = () => {
       setViewingReq(null);
       setIsAdding(false);
@@ -3131,12 +3137,30 @@ export const RequisitionsPanel: React.FC = () => {
           <input 
             type="text" 
             placeholder="Search documents..." 
-            className="w-full pl-11 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-primary/40 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+            className="w-full pl-11 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-primary/40 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
             value={globalSearchTerm}
             onChange={(e) => setGlobalSearchTerm(e.target.value)}
             onFocus={() => setShowTrending(true)}
             onBlur={() => setTimeout(() => setShowTrending(false), 200)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setShowTrending(false);
+                setTimeout(() => {
+                  setGlobalSearchTerm("");
+                }, 1000);
+              }
+            }}
           />
+          {globalSearchTerm && (
+            <button
+              type="button"
+              onClick={() => setGlobalSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+              title="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
           
           {/* Trending Searches Dropdown */}
           <AnimatePresence>

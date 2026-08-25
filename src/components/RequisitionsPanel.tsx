@@ -2697,7 +2697,34 @@ export const RequisitionsPanel: React.FC = () => {
       return inGroupName || inGroupId || inProjectName || inProjectId;
     };
 
-    const canSee = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN || req.groupId === currentUser?.group;
+    const userGroups = [
+      ...(currentUser?.groups || []),
+      ...(currentUser?.group ? [currentUser.group] : [])
+    ];
+
+    const isAdminOrFinance = 
+      currentUser?.role === UserRole.ADMIN || 
+      currentUser?.role === UserRole.SUPER_ADMIN || 
+      currentUser?.role === UserRole.FINANCE ||
+      canPerform('canDisburse') ||
+      canPerform('canManageBudgets');
+
+    const isApprover = 
+      currentUser?.role === UserRole.APPROVER_L1 || 
+      currentUser?.role === UserRole.APPROVER_L2 ||
+      canPerform('canApproveL1') ||
+      canPerform('canApproveL2');
+
+    const isOwner = 
+      Boolean(req.requesterId && req.requesterId === currentUser?.id) || 
+      Boolean(req.requesterEmail && currentUser?.email && req.requesterEmail.toLowerCase() === currentUser.email.toLowerCase());
+
+    const isGroupMember = 
+      userGroups.length > 0 
+        ? userGroups.includes(req.groupId) || userGroups.includes(req.groupName)
+        : req.groupId === currentUser?.group;
+
+    const canSee = isAdminOrFinance || isApprover || isOwner || isGroupMember;
     
     return matchesSearch && matchesStatus && matchesDateRange() && matchesPreset() && matchesBudgetLine() && canSee;
   }).sort((a, b) => {

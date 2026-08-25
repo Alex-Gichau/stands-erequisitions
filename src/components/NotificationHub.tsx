@@ -98,6 +98,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
 
   const [activeTab, setActiveTab] = useState<"ALL" | "REQUISITIONS" | "APPROVALS" | "PAYOUTS" | "ALERTS" | "STARRED" | "ARCHIVED" | "TRASH">("ALL");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showOlderNotifications, setShowOlderNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -110,6 +111,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       setActiveTab("ALL");
       setShowUnreadOnly(false);
       setSearchQuery("");
+      setShowOlderNotifications(false);
     };
     window.addEventListener("reset_notifications_home", handleResetHome);
     return () => window.removeEventListener("reset_notifications_home", handleResetHome);
@@ -402,8 +404,8 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     return counts;
   }, [notificationItems, readNoticeIds, deletedNoticeIds, archivedNoticeIds, starredNoticeIds]);
 
-  // Filter items based on active tab, unread toggle, and search query
-  const filteredItems = useMemo(() => {
+  // Filter items based on active tab, unread toggle, search query, and current week / older preference
+  const { filteredItems, currentWeekItems, olderItems, displayedItems } = useMemo(() => {
     let result = notificationItems;
 
     if (activeTab === "TRASH") {
@@ -447,8 +449,28 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       );
     }
 
-    return [...result].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [notificationItems, activeTab, showUnreadOnly, searchQuery, readNoticeIds, starredNoticeIds, archivedNoticeIds, deletedNoticeIds]);
+    const sorted = [...result].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Cutoff for current week (last 7 days)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const currentWeek = sorted.filter(item => {
+      const t = new Date(item.timestamp).getTime();
+      return isNaN(t) || t >= sevenDaysAgo;
+    });
+    const older = sorted.filter(item => {
+      const t = new Date(item.timestamp).getTime();
+      return !isNaN(t) && t < sevenDaysAgo;
+    });
+
+    const displayed = showOlderNotifications ? sorted : currentWeek;
+
+    return {
+      filteredItems: sorted,
+      currentWeekItems: currentWeek,
+      olderItems: older,
+      displayedItems: displayed
+    };
+  }, [notificationItems, activeTab, showUnreadOnly, searchQuery, readNoticeIds, starredNoticeIds, archivedNoticeIds, deletedNoticeIds, showOlderNotifications]);
 
   // Allow a state where user can have no selected notification (only clear selection if selected item is no longer in filtered view)
   useEffect(() => {
@@ -474,7 +496,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     const unreadItems: NotificationItem[] = [];
     const readItems: NotificationItem[] = [];
 
-    filteredItems.forEach(item => {
+    displayedItems.forEach(item => {
       if (!readNoticeIds.includes(item.id)) {
         unreadItems.push(item);
       } else {
@@ -503,7 +525,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     }
 
     return sections;
-  }, [filteredItems, readNoticeIds]);
+  }, [displayedItems, readNoticeIds]);
 
   const unreadTotal = categoryUnreadCounts.ALL;
 
@@ -851,18 +873,33 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                   <CheckCircle2 size={24} />
                 </div>
                 <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">
-                  {showUnreadOnly ? "All Caught Up!" : "No Notifications"}
+                  {showUnreadOnly ? "All Caught Up!" : "No Current Week Notifications"}
                 </h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[220px] mx-auto leading-relaxed">
+                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[240px] mx-auto leading-relaxed">
                   {showUnreadOnly 
                     ? "You have read all unread notifications in this section."
+                    : olderItems.length > 0
+                    ? `No notifications for the current week. ${olderItems.length} older notification${olderItems.length > 1 ? 's are' : ' is'} available.`
                     : "All member logs and requisitions are up to date."
                   }
                 </p>
+
+                {olderItems.length > 0 && !showOlderNotifications && (
+                  <button
+                    type="button"
+                    onClick={() => setShowOlderNotifications(true)}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center gap-2 mx-auto mt-2"
+                  >
+                    <Clock size={14} />
+                    <span>Load Older Notifications ({olderItems.length})</span>
+                  </button>
+                )}
+
                 {showUnreadOnly && (
                   <button
+                    type="button"
                     onClick={() => setShowUnreadOnly(false)}
-                    className="px-3.5 py-1.5 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-xs"
+                    className="px-3.5 py-1.5 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-xs mt-2"
                   >
                     View All Notifications
                   </button>
@@ -1013,6 +1050,36 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                   </div>
                 );
               })
+            )}
+
+            {/* Load More Older Notifications Section (Positioned directly below Unread & Read sections) */}
+            {olderItems.length > 0 && (
+              <div className="pt-3 pb-4">
+                {!showOlderNotifications ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowOlderNotifications(true)}
+                    className="w-full py-2.5 px-4 bg-white dark:bg-slate-900 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer group"
+                  >
+                    <Clock size={15} className="group-hover:rotate-[-45deg] transition-transform text-indigo-500" />
+                    <span>Load Older Notifications ({olderItems.length} Available)</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                      <CheckCircle2 size={13} className="text-emerald-500" />
+                      Loaded {olderItems.length} older notification{olderItems.length > 1 ? 's' : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowOlderNotifications(false)}
+                      className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      Current Week Only
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

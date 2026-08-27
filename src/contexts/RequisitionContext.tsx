@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { 
   Requisition, 
   RequisitionStatus, 
@@ -34,6 +34,9 @@ import {
 } from "../types";
 import { getProjectRequisitions } from "../utils/budgetUtils";
 import { databaseService } from "../lib/databaseService";
+import { AuthContext, AuthContextType } from "./AuthContext";
+import { NotificationContext, NotificationContextType } from "./NotificationContext";
+import { FiscalYearContext, FiscalYearContextType } from "./FiscalYearContext";
 import { uploadAttachmentsToLocalServer, unwrapAttachmentTarget, sendSlackNotification, resolveSenderName } from "../lib/utils";
 import { triggerAutosendBackupEmail, AUTOSEND_DEFAULT_EMAIL, getLocalAutosendConfig } from "../services/autosendBackupService";
 import { initializeApp as initFirebaseApp } from "firebase/app";
@@ -4603,7 +4606,37 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       cancelBackgroundUploadTask,
       clearCompletedUploadTasks
     }}>
-      {children}
+      <AuthContext.Provider value={{
+        currentUser,
+        users: uniqueUsers,
+        canPerform,
+        isAdmin: currentUser?.role === UserRole.ADMIN,
+        isSuperAdmin: currentUser?.role === UserRole.SUPER_ADMIN,
+        isFinance: currentUser?.role === UserRole.FINANCE,
+        isApprover: currentUser?.role === UserRole.APPROVER_L1 || currentUser?.role === UserRole.APPROVER_L2,
+        isChurchGroup: currentUser?.role === UserRole.CHURCH_GROUP,
+      }}>
+        <NotificationContext.Provider value={{
+          alerts: uniqueAlerts,
+          unreadCount: uniqueAlerts.filter(item => !item.isRead && !readNoticeIds.includes(item.id)).length,
+          readNoticeIds,
+          markNoticeRead: toggleNoticeRead,
+          markAllNoticesRead: () => markAllNoticesRead(uniqueAlerts.map(a => a.id)),
+          triggerToast,
+          activeToasts: uniqueActiveToasts,
+          removeToast,
+        }}>
+          <FiscalYearContext.Provider value={{
+            fiscalYears: uniqueFiscalYears,
+            currentFiscalYear: String(systemSettings.currentFiscalYear || "2026"),
+            setCurrentFiscalYear: (fy: string) => setActiveFiscalYear(parseInt(fy, 10) || 2026),
+            systemSettings,
+            updateSystemSettings,
+          }}>
+            {children}
+          </FiscalYearContext.Provider>
+        </NotificationContext.Provider>
+      </AuthContext.Provider>
     </RequisitionContext.Provider>
   );
 };
@@ -4615,6 +4648,62 @@ export const useRequisitions = () => {
     throw new Error("useRequisitions must be used within a RequisitionProvider");
   }
   return context;
+};
+
+/**
+ * Atomic Selector Hook: Auth slice
+ * Prevents re-renders in components that only need authentication details.
+ */
+export const useRequisitionAuth = () => {
+  const req = useRequisitions();
+  return useMemo(() => ({
+    currentUser: req.currentUser,
+    users: req.users,
+    canPerform: req.canPerform,
+    canAccess: req.canAccess,
+    isAdmin: req.currentUser?.role === UserRole.ADMIN,
+    isSuperAdmin: req.currentUser?.role === UserRole.SUPER_ADMIN,
+    isFinance: req.currentUser?.role === UserRole.FINANCE,
+    isApprover: req.currentUser?.role === UserRole.APPROVER_L1 || req.currentUser?.role === UserRole.APPROVER_L2,
+    isChurchGroup: req.currentUser?.role === UserRole.CHURCH_GROUP,
+  }), [req.currentUser, req.users, req.canPerform, req.canAccess]);
+};
+
+/**
+ * Atomic Selector Hook: Notification slice
+ * Prevents re-renders in components that only subscribe to alert feeds.
+ */
+export const useRequisitionNotifications = () => {
+  const req = useRequisitions();
+  return useMemo(() => ({
+    alerts: req.alerts,
+    readNoticeIds: req.readNoticeIds,
+    markAllNoticesRead: req.markAllNoticesRead,
+    toggleNoticeRead: req.toggleNoticeRead,
+    activeToasts: req.activeToasts,
+    triggerToast: req.triggerToast,
+    removeToast: req.removeToast
+  }), [req.alerts, req.readNoticeIds, req.markAllNoticesRead, req.toggleNoticeRead, req.activeToasts, req.triggerToast, req.removeToast]);
+};
+
+/**
+ * Atomic Selector Hook: Core Data slice
+ * Provides optimized access to data collections and CRUD operations.
+ */
+export const useRequisitionData = () => {
+  const req = useRequisitions();
+  return useMemo(() => ({
+    requisitions: req.requisitions,
+    projects: req.projects,
+    churchGroups: req.churchGroups,
+    ledgerBooks: req.ledgerBooks,
+    transactions: req.transactions,
+    addRequisition: req.addRequisition,
+    updateRequisition: req.updateRequisition,
+    deleteRequisition: req.deleteRequisition,
+    updateRequisitionStatus: req.updateRequisitionStatus,
+    disburseInstallment: req.disburseInstallment,
+  }), [req.requisitions, req.projects, req.churchGroups, req.ledgerBooks, req.transactions, req.addRequisition, req.updateRequisition, req.deleteRequisition, req.updateRequisitionStatus, req.disburseInstallment]);
 };
 
 export const useActiveFiscalYear = () => {

@@ -518,6 +518,59 @@ export const databaseService = {
     await apiCall(`/api/db/users/${id}`, "DELETE");
   },
 
+  // --- WINDOWING & PAGINATION METHODS ---
+  async getRequisitionsWindow(params: {
+    page?: number;
+    limit?: number;
+    fiscalYear?: string;
+    status?: string;
+    groupId?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } = {}): Promise<{
+    data: Requisition[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasMore: boolean;
+    };
+  }> {
+    const query = new URLSearchParams();
+    query.set("window", "true");
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    if (params.fiscalYear) query.set("fiscalYear", params.fiscalYear);
+    if (params.status) query.set("status", params.status);
+    if (params.groupId) query.set("groupId", params.groupId);
+    if (params.search) query.set("search", params.search);
+    if (params.sortBy) query.set("sortBy", params.sortBy);
+    if (params.sortOrder) query.set("sortOrder", params.sortOrder);
+
+    return apiCall(`/api/requisitions?${query.toString()}`, "GET");
+  },
+
+  async getPaginatedCollection<T = any>(
+    collection: string,
+    params: { page?: number; limit?: number } = {}
+  ): Promise<{
+    data: T[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasMore: boolean;
+    };
+  }> {
+    const query = new URLSearchParams();
+    if (params.page !== undefined) query.set("page", String(params.page));
+    if (params.limit !== undefined) query.set("limit", String(params.limit));
+    return apiCall(`/api/db/${collection}?${query.toString()}`, "GET");
+  },
+
   // --- SYSTEM LOGS OPERATIONS ---
   async saveAuditLog(log: SystemLog): Promise<void> {
     console.log(`[DatabaseService] Saving audit log to MongoDB`);

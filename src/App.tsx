@@ -17,14 +17,6 @@ import { Sidebar } from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import { useIdleTimeout } from "./hooks/useIdleTimeout";
 import { sendSlackNotification } from "./lib/utils";
-import { NotificationHub } from "./components/NotificationHub";
-import { WaitingRoom } from "./components/WaitingRoom";
-import { ProfilePrompt } from "./components/ProfilePrompt";
-import { AnnouncementBanner } from "./components/AnnouncementBanner";
-import { ProductTour } from "./components/ProductTour";
-import { FeedbackModal } from "./components/FeedbackModal";
-import { SplashPage } from "./components/SplashPage";
-import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
 import { PanelSkeletonFallback } from "./components/PanelSkeletonFallback";
 import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearAllRecentSearchTerms } from "./lib/searchHistory";
 import { databaseService } from "./lib/databaseService";
@@ -62,6 +54,14 @@ const AuditLogsPanel = lazyWithRetry(() => import("./components/AuditLogsPanel")
 const HelpPanel = lazyWithRetry(() => import("./components/HelpPanel").then(m => ({ default: m.HelpPanel })));
 const TransactionsPanel = lazyWithRetry(() => import("./components/TransactionsPanel").then(m => ({ default: m.default || (m as any).TransactionsPanel })));
 const ReceiptTemplateGenerator = lazyWithRetry(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
+const NotificationHub = lazyWithRetry(() => import("./components/NotificationHub").then(m => ({ default: m.NotificationHub })));
+const WaitingRoom = lazyWithRetry(() => import("./components/WaitingRoom").then(m => ({ default: m.WaitingRoom })));
+const ProfilePrompt = lazyWithRetry(() => import("./components/ProfilePrompt").then(m => ({ default: m.ProfilePrompt })));
+const AnnouncementBanner = lazyWithRetry(() => import("./components/AnnouncementBanner").then(m => ({ default: m.AnnouncementBanner })));
+const ProductTour = lazyWithRetry(() => import("./components/ProductTour").then(m => ({ default: m.ProductTour })));
+const FeedbackModal = lazyWithRetry(() => import("./components/FeedbackModal").then(m => ({ default: m.FeedbackModal })));
+const SplashPage = lazyWithRetry(() => import("./components/SplashPage").then(m => ({ default: m.SplashPage })));
+const BackgroundUploadWidget = lazyWithRetry(() => import("./components/BackgroundUploadWidget").then(m => ({ default: m.BackgroundUploadWidget })));
 import {
   Bell,
   ArrowRight,
@@ -1507,7 +1507,9 @@ function AppContent() {
   if ((!currentUser.isApproved && currentUser.role !== UserRole.SUPER_ADMIN) || currentUser.isSuspended) {
     return (
       <>
-        <WaitingRoom user={currentUser} onLogout={handleLogout} />
+        <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-mono text-sm">Loading security verification...</div>}>
+          <WaitingRoom user={currentUser} onLogout={handleLogout} />
+        </Suspense>
         {/* Real-time Toast Notifications */}
         <div className="fixed bottom-6 sm:bottom-8 right-4 sm:right-6 z-[100] flex flex-col gap-2.5 w-88 sm:w-96 max-w-[calc(100vw-2rem)] pointer-events-none">
           <AnimatePresence mode="popLayout">
@@ -1530,12 +1532,14 @@ function AppContent() {
   // Animated Splash Screen after login
   if (showSplash) {
     return (
-      <SplashPage
-        darkMode={darkMode}
-        durationMs={4500}
-        isDataReady={!loading && !authLoading}
-        onComplete={() => setShowSplash(false)}
-      />
+      <Suspense fallback={null}>
+        <SplashPage
+          darkMode={darkMode}
+          durationMs={4500}
+          isDataReady={!loading && !authLoading}
+          onComplete={() => setShowSplash(false)}
+        />
+      </Suspense>
     );
   }
 
@@ -2111,11 +2115,15 @@ function AppContent() {
         )}
 
         {showProfilePrompt && currentUser && (
-          <ProfilePrompt user={currentUser} onComplete={() => setShowProfilePrompt(false)} />
+          <Suspense fallback={null}>
+            <ProfilePrompt user={currentUser} onComplete={() => setShowProfilePrompt(false)} />
+          </Suspense>
         )}
 
         {showFeedbackModal && currentUser && (
-          <FeedbackModal currentUser={currentUser} onClose={() => setShowFeedbackModal(false)} />
+          <Suspense fallback={null}>
+            <FeedbackModal currentUser={currentUser} onClose={() => setShowFeedbackModal(false)} />
+          </Suspense>
         )}
 
         {showLogoutModal && currentUser && (
@@ -2830,7 +2838,14 @@ function AppContent() {
 
             <div id="notification-bell-trigger" className="relative" ref={notificationsRef}>
               <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                onClick={() => {
+                  const nextOpen = !isNotificationsOpen;
+                  setIsNotificationsOpen(nextOpen);
+                  if (nextOpen && notificationItems.length > 0) {
+                    const allIds = notificationItems.map(item => item.id);
+                    markAllNoticesRead(allIds);
+                  }
+                }}
                 className={cn(
                   "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 relative cursor-pointer border",
                   darkMode
@@ -3178,14 +3193,18 @@ function AppContent() {
         </Suspense>
       )}
 
-      <ProductTour
-        isOpen={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
-        currentView={currentView}
-        onViewChange={setCurrentView}
-      />
+      <Suspense fallback={null}>
+        <ProductTour
+          isOpen={isTourOpen}
+          onClose={() => setIsTourOpen(false)}
+          currentView={currentView}
+          onViewChange={setCurrentView}
+        />
+      </Suspense>
 
-      <BackgroundUploadWidget />
+      <Suspense fallback={null}>
+        <BackgroundUploadWidget />
+      </Suspense>
     </div>
   );
 }

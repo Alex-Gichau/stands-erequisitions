@@ -1,5 +1,6 @@
 
 import express from "express";
+import compression from "compression";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
@@ -794,6 +795,15 @@ function generateSlackFullReport(): string {
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Gzip / Brotli payload compression middleware for lightning-fast responses
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers["x-no-compression"]) return false;
+      return compression.filter(req, res);
+    },
+    level: 6
+  }));
 
   // Security / COOP Policy middleware for OAuth & Firebase Auth popups
   app.use((_req, res, next) => {
@@ -1641,6 +1651,77 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         }
       }, 300);
 
+      // Server-Side Windowing & Pagination Support
+      const hasPaginationQuery = req.query.page !== undefined || req.query.limit !== undefined || req.query.window === "true";
+      if (hasPaginationQuery) {
+        let filtered = Array.isArray(cleanData) ? [...cleanData] : [];
+
+        // Optional Fiscal Year Filter
+        if (req.query.fiscalYear) {
+          const fy = String(req.query.fiscalYear).trim();
+          filtered = filtered.filter((r: any) => !r.fiscal_year || r.fiscal_year === fy || r.fiscalYear === fy);
+        }
+
+        // Optional Status Filter
+        if (req.query.status) {
+          const st = String(req.query.status).trim();
+          filtered = filtered.filter((r: any) => r.status === st);
+        }
+
+        // Optional Group Filter
+        if (req.query.groupId) {
+          const gid = String(req.query.groupId).trim();
+          filtered = filtered.filter((r: any) => r.group_id === gid || r.groupId === gid || r.group_name === gid || r.groupName === gid);
+        }
+
+        // Optional Search Query
+        if (req.query.search) {
+          const q = String(req.query.search).toLowerCase().trim();
+          filtered = filtered.filter((r: any) => 
+            (r.title && String(r.title).toLowerCase().includes(q)) ||
+            (r.id && String(r.id).toLowerCase().includes(q)) ||
+            (r.requester_name && String(r.requester_name).toLowerCase().includes(q)) ||
+            (r.requesterName && String(r.requesterName).toLowerCase().includes(q)) ||
+            (r.payable_to && String(r.payable_to).toLowerCase().includes(q)) ||
+            (r.payableTo && String(r.payableTo).toLowerCase().includes(q)) ||
+            (r.description && String(r.description).toLowerCase().includes(q))
+          );
+        }
+
+        // Sorting
+        const sortBy = String(req.query.sortBy || "created_at");
+        const sortOrder = String(req.query.sortOrder || "desc").toLowerCase();
+        filtered.sort((a: any, b: any) => {
+          const valA = a[sortBy] || a.created_at || a.createdAt || a.submitted_at || a.submittedAt || 0;
+          const valB = b[sortBy] || b.created_at || b.createdAt || b.submitted_at || b.submittedAt || 0;
+          const timeA = new Date(valA).getTime() || 0;
+          const timeB = new Date(valB).getTime() || 0;
+          return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
+        });
+
+        const pageNum = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / limitNum));
+        const pagedData = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+        res.setHeader("X-Total-Count", String(total));
+        res.setHeader("X-Page", String(pageNum));
+        res.setHeader("X-Limit", String(limitNum));
+        res.setHeader("X-Total-Pages", String(totalPages));
+
+        return res.json({
+          data: pagedData,
+          pagination: {
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages,
+            hasMore: pageNum < totalPages
+          }
+        });
+      }
+
       res.json(cleanData);
     } catch (err: any) {
       console.error("[GET /api/requisitions Error]:", err);
@@ -1717,6 +1798,32 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
           });
         }
       }, 300);
+
+      // Pagination support if page or limit query parameters provided
+      if (req.query.page !== undefined || req.query.limit !== undefined) {
+        let list = Array.isArray(cleanData) ? cleanData : [];
+        const pageNum = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+        const limitNum = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+        const total = list.length;
+        const totalPages = Math.max(1, Math.ceil(total / limitNum));
+        const pagedData = list.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+        res.setHeader("X-Total-Count", String(total));
+        res.setHeader("X-Page", String(pageNum));
+        res.setHeader("X-Limit", String(limitNum));
+        res.setHeader("X-Total-Pages", String(totalPages));
+
+        return res.json({
+          data: pagedData,
+          pagination: {
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages,
+            hasMore: pageNum < totalPages
+          }
+        });
+      }
 
       res.json(cleanData);
     } catch (err: any) {

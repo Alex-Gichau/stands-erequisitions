@@ -5,50 +5,47 @@
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
-import { RequisitionStatus, UserRole, Requisition } from "../types";
-import { formatCurrency, cn } from "../lib/utils";
+import { RequisitionStatus, UserRole, Requisition, Comment } from "../types";
+import { formatCurrency, cn, resolveSenderName } from "../lib/utils";
 import { 
   Bell, 
-  CheckCircle, 
-  ArrowRight, 
+  MessageSquare, 
+  Smile, 
+  ThumbsUp, 
+  CheckCircle2, 
   ShieldCheck, 
-  UserCheck, 
-  FileCheck, 
-  AlertTriangle, 
-  Activity, 
-  FileText,
-  FilePlus,
-  DollarSign,
-  Calendar,
-  Sparkles,
-  Search,
-  Eye,
-  CheckCircle2,
-  Check,
-  Trash2,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  Star,
-  Archive,
-  Mail,
-  MailOpen,
-  Reply,
-  Forward,
-  MoreHorizontal,
-  Paperclip,
-  Tag,
-  ExternalLink,
-  Filter,
-  User,
-  Clock,
-  Zap,
-  Building2,
-  MessageSquare,
-  X,
-  RotateCcw,
-  ArchiveRestore
+  FilePlus, 
+  Users, 
+  KeyRound, 
+  LogIn, 
+  UserCog, 
+  Search, 
+  X, 
+  Star, 
+  Archive, 
+  Trash2, 
+  RotateCcw, 
+  ArchiveRestore, 
+  Mail, 
+  MailOpen, 
+  Filter, 
+  Clock, 
+  ExternalLink, 
+  ChevronDown, 
+  ChevronLeft, 
+  ArrowRight, 
+  Eye, 
+  Paperclip, 
+  FileText, 
+  RefreshCw, 
+  Laptop, 
+  Globe, 
+  Building2, 
+  Sparkles, 
+  Heart,
+  CheckCircle,
+  UserCheck,
+  ShieldAlert
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
@@ -57,14 +54,37 @@ interface NotificationHubProps {
   onSelectRequisition: (req: Requisition) => void;
 }
 
+export type NotificationHubCategory = 
+  | "ALL"
+  | "COMMENTS"
+  | "REACTIONS"
+  | "APPROVALS"
+  | "SUBMISSIONS"
+  | "GROUPS"
+  | "SECURITY"
+  | "STARRED"
+  | "ARCHIVED"
+  | "TRASH";
+
 export interface NotificationItem {
   id: string;
   rawId?: string;
-  type: "MEMBER_APPROVAL" | "REQ_RECEIVED" | "REQ_APPROVED" | "FINANCE_DISBURSEMENT_REQUIRED" | "BUDGET_ALERT";
-  category: "PRIMARY" | "REQUISITIONS" | "APPROVALS" | "PAYOUTS" | "ALERTS";
+  type: 
+    | "COMMENT" 
+    | "REACTION" 
+    | "APPROVAL" 
+    | "SUBMISSION" 
+    | "GROUP_ADDITION" 
+    | "ACCOUNT_UPDATE" 
+    | "NEW_LOGIN";
+  category: "COMMENTS" | "REACTIONS" | "APPROVALS" | "SUBMISSIONS" | "GROUPS" | "SECURITY";
   senderName: string;
   senderEmail: string;
+  senderRole?: string;
   avatarGradient: string;
+  icon: React.ReactNode;
+  badgeColor: string;
+  badgeLabel: string;
   title: string;
   message: string;
   snippet: string;
@@ -74,6 +94,56 @@ export interface NotificationItem {
   attachments?: Array<{ name: string; size: string; type: string }>;
   requisition?: Requisition;
   action: () => Promise<void> | void;
+  metadata?: Record<string, any>;
+}
+
+// Check RBAC access for a requisition
+function canUserAccessRequisition(req: Requisition, currentUser: any): boolean {
+  if (!currentUser) return false;
+  const role = currentUser.role;
+
+  // Admins, Super Admins, and Finance see all requisitions
+  if (role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.FINANCE) {
+    return true;
+  }
+
+  const filterGroups = currentUser.groups || [];
+  const userGroups = filterGroups.length > 0 ? filterGroups : (currentUser.group ? [currentUser.group] : []);
+  const userEmail = (currentUser.email || "").toLowerCase().trim();
+  const userId = currentUser.id;
+
+  // Group match
+  if (req.groupId && userGroups.includes(req.groupId)) return true;
+  if (req.groupName && userGroups.includes(req.groupName)) return true;
+  if (Array.isArray(req.sharedGroups) && req.sharedGroups.some((sg: string) => userGroups.includes(sg))) return true;
+
+  // Creator/Requester match
+  if (req.requesterId === userId || req.createdBy === userId) return true;
+  if (req.requesterEmail && req.requesterEmail.toLowerCase().trim() === userEmail) return true;
+
+  // Notification emails
+  if (Array.isArray(req.notificationEmails) && req.notificationEmails.some((e: string) => e.toLowerCase().trim() === userEmail)) return true;
+
+  // Comment author match
+  if (Array.isArray(req.comments)) {
+    for (const c of req.comments) {
+      if (!c) continue;
+      if (c.authorId === userId || (c.authorEmail && c.authorEmail.toLowerCase().trim() === userEmail)) return true;
+      if (Array.isArray(c.replies)) {
+        for (const rep of c.replies) {
+          if (!rep) continue;
+          if (rep.authorId === userId || (rep.authorEmail && rep.authorEmail.toLowerCase().trim() === userEmail)) return true;
+        }
+      }
+    }
+  }
+
+  // Approvers with no group restriction can see all
+  if ((role === UserRole.APPROVER_L1 || role === UserRole.APPROVER_L2) && userGroups.length === 0) {
+    return true;
+  }
+
+  return false;
 }
 
 export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequisition }) => {
@@ -81,8 +151,9 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     currentUser, 
     users, 
     requisitions, 
-    approveUser,
+    systemLogs,
     alerts,
+    approveUser,
     readNoticeIds,
     toggleNoticeRead,
     markAllNoticesRead,
@@ -96,7 +167,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     deleteAlert
   } = useRequisitions();
 
-  const [activeTab, setActiveTab] = useState<"ALL" | "REQUISITIONS" | "APPROVALS" | "PAYOUTS" | "ALERTS" | "STARRED" | "ARCHIVED" | "TRASH">("ALL");
+  const [activeTab, setActiveTab] = useState<NotificationHubCategory>("ALL");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [showOlderNotifications, setShowOlderNotifications] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,8 +187,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     window.addEventListener("reset_notifications_home", handleResetHome);
     return () => window.removeEventListener("reset_notifications_home", handleResetHome);
   }, []);
-
-  const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
 
   // Lookup profile picture from user directory
   const getUserPhoto = (email?: string, name?: string, id?: string) => {
@@ -155,141 +224,272 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     });
   };
 
-  const handleDeleteAlert = async (e: React.MouseEvent, itemId: string, rawId?: string) => {
+  const handleDeleteNotification = (e: React.MouseEvent, itemId: string, rawId?: string) => {
     e.stopPropagation();
-    if (!rawId) {
-      toggleNoticeRead(itemId, true);
-      return;
+    toggleNoticeDeleted(itemId);
+    if (rawId) {
+      deleteAlert(rawId).catch(() => {});
     }
-    
-    try {
-      await deleteAlert(rawId);
-      triggerToast({
-        type: "SYSTEM_INFO",
-        severity: "LOW",
-        message: "Notification deleted successfully",
-        timestamp: new Date().toISOString()
-      });
-    } catch (err) {
-      triggerToast({
-        type: "SYSTEM_INFO",
-        severity: "HIGH",
-        message: "Failed to delete notification",
-        timestamp: new Date().toISOString()
-      });
-    }
+    triggerToast({
+      type: "SYSTEM_INFO",
+      severity: "LOW",
+      message: deletedNoticeIds.includes(itemId) ? "Notification restored from Trash" : "Notification moved to Trash",
+      timestamp: new Date().toISOString()
+    });
   };
 
-  const seenRequisitionsRef = useRef<Set<string>>(new Set());
-  const isFirstMountRef = useRef(true);
-
-  useEffect(() => {
-    if (isFirstMountRef.current) {
-      requisitions.forEach(r => seenRequisitionsRef.current.add(r.id));
-      isFirstMountRef.current = false;
-      return;
-    }
-
-    requisitions.forEach(r => {
-      if (!seenRequisitionsRef.current.has(r.id)) {
-        seenRequisitionsRef.current.add(r.id);
-        if (r.status === RequisitionStatus.SUBMITTED && !r.id.includes("req-seed-")) {
-          const isUserAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN;
-          const toastMessage = isUserAdmin
-            ? `New Requisition: "${r.title}" for KES ${r.amount.toLocaleString()} submitted by ${r.requesterName}`
-            : `New Requisition Submitted: "${r.title}"`;
-
-          triggerToast({
-            type: "LARGE_REQUEST",
-            severity: "LOW",
-            message: toastMessage,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
-    });
-  }, [requisitions, currentUser, triggerToast]);
-
-  // Compile notification items stream
+  // Compile Strictly Optimized Notification Items Stream:
+  // 1. Comments
+  // 2. Reactions
+  // 3. Approvals
+  // 4. Submissions
+  // 5. Users added to groups
+  // 6. Account details changes like password updates
+  // 7. New login detected
   const notificationItems = useMemo(() => {
     const items: NotificationItem[] = [];
     const now = new Date().toISOString();
 
-    // 1. Members awaiting approval (ADMIN/SUPER_ADMIN)
-    if (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) {
-      users.filter(u => !u.isApproved).forEach(u => {
+    const accessibleReqs = (requisitions || []).filter(r => canUserAccessRequisition(r, currentUser));
+
+    // ==========================================
+    // 1. COMMENTS (Discussions & Replies)
+    // ==========================================
+    accessibleReqs.forEach(r => {
+      if (!r.comments || !Array.isArray(r.comments)) return;
+
+      r.comments.forEach((c: any, cIdx: number) => {
+        if (!c || !c.text) return;
+        const commentId = c.id || `comment-${r.id}-${cIdx}`;
+        const authorName = c.authorName || (c.authorEmail ? c.authorEmail.split("@")[0] : "Team Member");
+        const authorEmail = c.authorEmail || "accounts@pceastandrews.org";
+        const commentDate = c.createdAt || c.timestamp || r.updatedAt || now;
+
         items.push({
-          id: `user-await-${u.id}`,
-          type: "MEMBER_APPROVAL",
-          category: "APPROVALS",
-          senderName: u.name || "User Request",
-          senderEmail: u.email || "accounts@pceastandrews.org",
-          avatarGradient: "bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500",
-          title: "User Pending Authorization",
-          message: `${u.name} (${u.email}) requested account activation with role assignment as ${u.role}. Authorization is required to enable portal sign-in.`,
-          snippet: `Requested role: ${u.role}. Click to authorize account permissions.`,
-          actionLabel: "Authorize Account",
-          timestamp: now,
-          tags: ["#USER_AUTH", "#ROLE_REQUEST", "Action Required"],
-          action: async () => {
-            await approveUser(u.id);
-            setSuccessId(`user-await-${u.id}`);
-            setTimeout(() => setSuccessId(null), 3000);
+          id: `notif-comment-${r.id}-${commentId}`,
+          type: "COMMENT",
+          category: "COMMENTS",
+          senderName: authorName,
+          senderEmail: authorEmail,
+          senderRole: c.authorRole || "Member",
+          avatarGradient: "bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-500",
+          icon: <MessageSquare size={14} className="text-sky-500" />,
+          badgeColor: "bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-800/60",
+          badgeLabel: "Comment",
+          title: `Discussion comment on "${r.title || "Requisition"}"`,
+          message: `${authorName} commented on requisition "${r.title}":\n\n"${c.text}"`,
+          snippet: `"${c.text.length > 90 ? c.text.slice(0, 90) + '...' : c.text}"`,
+          actionLabel: "View Discussion & Reply",
+          timestamp: commentDate,
+          tags: ["#COMMENT", `#${r.groupName || "Ministry"}`, `KES ${r.amount?.toLocaleString() || 0}`],
+          requisition: r,
+          action: () => {
+            onSelectRequisition(r);
           }
         });
+
+        // Nested Replies
+        if (Array.isArray(c.replies)) {
+          c.replies.forEach((rep: any, repIdx: number) => {
+            if (!rep || !rep.text) return;
+            const replyId = rep.id || `reply-${commentId}-${repIdx}`;
+            const repAuthor = rep.authorName || (rep.authorEmail ? rep.authorEmail.split("@")[0] : "Contributor");
+            const repEmail = rep.authorEmail || "accounts@pceastandrews.org";
+            const replyDate = rep.createdAt || rep.timestamp || commentDate;
+
+            items.push({
+              id: `notif-reply-${r.id}-${replyId}`,
+              type: "COMMENT",
+              category: "COMMENTS",
+              senderName: repAuthor,
+              senderEmail: repEmail,
+              senderRole: rep.authorRole || "Member",
+              avatarGradient: "bg-gradient-to-tr from-cyan-500 via-blue-500 to-indigo-500",
+              icon: <MessageSquare size={14} className="text-blue-500" />,
+              badgeColor: "bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60",
+              badgeLabel: "Reply",
+              title: `Reply to discussion on "${r.title || "Requisition"}"`,
+              message: `${repAuthor} replied to a comment on requisition "${r.title}":\n\n"${rep.text}"`,
+              snippet: `↳ "${rep.text.length > 90 ? rep.text.slice(0, 90) + '...' : rep.text}"`,
+              actionLabel: "View Discussion & Reply",
+              timestamp: replyDate,
+              tags: ["#REPLY", `#${r.groupName || "Ministry"}`],
+              requisition: r,
+              action: () => {
+                onSelectRequisition(r);
+              }
+            });
+          });
+        }
+
+        // ==========================================
+        // 2. REACTIONS (Emoji High-fives & Reactions)
+        // ==========================================
+        const reactionsArr = Array.isArray(c.reactions) 
+          ? c.reactions 
+          : (c.reactions ? Object.values(c.reactions) : []);
+
+        reactionsArr.forEach((rx: any, rxIdx: number) => {
+          if (!rx || !rx.emoji) return;
+          const rxUser = rx.userName || (rx.userEmail ? rx.userEmail.split("@")[0] : "Team Member");
+          const rxEmail = rx.userEmail || "";
+          const rxDate = rx.createdAt || commentDate;
+          const emoji = rx.emoji;
+
+          items.push({
+            id: `notif-rx-${r.id}-${commentId}-${rx.userId || rxEmail || rxIdx}-${emoji}`,
+            type: "REACTION",
+            category: "REACTIONS",
+            senderName: rxUser,
+            senderEmail: rxEmail,
+            avatarGradient: "bg-gradient-to-tr from-amber-400 via-rose-500 to-pink-500",
+            icon: <Smile size={14} className="text-amber-500" />,
+            badgeColor: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60",
+            badgeLabel: `${emoji} Reaction`,
+            title: `Reaction ${emoji} on "${r.title || "Requisition"}"`,
+            message: `${rxUser} reacted with ${emoji} to comment "${c.text.slice(0, 80)}" on requisition "${r.title}".`,
+            snippet: `${emoji} Reacted to: "${c.text.length > 75 ? c.text.slice(0, 75) + '...' : c.text}"`,
+            actionLabel: "Inspect Reaction",
+            timestamp: rxDate,
+            tags: ["#REACTION", emoji, `#${r.groupName || "Ministry"}`],
+            requisition: r,
+            action: () => {
+              onSelectRequisition(r);
+            }
+          });
+        });
       });
+    });
 
-      // 2. New requisitions received (status === SUBMITTED)
-      requisitions.filter(r => r.status === RequisitionStatus.SUBMITTED && !r.id.includes("req-seed-")).forEach(r => {
-        const atts = Array.isArray(r.attachments) ? r.attachments.map((att, idx) => ({
-          name: typeof att === "string" ? att.split("/").pop() || `Document-${idx+1}.pdf` : `Attachment-${idx+1}.pdf`,
-          size: "245 KB",
-          type: "application/pdf"
-        })) : [];
+    // ==========================================
+    // 3. APPROVALS (L1, L2, Member Authorizations)
+    // ==========================================
+    // Requisition Approvals
+    accessibleReqs.forEach(r => {
+      if (r.id.includes("req-seed-")) return;
 
+      const atts = Array.isArray(r.attachments) ? r.attachments.map((att, idx) => ({
+        name: typeof att === "string" ? att.split("/").pop() || `Document-${idx+1}.pdf` : `Attachment-${idx+1}.pdf`,
+        size: "280 KB",
+        type: "application/pdf"
+      })) : [];
+
+      if (Array.isArray(r.approvalHistory) && r.approvalHistory.length > 0) {
+        r.approvalHistory.forEach((note, noteIdx) => {
+          if (!note) return;
+          const approver = note.approverName || "Treasury Approver";
+          const approverEmail = (note as any).approverEmail || "treasury@pceastandrews.org";
+          const appDate = note.timestamp || (note as any).approvedAt || r.approvedAtL2 || r.approvedAtL1 || r.updatedAt || now;
+          const levelName = (note as any).level || (note.role ? note.role.replace("_", " ") : r.status.replace("_", " "));
+
+          items.push({
+            id: `notif-app-note-${r.id}-${note.id || noteIdx}`,
+            type: "APPROVAL",
+            category: "APPROVALS",
+            senderName: approver,
+            senderEmail: approverEmail,
+            senderRole: "Approver",
+            avatarGradient: "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500",
+            icon: <CheckCircle2 size={14} className="text-emerald-500" />,
+            badgeColor: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60",
+            badgeLabel: "Approved",
+            title: `Requisition Approved (${levelName}): "${r.title || "Untitled"}"`,
+            message: `Requisition "${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} has been approved by ${approver}.${note.note ? `\n\nApprover Notes: "${note.note}"` : ''}`,
+            snippet: `✓ Approved by ${approver} for KES ${r.amount.toLocaleString()}`,
+            actionLabel: "Inspect Approved Requisition",
+            timestamp: appDate,
+            tags: ["#APPROVED", `#${levelName}`, `KES ${r.amount.toLocaleString()}`],
+            attachments: atts,
+            requisition: r,
+            action: () => {
+              onSelectRequisition(r);
+            }
+          });
+        });
+      } else if (r.status === RequisitionStatus.APPROVED_L1 || r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.DISBURSED) {
+        const appDate = r.approvedAtL2 || r.approvedAtL1 || r.disbursedAt || r.updatedAt || now;
         items.push({
-          id: `req-sub-${r.id}`,
-          type: "REQ_RECEIVED",
-          category: "REQUISITIONS",
-          senderName: r.requesterName || r.groupName || "Ministry Group",
-          senderEmail: r.requesterEmail || "requisitions@pceastandrews.org",
-          avatarGradient: "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500",
-          title: `Decision Required: "${r.title || "Untitled Requisition"}"`,
-          message: `New expense requisition "${r.title}" for KES ${r.amount.toLocaleString()} has been submitted by ${r.groupName} (${r.requesterName}) and is awaiting Level 1 verification.`,
-          snippet: `Amount: KES ${r.amount.toLocaleString()} • Group: ${r.groupName}. Needs audit signoff.`,
-          actionLabel: "Verify Requisition",
-          timestamp: r.submittedAt || r.createdAt || now,
-          tags: ["#REQUISITION", `#${r.groupName}`, `KES ${r.amount.toLocaleString()}`],
+          id: `notif-app-status-${r.id}`,
+          type: "APPROVAL",
+          category: "APPROVALS",
+          senderName: "Church Treasury & Governance",
+          senderEmail: "treasury@pceastandrews.org",
+          senderRole: "Approver",
+          avatarGradient: "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500",
+          icon: <ShieldCheck size={14} className="text-teal-500" />,
+          badgeColor: "bg-teal-50 dark:bg-teal-950/80 text-teal-600 dark:text-teal-400 border border-teal-200/60 dark:border-teal-800/60",
+          badgeLabel: r.status.replace("_", " "),
+          title: `Requisition Authorized: "${r.title || "Untitled"}"`,
+          message: `Requisition "${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} has successfully reached status ${r.status.replace("_", " ")}.`,
+          snippet: `Status updated to ${r.status.replace("_", " ")} for KES ${r.amount.toLocaleString()}`,
+          actionLabel: "Inspect Requisition",
+          timestamp: appDate,
+          tags: ["#APPROVED", `#${r.status}`, `KES ${r.amount.toLocaleString()}`],
           attachments: atts,
           requisition: r,
           action: () => {
             onSelectRequisition(r);
           }
         });
+      }
+    });
+
+    // Member Authorizations (for ADMIN / SUPER_ADMIN)
+    if (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) {
+      users.filter(u => !u.isApproved).forEach(u => {
+        items.push({
+          id: `notif-user-await-${u.id}`,
+          type: "APPROVAL",
+          category: "APPROVALS",
+          senderName: u.name || "New Registration",
+          senderEmail: u.email || "accounts@pceastandrews.org",
+          senderRole: u.role || "Member",
+          avatarGradient: "bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500",
+          icon: <UserCheck size={14} className="text-orange-500" />,
+          badgeColor: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60",
+          badgeLabel: "Authorization Required",
+          title: `Member Pending Approval: ${u.name || u.email}`,
+          message: `${u.name || "User"} (${u.email}) requested account authorization with assigned role "${u.role}". Approval is required to grant portal access.`,
+          snippet: `Requested Role: ${u.role}. Click to authorize account.`,
+          actionLabel: "Authorize Account",
+          timestamp: (u as any).createdAt || (u as any).timestamp || now,
+          tags: ["#USER_AUTH", `#${u.role}`, "Action Required"],
+          action: async () => {
+            await approveUser(u.id);
+            setSuccessId(`notif-user-await-${u.id}`);
+            setTimeout(() => setSuccessId(null), 3000);
+          }
+        });
       });
     }
 
-    // 3. Approvals done
-    requisitions.filter(r => (r.status === RequisitionStatus.APPROVED_L1 || r.status === RequisitionStatus.APPROVED_L2) && !r.id.includes("req-seed-")).forEach(r => {
+    // ==========================================
+    // 4. SUBMISSIONS (New Requisitions)
+    // ==========================================
+    accessibleReqs.filter(r => r.status === RequisitionStatus.SUBMITTED && !r.id.includes("req-seed-")).forEach(r => {
       const atts = Array.isArray(r.attachments) ? r.attachments.map((att, idx) => ({
-        name: typeof att === "string" ? att.split("/").pop() || `Approval-Document-${idx+1}.pdf` : `Document-${idx+1}.pdf`,
-        size: "310 KB",
+        name: typeof att === "string" ? att.split("/").pop() || `Document-${idx+1}.pdf` : `Attachment-${idx+1}.pdf`,
+        size: "245 KB",
         type: "application/pdf"
       })) : [];
 
       items.push({
-        id: `req-app-${r.id}`,
-        type: "REQ_APPROVED",
-        category: "APPROVALS",
-        senderName: (r.approvalHistory && r.approvalHistory.length > 0 ? r.approvalHistory[r.approvalHistory.length - 1].approverName : "") || "Church Treasury & Governance",
-        senderEmail: "treasury@pceastandrews.org",
-        avatarGradient: "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500",
-        title: `Requisition Authorized: "${r.title || "Untitled Requisition"}"`,
-        message: `Requisition "${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} has successfully cleared status level ${r.status.replace("_", " ")}.`,
-        snippet: `Status updated to ${r.status.replace("_", " ")} for KES ${r.amount.toLocaleString()}.`,
-        actionLabel: "Inspect Details",
-        timestamp: r.approvedAtL2 || r.approvedAtL1 || r.submittedAt || now,
-        tags: ["#APPROVED", `#${r.status}`, "Authorized"],
+        id: `notif-req-sub-${r.id}`,
+        type: "SUBMISSION",
+        category: "SUBMISSIONS",
+        senderName: r.requesterName || r.groupName || "Ministry Group",
+        senderEmail: r.requesterEmail || "requisitions@pceastandrews.org",
+        senderRole: "Requester",
+        avatarGradient: "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500",
+        icon: <FilePlus size={14} className="text-indigo-500" />,
+        badgeColor: "bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60",
+        badgeLabel: "New Submission",
+        title: `Requisition Submitted: "${r.title || "Untitled Requisition"}"`,
+        message: `New expense requisition "${r.title}" for KES ${r.amount.toLocaleString()} was submitted by ${r.groupName} (${r.requesterName}) and is pending Level 1 verification.`,
+        snippet: `Amount: KES ${r.amount.toLocaleString()} • Group: ${r.groupName}. Pending audit review.`,
+        actionLabel: "Verify Requisition",
+        timestamp: r.submittedAt || r.createdAt || now,
+        tags: ["#SUBMISSION", `#${r.groupName}`, `KES ${r.amount.toLocaleString()}`],
         attachments: atts,
         requisition: r,
         action: () => {
@@ -298,80 +498,202 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       });
     });
 
-    // 4. Disbursements needed (FINANCE, ADMIN, SUPER_ADMIN)
-    if (currentUser?.role === UserRole.FINANCE || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) {
-      requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 && !r.id.includes("req-seed-")).forEach(r => {
+    // ==========================================
+    // 5. USERS ADDED TO GROUPS
+    // ==========================================
+    (systemLogs || []).forEach(log => {
+      if (!log || !log.action) return;
+
+      const act = log.action.toUpperCase();
+      const isGroupAddition = 
+        act === "USER_ADDED_TO_GROUP" || 
+        act === "GROUP_ASSIGNMENT" ||
+        (act === "USER_PRE_PROVISIONED" && (log.metadata?.group || log.metadata?.groups)) ||
+        (act === "USER_PROFILE_UPDATE" && (log.details?.toLowerCase().includes("group") || log.metadata?.group || log.metadata?.groups));
+
+      if (isGroupAddition) {
+        const groupName = log.metadata?.group || (Array.isArray(log.metadata?.groups) ? log.metadata.groups.join(", ") : "") || "Ministry Group";
+        const targetUser = log.metadata?.name || log.metadata?.email || log.performedBy || "Member";
+
         items.push({
-          id: `finance-disb-req-${r.id}`,
-          type: "FINANCE_DISBURSEMENT_REQUIRED",
-          category: "PAYOUTS",
-          senderName: "Finance Payout Directives",
-          senderEmail: "finance@pceastandrews.org",
-          avatarGradient: "bg-gradient-to-tr from-blue-500 via-indigo-600 to-violet-600",
-          title: `Payout Directive Ready: "${r.title || "Untitled Requisition"}"`,
-          message: `Requisition "${r.title}" (${r.groupName}) is L2 APPROVED and ready for immediate fund disbursement of KES ${r.amount.toLocaleString()}.`,
-          snippet: `Disbursement pending for KES ${r.amount.toLocaleString()}. Click to execute payout.`,
-          actionLabel: "Execute Payout",
-          timestamp: r.approvedAtL2 || r.submittedAt || now,
-          tags: ["#DISBURSEMENT", "#PAYOUT_READY", `KES ${r.amount.toLocaleString()}`],
-          requisition: r,
+          id: `notif-group-add-${log.id}`,
+          type: "GROUP_ADDITION",
+          category: "GROUPS",
+          senderName: log.performedBy || "Administrator",
+          senderEmail: log.metadata?.email || "admin@pceastandrews.org",
+          senderRole: "Admin",
+          avatarGradient: "bg-gradient-to-tr from-violet-500 via-purple-600 to-indigo-600",
+          icon: <Building2 size={14} className="text-violet-500" />,
+          badgeColor: "bg-violet-50 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 border border-violet-200/60 dark:border-violet-800/60",
+          badgeLabel: "Group Addition",
+          title: `User Assigned to Group: ${groupName}`,
+          message: `${log.details || `${targetUser} was assigned to ${groupName}.`}`,
+          snippet: `👥 ${targetUser} assigned to ${groupName}`,
+          actionLabel: "Acknowledge Group Update",
+          timestamp: log.timestamp || now,
+          tags: ["#GROUP_UPDATE", `#${groupName}`, "Directory"],
+          metadata: log.metadata,
           action: () => {
-            onSelectRequisition(r);
+            triggerToast({
+              type: "SYSTEM_INFO",
+              severity: "LOW",
+              message: "Group assignment confirmed in user directory",
+              timestamp: new Date().toISOString()
+            });
           }
         });
-      });
-    }
-
-    // 5. Budget Alerts
-    alerts.filter(a => {
-      if (a.isRead) return false;
-      if (a.targetUserId) return currentUser?.id === a.targetUserId;
-      if (a.targetRole && currentUser?.role !== a.targetRole && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) return false;
-      return true;
-    }).forEach(a => {
-      const cleanText = a.message.toLowerCase();
-      const associatedReq = requisitions.find(r => 
-        (r.id && cleanText.includes(r.id.toLowerCase())) || 
-        (r.title && cleanText.includes(r.title.toLowerCase()))
-      );
-
-      items.push({
-        id: `budget-alert-${a.id}`,
-        rawId: a.id,
-        type: "BUDGET_ALERT",
-        category: "ALERTS",
-        senderName: "System Health & Budget Monitor",
-        senderEmail: "alerts@pceastandrews.org",
-        avatarGradient: "bg-gradient-to-tr from-rose-500 via-red-500 to-amber-500",
-        title: a.type === "OVERSHOOT" ? "Budget Overshoot Trigger" : "System Audit Notification",
-        message: a.message,
-        snippet: a.message.length > 90 ? `${a.message.slice(0, 90)}...` : a.message,
-        actionLabel: associatedReq ? "Inspect Requisition" : "Dismiss Alert",
-        timestamp: a.timestamp,
-        tags: ["#BUDGET_ALERT", "#AUDIT_FLAG", "High Priority"],
-        requisition: associatedReq,
-        action: () => {
-          if (associatedReq) {
-            onSelectRequisition(associatedReq);
-          }
-        }
-      });
+      }
     });
 
-    return items;
-  }, [requisitions, users, alerts, currentUser, onSelectRequisition, approveUser]);
+    // ==========================================
+    // 6. ACCOUNT DETAILS & PASSWORD UPDATES
+    // ==========================================
+    (systemLogs || []).forEach(log => {
+      if (!log || !log.action) return;
 
-  // Real-time unread counts calculation across active non-deleted items
-  const categoryUnreadCounts = useMemo(() => {
+      const act = log.action.toUpperCase();
+      const isPasswordUpdate = act === "PASSWORD_CHANGED" || act === "PASSWORD_RESET" || act === "PASSWORD_RESET_TRIGGERED";
+      const isAccountDetailChange = 
+        act === "USER_PROFILE_UPDATE" || 
+        act === "USER_ROLE_UPDATE" || 
+        act === "ELEVATED_ROLE_GRANTED";
+
+      if (isPasswordUpdate) {
+        const userEmail = log.metadata?.email || log.performedBy || currentUser?.email || "User Account";
+
+        items.push({
+          id: `notif-pwd-${log.id}`,
+          type: "ACCOUNT_UPDATE",
+          category: "SECURITY",
+          senderName: log.performedBy || "Account Security Guard",
+          senderEmail: userEmail,
+          senderRole: "Security",
+          avatarGradient: "bg-gradient-to-tr from-rose-500 via-pink-600 to-orange-500",
+          icon: <KeyRound size={14} className="text-rose-500" />,
+          badgeColor: "bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60",
+          badgeLabel: "Password Update",
+          title: `Account Password Updated: ${userEmail}`,
+          message: `Security notice: The account password for ${userEmail} was changed successfully. If you did not initiate this change, contact the ICT & Security Administrator immediately.`,
+          snippet: `🔒 Password changed for ${userEmail}`,
+          actionLabel: "Verify Security Notice",
+          timestamp: log.timestamp || now,
+          tags: ["#SECURITY", "#PASSWORD_CHANGE", "Account Alert"],
+          metadata: log.metadata,
+          action: () => {
+            triggerToast({
+              type: "SECURITY_UPDATE",
+              severity: "MEDIUM",
+              message: "Account security state is healthy and authenticated.",
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      } else if (isAccountDetailChange) {
+        const userEmail = log.metadata?.email || log.performedBy || "Member Account";
+        const isElevated = act === "ELEVATED_ROLE_GRANTED";
+
+        items.push({
+          id: `notif-acc-update-${log.id}`,
+          type: "ACCOUNT_UPDATE",
+          category: "SECURITY",
+          senderName: log.performedBy || "Administrator",
+          senderEmail: userEmail,
+          senderRole: "Admin",
+          avatarGradient: isElevated ? "bg-gradient-to-tr from-red-500 via-amber-500 to-rose-600" : "bg-gradient-to-tr from-slate-600 via-slate-700 to-slate-900",
+          icon: isElevated ? <ShieldAlert size={14} className="text-red-500" /> : <UserCog size={14} className="text-slate-600 dark:text-slate-400" />,
+          badgeColor: isElevated 
+            ? "bg-red-50 dark:bg-red-950/80 text-red-600 dark:text-red-400 border border-red-200/60 dark:border-red-800/60"
+            : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60",
+          badgeLabel: isElevated ? "Elevated Rights" : "Profile Update",
+          title: isElevated ? `Elevated Rights Granted: ${userEmail}` : `Account Details Modified: ${userEmail}`,
+          message: `${log.details || `Account settings and user profile attributes were updated for ${userEmail}.`}`,
+          snippet: `⚙️ ${log.details || `Account settings updated for ${userEmail}`}`,
+          actionLabel: "Review Profile Changes",
+          timestamp: log.timestamp || now,
+          tags: ["#ACCOUNT_UPDATE", isElevated ? "#ELEVATED_RIGHTS" : "#PROFILE", "Security"],
+          metadata: log.metadata,
+          action: () => {
+            triggerToast({
+              type: "SYSTEM_INFO",
+              severity: "LOW",
+              message: "Account profile audit entry verified.",
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      }
+    });
+
+    // ==========================================
+    // 7. NEW LOGIN DETECTED
+    // ==========================================
+    (systemLogs || []).forEach(log => {
+      if (!log || !log.action) return;
+
+      const act = log.action.toUpperCase();
+      const isLogin = act === "USER_LOGIN" || act === "LOGIN" || act === "SESSION_AUTH" || act === "NEW_DEVICE_LOGIN";
+
+      if (isLogin) {
+        const userEmail = log.metadata?.email || log.performedBy || "Authenticated User";
+        const authMethod = log.metadata?.authProvider || "Session Authorization";
+        const userAgent = log.metadata?.userAgent || "Web Browser Device";
+
+        items.push({
+          id: `notif-login-${log.id}`,
+          type: "NEW_LOGIN",
+          category: "SECURITY",
+          senderName: log.performedBy || userEmail,
+          senderEmail: userEmail,
+          senderRole: "Authentication",
+          avatarGradient: "bg-gradient-to-tr from-emerald-500 via-teal-600 to-cyan-600",
+          icon: <LogIn size={14} className="text-emerald-500" />,
+          badgeColor: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60",
+          badgeLabel: "New Login",
+          title: `New Login Detected: ${userEmail}`,
+          message: `A new session was authenticated for ${userEmail} via ${authMethod}.\n\nDevice / Environment: ${userAgent}`,
+          snippet: `🌐 Authenticated via ${authMethod} (${userEmail})`,
+          actionLabel: "Verify Login Session",
+          timestamp: log.timestamp || now,
+          tags: ["#NEW_LOGIN", `#${authMethod.replace(/\s+/g, "_")}`, "Session Audit"],
+          metadata: log.metadata,
+          action: () => {
+            triggerToast({
+              type: "SYSTEM_INFO",
+              severity: "LOW",
+              message: "Session authentication log verified.",
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      }
+    });
+
+    // Deduplicate and sort descending by timestamp
+    const uniqueMap = new Map<string, NotificationItem>();
+    items.forEach(item => {
+      if (!uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+
+    return Array.from(uniqueMap.values()).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [requisitions, users, systemLogs, currentUser, onSelectRequisition, approveUser, triggerToast]);
+
+  // Real-time category unread and total counts
+  const categoryCounts = useMemo(() => {
     const counts = {
-      ALL: 0,
-      REQUISITIONS: 0,
-      APPROVALS: 0,
-      PAYOUTS: 0,
-      ALERTS: 0,
-      STARRED: 0,
-      ARCHIVED: 0,
-      TRASH: 0,
+      ALL: { total: 0, unread: 0 },
+      COMMENTS: { total: 0, unread: 0 },
+      REACTIONS: { total: 0, unread: 0 },
+      APPROVALS: { total: 0, unread: 0 },
+      SUBMISSIONS: { total: 0, unread: 0 },
+      GROUPS: { total: 0, unread: 0 },
+      SECURITY: { total: 0, unread: 0 },
+      STARRED: { total: 0, unread: 0 },
+      ARCHIVED: { total: 0, unread: 0 },
+      TRASH: { total: 0, unread: 0 },
     };
 
     notificationItems.forEach(item => {
@@ -381,37 +703,41 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       const isStarred = starredNoticeIds.includes(item.id);
 
       if (isDeleted) {
-        if (isUnread) counts.TRASH += 1;
+        counts.TRASH.total += 1;
+        if (isUnread) counts.TRASH.unread += 1;
         return;
       }
 
       if (isArchived) {
-        if (isUnread) counts.ARCHIVED += 1;
+        counts.ARCHIVED.total += 1;
+        if (isUnread) counts.ARCHIVED.unread += 1;
         return;
       }
 
-      if (isUnread) {
-        counts.ALL += 1;
-        if (item.category && counts[item.category] !== undefined) {
-          counts[item.category] += 1;
-        }
-        if (isStarred) {
-          counts.STARRED += 1;
-        }
+      counts.ALL.total += 1;
+      if (isUnread) counts.ALL.unread += 1;
+
+      if (item.category && counts[item.category]) {
+        counts[item.category].total += 1;
+        if (isUnread) counts[item.category].unread += 1;
+      }
+
+      if (isStarred) {
+        counts.STARRED.total += 1;
+        if (isUnread) counts.STARRED.unread += 1;
       }
     });
 
     return counts;
   }, [notificationItems, readNoticeIds, deletedNoticeIds, archivedNoticeIds, starredNoticeIds]);
 
-  // Filter items based on active tab, unread toggle, search query, and current week / older preference
+  // Filter items based on active tab, search, unread filter, and time window
   const { filteredItems, currentWeekItems, olderItems, displayedItems } = useMemo(() => {
     let result = notificationItems;
 
     if (activeTab === "TRASH") {
       result = result.filter(i => deletedNoticeIds.includes(i.id));
     } else {
-      // Exclude deleted items for non-trash views
       result = result.filter(i => !deletedNoticeIds.includes(i.id));
 
       if (activeTab === "STARRED") {
@@ -419,17 +745,10 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
       } else if (activeTab === "ARCHIVED") {
         result = result.filter(i => archivedNoticeIds.includes(i.id));
       } else {
-        // Exclude archived items for main primary & category views
         result = result.filter(i => !archivedNoticeIds.includes(i.id));
 
-        if (activeTab === "REQUISITIONS") {
-          result = result.filter(i => i.category === "REQUISITIONS");
-        } else if (activeTab === "APPROVALS") {
-          result = result.filter(i => i.category === "APPROVALS");
-        } else if (activeTab === "PAYOUTS") {
-          result = result.filter(i => i.category === "PAYOUTS");
-        } else if (activeTab === "ALERTS") {
-          result = result.filter(i => i.category === "ALERTS");
+        if (activeTab !== "ALL") {
+          result = result.filter(i => i.category === activeTab);
         }
       }
     }
@@ -451,7 +770,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
 
     const sorted = [...result].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // Cutoff for current week (last 7 days)
+    // 7-day cutoff for recent week items
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const currentWeek = sorted.filter(item => {
       const t = new Date(item.timestamp).getTime();
@@ -472,7 +791,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     };
   }, [notificationItems, activeTab, showUnreadOnly, searchQuery, readNoticeIds, starredNoticeIds, archivedNoticeIds, deletedNoticeIds, showOlderNotifications]);
 
-  // Allow a state where user can have no selected notification (only clear selection if selected item is no longer in filtered view)
+  // Keep selection synced
   useEffect(() => {
     if (selectedItemId && !filteredItems.some(i => i.id === selectedItemId)) {
       setSelectedItemId(null);
@@ -484,14 +803,14 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     return filteredItems.find(i => i.id === selectedItemId) || null;
   }, [filteredItems, selectedItemId]);
 
-  // Automatically mark selected item as read when opened/active
+  // Auto mark opened item as read
   useEffect(() => {
     if (selectedItem?.id && !readNoticeIds.includes(selectedItem.id)) {
       toggleNoticeRead(selectedItem.id, true);
     }
   }, [selectedItem?.id, readNoticeIds, toggleNoticeRead]);
 
-  // Group notifications into Unread & Read Sections with muted headers
+  // Group into Unread & Read Sections
   const groupedSections = useMemo(() => {
     const unreadItems: NotificationItem[] = [];
     const readItems: NotificationItem[] = [];
@@ -527,7 +846,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     return sections;
   }, [displayedItems, readNoticeIds]);
 
-  const unreadTotal = categoryUnreadCounts.ALL;
+  const unreadTotal = categoryCounts.ALL.unread;
 
   const handleMarkAllRead = () => {
     const unreadIds = notificationItems.filter(i => !readNoticeIds.includes(i.id)).map(i => i.id);
@@ -564,30 +883,30 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     <div className="flex flex-col h-[calc(100vh-100px)] min-h-[600px] w-full bg-slate-50/70 dark:bg-slate-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden text-slate-900 dark:text-slate-100 select-text">
       
       {/* Top Header & Category Tabs Navigation Bar */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 md:px-6 py-3 shrink-0 flex flex-col gap-3">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 md:px-6 py-3.5 shrink-0 flex flex-col gap-3.5">
         {/* Main Title & Utility Toolbar */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-black text-sm shadow-sm shrink-0">
-              <Bell size={18} />
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-black text-sm shadow-sm shrink-0">
+              <Bell size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg md:text-xl font-black tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  All Inbox
+                  Notification Hub
                 </h1>
                 {unreadTotal > 0 ? (
-                  <span className="text-[10px] font-black font-mono bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                  <span className="text-[10px] font-black font-mono bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
                     {unreadTotal} UNREAD
                   </span>
                 ) : (
                   <span className="text-[10px] font-black font-mono bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-1">
-                    <CheckCircle2 size={10} /> ALL READ
+                    <CheckCircle2 size={10} /> ALL CAUGHT UP
                   </span>
                 )}
               </div>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 hidden xs:block">
-                Real-time activity logs, approvals & financial directives
+              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 hidden xs:block">
+                Streamlined feed for comments, reactions, approvals, submissions, group & security alerts
               </p>
             </div>
           </div>
@@ -627,144 +946,187 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 triggerToast({
                   type: "SYSTEM_INFO",
                   severity: "LOW",
-                  message: "Inbox re-synchronized with user directory",
+                  message: "Notification Hub synchronized",
                   timestamp: new Date().toISOString()
                 });
               }}
               className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-              title="Refresh Inbox"
+              title="Refresh Notifications"
             >
               <RefreshCw size={16} />
             </button>
           </div>
         </div>
 
-        {/* Category Pills Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+        {/* Category Navigation Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+          {/* ALL / Primary */}
           <button
             onClick={() => setActiveTab("ALL")}
             className={cn(
-              "px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
               activeTab === "ALL" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
             )}
           >
-            <span>Primary</span>
-            {categoryUnreadCounts.ALL > 0 ? (
+            <span>All</span>
+            {categoryCounts.ALL.unread > 0 ? (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryUnreadCounts.ALL}
+                {categoryCounts.ALL.unread}
               </span>
             ) : (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-                activeTab === "ALL" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              )}>
-                {notificationItems.length}
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.ALL.total}
               </span>
             )}
           </button>
 
+          {/* COMMENTS */}
           <button
-            onClick={() => setActiveTab("REQUISITIONS")}
+            onClick={() => setActiveTab("COMMENTS")}
             className={cn(
-              "px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "REQUISITIONS" 
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              activeTab === "COMMENTS" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
             )}
           >
-            <span>Requisitions</span>
-            {categoryUnreadCounts.REQUISITIONS > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryUnreadCounts.REQUISITIONS}
+            <MessageSquare size={13} className="text-sky-500" />
+            <span>Comments</span>
+            {categoryCounts.COMMENTS.unread > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-sky-500 text-white">
+                {categoryCounts.COMMENTS.unread}
               </span>
             ) : (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-                activeTab === "REQUISITIONS" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              )}>
-                {notificationItems.filter(i => i.category === "REQUISITIONS").length}
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.COMMENTS.total}
               </span>
             )}
           </button>
 
+          {/* REACTIONS */}
+          <button
+            onClick={() => setActiveTab("REACTIONS")}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              activeTab === "REACTIONS" 
+                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
+                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
+            )}
+          >
+            <Smile size={13} className="text-amber-500" />
+            <span>Reactions</span>
+            {categoryCounts.REACTIONS.unread > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-amber-500 text-white">
+                {categoryCounts.REACTIONS.unread}
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.REACTIONS.total}
+              </span>
+            )}
+          </button>
+
+          {/* APPROVALS */}
           <button
             onClick={() => setActiveTab("APPROVALS")}
             className={cn(
-              "px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
               activeTab === "APPROVALS" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
             )}
           >
+            <CheckCircle2 size={13} className="text-emerald-500" />
             <span>Approvals</span>
-            {categoryUnreadCounts.APPROVALS > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryUnreadCounts.APPROVALS}
+            {categoryCounts.APPROVALS.unread > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-white">
+                {categoryCounts.APPROVALS.unread}
               </span>
             ) : (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-                activeTab === "APPROVALS" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              )}>
-                {notificationItems.filter(i => i.category === "APPROVALS").length}
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.APPROVALS.total}
               </span>
             )}
           </button>
 
+          {/* SUBMISSIONS */}
           <button
-            onClick={() => setActiveTab("PAYOUTS")}
+            onClick={() => setActiveTab("SUBMISSIONS")}
             className={cn(
-              "px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "PAYOUTS" 
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              activeTab === "SUBMISSIONS" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
             )}
           >
-            <span>Payouts</span>
-            {categoryUnreadCounts.PAYOUTS > 0 ? (
+            <FilePlus size={13} className="text-indigo-500" />
+            <span>Submissions</span>
+            {categoryCounts.SUBMISSIONS.unread > 0 ? (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryUnreadCounts.PAYOUTS}
+                {categoryCounts.SUBMISSIONS.unread}
               </span>
             ) : (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-                activeTab === "PAYOUTS" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              )}>
-                {notificationItems.filter(i => i.category === "PAYOUTS").length}
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.SUBMISSIONS.total}
               </span>
             )}
           </button>
 
+          {/* GROUPS */}
           <button
-            onClick={() => setActiveTab("ALERTS")}
+            onClick={() => setActiveTab("GROUPS")}
             className={cn(
-              "px-4 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "ALERTS" 
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              activeTab === "GROUPS" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
             )}
           >
-            <span>Updates & Alerts</span>
-            {categoryUnreadCounts.ALERTS > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryUnreadCounts.ALERTS}
+            <Building2 size={13} className="text-violet-500" />
+            <span>Group Updates</span>
+            {categoryCounts.GROUPS.unread > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-violet-500 text-white">
+                {categoryCounts.GROUPS.unread}
               </span>
             ) : (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-                activeTab === "ALERTS" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              )}>
-                {notificationItems.filter(i => i.category === "ALERTS").length}
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.GROUPS.total}
               </span>
             )}
           </button>
 
+          {/* SECURITY & LOGINS */}
+          <button
+            onClick={() => setActiveTab("SECURITY")}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              activeTab === "SECURITY" 
+                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
+                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
+            )}
+          >
+            <KeyRound size={13} className="text-rose-500" />
+            <span>Account & Logins</span>
+            {categoryCounts.SECURITY.unread > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-rose-500 text-white">
+                {categoryCounts.SECURITY.unread}
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {categoryCounts.SECURITY.total}
+              </span>
+            )}
+          </button>
+
+          <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />
+
+          {/* STARRED */}
           <button
             onClick={() => setActiveTab("STARRED")}
             className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
               activeTab === "STARRED" 
                 ? "bg-amber-500 text-white shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
@@ -772,18 +1134,16 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           >
             <Star size={13} className={cn(activeTab === "STARRED" ? "fill-white text-white" : "fill-amber-500 text-amber-500")} />
             <span>Starred</span>
-            <span className={cn(
-              "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-              activeTab === "STARRED" ? "bg-white/20 text-white" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-            )}>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
               {starredNoticeIds.length}
             </span>
           </button>
 
+          {/* ARCHIVED */}
           <button
             onClick={() => setActiveTab("ARCHIVED")}
             className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
               activeTab === "ARCHIVED" 
                 ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
@@ -791,18 +1151,16 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           >
             <Archive size={13} />
             <span>Archived</span>
-            <span className={cn(
-              "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-              activeTab === "ARCHIVED" ? "bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-            )}>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
               {archivedNoticeIds.length}
             </span>
           </button>
 
+          {/* TRASH */}
           <button
             onClick={() => setActiveTab("TRASH")}
             className={cn(
-              "px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
+              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
               activeTab === "TRASH" 
                 ? "bg-rose-600 text-white shadow-sm" 
                 : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
@@ -810,10 +1168,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           >
             <Trash2 size={13} />
             <span>Trash</span>
-            <span className={cn(
-              "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black",
-              activeTab === "TRASH" ? "bg-white/20 text-white" : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-            )}>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
               {deletedNoticeIds.length}
             </span>
           </button>
@@ -825,18 +1180,18 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
         
         {/* Left Notification Stream Column */}
         <div className={cn(
-          "w-full lg:w-[380px] xl:w-[420px] bg-slate-50/50 dark:bg-slate-950/60 border-r border-slate-200/80 dark:border-slate-800 flex flex-col shrink-0 h-full overflow-hidden transition-all duration-300",
+          "w-full lg:w-[400px] xl:w-[440px] bg-slate-50/50 dark:bg-slate-950/60 border-r border-slate-200/80 dark:border-slate-800 flex flex-col shrink-0 h-full overflow-hidden transition-all duration-300",
           selectedItem ? "hidden lg:flex" : "flex"
         )}>
           {/* Search Box Header */}
-          <div className="p-3.5 border-b border-slate-200/80 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xs">
+          <div className="p-3 border-b border-slate-200/80 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs">
             <div className="relative flex items-center">
-              <Search size={15} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+              <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search from notifications..."
+                placeholder="Search comments, approvals, logins..."
                 className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-850 focus:border-indigo-500 transition-all"
               />
               {searchQuery && (
@@ -850,16 +1205,16 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
             </div>
           </div>
 
-          {/* ALL CAUGHT UP STATE BANNER */}
-          {unreadTotal === 0 && notificationItems.length > 0 && (
-            <div className="m-3 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center gap-3 text-emerald-900 dark:text-emerald-200 animate-in fade-in duration-300 shrink-0">
+          {/* ALL CAUGHT UP BANNER */}
+          {unreadTotal === 0 && notificationItems.length > 0 && !showUnreadOnly && (
+            <div className="m-3 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center gap-3 text-emerald-900 dark:text-emerald-200 animate-in fade-in duration-300 shrink-0">
               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <CheckCircle2 size={18} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-black tracking-tight leading-tight">You're All Caught Up!</p>
+                <p className="text-xs font-black tracking-tight leading-tight">All Caught Up!</p>
                 <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium truncate mt-0.5">
-                  All notifications in your directory have been read.
+                  All activity logs and comments have been reviewed.
                 </p>
               </div>
             </div>
@@ -869,18 +1224,18 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           <div className="flex-1 overflow-y-auto p-3 space-y-4 subtle-scrollbar">
             {groupedSections.length === 0 ? (
               <div className="py-16 text-center text-slate-400 space-y-3 px-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
+                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center mx-auto shadow-xs">
                   <CheckCircle2 size={24} />
                 </div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest">
-                  {showUnreadOnly ? "All Caught Up!" : "No Current Week Notifications"}
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                  {showUnreadOnly ? "No Unread Notifications" : "No Notifications Found"}
                 </h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[240px] mx-auto leading-relaxed">
+                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-[260px] mx-auto leading-relaxed">
                   {showUnreadOnly 
-                    ? "You have read all unread notifications in this section."
+                    ? "You have reviewed all unread notifications in this category."
                     : olderItems.length > 0
                     ? `No notifications for the current week. ${olderItems.length} older notification${olderItems.length > 1 ? 's are' : ' is'} available.`
-                    : "All member logs and requisitions are up to date."
+                    : "No comments, reactions, approvals, or login events recorded in this view."
                   }
                 </p>
 
@@ -901,7 +1256,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     onClick={() => setShowUnreadOnly(false)}
                     className="px-3.5 py-1.5 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-xs mt-2"
                   >
-                    View All Notifications
+                    Show All
                   </button>
                 )}
               </div>
@@ -911,11 +1266,11 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
 
                 return (
                   <div key={section.key} className="space-y-2">
-                    {/* Muted Section Divider Label where Unread/Read notifications start */}
-                    <div className="flex items-center gap-2 pt-3 pb-1.5 px-1 select-none">
+                    {/* Section Header Divider */}
+                    <div className="flex items-center gap-2 pt-2 pb-1 px-1 select-none">
                       <div className="flex items-center gap-1.5 shrink-0">
                         {section.isUnreadSection ? (
-                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0 animate-pulse" />
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 animate-pulse" />
                         ) : (
                           <CheckCircle2 size={12} className="text-slate-400 dark:text-slate-500 shrink-0" />
                         )}
@@ -950,38 +1305,34 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                               key={item.id}
                               onClick={() => setSelectedItemId(prev => prev === item.id ? null : item.id)}
                               className={cn(
-                                "group relative p-3.5 rounded-2xl border border-transparent transition-all duration-200 cursor-pointer select-none flex flex-col gap-2 shadow-xs",
+                                "group relative p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none flex flex-col gap-2 shadow-xs",
                                 isSelected 
-                                  ? "bg-white dark:bg-slate-900 ring-2 ring-indigo-500/40 shadow-md" 
+                                  ? "bg-white dark:bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/30 shadow-md" 
                                   : isRead
-                                    ? "bg-white/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-900 opacity-90"
-                                    : "bg-white dark:bg-slate-900 hover:bg-slate-100/50 dark:hover:bg-slate-800/50"
+                                    ? "bg-white/70 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900 border-slate-200/60 dark:border-slate-800/60 opacity-85"
+                                    : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-850 border-slate-200 dark:border-slate-800"
                               )}
                             >
-                              {/* Header Row: User Directory Avatar, Sender Name, Muted Read/Unread Status Pill, Timestamp */}
+                              {/* Header Row: Avatar, Sender, Category Badge, Time */}
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                  {/* User Directory Photo or Fallback Gradient */}
+                                <div className="flex items-center gap-2 min-w-0">
                                   <UserAvatar 
                                     user={{ name: item.senderName, photoURL: senderPhoto }} 
                                     size="xs" 
                                     className="shrink-0 shadow-xs" 
                                   />
-
                                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                                     {item.senderName}
                                   </span>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  {/* Muted Read / Unread Status Badge */}
                                   <span className={cn(
-                                    "text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider select-none",
-                                    !isRead 
-                                      ? "bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400" 
-                                      : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                                    "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1",
+                                    item.badgeColor
                                   )}>
-                                    {!isRead ? "Unread" : "Read"}
+                                    {item.icon}
+                                    <span>{item.badgeLabel}</span>
                                   </span>
                                   <span className="text-[10px] font-mono font-medium text-slate-400 dark:text-slate-500">
                                     {formatTimeString(item.timestamp)}
@@ -992,19 +1343,27 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                               {/* Title / Subject */}
                               <h4 className={cn(
                                 "text-xs leading-snug line-clamp-1 transition-colors",
-                                !isRead ? "font-black text-slate-900 dark:text-slate-100" : "font-bold text-slate-700 dark:text-slate-300"
+                                !isRead ? "font-black text-slate-900 dark:text-slate-100" : "font-semibold text-slate-700 dark:text-slate-300"
                               )}>
                                 {item.title}
                               </h4>
 
                               {/* Snippet preview */}
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed font-sans">
                                 {item.snippet}
                               </p>
 
-                              {/* Card Quick Action Buttons (Divider line and badges removed) */}
-                              <div className="flex items-center justify-end mt-1">
-                                <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                              {/* Footer Actions */}
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-0.5">
+                                <div className="flex items-center gap-1">
+                                  {item.requisition && (
+                                    <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500 truncate max-w-[150px]">
+                                      {item.requisition.groupName}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-1">
                                   <button
                                     type="button"
                                     onClick={(e) => toggleStar(e, item.id)}
@@ -1031,12 +1390,12 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
 
                                   <button
                                     type="button"
-                                    onClick={(e) => handleDeleteAlert(e, item.id, item.rawId)}
+                                    onClick={(e) => handleDeleteNotification(e, item.id, item.rawId)}
                                     className={cn(
                                       "p-1 rounded-md transition-colors cursor-pointer",
                                       isDeleted ? "text-indigo-600 dark:text-indigo-400" : "text-slate-300 hover:text-rose-600 dark:hover:text-rose-400"
                                     )}
-                                    title={isDeleted ? "Restore from trash" : "Delete notification"}
+                                    title={isDeleted ? "Restore from trash" : "Move to trash"}
                                   >
                                     {isDeleted ? <RotateCcw size={13} /> : <Trash2 size={13} />}
                                   </button>
@@ -1052,9 +1411,9 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
               })
             )}
 
-            {/* Load More Older Notifications Section (Positioned directly below Unread & Read sections) */}
+            {/* Load More Older Notifications Toggle */}
             {olderItems.length > 0 && (
-              <div className="pt-3 pb-4">
+              <div className="pt-2 pb-4">
                 {!showOlderNotifications ? (
                   <button
                     type="button"
@@ -1062,10 +1421,10 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     className="w-full py-2.5 px-4 bg-white dark:bg-slate-900 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer group"
                   >
                     <Clock size={15} className="group-hover:rotate-[-45deg] transition-transform text-indigo-500" />
-                    <span>Load Older Notifications ({olderItems.length} Available)</span>
+                    <span>Load Older Notifications ({olderItems.length})</span>
                   </button>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">
                     <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-400">
                       <CheckCircle2 size={13} className="text-emerald-500" />
                       Loaded {olderItems.length} older notification{olderItems.length > 1 ? 's' : ''}
@@ -1101,16 +1460,16 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                   {/* Mobile Back Button */}
                   <button
                     onClick={() => setSelectedItemId(null)}
-                    className="lg:hidden flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 px-2 py-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
+                    className="lg:hidden flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 px-2.5 py-1.5 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
                   >
                     <ChevronLeft size={16} />
-                    <span>Back to Inbox</span>
+                    <span>Back</span>
                   </button>
 
-                  {/* Left Action Buttons */}
+                  {/* Left Utility Actions */}
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={(e) => handleDeleteAlert(e, selectedItem.id, selectedItem.rawId)}
+                      onClick={(e) => handleDeleteNotification(e, selectedItem.id, selectedItem.rawId)}
                       className={cn(
                         "p-2 rounded-xl transition-colors cursor-pointer",
                         deletedNoticeIds.includes(selectedItem.id)
@@ -1144,7 +1503,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                           triggerToast({
                             type: "SYSTEM_INFO",
                             severity: "LOW",
-                            message: "Marked as unread & notification closed",
+                            message: "Marked as unread",
                             timestamp: new Date().toISOString()
                           });
                         } else {
@@ -1158,7 +1517,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                         }
                       }}
                       className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
-                      title={readNoticeIds.includes(selectedItem.id) ? "Mark as unread & close" : "Mark as read"}
+                      title={readNoticeIds.includes(selectedItem.id) ? "Mark as unread" : "Mark as read"}
                     >
                       {readNoticeIds.includes(selectedItem.id) ? <Mail size={16} /> : <MailOpen size={16} />}
                     </button>
@@ -1175,7 +1534,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     </button>
                   </div>
 
-                  {/* Right Action Icons */}
+                  {/* Right Primary Action */}
                   <div className="flex items-center gap-1.5">
                     {selectedItem.requisition && (
                       <button
@@ -1188,34 +1547,19 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     )}
 
                     <button 
-                      onClick={() => {
-                        triggerToast({
-                          type: "SYSTEM_INFO",
-                          severity: "LOW",
-                          message: "Notification details copied to clipboard",
-                          timestamp: new Date().toISOString()
-                        });
-                      }}
-                      className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                      title="Copy info"
-                    >
-                      <ExternalLink size={16} />
-                    </button>
-
-                    <button 
                       onClick={() => setSelectedItemId(null)}
                       className="p-2 rounded-xl text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                      title="Deselect notification"
+                      title="Close preview"
                     >
                       <X size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* Notification Full Content Scrollable Area */}
+                {/* Full Notification Content */}
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 subtle-scrollbar">
                   
-                  {/* Header Information with User Directory Profile Photo */}
+                  {/* Sender Header */}
                   <div className="space-y-4 pb-6 border-b border-slate-200/80 dark:border-slate-800">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3.5">
@@ -1226,11 +1570,20 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                         />
 
                         <div>
-                          <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-100">
-                            {selectedItem.senderName}
-                          </h3>
-                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                            {selectedItem.senderEmail}
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-100">
+                              {selectedItem.senderName}
+                            </h3>
+                            <span className={cn(
+                              "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1",
+                              selectedItem.badgeColor
+                            )}>
+                              {selectedItem.icon}
+                              <span>{selectedItem.badgeLabel}</span>
+                            </span>
+                          </div>
+                          <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                            {selectedItem.senderEmail} {selectedItem.senderRole ? `• ${selectedItem.senderRole}` : ''}
                           </p>
                         </div>
                       </div>
@@ -1242,41 +1595,36 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                       </div>
                     </div>
 
-                    {/* Main Notification Title Heading */}
+                    {/* Notification Title */}
                     <h2 className="text-lg md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-snug">
                       {selectedItem.title}
                     </h2>
 
-                    {/* To / Cc Recipients Pill Chips */}
+                    {/* Category Tags */}
                     <div className="flex items-center gap-2 flex-wrap pt-1">
-                      <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-xs font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60">
-                        <span className="text-slate-400 font-bold">To:</span>
-                        <span className="font-bold">{currentUser?.email || "treasury@pceastandrews.org"}</span>
-                      </div>
-
-                      <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-xs font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60">
-                        <span className="text-slate-400 font-bold">Cc:</span>
-                        <span className="font-bold">audit@pceastandrews.org</span>
-                      </div>
+                      {selectedItem.tags.map((tag, tIdx) => (
+                        <span 
+                          key={tIdx}
+                          className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60"
+                        >
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Message Body Content */}
-                  <div className="space-y-5 text-sm md:text-base leading-relaxed text-slate-700 dark:text-slate-300">
-                    <p className="font-medium text-slate-900 dark:text-slate-100">
-                      Dear {currentUser?.name || "Member"},
-                    </p>
-
-                    <p className="text-slate-700 dark:text-slate-300">
+                  {/* Message Body */}
+                  <div className="space-y-5 text-sm md:text-base leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">
+                    <p className="text-slate-800 dark:text-slate-200 font-normal">
                       {selectedItem.message}
                     </p>
 
-                    {/* Embedded Interactive Callout Banner / Action Card */}
+                    {/* Interactive Action Callout Box */}
                     <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 my-4">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="space-y-0.5">
                           <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 font-mono">
-                            System Directive Action
+                            Event Directive
                           </span>
                           <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                             {selectedItem.title}
@@ -1285,7 +1633,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
 
                         {selectedItem.requisition && (
                           <div className="text-right">
-                            <span className="text-[10px] font-mono text-slate-400 uppercase block font-bold">Total Request Value</span>
+                            <span className="text-[10px] font-mono text-slate-400 uppercase block font-bold">Requisition Amount</span>
                             <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400">
                               KES {selectedItem.requisition.amount.toLocaleString()}
                             </span>
@@ -1312,11 +1660,11 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                       </div>
                     </div>
 
-                    {/* Summary / Requisition Breakdown Details */}
+                    {/* Attached Requisition Overview */}
                     {selectedItem.requisition && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 pt-2">
                         <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest font-mono">
-                          Requisition Overview Summary:
+                          Requisition Context:
                         </h4>
                         <ul className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 font-mono">
                           <li className="flex items-center gap-2">
@@ -1325,7 +1673,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                           </li>
                           <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                            <span><strong>Ministry / Group:</strong> {selectedItem.requisition.groupName}</span>
+                            <span><strong>Ministry Group:</strong> {selectedItem.requisition.groupName}</span>
                           </li>
                           <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
@@ -1333,23 +1681,19 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                           </li>
                           <li className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                            <span><strong>Current Lifecycle Status:</strong> {selectedItem.requisition.status}</span>
+                            <span><strong>Lifecycle Status:</strong> {selectedItem.requisition.status}</span>
                           </li>
                         </ul>
                       </div>
                     )}
-
-                    <p className="text-xs text-slate-400 dark:text-slate-500 pt-4 border-t border-slate-100 dark:border-slate-800">
-                      This notification is generated automatically by the St. Andrew's PCEA eRequisitions Portal.
-                    </p>
                   </div>
 
-                  {/* File Attachments Section */}
+                  {/* File Attachments */}
                   {selectedItem.attachments && selectedItem.attachments.length > 0 && (
                     <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800 space-y-3">
                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
                         <Paperclip size={14} />
-                        <span>Attached File Documents ({selectedItem.attachments.length})</span>
+                        <span>Attached Documents ({selectedItem.attachments.length})</span>
                       </h4>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -1391,7 +1735,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 No Notification Selected
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm leading-relaxed">
-                Select a notification from the list on the left to preview its contents, attached documents, and approval audit trail.
+                Select a comment, reaction, approval, submission, group update, or security notice from the left to view details.
               </p>
             </div>
           )}

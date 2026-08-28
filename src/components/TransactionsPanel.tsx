@@ -35,7 +35,7 @@ import { useRequisitions } from "../contexts/RequisitionContext";
 import { Transaction, TransactionType, TransactionStatus, RequisitionStatus } from "../types";
 import { cn } from "../lib/utils";
 
-const TransactionsPanel: React.FC = () => {
+export const TransactionsPanel: React.FC = () => {
   const { 
     transactions, 
     requisitions, 

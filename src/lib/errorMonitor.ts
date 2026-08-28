@@ -62,7 +62,8 @@ export function initErrorMonitor() {
                               url.includes("ws://") || 
                               url.includes("wss://") ||
                               url.includes("securetoken.googleapis.com") ||
-                              url.includes("identitytoolkit.googleapis.com");
+                              url.includes("identitytoolkit.googleapis.com") ||
+                              (response.status === 404 && url.includes("/api/db/notification_states"));
 
         if (!isExcludedUrl) {
           if (response.status === 429) {

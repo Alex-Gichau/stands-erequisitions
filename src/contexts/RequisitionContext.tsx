@@ -2119,7 +2119,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
               id: alertId,
               type: "L2_APPROVED",
               severity: "HIGH",
-              message: `ATTENTION FINANCE: Requisition '${req.title}' from ${req.groupName} has reached APPROVED L2 status. Please verify entries and initiate disbursement of KES ${req.amount.toLocaleString()}.`,
+              message: `'${req.title}' L2 APPROVED : Requisition '${req.title}' from ${req.groupName} has reached APPROVED L2 status. Check your requisitions details and prepare for disbursement of KES ${req.amount.toLocaleString()}.`,
               timestamp: now.toISOString(),
               isRead: false,
               targetRole: UserRole.FINANCE
@@ -3109,7 +3109,28 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.warn("[User Sync] Background save profile failed:", e);
       });
 
-      addSystemLog("USER_PROFILE_UPDATE", `Profile updated for user ID: ${id}`, { userId: id, updates }).catch(e => {
+      if (updates.group && updates.group !== existingUser?.group) {
+        addSystemLog("USER_ADDED_TO_GROUP", `${updatedUser.name || updatedUser.email} was assigned to ministry group: ${updates.group}`, {
+          userId: id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          group: updates.group
+        }).catch(e => console.warn("[User Sync] Group log failed:", e));
+      } else if (updates.groups && JSON.stringify(updates.groups) !== JSON.stringify(existingUser?.groups)) {
+        addSystemLog("USER_ADDED_TO_GROUP", `${updatedUser.name || updatedUser.email} was assigned to ministry groups: ${updates.groups.join(", ")}`, {
+          userId: id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          groups: updates.groups
+        }).catch(e => console.warn("[User Sync] Group log failed:", e));
+      }
+
+      addSystemLog("USER_PROFILE_UPDATE", `Account profile details updated for ${updatedUser.name || updatedUser.email}`, { 
+        userId: id, 
+        email: updatedUser.email,
+        name: updatedUser.name,
+        updates 
+      }).catch(e => {
         console.warn("[User Sync] System log failed:", e);
       });
     } catch (err) {
@@ -3549,7 +3570,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           id: alertId,
           type: "L2_APPROVED",
           severity: "HIGH",
-          message: `ATTENTION FINANCE: Requisition '${req.title}' from ${req.groupName} has reached APPROVED L2 status. Please verify entries and initiate disbursement of KES ${req.amount.toLocaleString()}.`,
+          message: `'${req.title} L2 APPROVED : Requisition '${req.title}' from ${req.groupName} has reached APPROVED L2 status. Verify details and prepare disbursement of KES ${req.amount.toLocaleString()}.`,
           timestamp: new Date().toISOString(),
           isRead: false,
           targetRole: UserRole.FINANCE

@@ -22,46 +22,26 @@ import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearA
 import { databaseService } from "./lib/databaseService";
 import { UserRole, RequisitionStatus, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
 
-function lazyWithRetry<T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T }>
-) {
-  return lazy(async () => {
-    try {
-      return await factory();
-    } catch (error) {
-      console.warn("[LazyLoad] Dynamic import failed, retrying...", error);
-      await new Promise(resolve => setTimeout(resolve, 350));
-      try {
-        return await factory();
-      } catch (retryError) {
-        console.error("[LazyLoad] Retry failed:", retryError);
-        throw retryError;
-      }
-    }
-  });
-}
-
-// Route-based & Panel Code Splitting (React.lazy with retry resilience)
-const RequisitionsPanel = lazyWithRetry(() => import("./components/RequisitionsPanel").then(m => ({ default: m.RequisitionsPanel || m.default })));
-const ApprovalsPanel = lazyWithRetry(() => import("./components/ApprovalsPanel").then(m => ({ default: m.ApprovalsPanel })));
-const SettingsPanel = lazyWithRetry(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
-const UsersPanel = lazyWithRetry(() => import("./components/UsersPanel").then(m => ({ default: m.UsersPanel })));
-const ReportsPanel = lazyWithRetry(() => import("./components/ReportsPanel").then(m => ({ default: m.ReportsPanel })));
-const FinanceLedgerPanel = lazyWithRetry(() => import("./components/FinanceLedgerPanel").then(m => ({ default: m.FinanceLedgerPanel })));
-const AccessControlPanel = lazyWithRetry(() => import("./components/AccessControlPanel").then(m => ({ default: m.AccessControlPanel })));
-const VendorsPanel = lazyWithRetry(() => import("./components/VendorsPanel").then(m => ({ default: m.VendorsPanel })));
-const AuditLogsPanel = lazyWithRetry(() => import("./components/AuditLogsPanel").then(m => ({ default: m.AuditLogsPanel })));
-const HelpPanel = lazyWithRetry(() => import("./components/HelpPanel").then(m => ({ default: m.HelpPanel })));
-const TransactionsPanel = lazyWithRetry(() => import("./components/TransactionsPanel").then(m => ({ default: m.default || (m as any).TransactionsPanel })));
-const ReceiptTemplateGenerator = lazyWithRetry(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
-const NotificationHub = lazyWithRetry(() => import("./components/NotificationHub").then(m => ({ default: m.NotificationHub })));
-const WaitingRoom = lazyWithRetry(() => import("./components/WaitingRoom").then(m => ({ default: m.WaitingRoom })));
-const ProfilePrompt = lazyWithRetry(() => import("./components/ProfilePrompt").then(m => ({ default: m.ProfilePrompt })));
-const AnnouncementBanner = lazyWithRetry(() => import("./components/AnnouncementBanner").then(m => ({ default: m.AnnouncementBanner })));
-const ProductTour = lazyWithRetry(() => import("./components/ProductTour").then(m => ({ default: m.ProductTour })));
-const FeedbackModal = lazyWithRetry(() => import("./components/FeedbackModal").then(m => ({ default: m.FeedbackModal })));
-const SplashPage = lazyWithRetry(() => import("./components/SplashPage").then(m => ({ default: m.SplashPage })));
-const BackgroundUploadWidget = lazyWithRetry(() => import("./components/BackgroundUploadWidget").then(m => ({ default: m.BackgroundUploadWidget })));
+import { RequisitionsPanel } from "./components/RequisitionsPanel";
+import { ApprovalsPanel } from "./components/ApprovalsPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
+import { UsersPanel } from "./components/UsersPanel";
+import { ReportsPanel } from "./components/ReportsPanel";
+import { FinanceLedgerPanel } from "./components/FinanceLedgerPanel";
+import { AccessControlPanel } from "./components/AccessControlPanel";
+import { VendorsPanel } from "./components/VendorsPanel";
+import { AuditLogsPanel } from "./components/AuditLogsPanel";
+import { HelpPanel } from "./components/HelpPanel";
+import { TransactionsPanel } from "./components/TransactionsPanel";
+import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator";
+import { NotificationHub } from "./components/NotificationHub";
+import { WaitingRoom } from "./components/WaitingRoom";
+import { ProfilePrompt } from "./components/ProfilePrompt";
+import { AnnouncementBanner } from "./components/AnnouncementBanner";
+import { ProductTour } from "./components/ProductTour";
+import { FeedbackModal } from "./components/FeedbackModal";
+import { SplashPage } from "./components/SplashPage";
+import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
 import {
   Bell,
   ArrowRight,
@@ -1640,31 +1620,113 @@ function AppContent() {
     requisition?: any;
   }> = [];
 
-  // 1. Members awaiting approval (only for ADMIN/SUPER_ADMIN)
+  // 1. Comments & Discussions
+  requisitions.forEach(r => {
+    if (!r.comments || !Array.isArray(r.comments)) return;
+    r.comments.forEach((c: any, cIdx: number) => {
+      if (!c || !c.text) return;
+      const authorName = c.authorName || (c.authorEmail ? c.authorEmail.split("@")[0] : "Team Member");
+      notificationItems.push({
+        id: `bell-comment-${r.id}-${c.id || cIdx}`,
+        type: "COMMENT",
+        title: `Comment on "${r.title}"`,
+        message: `${authorName}: "${c.text.length > 70 ? c.text.slice(0, 70) + '...' : c.text}"`,
+        actionLabel: "View Discussion",
+        requisition: r,
+        action: () => {
+          setSelectedRequisition(r);
+          setCurrentView("requisitions");
+          setIsNotificationsOpen(false);
+        }
+      });
+
+      // Replies
+      if (Array.isArray(c.replies)) {
+        c.replies.forEach((rep: any, rIdx: number) => {
+          if (!rep || !rep.text) return;
+          const repAuthor = rep.authorName || (rep.authorEmail ? rep.authorEmail.split("@")[0] : "Contributor");
+          notificationItems.push({
+            id: `bell-reply-${r.id}-${rep.id || rIdx}`,
+            type: "COMMENT",
+            title: `Reply on "${r.title}"`,
+            message: `${repAuthor}: "${rep.text.length > 70 ? rep.text.slice(0, 70) + '...' : rep.text}"`,
+            actionLabel: "View Discussion",
+            requisition: r,
+            action: () => {
+              setSelectedRequisition(r);
+              setCurrentView("requisitions");
+              setIsNotificationsOpen(false);
+            }
+          });
+        });
+      }
+
+      // 2. Reactions
+      const reactionsArr = Array.isArray(c.reactions) ? c.reactions : (c.reactions ? Object.values(c.reactions) : []);
+      reactionsArr.forEach((rx: any, rxIdx: number) => {
+        if (!rx || !rx.emoji) return;
+        const rxUser = rx.userName || (rx.userEmail ? rx.userEmail.split("@")[0] : "Team Member");
+        notificationItems.push({
+          id: `bell-rx-${r.id}-${c.id || cIdx}-${rx.userId || rxIdx}-${rx.emoji}`,
+          type: "REACTION",
+          title: `Reaction ${rx.emoji} on "${r.title}"`,
+          message: `${rxUser} reacted with ${rx.emoji} to comment on "${r.title}".`,
+          actionLabel: "Inspect Reaction",
+          requisition: r,
+          action: () => {
+            setSelectedRequisition(r);
+            setCurrentView("requisitions");
+            setIsNotificationsOpen(false);
+          }
+        });
+      });
+    });
+  });
+
+  // 3. Approvals (Requisition Approvals & Member Approvals)
   if (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) {
     users.filter(u => !u.isApproved).forEach(u => {
       notificationItems.push({
         id: `user-await-${u.id}`,
         type: "MEMBER_APPROVAL",
-        title: "Member Pending Approval",
-        message: `${u.name} (${u.email}) is awaiting account activation.`,
+        title: "Member Pending Authorization",
+        message: `${u.name || u.email} is awaiting account activation.`,
         actionLabel: "Authorize User",
         action: async () => {
           await approveUser(u.id);
         }
       });
     });
+  }
 
-    // 2. New requisitions received (status === SUBMITTED)
+  requisitions.filter(r => (r.status === "APPROVED_L1" || r.status === "APPROVED_L2") && !r.id.includes("req-seed-")).forEach(r => {
+    notificationItems.push({
+      id: `req-app-${r.id}`,
+      type: "REQ_APPROVED",
+      title: `Requisition ${r.status.replace("_", " ")}`,
+      message: `"${r.title}" has been authorized to ${r.status.replace("_", " ")} for KES ${r.amount.toLocaleString()}.`,
+      actionLabel: "View Ledger",
+      requisition: r,
+      action: () => {
+        setSelectedRequisition(r);
+        setCurrentView("requisitions");
+        setIsNotificationsOpen(false);
+      }
+    });
+  });
+
+  // 4. Submissions
+  if (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN || currentUser?.role === UserRole.APPROVER_L1 || currentUser?.role === UserRole.APPROVER_L2) {
     requisitions.filter(r => r.status === "SUBMITTED" && !r.id.includes("req-seed-")).forEach(r => {
       notificationItems.push({
         id: `req-sub-${r.id}`,
         type: "REQ_RECEIVED",
-        title: "New Requisition Received",
-        message: `"${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} is pending decision.`,
-        actionLabel: "Review Requisitions",
+        title: "New Requisition Submitted",
+        message: `"${r.title}" (${r.groupName}) for KES ${r.amount.toLocaleString()} is pending review.`,
+        actionLabel: "Review Requisition",
         requisition: r,
         action: () => {
+          setSelectedRequisition(r);
           setCurrentView("approvals");
           setIsNotificationsOpen(false);
         }
@@ -1672,94 +1734,76 @@ function AppContent() {
     });
   }
 
-  // 3. New approvals done
-  requisitions.filter(r => (r.status === "APPROVED_L1" || r.status === "APPROVED_L2") && !r.id.includes("req-seed-")).forEach(r => {
-    notificationItems.push({
-      id: `req-app-${r.id}`,
-      type: "REQ_APPROVED",
-      title: "Requisition Approved",
-      message: `"${r.title}" has been authorized to ${r.status.replace("_", " ")} for KES ${r.amount.toLocaleString()}.`,
-      actionLabel: "View Ledger",
-      requisition: r,
-      action: () => {
-        setCurrentView("requisitions");
-        setIsNotificationsOpen(false);
-      }
-    });
-  });
-
-  // 3.5. Disbursements needed (specifically for FINANCE, ADMIN, and SUPER_ADMIN roles)
-  if (currentUser?.role === UserRole.FINANCE || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) {
-    requisitions.filter(r => r.status === "APPROVED_L2" && !r.id.includes("req-seed-")).forEach(r => {
+  // 5. Users Added to Groups
+  (systemLogs || []).forEach(log => {
+    if (!log || !log.action) return;
+    const act = log.action.toUpperCase();
+    if (act === "USER_ADDED_TO_GROUP" || act === "GROUP_ASSIGNMENT" || (act === "USER_PRE_PROVISIONED" && (log.metadata?.group || log.metadata?.groups))) {
+      const groupName = log.metadata?.group || (Array.isArray(log.metadata?.groups) ? log.metadata.groups.join(", ") : "") || "Ministry Group";
       notificationItems.push({
-        id: `finance-disb-req-${r.id}`,
-        type: "FINANCE_DISBURSEMENT_REQUIRED",
-        title: "Disbursement Action Required",
-        message: `Requisition "${r.title}" (${r.groupName}) is L2 APPROVED and ready for immediate payout of KES ${r.amount.toLocaleString()}.`,
-        actionLabel: "Disburse Ledger",
-        requisition: r,
+        id: `bell-group-add-${log.id}`,
+        type: "GROUP_ADDITION",
+        title: `User Assigned to ${groupName}`,
+        message: log.details || "User was assigned to ministry group.",
+        actionLabel: "View Notifications",
         action: () => {
-          setCurrentView("finance");
+          setCurrentView("notifications");
           setIsNotificationsOpen(false);
         }
       });
-    });
-  }
+    }
+  });
 
-  // 3.8. Database alerts (e.g. Budget overshoots, comment @mentions)
-  if (Array.isArray(alerts)) {
-    alerts.filter(a => {
-      if (a.targetUserId) {
-        return currentUser?.id === a.targetUserId;
-      }
-      if (a.targetRole && currentUser?.role !== a.targetRole && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) return false;
-      return true;
-    }).forEach(a => {
-      // Find matching requisition if possible
-      const cleanText = a.message.toLowerCase();
-      const associatedReq = requisitions.find(r => 
-        (r.id && cleanText.includes(r.id.toLowerCase())) || 
-        (r.title && cleanText.includes(r.title.toLowerCase()))
-      );
-
+  // 6. Account Details & Password Updates
+  (systemLogs || []).forEach(log => {
+    if (!log || !log.action) return;
+    const act = log.action.toUpperCase();
+    if (act === "PASSWORD_CHANGED" || act === "PASSWORD_RESET" || act === "PASSWORD_RESET_TRIGGERED") {
       notificationItems.push({
-        id: `budget-alert-${a.id}`,
-        type: "BUDGET_ALERT",
-        title: a.type === "OVERSHOOT" ? "Budget Alert" : a.targetUserId ? "New @Mention" : "System Notification",
-        message: a.message,
-        actionLabel: associatedReq ? "Inspect Requisition" : "Dismiss Alert",
-        requisition: associatedReq,
+        id: `bell-pwd-${log.id}`,
+        type: "PASSWORD_UPDATE",
+        title: "Account Password Updated",
+        message: log.details || "Security notice: Account password was updated.",
+        actionLabel: "Security Notice",
         action: () => {
-          if (associatedReq) {
-            setSelectedRequisition(associatedReq);
-            setCurrentView("requisitions");
-            setIsNotificationsOpen(false);
-          }
+          setCurrentView("notifications");
+          setIsNotificationsOpen(false);
         }
       });
-    });
-  }
+    } else if (act === "USER_PROFILE_UPDATE" || act === "USER_ROLE_UPDATE" || act === "ELEVATED_ROLE_GRANTED") {
+      notificationItems.push({
+        id: `bell-prof-${log.id}`,
+        type: "ACCOUNT_UPDATE",
+        title: act === "ELEVATED_ROLE_GRANTED" ? "Elevated Role Granted" : "Profile Details Updated",
+        message: log.details || "Account profile details were updated.",
+        actionLabel: "Security Notice",
+        action: () => {
+          setCurrentView("notifications");
+          setIsNotificationsOpen(false);
+        }
+      });
+    }
+  });
 
-  // 4. Report generation reminder
-  if (showReportReminder) {
-    notificationItems.push({
-      id: "report-reminder",
-      type: "REPORT_REMINDER",
-      title: "Consolidated Reports Pending",
-      message: "Reconcile actual payouts vs project allocations and compile audited ledger report.",
-      actionLabel: reportState === "SUCCESS" ? "Report Downloaded ✓" : reportState === "GENERATING" ? "Compiling..." : "Compile PDF Report",
-      action: () => {
-        setReportState("GENERATING");
-        setTimeout(() => {
-          setReportState("SUCCESS");
-          setTimeout(() => {
-            setShowReportReminder(false);
-            setReportState("IDLE");
-          }, 2000);
-        }, 1500);
-      }
-    });
-  }
+  // 7. New Login Detected
+  (systemLogs || []).forEach(log => {
+    if (!log || !log.action) return;
+    const act = log.action.toUpperCase();
+    if (act === "USER_LOGIN" || act === "LOGIN" || act === "SESSION_AUTH" || act === "NEW_DEVICE_LOGIN") {
+      const userEmail = log.metadata?.email || log.performedBy || "User";
+      notificationItems.push({
+        id: `bell-login-${log.id}`,
+        type: "NEW_LOGIN",
+        title: `New Login Detected: ${userEmail}`,
+        message: log.details || `New session authenticated for ${userEmail}.`,
+        actionLabel: "Audit Session",
+        action: () => {
+          setCurrentView("notifications");
+          setIsNotificationsOpen(false);
+        }
+      });
+    }
+  });
 
   const renderView = () => {
     if (deletedReqId) {
@@ -3128,7 +3172,7 @@ function AppContent() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors text-left cursor-pointer"
                       >
                         <HelpCircle size={14} className="text-slate-400" />
-                        PORTAL HELP
+                        HOW TO USE
                       </button>
 
                       <div className="h-[1px] bg-slate-50 my-1" />

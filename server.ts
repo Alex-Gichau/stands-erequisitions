@@ -43,7 +43,8 @@ const fileMappings: { [key: string]: string } = {
   "church_groups": "church_groups.json",
   "supplementary_budgets": "supplementary_budgets.json",
   "user_reaction_histories": "user_reaction_histories.json",
-  "user_reaction_history": "user_reaction_histories.json"
+  "user_reaction_history": "user_reaction_histories.json",
+  "notification_states": "notification_states.json"
 };
 
 // Helper function to resolve paths from environment variables relative to process.cwd() or absolute path
@@ -1860,6 +1861,9 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       }, 300);
 
       if (!itemData) {
+        if (collection === "notification_states") {
+          return res.json({ id, readNoticeIds: [], starredNoticeIds: [], archivedNoticeIds: [], deletedNoticeIds: [] });
+        }
         return res.status(404).json({ error: "Document not found" });
       }
 

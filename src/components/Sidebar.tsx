@@ -264,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button 
               onClick={handleLogoutClick}
               className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-550 dark:hover:text-rose-400 transition-colors hover:bg-rose-500/10 rounded-lg cursor-pointer"
-              title="Terminate Session"
+              title="Logout"
             >
               <LogOut size={16} />
             </button>

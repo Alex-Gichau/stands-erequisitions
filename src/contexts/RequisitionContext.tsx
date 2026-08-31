@@ -479,6 +479,7 @@ interface RequisitionContextType {
   disburseInstallment: (requisitionId: string, installmentId: string, details: { referenceNum: string; paymentMethod?: string; notes?: string; amount?: number }) => Promise<void>;
   uploadReceipts: (id: string, receipts: string[]) => Promise<void>;
   deleteRequisition: (id: string, reason?: string) => Promise<void>;
+  restoreRequisition: (id: string) => Promise<void>;
   markAlertAsRead: (id: string) => Promise<void>;
   addAlert: (alert: Omit<BudgetAlert, "id" | "isRead" | "timestamp">) => Promise<void>;
   deleteAlert: (id: string) => Promise<void>;
@@ -3843,24 +3844,34 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error("Permission Denied: You do not have permission to delete requisitions from the ledger.");
     }
 
-    // OPTIMISTIC DELETE: Immediately remove from UI
-    setRequisitions(prev => prev.filter(r => r.id !== id));
+    const updatedReq: Requisition = targetReq ? {
+      ...targetReq,
+      status: RequisitionStatus.DELETED,
+      rejectionReason: reason || targetReq.rejectionReason || "Requisition marked as deleted from portal",
+      updatedAt: new Date().toISOString()
+    } : null as any;
+
+    // Soft-delete in UI state so it displays in the Deleted Requisitions table
+    setRequisitions(prev => prev.map(r => r.id === id ? updatedReq : r));
 
     return withDbLoading("Deleting requisition from database...", async () => {
       if (!navigator.onLine) {
-        if (targetReq) setRequisitions(prev => [targetReq, ...prev]);
+        if (targetReq) setRequisitions(prev => prev.map(r => r.id === id ? targetReq : r));
         throw new Error("Offline Mode: You are offline. Deleting requisitions is locked.");
       }
 
       try {
         const projectId = targetReq?.projectId;
 
-        await databaseService.deleteRequisition(id);
-        addSystemLog("REQUISITION_DELETED", `Requisition ID '${id}' deleted`, { requisitionId: id }).catch(() => {});
+        await databaseService.updateRequisition(id, { 
+          status: RequisitionStatus.DELETED,
+          rejectionReason: reason || targetReq?.rejectionReason || "Requisition marked as deleted from portal"
+        });
+        addSystemLog("REQUISITION_DELETED", `Requisition ID '${id}' marked as DELETED`, { requisitionId: id }).catch(() => {});
 
         if (targetReq) {
           sendEmailNotification(
-            targetReq, 
+            updatedReq, 
             "DELETED", 
             reason || "Requisition has been deleted from the portal", 
             currentUser?.name || currentUser?.email || "Reviewing Official"
@@ -3871,12 +3882,39 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           syncProjectAmounts(projectId).catch(() => {});
         }
       } catch (err) {
-        if (targetReq) setRequisitions(prev => [targetReq, ...prev]);
+        if (targetReq) setRequisitions(prev => prev.map(r => r.id === id ? targetReq : r));
         console.error("[deleteRequisition Error]:", err);
         throw err;
       }
     });
   }, [requisitions, setRequisitions, addSystemLog, syncProjectAmounts, sendEmailNotification, currentUser, withDbLoading, canPerform]);
+
+  const restoreRequisition = useCallback(async (id: string) => {
+    const targetReq = requisitions.find(r => r.id === id);
+    if (!targetReq) return;
+
+    if (!canPerform('canDeleteRequisition') && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) {
+      throw new Error("Permission Denied: Only authorized officials can restore deleted requisitions.");
+    }
+
+    const restoredReq: Requisition = {
+      ...targetReq,
+      status: RequisitionStatus.SUBMITTED,
+      updatedAt: new Date().toISOString()
+    };
+
+    setRequisitions(prev => prev.map(r => r.id === id ? restoredReq : r));
+
+    return withDbLoading("Restoring deleted requisition...", async () => {
+      try {
+        await databaseService.updateRequisition(id, { status: RequisitionStatus.SUBMITTED });
+        addSystemLog("REQUISITION_RESTORED", `Requisition ID '${id}' restored to SUBMITTED status`, { requisitionId: id }).catch(() => {});
+      } catch (err) {
+        if (targetReq) setRequisitions(prev => prev.map(r => r.id === id ? targetReq : r));
+        throw err;
+      }
+    });
+  }, [requisitions, setRequisitions, addSystemLog, withDbLoading, canPerform, currentUser]);
 
   const updateRequisition = useCallback(async (id: string, updates: Partial<Requisition>) => {
     if (!navigator.onLine) {
@@ -4540,6 +4578,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       disburseInstallment,
       uploadReceipts,
       deleteRequisition,
+      restoreRequisition,
       markAlertAsRead,
       addAlert,
       updateThreshold,
@@ -4722,9 +4761,10 @@ export const useRequisitionData = () => {
     addRequisition: req.addRequisition,
     updateRequisition: req.updateRequisition,
     deleteRequisition: req.deleteRequisition,
+    restoreRequisition: req.restoreRequisition,
     updateRequisitionStatus: req.updateRequisitionStatus,
     disburseInstallment: req.disburseInstallment,
-  }), [req.requisitions, req.projects, req.churchGroups, req.ledgerBooks, req.transactions, req.addRequisition, req.updateRequisition, req.deleteRequisition, req.updateRequisitionStatus, req.disburseInstallment]);
+  }), [req.requisitions, req.projects, req.churchGroups, req.ledgerBooks, req.transactions, req.addRequisition, req.updateRequisition, req.deleteRequisition, req.restoreRequisition, req.updateRequisitionStatus, req.disburseInstallment]);
 };
 
 export const useActiveFiscalYear = () => {

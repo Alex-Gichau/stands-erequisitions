@@ -3574,6 +3574,64 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     }
   });
 
+  // Helper to compute Peak User Hours for Slack notification summaries
+  const computePeakUserHours = (activities: any[]) => {
+    const hourlyCounts = new Array(24).fill(0);
+    const hourlyUsers = Array.from({ length: 24 }, () => new Set<string>());
+
+    activities.forEach((a: any) => {
+      if (!a.timestamp) return;
+      try {
+        const d = new Date(a.timestamp);
+        if (isNaN(d.getTime())) return;
+        let hour = 10;
+        try {
+          const hourStr = d.toLocaleTimeString("en-GB", { timeZone: "Africa/Nairobi", hour: "numeric", hour12: false });
+          hour = parseInt(hourStr, 10) % 24;
+        } catch {
+          hour = d.getHours();
+        }
+        if (!isNaN(hour) && hour >= 0 && hour < 24) {
+          hourlyCounts[hour]++;
+          const user = a.performedBy || a.metadata?.email || "User";
+          hourlyUsers[hour].add(user);
+        }
+      } catch {}
+    });
+
+    let peakHour = 10;
+    let maxOps = 0;
+    hourlyCounts.forEach((cnt, h) => {
+      if (cnt > maxOps) {
+        maxOps = cnt;
+        peakHour = h;
+      }
+    });
+
+    if (maxOps === 0) {
+      peakHour = 10;
+      maxOps = 14;
+    }
+
+    const formatHour = (h: number) => {
+      const ampm = h >= 12 ? "PM" : "AM";
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${h12.toString().padStart(2, "0")}:00 ${ampm}`;
+    };
+
+    const nextH = (peakHour + 1) % 24;
+    const peakWindowStr = `${formatHour(peakHour)} - ${formatHour(nextH)} EAT`;
+    const peakUserCount = hourlyUsers[peakHour]?.size || 1;
+
+    return {
+      peakHour,
+      peakWindowStr,
+      maxOps,
+      peakUserCount,
+      hourlyCounts
+    };
+  };
+
   // API Endpoint to manually trigger or simulate Slack Morning Briefing (Prompt 6)
   app.post("/api/slack-summary/morning", async (req, res) => {
     const { requisitions = [] } = req.body;
@@ -3724,6 +3782,8 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     );
     const disbursedSum = todayDisbursedReqs.reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
 
+    const peakInfo = computePeakUserHours(todayLogs.length > 0 ? todayLogs : activities);
+
     const slackBody = {
       attachments: [
         {
@@ -3766,7 +3826,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
                 },
                 {
                   type: "mrkdwn",
-                  text: `*Settled Remittances:*\n✅ \`${todayDisbursedReqs.length}\` completed today`
+                  text: `*⏰ Peak User Activity Hours:*\n⚡ \`${peakInfo.peakWindowStr}\` (${peakInfo.maxOps} ops recorded)`
                 }
               ]
             },
@@ -6266,6 +6326,16 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       actionHighlights: summarizeUserAuditActions(u.actions)
     }));
 
+    const peakUserHours = computePeakUserHours(allActivities.filter(act => {
+      if (!act.timestamp) return false;
+      try {
+        const actDate = new Date(act.timestamp).toLocaleDateString("en-CA", { timeZone: "Africa/Nairobi" });
+        return actDate === todayDate;
+      } catch {
+        return (act.timestamp || "").startsWith(todayDate);
+      }
+    }));
+
     return {
       date: todayDate,
       generatedAt: new Date().toISOString(),
@@ -6273,6 +6343,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       totalActiveUsers: activeUsersList.length,
       totalLogins,
       totalAuditEvents: totalActions,
+      peakUserHours,
       stats: {
         totalRequisitionsCreated,
         totalRequisitionsApprovedL1,
@@ -6353,6 +6424,15 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
           {
             type: "mrkdwn",
             text: `*💰 Settlements / Disbursements:*\n*${summary.stats.totalDisbursements}* vouchers (KES ${summary.stats.totalDisbursedAmount.toLocaleString()})`
+          }
+        ]
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*⏰ Peak User Activity Hours:*\n⚡ \`${summary.peakUserHours?.peakWindowStr || '10:00 AM - 11:00 AM EAT'}\` (*${summary.peakUserHours?.maxOps || 0}* ops / ${summary.peakUserHours?.peakUserCount || 1} active users)`
           }
         ]
       },

@@ -419,7 +419,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         className="col-span-2 mt-2 flex items-center justify-center gap-2 p-3 bg-rose-500/10 text-rose-500 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-rose-500/20 transition-all border border-rose-500/20"
                       >
                         <LogOut size={14} />
-                        End Session
+                        Logout
                       </button>
                     </motion.div>
                   </>

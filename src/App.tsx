@@ -3182,7 +3182,7 @@ function AppContent() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-left"
                       >
                         <LogOut size={14} />
-                        EXIT SESSION
+                        Logout
                       </button>
                     </div>
                   </motion.div>

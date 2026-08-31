@@ -10,6 +10,7 @@ import {
   Filter, 
   X,
   Trash2, 
+  RotateCcw, 
   Pencil,
   Eye,
   CheckCircle,
@@ -2432,6 +2433,7 @@ export const RequisitionsPanel: React.FC = () => {
     requisitions, 
     projects,
     deleteRequisition, 
+    restoreRequisition,
     currentUser, 
     users,
     globalSearchTerm, 
@@ -2574,8 +2576,31 @@ export const RequisitionsPanel: React.FC = () => {
   const [activePage, setActivePage] = useState(1);
   const [disbursedPage, setDisbursedPage] = useState(1);
   const [rejectedPage, setRejectedPage] = useState(1);
+  const [deletedPage, setDeletedPage] = useState(1);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const ITEMS_PER_PAGE = 15;
+
+  const handleRestoreReq = async (req: Requisition, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      if (restoreRequisition) {
+        await restoreRequisition(req.id);
+        triggerToast({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: `Requisition "${req.title}" (${req.id}) successfully restored to active submitted status.`,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      triggerToast({
+        type: "SECURITY_UPDATE",
+        severity: "HIGH",
+        message: err.message || "Failed to restore requisition",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
 
   // Track expanded installment payment breakdown schedules
   const [expandedScheduleIds, setExpandedScheduleIds] = useState<Set<string>>(new Set());
@@ -2734,25 +2759,34 @@ export const RequisitionsPanel: React.FC = () => {
     return sortDirection === "desc" ? timeB - timeA : timeA - timeB;
   });
 
-  // Split into active, disbursed, and rejected/cancelled
-  const activeList = filtered.filter(r => r.status !== RequisitionStatus.DISBURSED && r.status !== RequisitionStatus.REJECTED && r.status !== RequisitionStatus.CANCELLED);
+  // Split into active, disbursed, rejected/cancelled, and deleted
+  const activeList = filtered.filter(r => 
+    r.status !== RequisitionStatus.DISBURSED && 
+    r.status !== RequisitionStatus.REJECTED && 
+    r.status !== RequisitionStatus.CANCELLED && 
+    r.status !== RequisitionStatus.DELETED
+  );
   const disbursedList = filtered.filter(r => r.status === RequisitionStatus.DISBURSED);
   const rejectedList = filtered.filter(r => r.status === RequisitionStatus.REJECTED || r.status === RequisitionStatus.CANCELLED);
+  const deletedList = filtered.filter(r => r.status === RequisitionStatus.DELETED);
 
   // Paginated slices
   const activeItems = activeList.slice((activePage - 1) * ITEMS_PER_PAGE, activePage * ITEMS_PER_PAGE);
   const disbursedItems = disbursedList.slice((disbursedPage - 1) * ITEMS_PER_PAGE, disbursedPage * ITEMS_PER_PAGE);
   const rejectedItems = rejectedList.slice((rejectedPage - 1) * ITEMS_PER_PAGE, rejectedPage * ITEMS_PER_PAGE);
+  const deletedItems = deletedList.slice((deletedPage - 1) * ITEMS_PER_PAGE, deletedPage * ITEMS_PER_PAGE);
 
   const activeTotalPages = Math.max(1, Math.ceil(activeList.length / ITEMS_PER_PAGE));
   const disbursedTotalPages = Math.max(1, Math.ceil(disbursedList.length / ITEMS_PER_PAGE));
   const rejectedTotalPages = Math.max(1, Math.ceil(rejectedList.length / ITEMS_PER_PAGE));
+  const deletedTotalPages = Math.max(1, Math.ceil(deletedList.length / ITEMS_PER_PAGE));
 
   // Reset pages when filters change
   React.useEffect(() => {
     setActivePage(1);
     setDisbursedPage(1);
     setRejectedPage(1);
+    setDeletedPage(1);
   }, [globalSearchTerm, filterStatus, dateRangePreset, customStartDate, customEndDate]);
 
   const Pagination = ({ current, total, onChange }: { current: number, total: number, onChange: (p: number) => void }) => (
@@ -4513,6 +4547,305 @@ export const RequisitionsPanel: React.FC = () => {
             current={rejectedPage} 
             total={rejectedTotalPages} 
             onChange={setRejectedPage} 
+          />
+        )}
+      </div>
+
+      {/* Deleted Requisitions Table */}
+      <div id="deleted-requisitions-table" className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-100/60 dark:bg-slate-800/40">
+          <h3 className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
+            <Trash2 size={16} className="text-slate-500" />
+            Deleted Requisitions
+            <span className="text-[10px] text-slate-400 normal-case font-medium ml-2">({deletedList.length} total)</span>
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="hidden md:table w-full text-left">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-200 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th className="px-4 md:px-6 py-3 md:py-4 w-10">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/20 accent-slate-600 cursor-pointer"
+                    checked={deletedItems.length > 0 && deletedItems.every(r => selectedIds.has(r.id))}
+                    onChange={() => {
+                      const allDeletedPageInSelected = deletedItems.every(r => selectedIds.has(r.id));
+                      const newSelected = new Set(selectedIds);
+                      deletedItems.forEach(r => {
+                        if (allDeletedPageInSelected) newSelected.delete(r.id);
+                        else newSelected.add(r.id);
+                      });
+                      setSelectedIds(newSelected);
+                    }}
+                  />
+                </th>
+                <th className="px-4 md:px-6 py-3 md:py-4">
+                  <div className="flex items-center gap-2">
+                    ID & Title
+                    <button 
+                      onClick={() => setSortDirection(prev => prev === "asc" ? "desc" : "asc")}
+                      className="p-1 hover:bg-slate-200 rounded-md transition-colors flex items-center gap-1 group text-slate-600 whitespace-nowrap cursor-pointer"
+                      title={sortDirection === "desc" ? "Switch to Newest Last" : "Switch to Newest First"}
+                    >
+                      <ArrowUpDown size={12} className={cn("transition-transform", sortDirection === "asc" && "rotate-180")} />
+                      <span className="text-[7px] text-slate-400 font-bold group-hover:text-slate-600">{sortDirection === "desc" ? "DESC" : "ASC"}</span>
+                    </button>
+                  </div>
+                </th>
+                <th className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">Requisition Ownership</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-right">Amount</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-center">Status</th>
+                <th className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">Date Deleted</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <AnimatePresence mode="popLayout">
+                {deletedItems.map((req) => (
+                  <motion.tr 
+                    key={req.id} 
+                    layout
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -15 }}
+                    transition={{ 
+                      opacity: { duration: 0.2 },
+                      layout: { type: "spring", stiffness: 300, damping: 30 },
+                      y: { type: "spring", stiffness: 300, damping: 30 }
+                    }}
+                    onClick={() => setViewingReq(req)}
+                    className={cn(
+                      "transition-colors group cursor-pointer border-l-2 opacity-85 hover:opacity-100",
+                      selectedIds.has(req.id) ? "bg-slate-100/70 border-l-slate-500" : "hover:bg-slate-50/80 border-l-transparent"
+                    )}
+                  >
+                    <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/20 accent-slate-600 cursor-pointer"
+                        checked={selectedIds.has(req.id)}
+                        onChange={() => toggleSelect(req.id)}
+                      />
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4">
+                      <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-none">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-700 line-through text-[11px] md:text-sm truncate">
+                            <HighlightText text={req.title} highlight={globalSearchTerm} />
+                          </span>
+                          {req.flaggedForAudit && (
+                            <span title="Flagged for Audit" className="inline-flex shrink-0">
+                              <Flag size={11} className="text-slate-400 fill-slate-400" />
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
+                          <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md text-[7.5px] md:text-[9px] font-extrabold uppercase tracking-wider leading-none w-fit">
+                            💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                          </span>
+                        </div>
+                        {req.rejectionReason && (
+                          <p className="text-[10px] text-slate-500 mt-1 italic truncate max-w-xs">
+                            Reason: {req.rejectionReason}
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
+                      <div className="flex flex-col">
+                        <span className="text-slate-700 font-bold text-[11px] md:text-xs">
+                          {req.requesterName}
+                        </span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
+                          {req.groupName}
+                        </span>
+                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                      </div>
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
+                      <span className="font-mono font-bold text-slate-500 line-through text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4">
+                      <div className="flex justify-center">
+                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border border-slate-200 bg-slate-100 text-slate-600 text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] shrink-0 flex items-center gap-1">
+                          <Trash2 size={10} />
+                          DELETED
+                        </span>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
+                      <span className="text-[9px] md:text-[10px] font-mono font-bold text-slate-500">
+                        {formatDate(req.updatedAt)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingReq(req);
+                          }}
+                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyShareLinkForReq(req);
+                          }}
+                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                          title="Copy Shareable Link"
+                        >
+                          <Share2 size={16} />
+                        </button>
+                        {restoreRequisition && (
+                          <button 
+                            onClick={(e) => handleRestoreReq(req, e)}
+                            className="p-2 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-200 text-slate-400 hover:text-emerald-600 transition-all flex items-center gap-1"
+                            title="Restore Requisition"
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+            {deletedList.length > 0 && (
+              <tfoot>
+                <tr className="bg-slate-100/50 border-t border-slate-200 font-bold text-slate-800">
+                  <td className="px-6 py-4 text-xs font-black uppercase tracking-wider" colSpan={2}>
+                    Total Deleted Requisitions Value
+                  </td>
+                  <td className="px-6 py-4 text-right font-mono text-xs text-slate-600 font-extrabold whitespace-nowrap">
+                    {formatCurrency(deletedList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
+                  </td>
+                  <td colSpan={3} className="px-6 py-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    ({deletedList.length} items marked as deleted)
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+
+          {/* Mobile Cards View for Deleted */}
+          <div className="block md:hidden divide-y divide-slate-100">
+            {deletedItems.map((req) => {
+              return (
+                <div 
+                  key={req.id}
+                  onClick={() => setViewingReq(req)}
+                  className={cn(
+                    "p-4 hover:bg-slate-50 transition-colors cursor-pointer space-y-3 relative border-l-4 opacity-85",
+                    selectedIds.has(req.id) ? "bg-slate-100/70 border-l-slate-500" : "border-l-transparent hover:border-l-slate-300"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/20 accent-slate-600 cursor-pointer shrink-0"
+                          checked={selectedIds.has(req.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleSelect(req.id);
+                          }}
+                        />
+                        <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                          {req.id}
+                        </span>
+                        {req.flaggedForAudit && (
+                          <Flag size={11} className="text-slate-400 fill-slate-400" />
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-700 line-through leading-snug">
+                        <HighlightText text={req.title} highlight={globalSearchTerm} />
+                      </h4>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full border border-slate-200 bg-slate-100 text-slate-600 text-[8px] font-black uppercase tracking-[0.1em] shrink-0 flex items-center gap-1">
+                      <Trash2 size={9} />
+                      DELETED
+                    </span>
+                  </div>
+
+                  {req.rejectionReason && (
+                    <p className="text-[10px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      Reason: {req.rejectionReason}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
+                        💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-semibold truncate">
+                        By {req.requesterName}
+                      </span>
+                      <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                      <span className="font-mono font-black text-slate-500 line-through text-sm">
+                        {formatCurrency(req.amount)}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                        Deleted: {formatDate(req.updatedAt)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                      onClick={() => setViewingReq(req)}
+                      className="p-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-600 transition-all flex items-center gap-1.5 font-bold text-[9px] uppercase tracking-wider"
+                    >
+                      <Eye size={12} />
+                      <span>Details</span>
+                    </button>
+                    <button 
+                      onClick={() => handleCopyShareLinkForReq(req)}
+                      className="p-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-600 transition-all flex items-center gap-1.5 font-bold text-[9px] uppercase tracking-wider"
+                    >
+                      <Share2 size={12} />
+                      <span>Share</span>
+                    </button>
+                    {restoreRequisition && (
+                      <button 
+                        onClick={(e) => handleRestoreReq(req, e)}
+                        className="p-2 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-700 rounded-xl transition-all flex items-center gap-1.5 font-bold text-[9px] uppercase tracking-wider"
+                      >
+                        <RotateCcw size={12} />
+                        <span>Restore</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {deletedList.length === 0 && (
+            <div className="py-16 text-center">
+              <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100">
+                <Trash2 size={20} className="text-slate-300" />
+              </div>
+              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">No deleted requisitions</h3>
+              <p className="text-[11px] text-slate-400 mt-1">Deleted items will be archived here for audit trail compliance.</p>
+            </div>
+          )}
+        </div>
+        {deletedTotalPages > 1 && (
+          <Pagination 
+            current={deletedPage} 
+            total={deletedTotalPages} 
+            onChange={setDeletedPage} 
           />
         )}
       </div>
@@ -7427,16 +7760,16 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               <ChevronDown size={12} className={cn("transition-transform duration-200", isMoreOpen && "rotate-180")} />
             </button>
             {isMoreOpen && (
-              <div className="absolute bottom-full right-0 mb-2 w-56 bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 rounded-xl shadow-xl z-[100] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="absolute bottom-full left-0 sm:left-auto sm:right-0 mb-2 w-56 max-w-[calc(100vw-2.5rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[100] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
                 {/* Print Receipt */}
                 <button 
                   onClick={() => {
                     setIsMoreOpen(false);
                     printRequisitionReceipt(req);
                   }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <Printer size={15} className="text-slate-400" />
+                  <Printer size={15} className="text-slate-400 shrink-0" />
                   <span>Print Receipt</span>
                 </button>
 
@@ -7446,9 +7779,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     setIsMoreOpen(false);
                     onGenerateReceipt();
                   }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <FileText size={15} className="text-slate-400" />
+                  <FileText size={15} className="text-slate-400 shrink-0" />
                   <span>Generate Receipt</span>
                 </button>
 
@@ -7458,9 +7791,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     setIsMoreOpen(false);
                     handleCopyDetails();
                   }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <Copy size={15} className="text-slate-400" />
+                  <Copy size={15} className="text-slate-400 shrink-0" />
                   <span>Copy Details</span>
                 </button>
 
@@ -7470,9 +7803,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     setIsMoreOpen(false);
                     handleCopyShareLink();
                   }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  <Share2 size={15} className="text-slate-400" />
+                  <Share2 size={15} className="text-slate-400 shrink-0" />
                   <span>Share Link</span>
                 </button>
 
@@ -7483,9 +7816,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       setIsMoreOpen(false);
                       handleToggleAuditFlag();
                     }}
-                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
                   >
-                    <Flag size={15} className={cn("text-slate-400", req.flaggedForAudit && "text-rose-500 fill-rose-500")} />
+                    <Flag size={15} className={cn("text-slate-400 shrink-0", req.flaggedForAudit && "text-rose-500 fill-rose-500")} />
                     <span>{req.flaggedForAudit ? "Remove Audit Flag" : "Flag for Audit"}</span>
                   </button>
                 )}
@@ -7501,9 +7834,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       setIsMoreOpen(false);
                       onEdit();
                     }}
-                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer"
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
                   >
-                    <Pencil size={15} className="text-slate-400" />
+                    <Pencil size={15} className="text-slate-400 shrink-0" />
                     <span>Edit Details</span>
                   </button>
                 )}
@@ -7515,9 +7848,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     onDelete();
                     onClose();
                   }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
                 >
-                  <Trash2 size={15} />
+                  <Trash2 size={15} className="shrink-0" />
                   <span>Delete Document</span>
                 </button>
               </div>

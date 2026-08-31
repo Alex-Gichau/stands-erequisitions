@@ -24,16 +24,16 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
     const activeProjects = projects.filter(p => p.fiscalYear === activeYear || (!p.fiscalYear && activeYear === 2026));
     const totalAllocated = activeProjects.reduce((sum, p) => sum + p.allocatedBudget, 0);
     
-    const committedRequisitions = requisitions.filter(r => 
-      (!r.fiscalYear || r.fiscalYear === activeYear) && 
-      [
+    const committedRequisitions = requisitions.filter(r => {
+      const rYear = r.fiscalYear || (r.submittedAt ? new Date(r.submittedAt).getFullYear() : (r.createdAt ? new Date(r.createdAt).getFullYear() : 2026));
+      return rYear === activeYear && [
         RequisitionStatus.SUBMITTED, 
         RequisitionStatus.APPROVED_L1, 
         RequisitionStatus.ESCALATED, 
         RequisitionStatus.APPROVED_L2, 
         RequisitionStatus.DISBURSED
-      ].includes(r.status)
-    );
+      ].includes(r.status);
+    });
 
     const totalSpentAndCommitted = committedRequisitions.reduce((sum, r) => sum + r.amount, 0);
     const utilizationRate = totalAllocated > 0 ? (totalSpentAndCommitted / totalAllocated) * 100 : 0;

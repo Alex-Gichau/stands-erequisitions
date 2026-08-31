@@ -189,13 +189,39 @@ const Dashboard: React.FC<{
   const [supError, setSupError] = useState<string | null>(null);
   const [supSuccess, setSupSuccess] = useState<string | null>(null);
 
+  const { year: activeYear } = useActiveFiscalYear();
+
+  const isRequisitionInFiscalYear = useCallback((r: Requisition, targetYear: number): boolean => {
+    if (r.fiscalYear) {
+      return Number(r.fiscalYear) === targetYear;
+    }
+    const dateStr = r.submittedAt || r.createdAt || r.updatedAt;
+    if (dateStr) {
+      const parsedYear = new Date(dateStr).getFullYear();
+      if (!isNaN(parsedYear)) {
+        return parsedYear === targetYear;
+      }
+    }
+    return targetYear === 2026;
+  }, []);
+
+  const activeFiscalYearRequisitions = useMemo(() => {
+    const targetYear = activeYear || 2026;
+    return requisitions.filter(r => isRequisitionInFiscalYear(r, targetYear));
+  }, [requisitions, activeYear, isRequisitionInFiscalYear]);
+
+  const activeFiscalYearProjects = useMemo(() => {
+    const targetYear = activeYear || 2026;
+    return projects.filter(p => p.fiscalYear === targetYear || (!p.fiscalYear && targetYear === 2026));
+  }, [projects, activeYear]);
+
   const dailyData = useMemo(() => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const sumByDay: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
     const approvedByDay: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
     const countByDay: Record<string, number> = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
     
-    requisitions.forEach(req => {
+    activeFiscalYearRequisitions.forEach(req => {
       const dateStr = req.submittedAt || req.updatedAt;
       if (dateStr) {
         const d = new Date(dateStr);
@@ -225,7 +251,7 @@ const Dashboard: React.FC<{
         average
       };
     });
-  }, [requisitions]);
+  }, [activeFiscalYearRequisitions]);
 
   const monthlyData = useMemo(() => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -239,7 +265,7 @@ const Dashboard: React.FC<{
       countByMonth[m] = 0;
     });
 
-    requisitions.forEach(req => {
+    activeFiscalYearRequisitions.forEach(req => {
       const dateStr = req.submittedAt || req.updatedAt;
       if (dateStr) {
         const d = new Date(dateStr);
@@ -269,7 +295,7 @@ const Dashboard: React.FC<{
         average
       };
     });
-  }, [requisitions]);
+  }, [activeFiscalYearRequisitions]);
 
   const annualData = useMemo(() => {
     const years = ["2024", "2025", "2026", "2027"];
@@ -287,7 +313,7 @@ const Dashboard: React.FC<{
       const dateStr = req.submittedAt || req.updatedAt;
       if (dateStr) {
         const d = new Date(dateStr);
-        const yStr = d.getFullYear().toString();
+        const yStr = (req.fiscalYear ? String(req.fiscalYear) : d.getFullYear().toString());
         if (years.includes(yStr)) {
           sumByYear[yStr] += req.amount;
           if (req.status === RequisitionStatus.APPROVED_L1 || req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED) {
@@ -331,7 +357,12 @@ const Dashboard: React.FC<{
     return `Ksh ${val}`;
   };
 
-  const recentRequisitions = requisitions.slice(0, 5);
+  const recentRequisitions = useMemo(() => {
+    return activeFiscalYearRequisitions.length > 0 
+      ? activeFiscalYearRequisitions.slice(0, 5) 
+      : requisitions.slice(0, 5);
+  }, [activeFiscalYearRequisitions, requisitions]);
+
   const activeAlerts = alerts.filter(a => {
     if (a.isRead) return false;
     if (a.targetRole && currentUser?.role !== a.targetRole && currentUser?.role !== UserRole.ADMIN && currentUser?.role !== UserRole.SUPER_ADMIN) return false;
@@ -405,10 +436,10 @@ const Dashboard: React.FC<{
   };
 
   const stats = useMemo(() => {
-    const totalValue = requisitions.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
-    const pending = requisitions.filter(r => r.status === RequisitionStatus.SUBMITTED || r.status === RequisitionStatus.APPROVED_L1).length;
-    const approved = requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.DISBURSED).length;
-    const disbursed = requisitions.filter(r => r.status === RequisitionStatus.DISBURSED).reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+    const totalValue = activeFiscalYearRequisitions.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+    const pending = activeFiscalYearRequisitions.filter(r => r.status === RequisitionStatus.SUBMITTED || r.status === RequisitionStatus.APPROVED_L1).length;
+    const approved = activeFiscalYearRequisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.DISBURSED).length;
+    const disbursed = activeFiscalYearRequisitions.filter(r => r.status === RequisitionStatus.DISBURSED).reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
 
     return [
       { label: "Total Req Value", value: formatCurrency(totalValue), icon: Wallet, color: "text-primary", bg: "bg-primary/5" },
@@ -416,9 +447,7 @@ const Dashboard: React.FC<{
       { label: "Status Approved", value: `${approved} Approved`, icon: CheckCircle, color: "text-emerald-600", bg: "bg-emerald-50" },
       { label: "Total Req Disbursed", value: formatCurrency(disbursed), icon: Users, color: "text-indigo-600", bg: "bg-indigo-50" },
     ];
-  }, [requisitions]);
-
-  const { year: activeYear } = useActiveFiscalYear();
+  }, [activeFiscalYearRequisitions]);
 
   const assignedMinistries = useMemo(() => {
     if (!currentUser) return [];
@@ -448,8 +477,7 @@ const Dashboard: React.FC<{
     selectedMinistries.forEach(min => {
       const cleanMin = min.toLowerCase().trim();
       
-      const minProjects = projects.filter(p => {
-        if (p.fiscalYear && p.fiscalYear !== activeYear && activeYear !== 2026) return false;
+      const minProjects = activeFiscalYearProjects.filter(p => {
         const cleanGroup = (p.groupId || "").toLowerCase().trim();
         const cleanName = (p.name || "").toLowerCase().trim();
         return cleanGroup === cleanMin || cleanName === cleanMin || cleanGroup.includes(cleanMin) || cleanMin.includes(cleanGroup);
@@ -468,7 +496,7 @@ const Dashboard: React.FC<{
         }
       }
 
-      const minReqs = requisitions.filter(r => {
+      const minReqs = activeFiscalYearRequisitions.filter(r => {
         if (!COMMITTED_REQUISITION_STATUSES.includes(r.status)) return false;
         const cleanReqGroup = (r.groupName || r.groupId || "").toLowerCase().trim();
         const matchesGroup = cleanReqGroup === cleanMin || cleanReqGroup.includes(cleanMin) || cleanMin.includes(cleanReqGroup);
@@ -489,14 +517,13 @@ const Dashboard: React.FC<{
       totalUsedForBanner: used,
       totalRequisitionsForBanner: reqCount
     };
-  }, [assignedMinistries, activeMinistryView, projects, ledgerBooks, requisitions, activeYear]);
+  }, [assignedMinistries, activeMinistryView, activeFiscalYearProjects, ledgerBooks, activeFiscalYearRequisitions]);
 
   const fiscalSummary = useMemo(() => {
-    const activeProjects = projects.filter(p => p.fiscalYear === activeYear);
+    const activeProjects = activeFiscalYearProjects;
     const totalAllocated = activeProjects.reduce((sum, p) => sum + (Number(p.allocatedBudget) || 0), 0);
     
-    const committedRequisitions = requisitions.filter(r => 
-      r.fiscalYear === activeYear && 
+    const committedRequisitions = activeFiscalYearRequisitions.filter(r => 
       COMMITTED_REQUISITION_STATUSES.includes(r.status)
     );
     const totalSpentAndCommitted = committedRequisitions.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
@@ -510,18 +537,18 @@ const Dashboard: React.FC<{
       absorptionRate,
       requisitionsCount
     };
-  }, [projects, requisitions, activeYear]);
+  }, [activeFiscalYearProjects, activeFiscalYearRequisitions, activeYear]);
 
   const requestedPerGroup = useMemo(() => {
     const groupTotals: Record<string, { groupId: string, groupName: string, count: number, totalAmount: number, pendingCount: number, disbursedAmount: number, requisitions: Requisition[] }> = {};
     
-    // Optimization: Create a O(1) lookup map for projects
+    // Optimization: Create a O(1) lookup map for projects in active fiscal year
     const projectMap = new Map<string, typeof projects[0]>();
-    projects.forEach(p => projectMap.set(p.id, p));
+    activeFiscalYearProjects.forEach(p => projectMap.set(p.id, p));
 
-    requisitions.forEach(req => {
+    activeFiscalYearRequisitions.forEach(req => {
       const project = req.projectId ? projectMap.get(req.projectId) : undefined;
-      const pid = project ? project.id : "OTHER";
+      const pid = project ? project.id : (req.groupId || req.groupName || "OTHER");
       const pname = project ? project.name : (req.groupName || "Other / Non-affine");
       const gid = project ? project.groupId : (req.groupId || "OTHER");
       
@@ -550,7 +577,7 @@ const Dashboard: React.FC<{
     });
 
     return Object.values(groupTotals).sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [requisitions, projects]);
+  }, [activeFiscalYearRequisitions, activeFiscalYearProjects]);
 
   const budgetVariances = useMemo(() => {
     // Optimization: Pre-calculate project utilizations and create a lookup map

@@ -92,5 +92,29 @@
     "in_procurement": false,
     "requires_more_info": false,
     "fiscal_year": 2026
+  },
+  {
+    "id": "req_2026_005",
+    "project_id": "p_praise_01",
+    "title": "Old Sound System Cables Replacement (Obsolete Draft)",
+    "description": "Replaced by comprehensive digital audio mixer requisition req_2026_001. Marked deleted by requester.",
+    "amount": 15000,
+    "amount_words": "Fifteen Thousand Shillings Only",
+    "group_id": "cg_praise_worship",
+    "group_name": "Praise & Worship Team",
+    "requester_id": "u-youth-lead",
+    "requester_name": "Youth Leader",
+    "requester_email": "youth@standrews.org",
+    "status": "DELETED",
+    "submitted_at": "2026-06-25T14:10:00.000Z",
+    "updated_at": "2026-06-26T09:30:00.000Z",
+    "payable_to": "Sound Systems Kenya Ltd",
+    "escalation_level": 0,
+    "escalation_notifications_sent": false,
+    "flagged_for_audit": false,
+    "in_procurement": false,
+    "requires_more_info": false,
+    "fiscal_year": 2026,
+    "rejection_reason": "Duplicated request; replaced by req_2026_001"
   }
 ]

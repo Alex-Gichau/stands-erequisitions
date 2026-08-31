@@ -459,7 +459,7 @@ export const ReportsPanel: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">FISCAL_PERIOD</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">FISCAL PERIOD</label>
             <div className="relative">
               <History className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <select
@@ -479,7 +479,7 @@ export const ReportsPanel: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">START_DATE_STAMP</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">START DATE</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <input 
@@ -492,7 +492,7 @@ export const ReportsPanel: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">END_DATE_STAMP</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">END DATE</label>
             <div className="relative">
               <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <input 
@@ -505,7 +505,7 @@ export const ReportsPanel: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">AFFILIATED_ORG</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">GROUP OR MINISTRY</label>
             <div className="relative">
               <Building className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <select
@@ -513,7 +513,7 @@ export const ReportsPanel: React.FC = () => {
                 value={selectedGroup}
                 onChange={(e) => setSelectedGroup(e.target.value)}
               >
-                <option value="ALL">ALL AFFILIATIONS</option>
+                <option value="ALL">ALL GROUPS & MINISTRIES</option>
                 {groups.map((group) => (
                   <option key={group} value={group}>{group}</option>
                 ))}
@@ -522,7 +522,7 @@ export const ReportsPanel: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">PROTOCOL_STATUS</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">REQUISITION STATUS</label>
             <div className="relative">
               <FileCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <select
@@ -530,7 +530,7 @@ export const ReportsPanel: React.FC = () => {
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
-                <option value="ALL">ALL LEDGER STATES</option>
+                <option value="ALL">ALL REQUISITION STATES</option>
                 {Object.values(RequisitionStatus).map(status => (
                   <option key={status} value={status}>{status.replace("_", " ")}</option>
                 ))}
@@ -557,7 +557,7 @@ export const ReportsPanel: React.FC = () => {
             onClick={() => applyQuickFilter("CLEAR")}
             className="px-4 py-2 bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest active:scale-95 ml-auto"
           >
-            RESET_ENGINE
+            RESET SEARCH
           </button>
         </div>
       </div>

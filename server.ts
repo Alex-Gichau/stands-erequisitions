@@ -145,15 +145,8 @@ function writeJsonCollection(collection: string, data: any[]): void {
 }
 
 
-const getFilename = () => {
-  try {
-    return typeof import.meta !== "undefined" && import.meta.url ? fileURLToPath(import.meta.url) : "";
-  } catch {
-    return "";
-  }
-};
-const __filename = getFilename();
-const __dirname = __filename ? path.dirname(__filename) : process.cwd();
+const serverFilename = typeof __filename !== "undefined" ? __filename : process.cwd();
+const serverDirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(serverFilename);
 
 // Email Config
 const transporter = nodemailer.createTransport({
@@ -795,7 +788,12 @@ function generateSlackFullReport(): string {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  // Standard API health check endpoint
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // Gzip / Brotli payload compression middleware for lightning-fast responses
   app.use(compression({

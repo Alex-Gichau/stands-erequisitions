@@ -176,7 +176,7 @@ export async function seedDatabase() {
 }
 
 // Run direct script if called natively
-if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('seed-mongo.ts')) {
+if (process.argv[1]?.endsWith('seed-mongo.ts') || process.argv[1]?.endsWith('seed-mongo.js')) {
   async function run() {
     try {
       await mongoose.connect(MONGODB_URI);

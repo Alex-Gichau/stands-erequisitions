@@ -8,9 +8,9 @@ import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionCon
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError, getAttachmentFileName, getAbsoluteAttachmentUrl } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Repeat, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
+import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { RecurrenceType, UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
+import { UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
@@ -31,7 +31,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   const [amountWords, setAmountWords] = useState<string>(targetReq?.amountWords || (targetReq?.amount ? numberToWords(targetReq.amount) : ""));
   const [title, setTitle] = useState(targetReq?.title || "");
   const [description, setDescription] = useState(targetReq?.description || "");
-  const [recurrence, setRecurrence] = useState<RecurrenceType>(targetReq?.recurrence || RecurrenceType.NONE);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<string[]>(() => {
     if (!targetReq?.attachments) return [];
@@ -321,7 +320,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       title,
       description,
       amount,
-      recurrence,
       payableTo,
       selectedGroup,
       vendorContact,
@@ -349,7 +347,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     title,
     description,
     amount,
-    recurrence,
     payableTo,
     selectedGroup,
     vendorContact,
@@ -374,7 +371,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         if (draft.title) setTitle(draft.title);
         if (draft.description) setDescription(draft.description);
         if (draft.amount) setAmount(draft.amount);
-        if (draft.recurrence) setRecurrence(draft.recurrence as RecurrenceType);
         if (draft.payableTo) setPayableTo(draft.payableTo);
         if (draft.selectedGroup) setSelectedGroup(draft.selectedGroup);
         if (draft.vendorContact) setVendorContact(draft.vendorContact);
@@ -733,7 +729,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         payableTo: payableTo.trim() || undefined,
         amount: parsedAmount,
         amountWords: amountWords || "",
-        recurrence,
         groupId: groupVal,
         groupName: groupVal,
         requesterId: currentUser?.id || "u-anon",
@@ -837,7 +832,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
           payableTo: payableTo.trim() || undefined,
           amount: parsedAmount,
           amountWords: amountWords || (parsedAmount ? numberToWords(parsedAmount) : ""),
-          recurrence,
           groupId: groupVal,
           groupName: groupVal,
           projectId: matchingProject ? matchingProject.id : (targetReq.projectId || undefined),
@@ -869,7 +863,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
           payableTo: payableTo.trim() || undefined,
           amount: parsedAmount,
           amountWords: amountWords || "",
-          recurrence,
           groupId: groupVal,
           groupName: groupVal,
           requesterId: currentUser?.id || "u-anon",
@@ -1759,22 +1752,6 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                 className="input-field resize-none py-3"
                 placeholder="Provide a comprehensive breakdown of the requirements..."
               />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Recurrence Protocol</label>
-              <div className="relative">
-                <Repeat className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <select 
-                  value={recurrence}
-                  onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
-                  className="input-field pl-12 cursor-pointer font-bold uppercase tracking-widest text-[11px]"
-                >
-                  <option value={RecurrenceType.NONE}>NO RECURRENCE</option>
-                  <option value={RecurrenceType.MONTHLY}>MONTHLY CYCLE</option>
-                  <option value={RecurrenceType.QUARTERLY}>QUARTERLY CYCLE</option>
-                </select>
-              </div>
             </div>
           </div>
 

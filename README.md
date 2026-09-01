@@ -131,6 +131,18 @@ Featuring a **dual-database architecture** (MongoDB with automated fallback to J
 
 ---
 
+## 📝 Update Log (Recent Prompt History)
+
+| Prompt / Feature | Summary of Technical & Visual Implementations | Status |
+| :--- | :--- | :---: |
+| **Receipt Approver Audit Trail & Status Tracker** | Added Level 1, Level 2, and Finance Officer names with exact sign-off timestamps to expenditure receipts. Embedded a 4-step outline diagram status tracker (`Submitted` ➔ `L1 Verified` ➔ `L2 Cleared` ➔ `Disbursed`) across in-app modal previews and HTML/PDF exports. | `COMPLETED` |
+| **Cloud Run Health Probes & Dynamic Port Binding** | Replaced hardcoded server port binding with dynamic `process.env.PORT` resolution (defaulting to 3000), exposed a dedicated `/api/health` JSON endpoint, and resolved CommonJS module compatibility for esbuild bundled deployments. | `COMPLETED` |
+| **Requisition Installment Disbursements & Tranche Ledger** | Added support for multi-stage partial disbursements (`RequisitionInstallment`) on high-value requisitions, featuring automatic remaining balance tracking, custom tranche payment vouchers (`printInstallmentVoucher`), and financial ledger entries. | `COMPLETED` |
+| **System Health Diagnostics & Automated Slack Alerts** | Implemented a real-time health diagnostic panel (`SystemHealth.tsx`) with 5-day / 04:00 AM scheduled Slack webhook report dispatches (`executeHealthSlackAlertDispatch`), Valkey cache standby detection, and database status reporting. | `COMPLETED` |
+| **RFC 2397 Attachment Normalization & PDF Previews** | Created the `normalizeAttachmentUrl` utility in `src/lib/utils.ts` to preserve RFC 2397 Data URIs and external domain URLs (`accounts.pceastandrews.org`), alongside clean HTML5 canvas PDF thumbnail previews (`PdfThumbnailPreview.tsx`). | `COMPLETED` |
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites

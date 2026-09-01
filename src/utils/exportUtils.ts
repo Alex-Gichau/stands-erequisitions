@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Requisition, RequisitionInstallment, SystemLog } from "../types";
+import { Requisition, RequisitionInstallment, SystemLog, RequisitionStatus, UserRole } from "../types";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { numberToWords } from "./numberUtils";
 import { jsPDF } from "jspdf";
@@ -1158,8 +1158,129 @@ export function getReceiptFileName(req: Requisition, extension: string = "html")
   return `Receipt_${group}_${title}_${id}.${extension}`;
 }
 
+export interface ApproverAuditStep {
+  stepNumber: number;
+  title: string;
+  roleLabel: string;
+  approverName: string;
+  timestamp?: string;
+  status: "COMPLETED" | "ACTIVE" | "PENDING" | "REJECTED";
+}
+
+export interface ApproverTrailResult {
+  requester: { name: string; timestamp?: string };
+  l1: { name: string; timestamp?: string; isApproved: boolean };
+  l2: { name: string; timestamp?: string; isApproved: boolean };
+  disburser: { name: string; timestamp?: string; isDisbursed: boolean };
+  isRejected: boolean;
+  rejectionReason?: string;
+  steps: ApproverAuditStep[];
+}
+
+export function extractApproverTrail(req: Requisition): ApproverTrailResult {
+  const history: any[] = Array.isArray(req.approvalHistory) ? req.approvalHistory : [];
+
+  // Find L1 action
+  const l1Action = history.find((h: any) =>
+    h.role === UserRole.APPROVER_L1 || h.role === "APPROVER_L1" || h.decision === "APPROVE_L1" || (h.decision === "APPROVE" && (h.role === UserRole.APPROVER_L1 || h.role === "APPROVER_L1" || h.role === "CHURCH_GROUP" || h.role === "GROUP_LEADER"))
+  ) || history.find((h: any) => h.decision === "APPROVE");
+
+  // Find L2 action
+  const l2Action = history.find((h: any) =>
+    h.role === UserRole.APPROVER_L2 || h.role === "APPROVER_L2" || h.decision === "APPROVE_L2" || (h.decision === "APPROVE" && (h.role === UserRole.APPROVER_L2 || h.role === "APPROVER_L2" || h.role === "TREASURER"))
+  ) || history.filter((h: any) => h.decision === "APPROVE")[1];
+
+  // Find Disburser action
+  const disburseAction = history.find((h: any) =>
+    h.role === UserRole.FINANCE || h.role === "FINANCE" || h.decision === "DISBURSED" || (h.note && h.note.toLowerCase().includes("disburs"))
+  );
+
+  const instDisburser = req.installments?.find((i: any) => i.disbursedByName)?.disbursedByName;
+  const instDisbursedAt = req.installments?.find((i: any) => i.disbursedAt)?.disbursedAt;
+
+  const isL1Approved =
+    req.status === RequisitionStatus.APPROVED_L1 ||
+    req.status === RequisitionStatus.APPROVED_L2 ||
+    req.status === RequisitionStatus.DISBURSED ||
+    req.status === RequisitionStatus.PARTIALLY_DISBURSED ||
+    Boolean(req.approvedAtL1);
+
+  const isL2Approved =
+    req.status === RequisitionStatus.APPROVED_L2 ||
+    req.status === RequisitionStatus.DISBURSED ||
+    req.status === RequisitionStatus.PARTIALLY_DISBURSED ||
+    Boolean(req.approvedAtL2);
+
+  const isDisbursed =
+    req.status === RequisitionStatus.DISBURSED ||
+    req.status === RequisitionStatus.PARTIALLY_DISBURSED ||
+    Boolean(req.disbursedAt);
+
+  const isRejected = req.status === RequisitionStatus.REJECTED || req.status === RequisitionStatus.CANCELLED;
+
+  const requesterName = req.requesterName || "Authorized Requester";
+  const requesterTime = req.submittedAt || req.createdAt;
+
+  const l1Name = l1Action?.approverName || (isL1Approved ? "L1 Compliance Officer" : "Pending Sign-off");
+  const l1Time = l1Action?.timestamp || req.approvedAtL1;
+
+  const l2Name = l2Action?.approverName || (isL2Approved ? "Treasury Official" : "Pending Authorization");
+  const l2Time = l2Action?.timestamp || req.approvedAtL2;
+
+  const disburserName =
+    disburseAction?.approverName || instDisburser || (isDisbursed ? "Finance Disburser" : "Pending Disbursement");
+  const disbursedTime = disburseAction?.timestamp || instDisbursedAt || req.disbursedAt;
+
+  const steps: ApproverAuditStep[] = [
+    {
+      stepNumber: 1,
+      title: "Submitted",
+      roleLabel: "Requester",
+      approverName: requesterName,
+      timestamp: requesterTime,
+      status: "COMPLETED",
+    },
+    {
+      stepNumber: 2,
+      title: "L1 Verified",
+      roleLabel: "L1 Approver",
+      approverName: l1Name,
+      timestamp: isL1Approved ? l1Time : undefined,
+      status: isL1Approved ? "COMPLETED" : isRejected ? "REJECTED" : req.status === RequisitionStatus.SUBMITTED ? "ACTIVE" : "PENDING",
+    },
+    {
+      stepNumber: 3,
+      title: "L2 Cleared",
+      roleLabel: "L2 Approver",
+      approverName: l2Name,
+      timestamp: isL2Approved ? l2Time : undefined,
+      status: isL2Approved ? "COMPLETED" : isRejected ? "REJECTED" : req.status === RequisitionStatus.APPROVED_L1 ? "ACTIVE" : "PENDING",
+    },
+    {
+      stepNumber: 4,
+      title: "Disbursed",
+      roleLabel: "Finance",
+      approverName: disburserName,
+      timestamp: isDisbursed ? disbursedTime : undefined,
+      status: isDisbursed ? "COMPLETED" : isRejected ? "REJECTED" : req.status === RequisitionStatus.APPROVED_L2 ? "ACTIVE" : "PENDING",
+    },
+  ];
+
+  return {
+    requester: { name: requesterName, timestamp: requesterTime },
+    l1: { name: l1Name, timestamp: l1Time, isApproved: isL1Approved },
+    l2: { name: l2Name, timestamp: l2Time, isApproved: isL2Approved },
+    disburser: { name: disburserName, timestamp: disbursedTime, isDisbursed },
+    isRejected,
+    rejectionReason: req.rejectionReason,
+    steps,
+  };
+}
+
 export function generateReceiptHtml(req: Requisition): string {
   const fileName = getReceiptFileName(req, "pdf");
+  const trail = extractApproverTrail(req);
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -1169,7 +1290,7 @@ export function generateReceiptHtml(req: Requisition): string {
   <style>
     @page {
       size: A4 portrait;
-      margin: 15mm;
+      margin: 12mm;
     }
     * {
       box-sizing: border-box;
@@ -1178,7 +1299,7 @@ export function generateReceiptHtml(req: Requisition): string {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       color: #0f172a;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
       background: #f8fafc;
       -webkit-font-smoothing: antialiased;
     }
@@ -1187,7 +1308,7 @@ export function generateReceiptHtml(req: Requisition): string {
       width: 100%;
       max-width: 680px;
       margin: 0 auto;
-      padding: 40px;
+      padding: 32px;
       box-sizing: border-box;
       background: #ffffff;
       border: 1px solid #e2e8f0;
@@ -1197,7 +1318,7 @@ export function generateReceiptHtml(req: Requisition): string {
       flex-direction: column;
       justify-content: space-between;
       overflow: hidden;
-      min-height: 800px;
+      min-height: 820px;
     }
     .watermark {
       position: absolute;
@@ -1217,11 +1338,11 @@ export function generateReceiptHtml(req: Requisition): string {
       flex-direction: column;
       height: 100%;
       justify-content: space-between;
-      gap: 32px;
+      gap: 20px;
     }
     .header {
       border-bottom: 3px solid #0f172a;
-      padding-bottom: 20px;
+      padding-bottom: 16px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -1278,8 +1399,8 @@ export function generateReceiptHtml(req: Requisition): string {
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      padding: 16px;
+      gap: 16px;
+      padding: 12px 16px;
       background: #f8fafc;
       border-radius: 12px;
       border: 1px solid #f1f5f9;
@@ -1309,11 +1430,11 @@ export function generateReceiptHtml(req: Requisition): string {
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 8px 0;
+      margin: 4px 0;
     }
     th {
       border-bottom: 2px solid #0f172a;
-      padding: 10px 0;
+      padding: 8px 0;
       font-size: 11px;
       font-weight: 900;
       color: #0f172a;
@@ -1322,13 +1443,13 @@ export function generateReceiptHtml(req: Requisition): string {
       letter-spacing: 1px;
     }
     td {
-      padding: 16px 0;
+      padding: 12px 0;
       border-bottom: 1px solid #e2e8f0;
       vertical-align: top;
     }
     .item-title {
       font-weight: 800;
-      font-size: 15px;
+      font-size: 14px;
       color: #0f172a;
       margin-bottom: 4px;
     }
@@ -1336,11 +1457,11 @@ export function generateReceiptHtml(req: Requisition): string {
       font-size: 12px;
       color: #475569;
       font-style: italic;
-      line-height: 1.5;
+      line-height: 1.4;
     }
     .item-status {
-      margin-top: 8px;
-      font-size: 10px;
+      margin-top: 6px;
+      font-size: 9px;
       font-weight: 800;
       text-transform: uppercase;
       color: #059669;
@@ -1353,36 +1474,208 @@ export function generateReceiptHtml(req: Requisition): string {
       text-align: right;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-weight: 800;
-      font-size: 16px;
+      font-size: 15px;
       color: #0f172a;
     }
     .amount-words {
       background: #f8fafc;
-      padding: 16px;
+      padding: 12px 16px;
       border-radius: 12px;
       border: 1px solid #e2e8f0;
+      margin-bottom: 4px;
     }
     .amount-words label {
       display: block;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 900;
       color: #64748b;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .amount-words div {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       color: #1e293b;
       text-transform: uppercase;
-      line-height: 1.4;
+      line-height: 1.3;
     }
+
+    /* Workflow Status Diagram & Approvers Outline */
+    .workflow-container {
+      border: 2px solid #0f172a;
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #ffffff;
+    }
+    .workflow-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .workflow-title {
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #0f172a;
+    }
+    .workflow-status-badge {
+      font-size: 9px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #047857;
+      background: #ecfdf5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #a7f3d0;
+    }
+    .workflow-diagram {
+      display: flex;
+      align-items: stretch;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .diagram-node {
+      flex: 1;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px;
+      background: #fafafa;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 80px;
+    }
+    .diagram-node.completed {
+      border-color: #047857;
+      background: #f0fdf4;
+    }
+    .diagram-node.active {
+      border-color: #4f46e5;
+      background: #eef2ff;
+    }
+    .diagram-node.rejected {
+      border-color: #e11d48;
+      background: #fff1f2;
+    }
+    .node-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .node-num {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .diagram-node.completed .node-num {
+      background: #047857;
+    }
+    .diagram-node.rejected .node-num {
+      background: #e11d48;
+    }
+    .node-pill {
+      font-size: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+    }
+    .diagram-node.completed .node-pill {
+      background: #d1fae5;
+      color: #065f46;
+      border-color: #a7f3d0;
+    }
+    .diagram-node.rejected .node-pill {
+      background: #ffe4e6;
+      color: #9f1239;
+      border-color: #fecdd3;
+    }
+    .diagram-node.active .node-pill {
+      background: #e0e7ff;
+      color: #3730a3;
+      border-color: #c7d2fe;
+    }
+    .node-title {
+      font-size: 10px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .node-name {
+      font-size: 9px;
+      font-weight: 700;
+      color: #334155;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+    .node-time {
+      font-size: 8px;
+      font-family: monospace;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .diagram-arrow {
+      align-self: center;
+      color: #94a3b8;
+      font-weight: 900;
+      font-size: 12px;
+    }
+
+    .approvers-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #cbd5e1;
+    }
+    .approver-cell {
+      font-size: 8px;
+    }
+    .approver-role {
+      font-weight: 900;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .approver-name {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 9.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 1px;
+    }
+    .approver-date {
+      font-family: monospace;
+      color: #64748b;
+      font-size: 8px;
+      margin-top: 1px;
+    }
+
     .footer {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      padding-top: 24px;
+      padding-top: 16px;
       border-top: 2px dashed #cbd5e1;
       margin-top: auto;
       gap: 16px;
@@ -1391,7 +1684,7 @@ export function generateReceiptHtml(req: Requisition): string {
       border-top: 1px solid #94a3b8;
       width: 130px;
       padding-top: 6px;
-      margin-top: 20px;
+      margin-top: 16px;
       font-size: 9px;
       font-weight: 900;
       color: #64748b;
@@ -1403,7 +1696,7 @@ export function generateReceiptHtml(req: Requisition): string {
       align-items: center;
       gap: 12px;
       border: 1px solid #cbd5e1;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 12px;
       background: #f8fafc;
     }
@@ -1411,14 +1704,14 @@ export function generateReceiptHtml(req: Requisition): string {
       text-align: right;
     }
     .grand-total .val {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 900;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       color: #0f172a;
       margin-bottom: 2px;
     }
     .grand-total .lab {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 900;
       color: #64748b;
       text-transform: uppercase;
@@ -1472,6 +1765,7 @@ export function generateReceiptHtml(req: Requisition): string {
             <div class="meta-value">#${req.id.toUpperCase()}</div>
           </div>
         </div>
+
         <div class="info-grid">
           <div class="info-item">
             <label>Issued To</label>
@@ -1484,6 +1778,7 @@ export function generateReceiptHtml(req: Requisition): string {
             <div class="secondary-val">FY ${req.fiscalYear || '2026'}</div>
           </div>
         </div>
+
         <table>
           <thead>
             <tr>
@@ -1496,7 +1791,7 @@ export function generateReceiptHtml(req: Requisition): string {
               <td>
                 <div class="item-title">${req.title}</div>
                 <div class="item-desc">"${req.description}"</div>
-                <div class="item-status">Status: ${req.status}</div>
+                <div class="item-status">Status: ${req.status.replace(/_/g, " ")}</div>
               </td>
               <td class="item-amount">
                 ${formatCurrency(req.amount)}
@@ -1504,22 +1799,74 @@ export function generateReceiptHtml(req: Requisition): string {
             </tr>
           </tbody>
         </table>
+
         <div class="amount-words">
           <label>Amount in Words</label>
           <div>${req.amountWords}</div>
         </div>
+
+        <!-- Workflow Status & Approvers Diagram Section -->
+        <div class="workflow-container">
+          <div class="workflow-header">
+            <div class="workflow-title">Workflow Authorization & Status Tracker</div>
+            <div class="workflow-status-badge">${req.status.replace(/_/g, " ")}</div>
+          </div>
+
+          <!-- Outline Diagram Flow -->
+          <div class="workflow-diagram">
+            ${trail.steps.map((step, idx) => `
+              <div class="diagram-node ${step.status.toLowerCase()}">
+                <div class="node-top">
+                  <span class="node-num">${step.status === 'COMPLETED' ? '✓' : step.status === 'REJECTED' ? '✕' : step.stepNumber}</span>
+                  <span class="node-pill">${step.status === 'COMPLETED' ? 'Cleared' : step.status === 'REJECTED' ? 'Rejected' : step.status === 'ACTIVE' ? 'Current' : 'Pending'}</span>
+                </div>
+                <div>
+                  <div class="node-title">${step.title}</div>
+                  <div class="node-name" title="${step.approverName}">${step.approverName}</div>
+                  <div class="node-time">${step.timestamp ? formatDate(step.timestamp) : '—'}</div>
+                </div>
+              </div>
+              ${idx < 3 ? '<div class="diagram-arrow">➔</div>' : ''}
+            `).join('')}
+          </div>
+
+          <!-- Approvers Name & Timestamp Details Grid -->
+          <div class="approvers-summary-grid">
+            <div class="approver-cell">
+              <div class="approver-role">1. Requester</div>
+              <div class="approver-name" title="${trail.requester.name}">${trail.requester.name}</div>
+              <div class="approver-date">${trail.requester.timestamp ? formatDate(trail.requester.timestamp) : '—'}</div>
+            </div>
+            <div class="approver-cell">
+              <div class="approver-role">2. L1 Approver</div>
+              <div class="approver-name" title="${trail.l1.name}">${trail.l1.name}</div>
+              <div class="approver-date">${trail.l1.timestamp ? formatDate(trail.l1.timestamp) : '—'}</div>
+            </div>
+            <div class="approver-cell">
+              <div class="approver-role">3. L2 Approver</div>
+              <div class="approver-name" title="${trail.l2.name}">${trail.l2.name}</div>
+              <div class="approver-date">${trail.l2.timestamp ? formatDate(trail.l2.timestamp) : '—'}</div>
+            </div>
+            <div class="approver-cell">
+              <div class="approver-role">4. Finance Officer</div>
+              <div class="approver-name" title="${trail.disburser.name}">${trail.disburser.name}</div>
+              <div class="approver-date">${trail.disburser.timestamp ? formatDate(trail.disburser.timestamp) : '—'}</div>
+            </div>
+          </div>
+        </div>
       </div>
+
       <div class="footer">
         <div>
           <div style="color: #059669; font-size: 10px; font-weight: 900; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">✓ AUTHORIZED DIGITALLY</div>
           <div class="signature-area">Ministry Stamp</div>
         </div>
         <div class="qr-block">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`VERIFY REQUISITION #${req.id} | ${req.title} | ${formatCurrency(req.amount)} | Status: ${req.status} | Group: ${req.groupName}`)}" alt="QR Code" style="width: 54px; height: 54px; border-radius: 6px;" />
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`VERIFY REQUISITION #${req.id} | ${req.title} | ${formatCurrency(req.amount)} | Status: ${req.status} | Group: ${req.groupName} | L1: ${trail.l1.name} | L2: ${trail.l2.name}`)}" alt="QR Code" style="width: 50px; height: 50px; border-radius: 6px;" />
           <div style="text-align: left;">
             <div style="font-size: 9px; font-weight: 900; color: #059669; text-transform: uppercase;">Scannable QR</div>
-            <div style="font-size: 9px; font-weight: 700; color: #334155;">Mobile Verification</div>
-            <div style="font-size: 9px; font-family: monospace; color: #64748b;">#${req.id}</div>
+            <div style="font-size: 8.5px; font-weight: 700; color: #334155;">Mobile Verification</div>
+            <div style="font-size: 8.5px; font-family: monospace; color: #64748b;">#${req.id}</div>
           </div>
         </div>
         <div class="grand-total">

@@ -9,7 +9,7 @@ import { formatCurrency, formatDate, cn } from "../lib/utils";
 import { Printer, Download, X, FileText, CheckCircle, Paperclip, Loader2, Image as ImageIcon, Lock } from "lucide-react";
 import { motion } from "motion/react";
 import { useRequisitions } from "../contexts/RequisitionContext";
-import { printRequisitionReceipt, downloadReceiptHtml, getReceiptFileName } from "../utils/exportUtils";
+import { printRequisitionReceipt, downloadReceiptHtml, getReceiptFileName, extractApproverTrail } from "../utils/exportUtils";
 import { QRCodeSVG } from "qrcode.react";
 import html2canvas from "html2canvas";
 
@@ -24,6 +24,8 @@ export const ReceiptTemplateGenerator: React.FC<ReceiptTemplateGeneratorProps> =
   const [isDownloadingImage, setIsDownloadingImage] = useState(false);
   const [attached, setAttached] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
+
+  const auditTrail = useMemo(() => extractApproverTrail(req), [req]);
 
   const qrPayload = useMemo(() => {
     return JSON.stringify({
@@ -214,6 +216,116 @@ export const ReceiptTemplateGenerator: React.FC<ReceiptTemplateGeneratorProps> =
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Amount in Words</span>
                 <div className="text-sm font-bold text-slate-800 uppercase font-serif tracking-tight leading-snug">{req.amountWords}</div>
+              </div>
+
+              {/* Workflow Authorization Pipeline & Approvers Outline Diagram */}
+              <div className="bg-white border-2 border-slate-900 rounded-xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
+                    Workflow Authorization & Status Tracker
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded uppercase">
+                    {req.status.replace(/_/g, " ")}
+                  </span>
+                </div>
+
+                {/* Outline Diagram Pipeline */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 relative">
+                  {auditTrail.steps.map((step, idx) => {
+                    const isDone = step.status === "COMPLETED";
+                    const isActive = step.status === "ACTIVE";
+                    const isRejected = step.status === "REJECTED";
+
+                    return (
+                      <div key={step.stepNumber} className="relative flex flex-col justify-between">
+                        <div
+                          className={cn(
+                            "border-2 rounded-lg p-2 bg-slate-50/50 flex flex-col justify-between min-h-[82px]",
+                            isDone
+                              ? "border-emerald-700 bg-emerald-50/40 text-emerald-950"
+                              : isRejected
+                              ? "border-rose-600 bg-rose-50/40 text-rose-950"
+                              : isActive
+                              ? "border-indigo-600 bg-indigo-50/30 text-indigo-950"
+                              : "border-slate-300 border-dashed text-slate-600"
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span
+                              className={cn(
+                                "w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center shrink-0 text-white",
+                                isDone
+                                  ? "bg-emerald-700"
+                                  : isRejected
+                                  ? "bg-rose-600"
+                                  : isActive
+                                  ? "bg-indigo-600"
+                                  : "bg-slate-400"
+                              )}
+                            >
+                              {isDone ? "✓" : isRejected ? "✕" : step.stepNumber}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-[7.5px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                isDone
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                  : isRejected
+                                  ? "bg-rose-100 text-rose-800 border-rose-300"
+                                  : isActive
+                                  ? "bg-indigo-100 text-indigo-800 border-indigo-300"
+                                  : "bg-slate-100 text-slate-500 border-slate-200"
+                              )}
+                            >
+                              {isDone ? "Cleared" : isRejected ? "Rejected" : isActive ? "Current" : "Pending"}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="text-[10px] font-black text-slate-900 leading-tight">{step.title}</div>
+                            <div className="text-[9.5px] font-bold text-slate-800 truncate" title={step.approverName}>
+                              {step.approverName}
+                            </div>
+                            <div className="text-[8px] font-mono text-slate-500 mt-0.5">
+                              {step.timestamp ? formatDate(step.timestamp) : "—"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Connecting Arrow for Desktop View */}
+                        {idx < 3 && (
+                          <div className="hidden sm:block absolute -right-2.5 top-1/2 -translate-y-1/2 z-10 text-slate-400 font-black text-[10px] pointer-events-none">
+                            ➔
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Approvers Name & Time Audit Table */}
+                <div className="pt-2 border-t border-dashed border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+                  <div>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">1. Requester</span>
+                    <div className="text-[10px] font-extrabold text-slate-900 truncate" title={auditTrail.requester.name}>{auditTrail.requester.name}</div>
+                    <div className="text-[8px] font-mono text-slate-500">{auditTrail.requester.timestamp ? formatDate(auditTrail.requester.timestamp) : "—"}</div>
+                  </div>
+                  <div>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">2. L1 Approver</span>
+                    <div className="text-[10px] font-extrabold text-slate-900 truncate" title={auditTrail.l1.name}>{auditTrail.l1.name}</div>
+                    <div className="text-[8px] font-mono text-slate-500">{auditTrail.l1.timestamp ? formatDate(auditTrail.l1.timestamp) : "—"}</div>
+                  </div>
+                  <div>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">3. L2 Approver</span>
+                    <div className="text-[10px] font-extrabold text-slate-900 truncate" title={auditTrail.l2.name}>{auditTrail.l2.name}</div>
+                    <div className="text-[8px] font-mono text-slate-500">{auditTrail.l2.timestamp ? formatDate(auditTrail.l2.timestamp) : "—"}</div>
+                  </div>
+                  <div>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">4. Finance Officer</span>
+                    <div className="text-[10px] font-extrabold text-slate-900 truncate" title={auditTrail.disburser.name}>{auditTrail.disburser.name}</div>
+                    <div className="text-[8px] font-mono text-slate-500">{auditTrail.disburser.timestamp ? formatDate(auditTrail.disburser.timestamp) : "—"}</div>
+                  </div>
+                </div>
               </div>
             </div>
 

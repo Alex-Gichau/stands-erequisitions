@@ -391,6 +391,7 @@ export interface PermissionConfig {
   };
   actions: {
     canCreateRequisition: boolean;
+    canEditRequisition?: boolean;
     canApproveL1: boolean;
     canApproveL2: boolean;
     canDisburse: boolean;

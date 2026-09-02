@@ -42,6 +42,14 @@ import { ProductTour } from "./components/ProductTour";
 import { FeedbackModal } from "./components/FeedbackModal";
 import { SplashPage } from "./components/SplashPage";
 import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
+import { 
+  isDesktopNotificationSupported, 
+  getDesktopNotificationPermission, 
+  requestDesktopNotificationPermission, 
+  isDesktopNotificationEnabled, 
+  setDesktopNotificationEnabled,
+  sendDesktopNotification 
+} from "./lib/desktopNotifications";
 import {
   Bell,
   ArrowRight,
@@ -2921,39 +2929,108 @@ function AppContent() {
                   >
                     {/* Header */}
                     <div className={cn(
-                      "px-5 py-4 border-b flex items-center justify-between",
+                      "px-5 py-4 border-b flex flex-col gap-2.5",
                       darkMode ? "border-slate-850 bg-slate-900/50" : "border-slate-100 bg-white"
                     )}>
-                      <span className={cn(
-                        "text-[15px] font-black tracking-tight",
-                        darkMode ? "text-slate-100" : "text-slate-900"
-                      )}>
-                        Notifications
-                      </span>
-                      
-                      {/* Do not disturb toggle */}
-                      <div className="flex items-center gap-2.5 select-none">
-                        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
-                          Do not disturb
+                      <div className="flex items-center justify-between">
+                        <span className={cn(
+                          "text-[15px] font-black tracking-tight",
+                          darkMode ? "text-slate-100" : "text-slate-900"
+                        )}>
+                          Notifications
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setIsDoNotDisturb(!isDoNotDisturb)}
-                          className={cn(
-                            "w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative cursor-pointer",
-                            isDoNotDisturb 
-                              ? "bg-indigo-500" 
-                              : darkMode ? "bg-slate-800" : "bg-slate-200"
-                          )}
-                        >
-                          <motion.div
-                            layout
-                            className="w-4 h-4 rounded-full bg-white shadow-sm"
-                            animate={{ x: isDoNotDisturb ? 16 : 0 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                          />
-                        </button>
+                        
+                        {/* Do not disturb toggle */}
+                        <div className="flex items-center gap-2.5 select-none">
+                          <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                            Do not disturb
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsDoNotDisturb(!isDoNotDisturb)}
+                            className={cn(
+                              "w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none relative cursor-pointer",
+                              isDoNotDisturb 
+                                ? "bg-indigo-500" 
+                                : darkMode ? "bg-slate-800" : "bg-slate-200"
+                            )}
+                          >
+                            <motion.div
+                              layout
+                              className="w-4 h-4 rounded-full bg-white shadow-sm"
+                              animate={{ x: isDoNotDisturb ? 16 : 0 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                            />
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Desktop Browser Notification Quick Access Pill */}
+                      {isDesktopNotificationSupported() && (
+                        <div className={cn(
+                          "flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold border",
+                          getDesktopNotificationPermission() === "granted" && isDesktopNotificationEnabled()
+                            ? "bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300"
+                            : getDesktopNotificationPermission() === "denied"
+                            ? "bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300"
+                            : "bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300"
+                        )}>
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            <Bell size={13} className={getDesktopNotificationPermission() === "granted" && isDesktopNotificationEnabled() ? "text-emerald-600" : "text-amber-600"} />
+                            <span>
+                              {getDesktopNotificationPermission() === "granted"
+                                ? isDesktopNotificationEnabled() ? "Desktop Alerts: Active" : "Desktop Alerts: Paused"
+                                : getDesktopNotificationPermission() === "denied"
+                                ? "Desktop Alerts: Blocked in Browser"
+                                : "Desktop Alerts: Off"}
+                            </span>
+                          </div>
+                          {getDesktopNotificationPermission() === "granted" ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const nextState = !isDesktopNotificationEnabled();
+                                setDesktopNotificationEnabled(nextState);
+                                triggerToast({
+                                  type: "SYSTEM_INFO",
+                                  severity: "LOW",
+                                  message: nextState ? "Desktop notifications resumed" : "Desktop notifications paused",
+                                  timestamp: new Date().toISOString()
+                                });
+                              }}
+                              className="text-[10px] font-black uppercase underline hover:opacity-80 cursor-pointer tracking-wider"
+                            >
+                              {isDesktopNotificationEnabled() ? "Pause" : "Resume"}
+                            </button>
+                          ) : getDesktopNotificationPermission() !== "denied" ? (
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const res = await requestDesktopNotificationPermission();
+                                if (res === "granted") {
+                                  sendDesktopNotification({
+                                    title: "🔔 Desktop Notifications Enabled",
+                                    body: "Real-time requisition alerts are now configured for your desktop.",
+                                    playSound: true,
+                                    soundType: "success"
+                                  });
+                                  triggerToast({
+                                    type: "SYSTEM_INFO",
+                                    severity: "LOW",
+                                    message: "Desktop notifications enabled!",
+                                    timestamp: new Date().toISOString()
+                                  });
+                                }
+                              }}
+                              className="text-[10px] font-black uppercase bg-amber-600 text-white px-2 py-0.5 rounded-md hover:bg-amber-700 cursor-pointer tracking-wider"
+                            >
+                              Enable
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
                     </div>
 
                     {/* List */}

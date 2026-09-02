@@ -84,7 +84,7 @@ import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentF
 import { motion, AnimatePresence } from "motion/react";
 import * as XLSX from "xlsx";
 import { useRequisitions, getActiveFiscalYear, safeNormalizeAttachments } from "../contexts/RequisitionContext";
-import { RequisitionStatus, UserRole, Requisition, CommentReaction, Comment, RequisitionInstallment } from "../types";
+import { RequisitionStatus, UserRole, Requisition, CommentReaction, Comment, RequisitionInstallment, UserProfile, PermissionConfig } from "../types";
 import { compressImageFile } from "../lib/imageCompression";
 import { databaseService } from "../lib/databaseService";
 import { 
@@ -137,6 +137,48 @@ function getAvatarInitials(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase() || "U";
+}
+
+/**
+ * Checks if a user has authority to edit a given requisition.
+ * - Admins / Super Admins: Can edit any active non-rejected requisition.
+ * - Church Group Users, Requesters, and Ministry Members: Can edit when requisition is in DRAFT, SUBMITTED, or REVISED status.
+ */
+export function isRequisitionEditableByUser(
+  req: Requisition | null | undefined,
+  currentUser: UserProfile | null | undefined,
+  canPerform?: (action: keyof PermissionConfig["actions"]) => boolean
+): boolean {
+  if (!currentUser || !req) return false;
+  if (req.status === RequisitionStatus.REJECTED) return false;
+
+  // Super Admin & Admin can edit any non-rejected requisition
+  if (currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.ADMIN) {
+    return true;
+  }
+
+  // Editable statuses for Church Group / Requester / Group Members
+  const isEditableStatus = [
+    RequisitionStatus.DRAFT,
+    RequisitionStatus.SUBMITTED
+  ].includes(req.status);
+
+  if (isEditableStatus) {
+    const isOwner = req.requesterId === currentUser.id || (Boolean(currentUser.email) && req.requesterEmail?.toLowerCase() === currentUser.email.toLowerCase());
+    const isGroupMember = currentUser.group === req.groupName || (Array.isArray(currentUser.groups) && currentUser.groups.includes(req.groupName));
+    const isChurchGroup = currentUser.role === UserRole.CHURCH_GROUP;
+    const hasPerm = canPerform ? (canPerform('canEditRequisition') || canPerform('canCreateRequisition')) : false;
+
+    if (isChurchGroup || isOwner || isGroupMember || hasPerm) {
+      return true;
+    }
+  }
+
+  if (canPerform && canPerform('canEditRequisition') && isEditableStatus) {
+    return true;
+  }
+
+  return false;
 }
 
 function getAvatarBgColor(name: string): string {
@@ -3568,17 +3610,14 @@ export const RequisitionsPanel: React.FC = () => {
                             >
                               <Share2 size={16} />
                             </button>
-                            {/* Edit button: Drafts can be edited by requester or admin/super-admin, others only if admin, rejected can NEVER be edited */}
-                            {req.status !== RequisitionStatus.REJECTED && (
-                              canPerform('canDeleteRequisition') || 
-                              (req.status === RequisitionStatus.DRAFT && (req.requesterId === currentUser?.id || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN))
-                            ) && (
+                            {/* Edit button for Church Group users, requesters, and admins */}
+                            {isRequisitionEditableByUser(req, currentUser, canPerform) && (
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingReq(req);
                                 }}
-                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all"
+                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all cursor-pointer"
                                 title="Edit Requisition"
                               >
                                 <Pencil size={15} />
@@ -3658,10 +3697,7 @@ export const RequisitionsPanel: React.FC = () => {
               const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
               const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
 
-              const canEdit = req.status !== RequisitionStatus.REJECTED && (
-                canPerform('canDeleteRequisition') || 
-                (req.status === RequisitionStatus.DRAFT && (req.requesterId === currentUser?.id || currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN))
-              );
+              const canEdit = isRequisitionEditableByUser(req, currentUser, canPerform);
 
               return (
                 <div 
@@ -7824,11 +7860,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 )}
 
                 {/* Edit details */}
-                {onEdit && req.status !== RequisitionStatus.REJECTED && (
-                  currentUser?.role === UserRole.ADMIN ||
-                  currentUser?.role === UserRole.SUPER_ADMIN ||
-                  (req.status === RequisitionStatus.DRAFT && req.requesterId === currentUser?.id)
-                ) && (
+                {onEdit && isRequisitionEditableByUser(req, currentUser, canPerform) && (
                   <button 
                     onClick={() => {
                       setIsMoreOpen(false);
@@ -7836,7 +7868,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     }}
                     className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
                   >
-                    <Pencil size={15} className="text-slate-400 shrink-0" />
+                    <Pencil size={15} className="text-amber-500 shrink-0" />
                     <span>Edit Details</span>
                   </button>
                 )}
@@ -7858,6 +7890,21 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end flex-wrap sm:flex-nowrap">
+            {/* Direct Edit Button for Church Groups / Requesters / Admins */}
+            {onEdit && isRequisitionEditableByUser(req, currentUser, canPerform) && (
+              <button 
+                onClick={() => {
+                  setIsMoreOpen(false);
+                  onEdit();
+                }}
+                className="px-3.5 sm:px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                title="Edit Requisition Details"
+              >
+                <Pencil size={13} />
+                <span>Edit Requisition</span>
+              </button>
+            )}
+
             {!showDecisionForm && canAct() && (
               <div className="flex items-center gap-1.5 md:gap-2">
                 {req.status !== RequisitionStatus.DISBURSED && (

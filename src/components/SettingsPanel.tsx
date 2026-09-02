@@ -52,6 +52,15 @@ import { motion, AnimatePresence } from "motion/react";
 import { SystemHealth } from "./SystemHealth";
 import { AutosendBackupMonitoringPanel } from "./AutosendBackupMonitoringPanel";
 import { UserAvatar } from "./UserAvatar";
+import { 
+  isDesktopNotificationSupported, 
+  getDesktopNotificationPermission, 
+  requestDesktopNotificationPermission, 
+  isDesktopNotificationEnabled, 
+  setDesktopNotificationEnabled,
+  sendDesktopNotification,
+  DesktopNotificationPermission
+} from "../lib/desktopNotifications";
 
 export const SettingsPanel: React.FC = () => {
   const { 
@@ -102,6 +111,84 @@ export const SettingsPanel: React.FC = () => {
   }, [currentUser?.activeDevices]);
 
   const devices = Array.isArray(localActiveDevices) ? localActiveDevices : [];
+
+  // Desktop Notification States
+  const [desktopPermission, setDesktopPermission] = React.useState<DesktopNotificationPermission>(() => getDesktopNotificationPermission());
+  const [desktopEnabled, setDesktopEnabled] = React.useState<boolean>(() => isDesktopNotificationEnabled());
+  const [isRequestingPermission, setIsRequestingPermission] = React.useState(false);
+
+  React.useEffect(() => {
+    setDesktopPermission(getDesktopNotificationPermission());
+    setDesktopEnabled(isDesktopNotificationEnabled());
+  }, []);
+
+  const handleRequestDesktopPermission = async () => {
+    setIsRequestingPermission(true);
+    try {
+      const res = await requestDesktopNotificationPermission();
+      setDesktopPermission(res);
+      const isGranted = res === "granted";
+      setDesktopEnabled(isGranted);
+      if (isGranted) {
+        setDesktopNotificationEnabled(true);
+        sendDesktopNotification({
+          title: "🔔 Desktop Notifications Enabled",
+          body: "You will now receive desktop alerts for real-time approvals, disbursement updates, and notices.",
+          playSound: true,
+          soundType: "success"
+        });
+        triggerToast({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: "Desktop notifications enabled successfully!",
+          timestamp: new Date().toISOString()
+        });
+      } else if (res === "denied") {
+        triggerToast({
+          type: "SECURITY_UPDATE",
+          severity: "HIGH",
+          message: "Desktop notifications were denied by browser settings.",
+          timestamp: new Date().toISOString()
+        });
+      }
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handleToggleDesktopNotifications = (enable: boolean) => {
+    setDesktopNotificationEnabled(enable);
+    setDesktopEnabled(enable);
+    if (enable && desktopPermission === "default") {
+      handleRequestDesktopPermission();
+    } else {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: enable ? "Desktop notifications enabled" : "Desktop notifications disabled",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  const handleTestDesktopNotification = () => {
+    if (desktopPermission !== "granted") {
+      handleRequestDesktopPermission();
+      return;
+    }
+    sendDesktopNotification({
+      title: "🔔 Test Notification — St. Andrew's PCEA",
+      body: "Desktop browser notifications are operational and synced with your account.",
+      playSound: true,
+      soundType: "alert"
+    });
+    triggerToast({
+      type: "SYSTEM_INFO",
+      severity: "LOW",
+      message: "Test desktop notification dispatched.",
+      timestamp: new Date().toISOString()
+    });
+  };
 
   // Slack Notification States and Live Dispatchers
   const [slackActionLoading, setSlackActionLoading] = React.useState<{ [key: string]: boolean }>({});
@@ -1230,6 +1317,89 @@ export const SettingsPanel: React.FC = () => {
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                       Configure target emails and force-dispatch Slack automated reports.
                     </p>
+                  </div>
+
+                  {/* Desktop Browser Notifications Permission Card */}
+                  <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-2xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                          <Bell size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>Desktop Browser Notifications</span>
+                            {desktopPermission === "granted" && desktopEnabled && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                Active
+                              </span>
+                            )}
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Receive real-time system alerts, approval notifications, and financial updates even when this tab is in the background.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">Permission Status:</span>
+                          <span className={cn(
+                            "text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
+                            desktopPermission === "granted" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" :
+                            desktopPermission === "denied" ? "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800" :
+                            "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                          )}>
+                            {desktopPermission === "granted" ? "Permission Granted" : desktopPermission === "denied" ? "Permission Blocked" : "Permission Not Requested"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                          {desktopPermission === "granted"
+                            ? "Your browser is authorized to display desktop popups for new events."
+                            : desktopPermission === "denied"
+                            ? "Notifications were blocked in your browser settings. To enable, click the lock icon in the URL bar."
+                            : "Click below to grant permission and enable instant notifications."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {desktopPermission === "granted" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDesktopNotifications(!desktopEnabled)}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                                desktopEnabled
+                                  ? "bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200"
+                                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                              )}
+                            >
+                              {desktopEnabled ? "Pause Alerts" : "Resume Alerts"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTestDesktopNotification}
+                              className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer"
+                            >
+                              Send Test Alert
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleRequestDesktopPermission}
+                            disabled={isRequestingPermission}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-2.5 text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Bell size={14} />
+                            <span>{isRequestingPermission ? "Requesting..." : "Enable Desktop Notifications"}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Target Email Config */}

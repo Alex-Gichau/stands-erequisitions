@@ -49,6 +49,15 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
+import { 
+  isDesktopNotificationSupported, 
+  getDesktopNotificationPermission, 
+  requestDesktopNotificationPermission, 
+  isDesktopNotificationEnabled, 
+  setDesktopNotificationEnabled,
+  sendDesktopNotification,
+  DesktopNotificationPermission
+} from "../lib/desktopNotifications";
 
 interface NotificationHubProps {
   onSelectRequisition: (req: Requisition) => void;
@@ -174,6 +183,65 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [successId, setSuccessId] = useState<string | null>(null);
+
+  // Desktop Browser Notification States
+  const [desktopPermission, setDesktopPermission] = useState<DesktopNotificationPermission>(() => getDesktopNotificationPermission());
+  const [desktopEnabled, setDesktopEnabled] = useState<boolean>(() => isDesktopNotificationEnabled());
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+
+  useEffect(() => {
+    setDesktopPermission(getDesktopNotificationPermission());
+    setDesktopEnabled(isDesktopNotificationEnabled());
+  }, []);
+
+  const handleRequestDesktopPermission = async () => {
+    setIsRequestingPermission(true);
+    try {
+      const res = await requestDesktopNotificationPermission();
+      setDesktopPermission(res);
+      const isGranted = res === "granted";
+      setDesktopEnabled(isGranted);
+      if (isGranted) {
+        setDesktopNotificationEnabled(true);
+        sendDesktopNotification({
+          title: "🔔 Desktop Notifications Activated",
+          body: "You will now receive native desktop browser alerts for approvals, comments, and requisitions.",
+          playSound: true,
+          soundType: "success"
+        });
+        triggerToast({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: "Desktop notifications enabled successfully!",
+          timestamp: new Date().toISOString()
+        });
+      } else if (res === "denied") {
+        triggerToast({
+          type: "SECURITY_UPDATE",
+          severity: "HIGH",
+          message: "Desktop notifications were blocked in your browser settings. Please enable them in site permissions.",
+          timestamp: new Date().toISOString()
+        });
+      }
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handleToggleDesktopNotifications = (enable: boolean) => {
+    setDesktopNotificationEnabled(enable);
+    setDesktopEnabled(enable);
+    if (enable && desktopPermission === "default") {
+      handleRequestDesktopPermission();
+    } else {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: enable ? "Desktop browser alerts active" : "Desktop browser alerts paused",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
 
   // Listen for navigation button clicks to reset to home section of notifications
   useEffect(() => {
@@ -912,6 +980,47 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Desktop Notification Toggle / Permission Prompt Button */}
+            {isDesktopNotificationSupported() && (
+              <button
+                onClick={() => {
+                  if (desktopPermission !== "granted") {
+                    handleRequestDesktopPermission();
+                  } else {
+                    handleToggleDesktopNotifications(!desktopEnabled);
+                  }
+                }}
+                disabled={isRequestingPermission}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none",
+                  desktopPermission === "granted" && desktopEnabled
+                    ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
+                    : desktopPermission === "denied"
+                    ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 opacity-80"
+                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 animate-pulse"
+                )}
+                title={
+                  desktopPermission === "granted"
+                    ? desktopEnabled
+                      ? "Desktop notifications are active. Click to pause."
+                      : "Desktop notifications are paused. Click to resume."
+                    : desktopPermission === "denied"
+                    ? "Desktop notifications are blocked by browser. Click to view instructions."
+                    : "Enable native desktop notifications for instant alerts"
+                }
+              >
+                <Bell size={13} className={desktopPermission === "granted" && desktopEnabled ? "text-emerald-600" : "text-amber-600"} />
+                <span className="hidden sm:inline">
+                  {desktopPermission === "granted"
+                    ? desktopEnabled ? "Desktop Alerts: ON" : "Desktop Alerts: OFF"
+                    : desktopPermission === "denied" ? "Alerts Blocked" : "Enable Desktop Alerts"}
+                </span>
+                <span className="sm:hidden">
+                  {desktopPermission === "granted" ? (desktopEnabled ? "Desktop ON" : "Desktop OFF") : "Alerts"}
+                </span>
+              </button>
+            )}
+
             {/* Unread Only Toggle */}
             <button
               onClick={() => setShowUnreadOnly(!showUnreadOnly)}

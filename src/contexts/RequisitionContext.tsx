@@ -38,6 +38,7 @@ import { AuthContext, AuthContextType } from "./AuthContext";
 import { NotificationContext, NotificationContextType } from "./NotificationContext";
 import { FiscalYearContext, FiscalYearContextType } from "./FiscalYearContext";
 import { uploadAttachmentsToLocalServer, unwrapAttachmentTarget, sendSlackNotification, resolveSenderName } from "../lib/utils";
+import { sendDesktopNotification } from "../lib/desktopNotifications";
 import { triggerAutosendBackupEmail, AUTOSEND_DEFAULT_EMAIL, getLocalAutosendConfig } from "../services/autosendBackupService";
 import { initializeApp as initFirebaseApp } from "firebase/app";
 import { 
@@ -592,31 +593,31 @@ const DEFAULT_PERMISSIONS: PermissionConfig[] = [
     id: UserRole.CHURCH_GROUP,
     role: UserRole.CHURCH_GROUP,
     access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
-    actions: { canCreateRequisition: true, canApproveL1: false, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
+    actions: { canCreateRequisition: true, canEditRequisition: true, canApproveL1: false, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.APPROVER_L1,
     role: UserRole.APPROVER_L1,
     access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
-    actions: { canCreateRequisition: false, canApproveL1: true, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
+    actions: { canCreateRequisition: false, canEditRequisition: false, canApproveL1: true, canApproveL2: false, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.APPROVER_L2,
     role: UserRole.APPROVER_L2,
     access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: false, users: false, settings: false, accessControl: false, auditTrail: false, transactions: true, vendors: true, notifications: true },
-    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: true, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
+    actions: { canCreateRequisition: false, canEditRequisition: false, canApproveL1: false, canApproveL2: true, canDisburse: false, canDeleteRequisition: false, canManageUsers: false, canManageSettings: false, canViewTransactions: true, canExportReports: false, canManageBudgets: false }
   },
   {
     id: UserRole.FINANCE,
     role: UserRole.FINANCE,
     access: { dashboard: true, requisitions: true, approvals: false, finance: true, reports: true, users: false, settings: true, accessControl: false, auditTrail: true, transactions: true, vendors: true, notifications: true },
-    actions: { canCreateRequisition: false, canApproveL1: false, canApproveL2: false, canDisburse: true, canDeleteRequisition: false, canManageUsers: false, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
+    actions: { canCreateRequisition: false, canEditRequisition: false, canApproveL1: false, canApproveL2: false, canDisburse: true, canDeleteRequisition: false, canManageUsers: false, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
   },
   {
     id: UserRole.ADMIN,
     role: UserRole.ADMIN,
     access: { dashboard: true, requisitions: true, approvals: true, finance: true, reports: true, users: true, settings: true, accessControl: true, auditTrail: true, transactions: true, vendors: true, notifications: true },
-    actions: { canCreateRequisition: true, canApproveL1: true, canApproveL2: true, canDisburse: true, canDeleteRequisition: true, canManageUsers: true, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
+    actions: { canCreateRequisition: true, canEditRequisition: true, canApproveL1: true, canApproveL2: true, canDisburse: true, canDeleteRequisition: true, canManageUsers: true, canManageSettings: true, canViewTransactions: true, canExportReports: true, canManageBudgets: true }
   }
 ];
 
@@ -642,6 +643,7 @@ function normalizePermissionConfig(p: any): PermissionConfig {
 
   const actions = {
     canCreateRequisition: Boolean(rawActions.canCreateRequisition !== undefined ? rawActions.canCreateRequisition : (rawActions.can_create_requisition !== undefined ? rawActions.can_create_requisition : false)),
+    canEditRequisition: Boolean(rawActions.canEditRequisition !== undefined ? rawActions.canEditRequisition : (rawActions.can_edit_requisition !== undefined ? rawActions.can_edit_requisition : (p.role === UserRole.CHURCH_GROUP || p.role === UserRole.ADMIN))),
     canApproveL1: Boolean(rawActions.canApproveL1 !== undefined ? rawActions.canApproveL1 : (rawActions.can_approve_l1 !== undefined ? rawActions.can_approve_l1 : (rawActions.can_approve_l_1 !== undefined ? rawActions.can_approve_l_1 : false))),
     canApproveL2: Boolean(rawActions.canApproveL2 !== undefined ? rawActions.canApproveL2 : (rawActions.can_approve_l2 !== undefined ? rawActions.can_approve_l2 : (rawActions.can_approve_l_2 !== undefined ? rawActions.can_approve_l_2 : false))),
     canDisburse: Boolean(rawActions.canDisburse !== undefined ? rawActions.canDisburse : (rawActions.can_disburse !== undefined ? rawActions.can_disburse : false)),
@@ -976,6 +978,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     if (actionId === 'canCreateRequisition') return currentUser.role === UserRole.CHURCH_GROUP || currentUser.role === UserRole.ADMIN;
+    if (actionId === 'canEditRequisition') return currentUser.role === UserRole.CHURCH_GROUP || currentUser.role === UserRole.ADMIN;
     if (actionId === 'canApproveL1') return currentUser.role === UserRole.APPROVER_L1 || currentUser.role === UserRole.ADMIN;
     if (actionId === 'canApproveL2') return currentUser.role === UserRole.APPROVER_L2 || currentUser.role === UserRole.ADMIN;
     if (actionId === 'canDisburse') return currentUser.role === UserRole.FINANCE || currentUser.role === UserRole.ADMIN;
@@ -1004,6 +1007,30 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       isRead: toast.isRead ?? false
     };
     setActiveToasts(prev => [newToast, ...prev].slice(0, 5));
+
+    // Also dispatch to desktop browser notification if enabled
+    try {
+      const titleMap: Record<string, string> = {
+        OVERSHOOT: "⚠️ Budget Warning",
+        LARGE_REQUEST: "📋 High-Value Requisition",
+        EXPIRY: "⏳ Requisition Expiring Soon",
+        L2_APPROVED: "✅ L2 Approval Cleared",
+        FINANCE_DISBURSEMENT: "💰 Funds Disbursed",
+        SYSTEM_INFO: "ℹ️ St. Andrew's Portal",
+        SECURITY_UPDATE: "🛡️ Security Alert"
+      };
+      const title = titleMap[toast.type] || "St. Andrew's Requisitions";
+      const soundType = toast.severity === "HIGH" ? "alert" : toast.type === "FINANCE_DISBURSEMENT" || toast.type === "L2_APPROVED" ? "success" : "subtle";
+      sendDesktopNotification({
+        title,
+        body: toast.message,
+        soundType,
+        playSound: true,
+        tag: `toast-${toast.type}-${Date.now()}`
+      });
+    } catch {
+      // Gracefully continue
+    }
   }, []);
 
   // Track which alerts have already been sent to activeToasts

@@ -49,6 +49,7 @@ export const AccessControlPanel: React.FC = () => {
     },
     actions: {
       canCreateRequisition: selectedRole === UserRole.CHURCH_GROUP || selectedRole === UserRole.ADMIN,
+      canEditRequisition: selectedRole === UserRole.CHURCH_GROUP || selectedRole === UserRole.ADMIN,
       canApproveL1: selectedRole === UserRole.APPROVER_L1 || selectedRole === UserRole.ADMIN,
       canApproveL2: selectedRole === UserRole.APPROVER_L2 || selectedRole === UserRole.ADMIN,
       canDisburse: selectedRole === UserRole.FINANCE || selectedRole === UserRole.ADMIN,
@@ -111,6 +112,7 @@ export const AccessControlPanel: React.FC = () => {
 
   const actionPermissions = [
     { id: "canCreateRequisition", label: "Initiate Requisitions", description: "Permission to draft and submit new requests" },
+    { id: "canEditRequisition", label: "Edit Requisitions", description: "Permission to modify draft and submitted requisition details" },
     { id: "canApproveL1", label: "Level 1 Approval Authority", description: "Permission to grant first-tier authorization" },
     { id: "canApproveL2", label: "Level 2 Approval Authority", description: "Permission to grant final-tier authorization" },
     { id: "canDisburse", label: "Disbursement Authority", description: "Permission to process final payouts" },

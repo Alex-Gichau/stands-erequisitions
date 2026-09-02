@@ -500,7 +500,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
 
   // Handle default group setting ONLY if there is no auto-saved group in localStorage
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (isEditMode || !currentUser?.id) return;
     const draftKey = `stands_requisition_draft_${currentUser.id}`;
     const hasDraft = localStorage.getItem(draftKey);
     if (hasDraft) return;
@@ -518,11 +518,11 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         setSelectedGroup(currentUser?.group || `Youth Camp ${activeYear}`);
       }
     }
-  }, [currentUser, churchGroups, isAdminOrFinance]);
+  }, [currentUser, churchGroups, isAdminOrFinance, isEditMode]);
 
   // Real-time auto-save form inputs to localStorage on state updates
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (isEditMode || !currentUser?.id) return;
 
     if (!title.trim() && !description.trim() && !amount.trim() && !payableTo.trim()) {
       const draftKey = `stands_requisition_draft_${currentUser.id}`;

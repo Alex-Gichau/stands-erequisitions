@@ -2971,8 +2971,6 @@ function AppContent() {
                           "flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold border",
                           getDesktopNotificationPermission() === "granted" && isDesktopNotificationEnabled()
                             ? "bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-300"
-                            : getDesktopNotificationPermission() === "denied"
-                            ? "bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300"
                             : "bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300"
                         )}>
                           <div className="flex items-center gap-1.5 text-[11px]">
@@ -2980,8 +2978,6 @@ function AppContent() {
                             <span>
                               {getDesktopNotificationPermission() === "granted"
                                 ? isDesktopNotificationEnabled() ? "Desktop Alerts: Active" : "Desktop Alerts: Paused"
-                                : getDesktopNotificationPermission() === "denied"
-                                ? "Desktop Alerts: Blocked in Browser"
                                 : "Desktop Alerts: Off"}
                             </span>
                           </div>

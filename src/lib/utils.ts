@@ -7,6 +7,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Extracts a clean first name from a full name or email address.
+ * Removes clerical/honorific titles (e.g., Rev., Dr., Elder, Pastor) and returns a capitalized first name.
+ */
+export function extractFirstName(name?: string, email?: string): string {
+  if (name && typeof name === "string" && name.trim()) {
+    let clean = name.trim();
+    // Strip common honorifics and titles
+    clean = clean.replace(/^(Rev\.?|Reverend|Pastor|Pst\.?|Elder|Eld\.?|Dr\.?|Doctor|Prof\.?|Professor|Mr\.?|Mrs\.?|Ms\.?|Miss|Eng\.?|Hon\.?)\s+/i, '').trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length > 0 && parts[0].length > 0) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    }
+  }
+
+  if (email && typeof email === "string" && email.includes("@")) {
+    const handle = email.split("@")[0];
+    const cleanHandle = handle.split(/[._-]/)[0];
+    if (cleanHandle && cleanHandle.length > 0) {
+      return cleanHandle.charAt(0).toUpperCase() + cleanHandle.slice(1);
+    }
+  }
+
+  return "Member";
+}
+
 export const DEFAULT_IMAGE_PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" fill="none">
   <rect width="400" height="300" fill="#0F172A"/>

@@ -2747,8 +2747,7 @@ export const RequisitionsPanel: React.FC = () => {
         return days > 3 && (req.status === RequisitionStatus.SUBMITTED || req.status === RequisitionStatus.APPROVED_L1);
       }
       if (filterPreset === "URGENT") {
-        const hoursRemaining = req.expiresAt ? (new Date(req.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60) : null;
-        return (hoursRemaining !== null && hoursRemaining < 48 && hoursRemaining > 0) || req.amount > 20000;
+        return req.escalationLevel > 0 || req.amount > 20000;
       }
       return true;
     };
@@ -5776,7 +5775,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     text += `Group: ${req.groupName || "N/A"}\n`;
     text += `Requester: ${req.requesterName}\n`;
     text += `Submitted At: ${formatDate(req.submittedAt)}\n`;
-    text += `Expiry Date: ${req.expiresAt ? formatDate(req.expiresAt) : "N/A"}\n`;
     if (req.recurrence && req.recurrence !== "NONE") {
       text += `Recurrence: ${req.recurrence}\n`;
     }

@@ -315,59 +315,6 @@ export const AccessControlPanel: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Setting: Requisition Expiry Period */}
-                    <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/50 transition-colors border-t border-slate-100/50">
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-black text-slate-800 uppercase tracking-widest">Requisition Expiry Period</p>
-                        <p className="text-[10px] text-slate-500 font-medium">Set the number of days after which submitted requisitions automatically expire (currently set at {systemSettings?.requisitionExpiryDays ?? 7} days)</p>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl p-1 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = systemSettings?.requisitionExpiryDays ?? 7;
-                              if (current > 1) {
-                                updateSystemSettings({ requisitionExpiryDays: current - 1 });
-                              }
-                            }}
-                            className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-black transition-colors cursor-pointer"
-                            title="Reduce expiry by 1 day"
-                          >
-                            -
-                          </button>
-                          <span className="text-xs font-black font-mono text-slate-800 w-16 text-center">
-                            {systemSettings?.requisitionExpiryDays ?? 7} DAYS
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const current = systemSettings?.requisitionExpiryDays ?? 7;
-                              updateSystemSettings({ requisitionExpiryDays: current + 1 });
-                            }}
-                            className="w-8 h-8 flex items-center justify-center bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-black transition-colors cursor-pointer"
-                            title="Increase expiry by 1 day"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder="7"
-                          className="w-20 px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold focus:border-primary/50 outline-none text-center"
-                          value={systemSettings?.requisitionExpiryDays ?? 7}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val > 0) {
-                              updateSystemSettings({ requisitionExpiryDays: val });
-                            }
-                          }}
-                        />
-                      </div>
-                    </div>
-
                     {/* Section: Sudo Emergency System Shutdown */}
                     {systemSettings?.isSystemOffline ? (
                       <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-emerald-50/20 transition-colors border-t border-emerald-100 bg-emerald-50/10">

@@ -615,7 +615,7 @@ export const SettingsPanel: React.FC = () => {
   const navItems = [
     { id: "profile", label: "Profile & Account", icon: User, description: "Personal details and display name" },
     { id: "security", label: "Security & Auth", icon: Lock, description: "Password, biometrics & connected devices" },
-    { id: "expiry", label: "Limits & Expiry", icon: Clock, description: "Requisition duration & operational limits" },
+    { id: "expiry", label: "Limits & Thresholds", icon: SlidersHorizontal, description: "Operational approval thresholds & spending limits" },
     { id: "notifications", label: "Notifications & Slack", icon: Bell, description: "Email alerts & Slack webhook dispatches" },
     { id: "backups", label: "Automated Backups", icon: Cloud, description: "Scheduled JSON email snapshots & snapshots" },
     { id: "health", label: "System Health & Logs", icon: Gauge, description: "Telemetry speed & real-time audit trails" },
@@ -1226,44 +1226,12 @@ export const SettingsPanel: React.FC = () => {
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                      Limits & Requisition Expiry
+                      Operational Limits & Thresholds
                     </h1>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      Configure default expiration periods and operational spending thresholds.
+                      Configure operational spending thresholds and approval parameters.
                     </p>
                   </div>
-
-                  {currentUser?.role === UserRole.SUPER_ADMIN && (
-                    <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-2xl">
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Clock size={16} className="text-blue-600" />
-                        <span>Default Requisition Expiry (Days)</span>
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Submitted requisitions will automatically expire and archive after this period.
-                      </p>
-
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="number"
-                          min="1"
-                          className="w-32 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-3 text-sm font-bold text-slate-900 dark:text-slate-100"
-                          value={systemSettings.requisitionExpiryDays ?? 7}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val > 0) updateSystemSettings({ requisitionExpiryDays: val });
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => updateSystemSettings({ requisitionExpiryDays: 7 })}
-                          className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-2xl px-5 py-3 text-xs font-bold transition-all cursor-pointer"
-                        >
-                          Reset Default (7 Days)
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Operational Security Thresholds */}
                   <div className="space-y-4 max-w-2xl">
@@ -1272,7 +1240,7 @@ export const SettingsPanel: React.FC = () => {
                     </h3>
 
                     <div className="space-y-3">
-                      {thresholds.map((t) => (
+                      {thresholds.filter(t => t.type !== "EXPIRY_ALERT").map((t) => (
                         <div key={t.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-between gap-4">
                           <div>
                             <p className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase">
@@ -1346,20 +1314,19 @@ export const SettingsPanel: React.FC = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-slate-900 dark:text-white">Permission Status:</span>
-                          <span className={cn(
-                            "text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md",
-                            desktopPermission === "granted" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" :
-                            desktopPermission === "denied" ? "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800" :
-                            "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                          )}>
-                            {desktopPermission === "granted" ? "Permission Granted" : desktopPermission === "denied" ? "Permission Blocked" : "Permission Not Requested"}
-                          </span>
+                          {desktopPermission === "granted" ? (
+                            <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              Permission Granted
+                            </span>
+                          ) : desktopPermission === "default" ? (
+                            <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              Permission Not Requested
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                           {desktopPermission === "granted"
                             ? "Your browser is authorized to display desktop popups for new events."
-                            : desktopPermission === "denied"
-                            ? "Notifications were blocked in your browser settings. To enable, click the lock icon in the URL bar."
                             : "Click below to grant permission and enable instant notifications."}
                         </p>
                       </div>

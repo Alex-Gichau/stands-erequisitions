@@ -2174,6 +2174,56 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   });
 
 
+  // Helper to cleanly extract a user's first name from their name or email address
+  function extractFirstName(name?: string, email?: string): string {
+    if (name && typeof name === "string" && name.trim()) {
+      let clean = name.trim();
+      // Strip common clerical/honorific titles
+      clean = clean.replace(/^(Rev\.?|Reverend|Pastor|Pst\.?|Elder|Eld\.?|Dr\.?|Doctor|Prof\.?|Professor|Mr\.?|Mrs\.?|Ms\.?|Miss|Eng\.?|Hon\.?)\s+/i, '').trim();
+      const parts = clean.split(/\s+/);
+      if (parts.length > 0 && parts[0].length > 0) {
+        return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      }
+    }
+
+    if (email && typeof email === "string" && email.includes("@")) {
+      const handle = email.split("@")[0];
+      const cleanHandle = handle.split(/[._-]/)[0];
+      if (cleanHandle && cleanHandle.length > 0) {
+        return cleanHandle.charAt(0).toUpperCase() + cleanHandle.slice(1);
+      }
+    }
+
+    return "Member";
+  }
+
+  // Helper to find a user document or record by their email address across MongoDB and local JSON
+  async function findUserByEmail(email: string): Promise<any> {
+    if (!email) return null;
+    const normalized = email.toLowerCase().trim();
+    try {
+      if (mongoose.connection.readyState === 1 && models.User) {
+        const user = await (models.User as any).findOne({
+          $or: [
+            { email: normalized },
+            { email_address: normalized }
+          ]
+        }).lean();
+        if (user) return user;
+      }
+    } catch (e) {
+      // ignore
+    }
+    try {
+      const localUsers = readJsonCollection("users") || [];
+      return localUsers.find((u: any) => 
+        String(u.email || u.email_address || "").toLowerCase().trim() === normalized
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Helper function to generate diagrammatic representation of requisition status for email updates
   function generateRequisitionStatusDiagramHtml(status: string): string {
     const currentStatus = (status || "").toUpperCase();
@@ -2428,6 +2478,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       to, 
       notificationEmails,
       cc,
+      recipientName,
       requesterName, 
       requesterEmail,
       amount, 
@@ -2445,19 +2496,19 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     } = req.body;
 
     const rawCcList = Array.isArray(notificationEmails) ? notificationEmails : (Array.isArray(cc) ? cc : (typeof cc === "string" ? cc.split(",") : []));
-    const extraRecipients = rawCcList
-      .map((e: any) => (typeof e === "string" ? e.trim() : ""))
-      .filter((e: string) => e.length > 0 && e.toLowerCase() !== (to || "").trim().toLowerCase());
-    
-    if (!process.env.SMTP_PASS) {
-      console.warn("SMTP_PASS is not configured. Email will be logged but not sent.");
-      persistActivity({
-        action: "EMAIL_SKIPPED",
-        details: `Mail to ${to} skipped (No Credentials). Requisition: ${title}`,
-        performedBy: "SYSTEM_MAILER",
-        timestamp: new Date().toISOString()
-      });
-      return res.json({ success: true, message: "SMTP not configured, activity recorded." });
+    const recipientEmailsSet = new Set<string>();
+    if (to && typeof to === "string" && to.trim() && to.includes("@")) {
+      recipientEmailsSet.add(to.trim().toLowerCase());
+    }
+    for (const em of rawCcList) {
+      if (typeof em === "string" && em.trim() && em.includes("@")) {
+        recipientEmailsSet.add(em.trim().toLowerCase());
+      }
+    }
+    const allRecipients = Array.from(recipientEmailsSet);
+
+    if (allRecipients.length === 0) {
+      return res.status(400).json({ error: "No recipient email addresses provided." });
     }
 
     try {
@@ -2488,315 +2539,372 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
         }
       }
 
-      let subject = `[Requisition Update] ${reqName}`;
-      let headerTitle = "Requisition Update";
-      let mainMessage = `There is a new status update regarding your requisition "<strong>${reqName}</strong>".`;
-      let decisionBoxHtml = "";
-      let nextStepsText = "";
+      // Process and dispatch individually personalized emails to every recipient
+      const results: { email: string; name: string; status: string; error?: string }[] = [];
 
-      switch (status) {
-        case "SUBMITTED":
-          subject = `[Submitted] Requisition: ${reqName}`;
-          headerTitle = "Requisition Submitted";
-          mainMessage = `Your requisition "<strong>${reqName}</strong>" has been submitted successfully and entered the approval pipeline.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 14px 16px; background-color: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 6px;">
-              <p style="margin: 0; font-size: 13px; color: #0369a1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Current Workflow Stage:</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">Awaiting Level 1 Compliance & Verification by <strong>${ministryName}</strong> leadership and compliance team.</p>
-            </div>
-          `;
-          nextStepsText = `Your requisition will now be reviewed by the designated ministry leaders and compliance officers. You will receive an automated notification as soon as a decision is recorded.`;
-          break;
+      for (const recEmail of allRecipients) {
+        const user = await findUserByEmail(recEmail);
+        const isPrimaryTo = Boolean(to && recEmail === to.trim().toLowerCase());
+        const isRequester = Boolean(
+          (requesterEmail && recEmail === requesterEmail.trim().toLowerCase()) || 
+          (isPrimaryTo && !requesterEmail)
+        );
 
-        case "APPROVED_L1":
-          subject = `[L1 Approved] Requisition: ${reqName}`;
-          headerTitle = "Level 1 Approval Granted";
-          mainMessage = `Your requisition "<strong>${reqName}</strong>" has passed Level 1 Compliance & Verification review.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #10b981; border-radius: 6px;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Approval Decision Details</p>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #064e3b;">
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; width: 35%;">Level 1 Approver:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #047857;">${actualApprover}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Reason / Notes:</td>
-                  <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Compliance standards verified and budget clearance confirmed."}</td>
-                </tr>
-              </table>
-            </div>
-          `;
-          nextStepsText = `The requisition has escalated to Level 2 (Final Executive/Finance Authorization) for final sign-off.`;
-          break;
+        const resolvedFullName = (isPrimaryTo && recipientName)
+          ? recipientName
+          : (user?.name || (isRequester ? requesterName : undefined));
 
-        case "APPROVED_L2":
-          subject = `[Approved] Requisition: ${reqName}`;
-          headerTitle = "Final Authorization Granted";
-          mainMessage = `Excellent news! Your requisition "<strong>${reqName}</strong>" has received final Level 2 executive authorization.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #059669; border-radius: 6px;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Executive Approval Details</p>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #064e3b;">
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; width: 35%;">Final Approver:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #047857;">${actualApprover}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Approval Reason / Notes:</td>
-                  <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Approved for payment and budget allocation."}</td>
-                </tr>
-              </table>
-            </div>
-          `;
-          nextStepsText = `The Finance Treasury team has been notified to prepare the funds for settlement and disbursement.`;
-          break;
+        const firstName = extractFirstName(resolvedFullName, recEmail);
 
-        case "DISBURSED":
-          subject = `[Disbursed] Requisition: ${reqName}`;
-          headerTitle = "Funds Disbursed";
-          mainMessage = `Payment disbursement for your requisition "<strong>${reqName}</strong>" has been completed and released!`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Disbursement Details</p>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #78350f;">
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; width: 35%;">Disbursed By:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${actualApprover}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Disbursement Notes:</td>
-                  <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Funds released to specified vendor or payee account."}</td>
-                </tr>
-              </table>
-            </div>
-          `;
-          nextStepsText = `Please check your bank or mobile money account (${payableTo || requesterName}) to confirm receipt.`;
-          break;
+        let subject = `[Requisition Update] ${reqName}`;
+        let headerTitle = "Requisition Update";
+        let mainMessage = isRequester
+          ? `There is a new status update regarding your requisition "<strong>${reqName}</strong>".`
+          : `There is a new status update for requisition "<strong>${reqName}</strong>" (submitted by <strong>${requesterName || "Requester"}</strong>).`;
+        let decisionBoxHtml = "";
+        let nextStepsText = "";
 
-        case "REJECTED":
-          subject = `[Returned] Requisition: ${reqName}`;
-          headerTitle = "Requisition Returned / Declined";
-          mainMessage = `Your requisition "<strong>${reqName}</strong>" has been returned by the reviewing official and requires your attention.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Review Committee Feedback</p>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #7f1d1d;">
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; width: 35%;">Reviewed By:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Reason for Return:</td>
-                  <td style="padding: 4px 0; font-weight: 700; color: #dc2626;">${decisionNote || "No specific reason provided."}</td>
-                </tr>
-              </table>
-            </div>
-          `;
-          nextStepsText = `Please log in to the STANDS eRequisitions portal to review feedback, make required changes, and resubmit if appropriate.`;
-          break;
+        switch (status) {
+          case "SUBMITTED":
+            subject = `[Submitted] Requisition: ${reqName}`;
+            headerTitle = "Requisition Submitted";
+            mainMessage = isRequester
+              ? `Your requisition "<strong>${reqName}</strong>" has been submitted successfully and entered the approval pipeline.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> for <strong>${ministryName}</strong> has entered the approval pipeline.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 14px 16px; background-color: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 6px;">
+                <p style="margin: 0; font-size: 13px; color: #0369a1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Current Workflow Stage:</p>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">Awaiting Level 1 Compliance & Verification by <strong>${ministryName}</strong> leadership and compliance team.</p>
+              </div>
+            `;
+            nextStepsText = isRequester
+              ? `Your requisition will now be reviewed by the designated ministry leaders and compliance officers. You will receive an automated notification as soon as a decision is recorded.`
+              : `Please log in to review and verify this requisition if you are a designated compliance officer or approver for ${ministryName}.`;
+            break;
 
-        case "DELETED":
-          subject = `[Deleted] Requisition Notice: ${reqName}`;
-          headerTitle = "Requisition Deleted";
-          mainMessage = `The requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been deleted from the eRequisitions portal.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px;">
-              <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Deletion Record</p>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #7f1d1d;">
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; width: 35%;">Action By:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
-                  <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Requisition URL:</td>
-                  <td style="padding: 4px 0; word-break: break-all; color: #991b1b;"><a href="${reqUrl}" style="color: #dc2626; font-weight: 600; text-decoration: underline;">${reqUrl}</a></td>
-                </tr>
-                ${decisionNote ? `
-                <tr>
-                  <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Details / Note:</td>
-                  <td style="padding: 4px 0; font-style: italic; color: #7f1d1d;">"${decisionNote}"</td>
-                </tr>
-                ` : ""}
-              </table>
-            </div>
-          `;
-          nextStepsText = `This requisition has been removed from active workflow queues. All subscribers receiving updates for this record have been notified.`;
-          break;
+          case "APPROVED_L1":
+            subject = `[L1 Approved] Requisition: ${reqName}`;
+            headerTitle = "Level 1 Approval Granted";
+            mainMessage = isRequester
+              ? `Your requisition "<strong>${reqName}</strong>" has passed Level 1 Compliance & Verification review.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has passed Level 1 Compliance & Verification review.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #10b981; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Approval Decision Details</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #064e3b;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Level 1 Approver:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #047857;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Reason / Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Compliance standards verified and budget clearance confirmed."}</td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            nextStepsText = `The requisition has escalated to Level 2 (Final Executive/Finance Authorization) for final sign-off.`;
+            break;
 
-        case "Comment Mention":
-          subject = `[Comment Mention] ${actualApprover} mentioned you on: ${reqName}`;
-          headerTitle = "You Were Mentioned in a Comment";
-          mainMessage = `<strong>${actualApprover}</strong> mentioned you in a comment on requisition "<strong>${reqName}</strong>".`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px;">
-              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">
-                Comment Sender: <strong>${actualApprover}</strong>
-              </p>
-              <p style="margin: 0; font-size: 14px; color: #1e3a8a; line-height: 1.5; font-style: italic;">
-                "${cleanCommentText}"
-              </p>
-            </div>
-          `;
-          nextStepsText = `Click the button below to view the requisition and respond to the comment.`;
-          break;
+          case "APPROVED_L2":
+            subject = `[Approved] Requisition: ${reqName}`;
+            headerTitle = "Final Authorization Granted";
+            mainMessage = isRequester
+              ? `Excellent news! Your requisition "<strong>${reqName}</strong>" has received final Level 2 executive authorization.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has received final Level 2 executive authorization.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #059669; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Executive Approval Details</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #064e3b;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Final Approver:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #047857;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Approval Reason / Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Approved for payment and budget allocation."}</td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            nextStepsText = `The Finance Treasury team has been notified to prepare the funds for settlement and disbursement.`;
+            break;
 
-        case "New Comment Thread Activity":
-        case "COMMENT":
-          subject = `[New Comment] ${actualApprover} commented on: ${reqName}`;
-          headerTitle = "New Comment Posted";
-          mainMessage = `<strong>${actualApprover}</strong> posted a new comment on requisition "<strong>${reqName}</strong>".`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 16px; background-color: #f8fafc; border-left: 4px solid #4f46e5; border-radius: 6px;">
-              <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #3730a3; text-transform: uppercase; letter-spacing: 0.5px;">
-                Comment Sender: <strong>${actualApprover}</strong>
-              </p>
-              <p style="margin: 0; font-size: 14px; color: #1e1b4b; line-height: 1.5; font-style: italic;">
-                "${cleanCommentText}"
-              </p>
-            </div>
-          `;
-          nextStepsText = `Click the button below to view the requisition thread and join the discussion.`;
-          break;
+          case "DISBURSED":
+            subject = `[Disbursed] Requisition: ${reqName}`;
+            headerTitle = "Funds Disbursed";
+            mainMessage = isRequester
+              ? `Payment disbursement for your requisition "<strong>${reqName}</strong>" has been completed and released!`
+              : `Payment disbursement for requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been completed and released.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Disbursement Details</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #78350f;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Disbursed By:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Disbursement Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Funds released to specified vendor or payee account."}</td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            nextStepsText = `Please check your bank or mobile money account (${payableTo || requesterName}) to confirm receipt.`;
+            break;
 
-        default:
-          subject = `[Update] Requisition: ${reqName}`;
-          headerTitle = "Requisition Status Update";
-          mainMessage = `There is a new update for your requisition "<strong>${reqName}</strong>". Current Status: <strong>${status}</strong>.`;
-          decisionBoxHtml = `
-            <div style="margin-top: 16px; padding: 14px 16px; background-color: #f8fafc; border-left: 4px solid #64748b; border-radius: 6px;">
-              <p style="margin: 0; font-size: 13px; color: #334155;">Updated by: <strong>${actualApprover}</strong> | Ministry: <strong>${ministryName}</strong></p>
-              ${decisionNote ? `<p style="margin: 4px 0 0 0; font-size: 13px; color: #475569; font-style: italic;">Notes: "${decisionNote}"</p>` : ""}
+          case "REJECTED":
+            subject = `[Returned] Requisition: ${reqName}`;
+            headerTitle = "Requisition Returned / Declined";
+            mainMessage = isRequester
+              ? `Your requisition "<strong>${reqName}</strong>" has been returned by the reviewing official and requires your attention.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been returned by the reviewing official.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Review Committee Feedback</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #7f1d1d;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Reviewed By:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Reason for Return:</td>
+                    <td style="padding: 4px 0; font-weight: 700; color: #dc2626;">${decisionNote || "No specific reason provided."}</td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            nextStepsText = `Please log in to the STANDS eRequisitions portal to review feedback, make required changes, and resubmit if appropriate.`;
+            break;
+
+          case "DELETED":
+            subject = `[Deleted] Requisition Notice: ${reqName}`;
+            headerTitle = "Requisition Deleted";
+            mainMessage = isRequester
+              ? `The requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been deleted from the eRequisitions portal.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been deleted from the portal.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #991b1b; text-transform: uppercase; letter-spacing: 0.5px;">Deletion Record</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #7f1d1d;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Action By:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Requisition URL:</td>
+                    <td style="padding: 4px 0; word-break: break-all; color: #991b1b;"><a href="${reqUrl}" style="color: #dc2626; font-weight: 600; text-decoration: underline;">${reqUrl}</a></td>
+                  </tr>
+                  ${decisionNote ? `
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Details / Note:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #7f1d1d;">"${decisionNote}"</td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </div>
+            `;
+            nextStepsText = `This requisition has been removed from active workflow queues. All subscribers receiving updates for this record have been notified.`;
+            break;
+
+          case "Comment Mention":
+            subject = `[Comment Mention] ${actualApprover} mentioned you on: ${reqName}`;
+            headerTitle = "You Were Mentioned in a Comment";
+            mainMessage = `<strong>${actualApprover}</strong> mentioned you in a comment on requisition "<strong>${reqName}</strong>".`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px;">
+                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Comment Sender: <strong>${actualApprover}</strong>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #1e3a8a; line-height: 1.5; font-style: italic;">
+                  "${cleanCommentText}"
+                </p>
+              </div>
+            `;
+            nextStepsText = `Click the button below to view the requisition and respond to the comment.`;
+            break;
+
+          case "New Comment Thread Activity":
+          case "COMMENT":
+            subject = `[New Comment] ${actualApprover} commented on: ${reqName}`;
+            headerTitle = "New Comment Posted";
+            mainMessage = `<strong>${actualApprover}</strong> posted a new comment on requisition "<strong>${reqName}</strong>".`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #f8fafc; border-left: 4px solid #4f46e5; border-radius: 6px;">
+                <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 800; color: #3730a3; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Comment Sender: <strong>${actualApprover}</strong>
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #1e1b4b; line-height: 1.5; font-style: italic;">
+                  "${cleanCommentText}"
+                </p>
+              </div>
+            `;
+            nextStepsText = `Click the button below to view the requisition thread and join the discussion.`;
+            break;
+
+          default:
+            subject = `[Update] Requisition: ${reqName}`;
+            headerTitle = "Requisition Status Update";
+            mainMessage = isRequester
+              ? `There is a new update for your requisition "<strong>${reqName}</strong>". Current Status: <strong>${status}</strong>.`
+              : `There is a new update for requisition "<strong>${reqName}</strong>" (submitted by <strong>${requesterName || "Requester"}</strong>). Current Status: <strong>${status}</strong>.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 14px 16px; background-color: #f8fafc; border-left: 4px solid #64748b; border-radius: 6px;">
+                <p style="margin: 0; font-size: 13px; color: #334155;">Updated by: <strong>${actualApprover}</strong> | Ministry: <strong>${ministryName}</strong></p>
+                ${decisionNote ? `<p style="margin: 4px 0 0 0; font-size: 13px; color: #475569; font-style: italic;">Notes: "${decisionNote}"</p>` : ""}
+              </div>
+            `;
+            nextStepsText = `You can log in to the portal at any time to track progress.`;
+        }
+
+        const bodyHtml = `
+          <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+            <!-- Header Banner -->
+            <div style="background-color: #0f172a; padding: 24px; text-align: left;">
+              <span style="color: #38bdf8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">STANDS eRequisitions</span>
+              <h1 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 6px 0 0 0; tracking: -0.5px;">${headerTitle}</h1>
             </div>
-          `;
-          nextStepsText = `You can log in to the portal at any time to track progress.`;
+
+            <!-- Body Content -->
+            <div style="padding: 24px; color: #334155;">
+              <p style="font-size: 15px; line-height: 1.5; margin-top: 0; color: #0f172a;">Hello <strong>${firstName}</strong>,</p>
+              <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 16px;">${mainMessage}</p>
+
+              <!-- Requisition Workflow Status Diagrammatic Representation -->
+              ${generateRequisitionStatusDiagramHtml(status)}
+
+              ${decisionBoxHtml}
+
+              <!-- Direct Action Button -->
+              <div style="margin: 20px 0; text-align: center;">
+                <a href="${reqUrl}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
+                  View Requisition in Portal
+                </a>
+              </div>
+
+              <!-- Comprehensive Requisition Details -->
+              <div style="margin-top: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
+                <h3 style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 12px 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Requisition Details</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #334155;">
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 38%;">Requisition Name:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${reqName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requisition URL:</td>
+                    <td style="padding: 6px 0; word-break: break-all; font-weight: 600; color: #0284c7;">
+                      <a href="${reqUrl}" style="color: #0284c7; text-decoration: underline; word-break: break-all;">${reqUrl}</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Ministry / Group:</td>
+                    <td style="padding: 6px 0; font-weight: 700; color: #0284c7;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Total Amount:</td>
+                    <td style="padding: 6px 0; font-weight: 800; color: #0f172a; font-size: 14px;">${formattedAmount}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requester:</td>
+                    <td style="padding: 6px 0; font-weight: 500; color: #334155;">${requesterName || "Requester"} ${requesterEmail ? `(${requesterEmail})` : ""}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Payee / Vendor:</td>
+                    <td style="padding: 6px 0; font-weight: 500; color: #334155;">${payableTo || "N/A"}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Submission Date:</td>
+                    <td style="padding: 6px 0; color: #64748b;">${formattedSubmittedAt}</td>
+                  </tr>
+                  ${description ? `
+                  <tr>
+                    <td style="padding: 6px 0; color: #64748b; font-weight: 600; vertical-align: top;">Description:</td>
+                    <td style="padding: 6px 0; color: #334155; line-height: 1.4;">${description}</td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </div>
+
+              <div style="margin-top: 20px; font-size: 13px; color: #475569; line-height: 1.5; background-color: #f1f5f9; padding: 12px 14px; border-radius: 6px;">
+                <strong>Next Steps:</strong> ${nextStepsText}
+              </div>
+
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
+              <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system notification from ST. ANDREWS CHURCH eRequisitions Portal.</p>
+            </div>
+          </div>
+        `;
+
+        if (!process.env.SMTP_PASS) {
+          console.warn(`SMTP_PASS is not configured. Email to ${firstName} <${recEmail}> recorded as simulated.`);
+          persistActivity({
+            action: "EMAIL_SKIPPED",
+            details: `Simulated Email (${status}) to ${firstName} <${recEmail}> regarding '${reqName}' (No SMTP Credentials)`,
+            performedBy: "SYSTEM_MAILER",
+            timestamp: new Date().toISOString()
+          });
+          results.push({ email: recEmail, name: firstName, status: "SIMULATED" });
+        } else {
+          try {
+            await transporter.sendMail({
+              from: `"STANDS eRequisitions" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
+              to: recEmail,
+              subject,
+              html: bodyHtml,
+            });
+
+            persistActivity({
+              action: "EMAIL_DISPATCH",
+              details: `Notification Email (${status}) sent to ${firstName} <${recEmail}> regarding '${reqName}'`,
+              performedBy: "SYSTEM_MAILER",
+              timestamp: new Date().toISOString()
+            });
+            results.push({ email: recEmail, name: firstName, status: "DELIVERED" });
+          } catch (mailErr: any) {
+            console.warn(`Failed to send email to ${recEmail}:`, mailErr.message || mailErr);
+            persistActivity({
+              action: "EMAIL_SIMULATED",
+              details: `Simulated Email (${status}) to ${firstName} <${recEmail}> regarding '${reqName}' (SMTP Error: ${mailErr.message || "Unknown error"})`,
+              performedBy: "SYSTEM_MAILER",
+              timestamp: new Date().toISOString()
+            });
+            results.push({ email: recEmail, name: firstName, status: "FAILED", error: mailErr.message });
+          }
+        }
       }
 
-      const bodyHtml = `
-        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-          <!-- Header Banner -->
-          <div style="background-color: #0f172a; padding: 24px; text-align: left;">
-            <span style="color: #38bdf8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">STANDS eRequisitions</span>
-            <h1 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 6px 0 0 0; tracking: -0.5px;">${headerTitle}</h1>
-          </div>
-
-          <!-- Body Content -->
-          <div style="padding: 24px; color: #334155;">
-            <p style="font-size: 15px; line-height: 1.5; margin-top: 0; color: #0f172a;">Hello <strong>${requesterName || "Requester"}</strong>,</p>
-            <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 16px;">${mainMessage}</p>
-
-            <!-- Requisition Workflow Status Diagrammatic Representation -->
-            ${generateRequisitionStatusDiagramHtml(status)}
-
-            ${decisionBoxHtml}
-
-            <!-- Direct Action Button -->
-            <div style="margin: 20px 0; text-align: center;">
-              <a href="${reqUrl}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
-                View Requisition in Portal
-              </a>
-            </div>
-
-            <!-- Comprehensive Requisition Details -->
-            <div style="margin-top: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
-              <h3 style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 12px 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Requisition Details</h3>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #334155;">
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 38%;">Requisition Name:</td>
-                  <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${reqName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requisition URL:</td>
-                  <td style="padding: 6px 0; word-break: break-all; font-weight: 600; color: #0284c7;">
-                    <a href="${reqUrl}" style="color: #0284c7; text-decoration: underline; word-break: break-all;">${reqUrl}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Ministry / Group:</td>
-                  <td style="padding: 6px 0; font-weight: 700; color: #0284c7;">${ministryName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Total Amount:</td>
-                  <td style="padding: 6px 0; font-weight: 800; color: #0f172a; font-size: 14px;">${formattedAmount}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requester:</td>
-                  <td style="padding: 6px 0; font-weight: 500; color: #334155;">${requesterName} (${requesterEmail || to})</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Payee / Vendor:</td>
-                  <td style="padding: 6px 0; font-weight: 500; color: #334155;">${payableTo || "N/A"}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Submission Date:</td>
-                  <td style="padding: 6px 0; color: #64748b;">${formattedSubmittedAt}</td>
-                </tr>
-                ${description ? `
-                <tr>
-                  <td style="padding: 6px 0; color: #64748b; font-weight: 600; vertical-align: top;">Description:</td>
-                  <td style="padding: 6px 0; color: #334155; line-height: 1.4;">${description}</td>
-                </tr>
-                ` : ""}
-              </table>
-            </div>
-
-            <div style="margin-top: 20px; font-size: 13px; color: #475569; line-height: 1.5; background-color: #f1f5f9; padding: 12px 14px; border-radius: 6px;">
-              <strong>Next Steps:</strong> ${nextStepsText}
-            </div>
-
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
-            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system notification from ST. ANDREWS CHURCH eRequisitions Portal.</p>
-          </div>
-        </div>
-      `;
-
-      await transporter.sendMail({
-        from: `"STANDS eRequisitions" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
-        to,
-        cc: extraRecipients.length > 0 ? extraRecipients : undefined,
-        subject,
-        html: bodyHtml,
+      const anyDelivered = results.some(r => r.status === "DELIVERED");
+      res.json({
+        success: true,
+        deliveredTo: allRecipients,
+        results,
+        status,
+        simulated: !anyDelivered
       });
-
-      persistActivity({
-        action: "EMAIL_DISPATCH",
-        details: `Notification Email (${status}) sent to ${requesterName} <${to}>${extraRecipients.length > 0 ? ` (CC: ${extraRecipients.join(", ")})` : ""} regarding '${reqName}'`,
-        performedBy: "SYSTEM_MAILER",
-        timestamp: new Date().toISOString()
-      });
-
-      res.json({ success: true, deliveredTo: to, status });
     } catch (err: any) {
-      console.warn("SMTP Send failed, logging as simulated:", err.message || err);
-      
-      persistActivity({
-        action: "EMAIL_SIMULATED",
-        details: `Simulated Email (${status}) to ${requesterName} <${to}> regarding '${title}' (SMTP Error: ${err.message || "Unknown error"})`,
-        performedBy: "SYSTEM_MAILER",
-        timestamp: new Date().toISOString()
-      });
-
-      res.json({ success: true, deliveredTo: to, status, simulated: true, warning: err.message });
+      console.warn("Email processing error:", err.message || err);
+      res.json({ success: true, status, simulated: true, warning: err.message });
     }
   });
 
@@ -2923,6 +3031,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     }
 
     try {
+      const userFirstName = extractFirstName(userName, to);
       const subject = `📊 [${frequency} Summary] Your STANDS eRequisitions Digest`;
       const disbursedHtml = recentDisbursed && recentDisbursed.length > 0 
         ? recentDisbursed.map((r: any) => `
@@ -2963,7 +3072,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
             <!-- Body contents -->
             <tr>
               <td style="padding: 40px 30px;">
-                <p style="font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Hello ${userName},</p>
+                <p style="font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Hello ${userFirstName},</p>
                 <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                   Here is your automated requisitions summary of active approvals, drafted logs, and recently disbursed financial vouchers across your department.
                 </p>

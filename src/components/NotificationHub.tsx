@@ -995,17 +995,13 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                   "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none",
                   desktopPermission === "granted" && desktopEnabled
                     ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
-                    : desktopPermission === "denied"
-                    ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 opacity-80"
-                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100 animate-pulse"
+                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100"
                 )}
                 title={
                   desktopPermission === "granted"
                     ? desktopEnabled
                       ? "Desktop notifications are active. Click to pause."
                       : "Desktop notifications are paused. Click to resume."
-                    : desktopPermission === "denied"
-                    ? "Desktop notifications are blocked by browser. Click to view instructions."
                     : "Enable native desktop notifications for instant alerts"
                 }
               >
@@ -1013,7 +1009,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 <span className="hidden sm:inline">
                   {desktopPermission === "granted"
                     ? desktopEnabled ? "Desktop Alerts: ON" : "Desktop Alerts: OFF"
-                    : desktopPermission === "denied" ? "Alerts Blocked" : "Enable Desktop Alerts"}
+                    : "Enable Desktop Alerts"}
                 </span>
                 <span className="sm:hidden">
                   {desktopPermission === "granted" ? (desktopEnabled ? "Desktop ON" : "Desktop OFF") : "Alerts"}

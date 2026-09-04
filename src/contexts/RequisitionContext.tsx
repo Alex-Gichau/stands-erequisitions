@@ -3390,8 +3390,9 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         body: JSON.stringify({
           to: targetEmail || notificationEmailsList[0] || "",
           notificationEmails: notificationEmailsList,
-          requesterName: customRecipientName || req.requesterName || "Requester",
-          requesterEmail: req.requesterEmail || targetEmail,
+          recipientName: customRecipientName || (targetEmail === req.requesterEmail ? req.requesterName : undefined),
+          requesterName: req.requesterName || "Requester",
+          requesterEmail: req.requesterEmail || "",
           amount: req.amount,
           title: req.title,
           requisitionId: req.id,

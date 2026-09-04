@@ -714,7 +714,7 @@ const Dashboard: React.FC<{
       }
     });
 
-    // 3. Auto-updated Requisitions (Created, Approved, Disbursed, Expiring)
+    // 3. Auto-updated Requisitions (Created, Approved, Disbursed)
     requisitions.forEach(r => {
       // Created / Submitted
       if (matchDate(r.submittedAt || r.updatedAt)) {
@@ -754,20 +754,6 @@ const Dashboard: React.FC<{
           requisition: r,
           amount: r.amount,
           badge: "Req Disbursed",
-          groupName: r.groupName
-        });
-      }
-
-      // Expiring
-      if (r.expiresAt && matchDate(r.expiresAt)) {
-        events.push({
-          id: `req-expiry-${r.id}`,
-          title: `Expiring: ${r.title}`,
-          description: `Requisition submission deadline window expiring.`,
-          type: "REQ_DEADLINE",
-          requisition: r,
-          amount: r.amount,
-          badge: "Req Expiring",
           groupName: r.groupName
         });
       }
@@ -1099,7 +1085,6 @@ const Dashboard: React.FC<{
                   const dayEvents = getEventsForDate(cell.year, cell.month, cell.day);
                   const hasWeekly = dayEvents.some(e => e.type === "SYSTEM_WEEKLY");
                   const hasQuarterly = dayEvents.some(e => e.type === "SYSTEM_QUARTERLY");
-                  const hasReqs = dayEvents.some(e => e.type === "REQ_DEADLINE");
                   const hasAdded = dayEvents.some(e => e.type === "REQ_ADDED");
                   const hasApproved = dayEvents.some(e => e.type === "REQ_APPROVED");
                   const hasDisbursed = dayEvents.some(e => e.type === "REQ_DISBURSED");
@@ -1161,12 +1146,6 @@ const Dashboard: React.FC<{
                           <span 
                             title="Requisition Approved"
                             className={cn("w-1.5 h-1.5 rounded-full shrink-0", isSelected ? "bg-white" : "bg-sky-500")} 
-                          />
-                        )}
-                        {hasReqs && (
-                          <span 
-                            title={`${dayEvents.filter(e => e.type === "REQ_DEADLINE").length} Requisition Expiration(s)`}
-                            className={cn("w-1.5 h-1.5 rounded-full shrink-0 animate-pulse", isSelected ? "bg-white" : "bg-rose-500")} 
                           />
                         )}
                         {hasAdded && (

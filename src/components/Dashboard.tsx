@@ -17,6 +17,7 @@ import { BudgetCircularGauges } from "./BudgetCircularGauges";
 import { RecentCommentsAndReactionsFeed } from "./RecentCommentsAndReactionsFeed";
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { NewRequisitionForm } from "./NewRequisitionForm";
+import { StockRatesRssStrip } from "./StockRatesRssStrip";
 
 // Custom high-detail chart tooltip
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -828,6 +829,9 @@ const Dashboard: React.FC<{
 
   return (
     <div className="space-y-6 animate-in fade-in transition-all duration-700">
+      {/* Top Flowing Stock Rates & Financial RSS Feed Strip */}
+      <StockRatesRssStrip />
+
       {/* Role-aware Greeting */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-2">
         <div>

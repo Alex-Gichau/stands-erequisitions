@@ -58,6 +58,34 @@ export const AnnouncementBanner: React.FC = () => {
     }
   };
 
+  const getBadgeText = () => {
+    switch (systemSettings?.announcementType) {
+      case "alert":
+        return "MAINTENANCE ALERT";
+      case "warning":
+        return "SYSTEM NOTICE";
+      case "success":
+        return "UPDATE RESOLVED";
+      case "info":
+      default:
+        return "ANNOUNCEMENT";
+    }
+  };
+
+  const getBadgeStyles = () => {
+    switch (systemSettings?.announcementType) {
+      case "alert":
+        return "bg-rose-600 text-white border-rose-700";
+      case "warning":
+        return "bg-amber-500 text-white border-amber-600";
+      case "success":
+        return "bg-emerald-600 text-white border-emerald-700";
+      case "info":
+      default:
+        return "bg-blue-600 text-white border-blue-700";
+    }
+  };
+
   return (
     <AnimatePresence>
       {isVisible && (
@@ -67,19 +95,25 @@ export const AnnouncementBanner: React.FC = () => {
           exit={{ opacity: 0, y: -20, height: 0 }}
           className="w-full relative z-[60]"
         >
-          <div className={`border-b ${getThemeStyles()}`}>
-            <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {getIcon()}
-                <p className="text-[12px] md:text-sm font-medium leading-tight">
+          <div className={`border-b shadow-sm ${getThemeStyles()}`}>
+            <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="shrink-0 flex items-center gap-2">
+                  {getIcon()}
+                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shadow-xs ${getBadgeStyles()}`}>
+                    {getBadgeText()}
+                  </span>
+                </div>
+                <p className="text-[12px] md:text-sm font-semibold leading-snug truncate sm:whitespace-normal">
                   {systemSettings?.announcementMessage}
                 </p>
               </div>
               <button
                 onClick={handleDismiss}
-                className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg transition-colors shrink-0"
+                title="Dismiss banner"
+                className="p-1 hover:bg-black/10 dark:hover:bg-white/15 rounded-lg transition-colors shrink-0 text-current cursor-pointer"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
           </div>

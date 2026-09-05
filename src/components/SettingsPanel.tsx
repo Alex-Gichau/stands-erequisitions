@@ -43,7 +43,18 @@ import {
   Users,
   CheckCircle2,
   Camera,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Calendar,
+  Send,
+  Eye,
+  EyeOff,
+  Volume2,
+  Megaphone,
+  Radio,
+  FileText
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { cn } from "../lib/utils";
@@ -354,6 +365,171 @@ export const SettingsPanel: React.FC = () => {
 
   const dispatchWeeklySearchSummary = () => {
     executeSlackTrigger("search-weekly", {});
+  };
+
+  // Automated Bi-Weekly Unapproved Summary Email States
+  const [unapprovedDigestSending, setUnapprovedDigestSending] = React.useState(false);
+  const [unapprovedSummaryStatus, setUnapprovedSummaryStatus] = React.useState<any | null>(null);
+  const [showUnapprovedList, setShowUnapprovedList] = React.useState(false);
+  const [customRecipientsInput, setCustomRecipientsInput] = React.useState(systemSettings?.unapprovedSummaryEmailRecipients || "");
+
+  // Announcement & Maintenance Banner States
+  const [bannerActiveInput, setBannerActiveInput] = React.useState<boolean>(!!systemSettings?.announcementIsActive);
+  const [bannerTypeInput, setBannerTypeInput] = React.useState<"info" | "warning" | "alert" | "success">(systemSettings?.announcementType || "alert");
+  const [bannerMessageInput, setBannerMessageInput] = React.useState<string>(systemSettings?.announcementMessage || "Scheduled System Maintenance: The portal will be temporarily undergoing database optimization.");
+  const [bannerSaving, setBannerSaving] = React.useState(false);
+
+  // Sync settings when systemSettings changes
+  React.useEffect(() => {
+    if (systemSettings) {
+      setBannerActiveInput(!!systemSettings.announcementIsActive);
+      if (systemSettings.announcementType) setBannerTypeInput(systemSettings.announcementType);
+      if (systemSettings.announcementMessage) setBannerMessageInput(systemSettings.announcementMessage);
+      if (systemSettings.unapprovedSummaryEmailRecipients !== undefined) {
+        setCustomRecipientsInput(systemSettings.unapprovedSummaryEmailRecipients);
+      }
+    }
+  }, [systemSettings]);
+
+  const fetchUnapprovedSummaryStatus = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/unapproved-summary-status");
+      if (res.ok) {
+        const data = await res.json();
+        setUnapprovedSummaryStatus(data);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch unapproved summary status:", err);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchUnapprovedSummaryStatus();
+  }, [fetchUnapprovedSummaryStatus]);
+
+  const handleToggleUnapprovedSummary = async (enabled: boolean) => {
+    try {
+      await updateSystemSettings({
+        unapprovedSummaryEmailEnabled: enabled
+      });
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: enabled 
+          ? "Bi-weekly unapproved requisitions summary email is active for all users." 
+          : "Bi-weekly unapproved requisitions summary email has been turned OFF for all users.",
+        timestamp: new Date().toISOString()
+      });
+      fetchUnapprovedSummaryStatus();
+    } catch (err) {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "HIGH",
+        message: "Could not update unapproved summary email toggle.",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  const handleSaveUnapprovedRecipients = async () => {
+    try {
+      await updateSystemSettings({
+        unapprovedSummaryEmailRecipients: customRecipientsInput
+      });
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: "Unapproved summary email recipient list updated successfully.",
+        timestamp: new Date().toISOString()
+      });
+      fetchUnapprovedSummaryStatus();
+    } catch (err) {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "HIGH",
+        message: "Failed to save recipients list.",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
+  const handleDispatchUnapprovedSummaryNow = async () => {
+    setUnapprovedDigestSending(true);
+    try {
+      const token = localStorage.getItem("auth_token") || localStorage.getItem("token") || "";
+      const recipientsList = customRecipientsInput
+        ? customRecipientsInput.split(",").map(s => s.trim()).filter(Boolean)
+        : undefined;
+
+      const res = await fetch("/api/send-unapproved-summary-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          forceSend: true,
+          recipients: recipientsList
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        triggerToast({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: data.delivered 
+            ? `Bi-weekly unapproved summary email dispatched to ${data.recipients?.length || 1} recipient(s).`
+            : `Summary digest generated and recorded in audit trail (${data.totalCount} unapproved, KES ${Number(data.totalAmount || 0).toLocaleString()}).`,
+          timestamp: new Date().toISOString()
+        });
+        fetchUnapprovedSummaryStatus();
+      } else {
+        triggerToast({
+          type: "SYSTEM_INFO",
+          severity: "HIGH",
+          message: data.error || data.reason || "Unable to dispatch summary email.",
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "HIGH",
+        message: err.message || "Failed to dispatch unapproved summary email.",
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setUnapprovedDigestSending(false);
+    }
+  };
+
+  const handleSaveBanner = async () => {
+    setBannerSaving(true);
+    try {
+      await updateSystemSettings({
+        announcementIsActive: bannerActiveInput,
+        announcementType: bannerTypeInput,
+        announcementMessage: bannerMessageInput
+      });
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: bannerActiveInput
+          ? "System announcement banner is now LIVE across all user sessions."
+          : "System announcement banner has been deactivated for all users.",
+        timestamp: new Date().toISOString()
+      });
+    } catch (err) {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "HIGH",
+        message: "Failed to broadcast announcement banner.",
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setBannerSaving(false);
+    }
   };
 
   const [sliderIndex, setSliderIndex] = React.useState(1); // 0 = Aggressive, 1 = Balanced, 2 = Power Saver
@@ -1369,11 +1545,354 @@ export const SettingsPanel: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* SECTION: AUTOMATED BI-WEEKLY UNAPPROVED SUMMARY EMAIL */}
+                  <div className="p-6 rounded-3xl border border-blue-200/80 dark:border-blue-900/50 bg-gradient-to-b from-blue-50/50 to-white dark:from-slate-800/40 dark:to-slate-800/20 space-y-5 max-w-3xl shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-blue-100 dark:border-slate-700">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-500/20 shrink-0">
+                          <Mail size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                              Automated Bi-Weekly Unapproved Requisitions Summary Email
+                            </h3>
+                            <span className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border",
+                              systemSettings?.unapprovedSummaryEmailEnabled !== false
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                            )}>
+                              {systemSettings?.unapprovedSummaryEmailEnabled !== false ? "Active (Every 14 Days)" : "Turned Off (Global)"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Automatically dispatches a comprehensive digest of all unapproved requisitions every two weeks (14 days) to approvers, finance officers, and church leadership.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Global Master Toggle Button */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleUnapprovedSummary(systemSettings?.unapprovedSummaryEmailEnabled === false)}
+                          className={cn(
+                            "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                            systemSettings?.unapprovedSummaryEmailEnabled !== false ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-700"
+                          )}
+                          role="switch"
+                          aria-checked={systemSettings?.unapprovedSummaryEmailEnabled !== false}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                              systemSettings?.unapprovedSummaryEmailEnabled !== false ? "translate-x-5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Unapproved Queue Live Metrics & Schedule */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Queue Size</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-xl font-extrabold text-slate-900 dark:text-white">
+                            {unapprovedSummaryStatus?.summaryData?.totalCount ?? requisitions.filter(r => !["APPROVED_L2", "DISBURSED", "PARTIALLY_DISBURSED", "REJECTED", "CANCELLED", "DELETED", "DRAFT"].includes(String(r.status || "").toUpperCase())).length}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">unapproved</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pending Value</span>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-base sm:text-lg font-extrabold text-amber-600 dark:text-amber-400">
+                            KES {(unapprovedSummaryStatus?.summaryData?.totalAmount ?? requisitions.filter(r => !["APPROVED_L2", "DISBURSED", "PARTIALLY_DISBURSED", "REJECTED", "CANCELLED", "DELETED", "DRAFT"].includes(String(r.status || "").toUpperCase())).reduce((s, r) => s + (r.amount || 0), 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Next Cycle</span>
+                        <div className="mt-1">
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                            {systemSettings?.lastUnapprovedSummaryEmailSentAt 
+                              ? `Last sent: ${new Date(systemSettings.lastUnapprovedSummaryEmailSentAt).toLocaleDateString()}`
+                              : "Cycle active (14 days)"}
+                          </span>
+                          <p className="text-[10px] text-slate-400">
+                            {unapprovedSummaryStatus?.nextDueDays !== null && unapprovedSummaryStatus?.nextDueDays !== undefined
+                              ? `Due in approx ${unapprovedSummaryStatus.nextDueDays} day(s)`
+                              : "Auto-checks every 15 min"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom Recipient Override & Force Send Actions */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex-1 w-full">
+                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                            Recipient Overrides (Optional comma-separated emails, or leave blank for all active approvers)
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. treasurer@church.org, ict.team@pceastandrews.org"
+                              className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-xs font-medium"
+                              value={customRecipientsInput}
+                              onChange={(e) => setCustomRecipientsInput(e.target.value)}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveUnapprovedRecipients}
+                              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowUnapprovedList(!showUnapprovedList)}
+                          className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          {showUnapprovedList ? <EyeOff size={14} /> : <Eye size={14} />}
+                          <span>{showUnapprovedList ? "Hide" : "Preview"} Pending Requisitions List ({unapprovedSummaryStatus?.summaryData?.totalCount ?? 0})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={unapprovedDigestSending}
+                          onClick={handleDispatchUnapprovedSummaryNow}
+                          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {unapprovedDigestSending ? (
+                            <>
+                              <RefreshCw size={14} className="animate-spin" />
+                              <span>Dispatching Digest...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send size={14} />
+                              <span>Dispatch Summary Email Now (Test / Immediate)</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Expandable Preview List */}
+                      {showUnapprovedList && (
+                        <div className="mt-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 max-h-60 overflow-y-auto">
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider pb-1 border-b border-slate-100 dark:border-slate-800">
+                            Unapproved Requisitions Waiting in Queue
+                          </h4>
+                          {unapprovedSummaryStatus?.summaryData?.items && unapprovedSummaryStatus.summaryData.items.length > 0 ? (
+                            unapprovedSummaryStatus.summaryData.items.map((item: any, idx: number) => (
+                              <div key={item.id || idx} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-xs">
+                                <div className="min-w-0 pr-2">
+                                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.title}</div>
+                                  <div className="text-[11px] text-slate-400">
+                                    <span className="font-mono">{item.referenceNo || item.id}</span> • {item.groupName} • Requester: {item.requesterName} ({item.daysWaiting}d waiting)
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="font-extrabold text-slate-900 dark:text-white">KES {Number(item.amount || 0).toLocaleString()}</div>
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                    {item.stageLabel}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-slate-400 italic py-2">No unapproved requisitions currently waiting in queue.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SECTION: SYSTEM-WIDE MAINTENANCE & ANNOUNCEMENT BANNER */}
+                  <div className="p-6 rounded-3xl border border-amber-200/80 dark:border-amber-900/50 bg-gradient-to-b from-amber-50/40 to-white dark:from-slate-800/40 dark:to-slate-800/20 space-y-5 max-w-3xl shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-amber-100 dark:border-slate-700">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
+                          <Megaphone size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                              System-Wide Maintenance & Announcement Banner
+                            </h3>
+                            <span className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border",
+                              bannerActiveInput
+                                ? "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                            )}>
+                              {bannerActiveInput ? "Banner Live for All Users" : "Banner Inactive"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Display a prominent banner across the top of all user screens to notify staff of upcoming maintenance windows, audit closures, or urgent announcements.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Banner Master Switch */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setBannerActiveInput(!bannerActiveInput)}
+                          className={cn(
+                            "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                            bannerActiveInput ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-700"
+                          )}
+                          role="switch"
+                          aria-checked={bannerActiveInput}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                              bannerActiveInput ? "translate-x-5" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Banner Type Picker */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                        Banner Type & Severity
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "alert", label: "Maintenance / Alert", color: "border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300" },
+                          { id: "warning", label: "System Warning", color: "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+                          { id: "info", label: "General Notice", color: "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
+                          { id: "success", label: "System Resolved", color: "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" }
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setBannerTypeInput(t.id as any)}
+                            className={cn(
+                              "p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer",
+                              bannerTypeInput === t.id
+                                ? `${t.color} ring-2 ring-blue-500 shadow-xs font-black`
+                                : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400"
+                            )}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Quick Preset Templates
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { label: "Scheduled Maintenance (Sat 10 PM)", msg: "Scheduled System Maintenance: The portal will undergo maintenance this Saturday 10:00 PM – 2:00 AM EAT." },
+                          { label: "Emergency Maintenance", msg: "Emergency Maintenance: Core services are operating under read-only mode during database indexing." },
+                          { label: "Fiscal Year Closure", msg: "Fiscal Year-End Notice: All departmental expense requisitions for the current quarter must be submitted before Friday 5:00 PM." },
+                          { label: "Treasury Audit in Progress", msg: "Audit Notice: Level 2 Treasury budget audits are currently in progress. Clearance timelines may be slightly extended." }
+                        ].map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setBannerMessageInput(preset.msg)}
+                            className="text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Message Composer */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                        Announcement Message
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={bannerMessageInput}
+                        onChange={(e) => setBannerMessageInput(e.target.value)}
+                        placeholder="Type the message to be displayed at the top of every user's screen..."
+                        className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-xs font-medium focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
+                      />
+                    </div>
+
+                    {/* Live Preview of Banner */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Live Preview (How it appears to users)
+                      </span>
+                      <div className={cn(
+                        "p-3 rounded-xl border flex items-center justify-between gap-3 text-xs font-medium shadow-xs",
+                        bannerTypeInput === "alert" && "bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-900/50",
+                        bannerTypeInput === "warning" && "bg-yellow-50 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900/50",
+                        bannerTypeInput === "info" && "bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-900/50",
+                        bannerTypeInput === "success" && "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50"
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white",
+                            bannerTypeInput === "alert" ? "bg-rose-600" :
+                            bannerTypeInput === "warning" ? "bg-amber-500" :
+                            bannerTypeInput === "success" ? "bg-emerald-600" : "bg-blue-600"
+                          )}>
+                            {bannerTypeInput === "alert" ? "MAINTENANCE ALERT" :
+                             bannerTypeInput === "warning" ? "SYSTEM NOTICE" :
+                             bannerTypeInput === "success" ? "UPDATE RESOLVED" : "ANNOUNCEMENT"}
+                          </span>
+                          <span className="font-semibold">{bannerMessageInput || "Your announcement message will display here..."}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save & Broadcast Button */}
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="button"
+                        disabled={bannerSaving}
+                        onClick={handleSaveBanner}
+                        className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {bannerSaving ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            <span>Broadcasting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Radio size={14} />
+                            <span>Save &amp; Broadcast Announcement</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Target Email Config */}
-                  <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-2xl">
+                  <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-3xl">
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Mail size={16} className="text-blue-600" />
-                      <span>Target Notification Email</span>
+                      <span>Primary System Notification Email</span>
                     </h3>
                     
                     <div className="flex gap-3">
@@ -1385,7 +1904,15 @@ export const SettingsPanel: React.FC = () => {
                         onChange={(e) => updateSystemSettings({ ...systemSettings, notificationEmail: e.target.value })}
                       />
                       <button
-                        onClick={() => alert("Email notification settings saved.")}
+                        onClick={() => {
+                          updateSystemSettings({ ...systemSettings, notificationEmail: systemSettings.notificationEmail });
+                          triggerToast({
+                            type: "SYSTEM_INFO",
+                            severity: "LOW",
+                            message: "Primary notification email updated.",
+                            timestamp: new Date().toISOString()
+                          });
+                        }}
                         className="bg-[#0f172a] hover:bg-[#1e293b] text-white rounded-2xl px-6 py-3 font-bold text-xs transition-all cursor-pointer"
                       >
                         Save Email

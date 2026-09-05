@@ -419,6 +419,10 @@ export interface SystemSettings {
   announcementType?: "info" | "warning" | "alert" | "success";
   announcementIsActive?: boolean;
   requisitionExpiryDays?: number;
+  unapprovedSummaryEmailEnabled?: boolean;
+  unapprovedSummaryEmailFrequencyDays?: number;
+  lastUnapprovedSummaryEmailSentAt?: string;
+  unapprovedSummaryEmailRecipients?: string;
 }
 
 export interface SupplementaryBudgetRequest {

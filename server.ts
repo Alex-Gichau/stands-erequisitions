@@ -1534,6 +1534,7 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
   app.use("/api/db", authMiddleware);
   app.use("/api/send-email", authMiddleware);
   app.use("/api/send-summary-email", authMiddleware);
+  app.use("/api/send-unapproved-summary-email", authMiddleware);
   app.use("/api/send-bulk-email", authMiddleware);
   app.use("/api/slack", authMiddleware);
   app.use("/api/attachments/upload", authMiddleware);
@@ -3136,6 +3137,411 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     } catch (err: any) {
       console.warn("SMTP Summary Send failed, logging as simulated:", err.message || err);
       res.json({ success: true, deliveredTo: to, simulated: true, warning: err.message });
+    }
+  });
+
+  // Helper: Retrieve system settings object from JSON or MongoDB
+  function getSystemSettingsObject(): any {
+    try {
+      const settingsList = readJsonCollection("settings") || [];
+      const systemSettings = settingsList.find((s: any) => s.id === "system") || settingsList[0] || { id: "system" };
+      return systemSettings;
+    } catch (err) {
+      console.error("[Settings Helper] Error getting system settings:", err);
+      return { id: "system" };
+    }
+  }
+
+  // Helper: Update system settings object
+  function updateSystemSettingsObject(updates: any): void {
+    try {
+      const settingsList = readJsonCollection("settings") || [];
+      const idx = settingsList.findIndex((s: any) => s.id === "system");
+      if (idx >= 0) {
+        settingsList[idx] = { ...settingsList[idx], ...updates, updated_at: new Date().toISOString() };
+      } else {
+        settingsList.push({ id: "system", ...updates, updated_at: new Date().toISOString() });
+      }
+      writeJsonCollection("settings", settingsList);
+    } catch (err) {
+      console.error("[Settings Helper] Error updating system settings:", err);
+    }
+  }
+
+  // Helper: Gather unapproved requisitions data & metrics
+  function getUnapprovedRequisitionsSummaryData() {
+    const allRequisitions = readJsonCollection("requisitions") || [];
+    const finalizedStatuses = new Set([
+      "APPROVED_L2",
+      "DISBURSED",
+      "PARTIALLY_DISBURSED",
+      "REJECTED",
+      "CANCELLED",
+      "DELETED",
+      "DRAFT"
+    ]);
+
+    const unapprovedList = allRequisitions.filter((r: any) => {
+      if (!r) return false;
+      const status = String(r.status || "").toUpperCase();
+      if (finalizedStatuses.has(status)) return false;
+      return true;
+    });
+
+    // Sort by submission date ascending (oldest unapproved first)
+    unapprovedList.sort((a: any, b: any) => {
+      const timeA = new Date(a.submittedAt || a.createdAt || a.date || 0).getTime();
+      const timeB = new Date(b.submittedAt || b.createdAt || b.date || 0).getTime();
+      return timeA - timeB;
+    });
+
+    const now = Date.now();
+    let totalAmount = 0;
+    let level1Count = 0;
+    let level2Count = 0;
+
+    const items = unapprovedList.map((r: any) => {
+      const amount = Number(r.amount || 0);
+      totalAmount += amount;
+      const status = String(r.status || "").toUpperCase();
+      const isL1 = status === "SUBMITTED" || status === "PENDING" || status === "PENDING_L1";
+      if (isL1) {
+        level1Count++;
+      } else {
+        level2Count++;
+      }
+
+      const subTime = new Date(r.submittedAt || r.createdAt || r.date || now).getTime();
+      const daysWaiting = Math.max(0, Math.floor((now - subTime) / (1000 * 60 * 60 * 24)));
+
+      return {
+        id: r.id,
+        referenceNo: r.referenceNo || r.id,
+        title: r.title || "Untitled Requisition",
+        groupName: r.groupName || r.group || "General Ministry",
+        amount,
+        createdBy: r.createdBy || "Unknown Requester",
+        requesterName: r.requesterName || (r.createdBy ? r.createdBy.split("@")[0] : "Parish Requester"),
+        submittedAt: r.submittedAt || r.createdAt || new Date().toISOString(),
+        status: r.status,
+        daysWaiting,
+        stageLabel: isL1 ? "Level 1 Audit Verification" : "Level 2 Treasury Approval"
+      };
+    });
+
+    return {
+      totalCount: items.length,
+      totalAmount,
+      level1Count,
+      level2Count,
+      items
+    };
+  }
+
+  // Helper: Determine recipients for unapproved summary emails
+  function getUnapprovedSummaryRecipients(customRecipients?: string[]): string[] {
+    const recipientsSet = new Set<string>();
+
+    if (Array.isArray(customRecipients) && customRecipients.length > 0) {
+      customRecipients.forEach(em => {
+        if (em && typeof em === "string" && em.includes("@")) {
+          recipientsSet.add(em.trim().toLowerCase());
+        }
+      });
+      if (recipientsSet.size > 0) return Array.from(recipientsSet);
+    }
+
+    const systemSettings = getSystemSettingsObject();
+    
+    if (systemSettings.notificationEmail && systemSettings.notificationEmail.includes("@")) {
+      recipientsSet.add(systemSettings.notificationEmail.trim().toLowerCase());
+    }
+    if (systemSettings.unapprovedSummaryEmailRecipients && typeof systemSettings.unapprovedSummaryEmailRecipients === "string") {
+      systemSettings.unapprovedSummaryEmailRecipients.split(",").forEach((em: string) => {
+        if (em.trim().includes("@")) recipientsSet.add(em.trim().toLowerCase());
+      });
+    }
+
+    // Include approvers and finance officers
+    const users = readJsonCollection("users") || [];
+    users.forEach((u: any) => {
+      if (u.status === "ACTIVE" && u.email && u.email.includes("@")) {
+        const role = String(u.role || "").toUpperCase();
+        if (
+          role === "SUPER_ADMIN" ||
+          role === "ADMIN" ||
+          role === "APPROVER_L1" ||
+          role === "APPROVER_L2" ||
+          role === "FINANCE"
+        ) {
+          recipientsSet.add(u.email.trim().toLowerCase());
+        }
+      }
+    });
+
+    if (recipientsSet.size === 0) {
+      recipientsSet.add("ict.team@pceastandrews.org");
+    }
+
+    return Array.from(recipientsSet);
+  }
+
+  // Helper: Dispatch the Unapproved Requisitions Summary Email
+  async function dispatchUnapprovedSummaryEmail(options?: {
+    customRecipients?: string[];
+    isAutomatedCron?: boolean;
+    force?: boolean;
+    reqOrigin?: string;
+  }) {
+    const systemSettings = getSystemSettingsObject();
+
+    // Check if globally disabled in super admin settings
+    if (systemSettings.unapprovedSummaryEmailEnabled === false && !options?.force) {
+      console.log("[Unapproved Digest] Automated summary skipped — disabled globally in settings.");
+      return { success: true, skipped: true, reason: "Disabled globally in settings" };
+    }
+
+    const summaryData = getUnapprovedRequisitionsSummaryData();
+    if (summaryData.totalCount === 0 && !options?.force) {
+      console.log("[Unapproved Digest] Automated summary skipped — zero unapproved requisitions.");
+      return { success: true, skipped: true, reason: "Zero unapproved requisitions" };
+    }
+
+    const recipients = getUnapprovedSummaryRecipients(options?.customRecipients);
+    if (recipients.length === 0) {
+      return { success: false, error: "No valid recipient email addresses found." };
+    }
+
+    const subject = `⏳ [Bi-Weekly Digest] ${summaryData.totalCount} Unapproved Requisition(s) Pending Action`;
+    const portalUrl = options?.reqOrigin || "https://accounts.pceastandrews.org";
+
+    const rowsHtml = summaryData.items.length > 0
+      ? summaryData.items.slice(0, 15).map((item, idx) => `
+        <tr style="border-bottom: 1px solid #e2e8f0; background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+          <td style="padding: 12px 10px; font-size: 13px; font-weight: 700; color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div>${item.title}</div>
+            <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-top: 2px;">
+              <span style="font-family: monospace; background-color: #f1f5f9; padding: 2px 5px; border-radius: 4px;">${item.referenceNo || item.id}</span> • ${item.groupName}
+            </div>
+          </td>
+          <td style="padding: 12px 10px; font-size: 12px; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div style="font-weight: 600;">${item.requesterName}</div>
+            <div style="font-size: 10px; color: #94a3b8;">${item.daysWaiting === 0 ? 'Today' : `${item.daysWaiting} day${item.daysWaiting === 1 ? '' : 's'} ago`}</div>
+          </td>
+          <td align="right" style="padding: 12px 10px; font-size: 13px; font-weight: 800; color: #0f172a; white-space: nowrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            KES ${item.amount.toLocaleString()}
+          </td>
+          <td style="padding: 12px 10px; text-align: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <span style="display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 8px; border-radius: 6px; ${
+              item.stageLabel.includes('Level 1')
+                ? 'background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;'
+                : 'background-color: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff;'
+            }">
+              ${item.stageLabel.includes('Level 1') ? 'L1 Audit' : 'L2 Treasury'}
+            </span>
+          </td>
+        </tr>
+      `).join("")
+      : `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #64748b; font-size: 13px;">No unapproved requisitions currently waiting.</td></tr>`;
+
+    const bodyHtml = `
+      <div style="background-color: #f1f5f9; padding: 35px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 650px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 36px 28px; text-align: center;">
+              <div style="font-size: 10px; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 8px;">
+                PCEA ST. ANDREWS CHURCH
+              </div>
+              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                STANDS eRequisitions
+              </h1>
+              <div style="display: inline-block; margin-top: 14px; background-color: rgba(251, 191, 36, 0.15); color: #fbbf24; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.3);">
+                ⏳ BI-WEEKLY UNAPPROVED SUMMARY (14-DAY CYCLE)
+              </div>
+            </td>
+          </tr>
+
+          <!-- Intro -->
+          <tr>
+            <td style="padding: 32px 28px 20px;">
+              <p style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 6px;">
+                Attention Approvers &amp; Church Leadership,
+              </p>
+              <p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 24px;">
+                This is the automated bi-weekly digest of expense requisitions currently awaiting review, Level 1 audit verification, or Level 2 Treasury clearance. Please review pending items to maintain financial workflow momentum.
+              </p>
+
+              <!-- Metrics Grid -->
+              <table border="0" cellpadding="0" cellspacing="10" width="100%" style="margin-left: -10px; margin-right: -10px; margin-bottom: 24px;">
+                <tr>
+                  <td width="50%" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 4px;">${summaryData.totalCount}</div>
+                    <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Unapproved</div>
+                  </td>
+                  <td width="50%" valign="top" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 16px; text-align: center;">
+                    <div style="font-size: 24px; font-weight: 800; color: #a16207; line-height: 1; margin-bottom: 4px;">KES ${summaryData.totalAmount.toLocaleString()}</div>
+                    <div style="font-size: 10px; font-weight: 800; color: #854d0e; text-transform: uppercase; letter-spacing: 1px;">Total Pending Value</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td width="50%" valign="top" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 16px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; line-height: 1; margin-bottom: 2px;">${summaryData.level1Count}</div>
+                    <div style="font-size: 9px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 1 Audit</div>
+                  </td>
+                  <td width="50%" valign="top" style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 12px 16px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 800; color: #7e22ce; line-height: 1; margin-bottom: 2px;">${summaryData.level2Count}</div>
+                    <div style="font-size: 9px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 2 Treasury</div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Itemized Table -->
+              <div style="margin-top: 24px; margin-bottom: 24px; overflow-x: auto;">
+                <div style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 8px; border-bottom: 2px solid #0f172a; margin-bottom: 8px;">
+                  📋 Unapproved Requisitions Queue (${summaryData.items.length > 15 ? `Showing 15 of ${summaryData.totalCount}` : summaryData.totalCount})
+                </div>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
+                  <thead>
+                    <tr style="background-color: #f1f5f9; text-align: left;">
+                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Title &amp; Group</th>
+                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Requester</th>
+                      <th align="right" style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Amount</th>
+                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Required Stage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Call to Action Button -->
+              <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
+                <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 13px; font-weight: 800; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
+                  Access Portal &amp; Review Approvals →
+                </a>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 28px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin: 0 0 10px;">
+                ⚙️ <strong>Notification Control</strong>: This automated digest is sent on a 14-day schedule. Super Admins can turn off or adjust this notification for all users anytime in the <strong>Settings &gt; Notifications &amp; Slack</strong> control panel.
+              </p>
+              <div style="display: inline-block; background-color: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px;">
+                DISPATCH SENDER: ict.team@pceastandrews.org
+              </div>
+              <p style="font-size: 10px; color: #94a3b8; margin-top: 14px; margin-bottom: 0;">
+                PCEA St. Andrew's Church © ${new Date().getFullYear()} eRequisitions Financial Management System
+              </p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    let emailDelivered = false;
+    let emailError: string | null = null;
+
+    if (process.env.SMTP_PASS) {
+      try {
+        await transporter.sendMail({
+          from: `"STANDS eRequisitions" <ict.team@pceastandrews.org>`,
+          to: recipients.join(", "),
+          subject,
+          html: bodyHtml
+        });
+        emailDelivered = true;
+      } catch (err: any) {
+        emailError = err.message || String(err);
+        console.warn("[Unapproved Digest] SMTP dispatch error, logging as simulated:", emailError);
+      }
+    } else {
+      console.log("[Unapproved Digest] SMTP_PASS not set. Email logged as simulated.");
+    }
+
+    const sentTimestamp = new Date().toISOString();
+    updateSystemSettingsObject({
+      lastUnapprovedSummaryEmailSentAt: sentTimestamp
+    });
+
+    persistActivity({
+      action: emailDelivered ? "DISPATCH_UNAPPROVED_SUMMARY_EMAIL" : "SIMULATED_UNAPPROVED_SUMMARY_EMAIL",
+      details: `Bi-weekly unapproved requisitions digest (${summaryData.totalCount} unapproved, KES ${summaryData.totalAmount.toLocaleString()}) dispatched to ${recipients.length} recipients (${recipients.slice(0, 3).join(", ")}${recipients.length > 3 ? ` +${recipients.length - 3} more` : ""})`,
+      performedBy: options?.isAutomatedCron ? "BIWEEKLY_CRON_SCHEDULER" : "SUPER_ADMIN",
+      timestamp: sentTimestamp,
+      metadata: {
+        category: "DIGEST_SUMMARY",
+        totalCount: summaryData.totalCount,
+        totalAmount: summaryData.totalAmount,
+        recipients,
+        isAutomatedCron: !!options?.isAutomatedCron,
+        delivered: emailDelivered,
+        error: emailError
+      }
+    });
+
+    return {
+      success: true,
+      delivered: emailDelivered,
+      simulated: !emailDelivered,
+      recipients,
+      totalCount: summaryData.totalCount,
+      totalAmount: summaryData.totalAmount,
+      sentAt: sentTimestamp,
+      error: emailError
+    };
+  }
+
+  // GET /api/unapproved-summary-status - Retrieve status and current queue stats
+  app.get("/api/unapproved-summary-status", async (req, res) => {
+    try {
+      const systemSettings = getSystemSettingsObject();
+      const summaryData = getUnapprovedRequisitionsSummaryData();
+      const recipients = getUnapprovedSummaryRecipients();
+      const enabled = systemSettings.unapprovedSummaryEmailEnabled !== false;
+      const frequencyDays = systemSettings.unapprovedSummaryEmailFrequencyDays || 14;
+      const lastSentAt = systemSettings.lastUnapprovedSummaryEmailSentAt || null;
+
+      let nextDueDays: number | null = null;
+      if (lastSentAt) {
+        const lastSentTime = new Date(lastSentAt).getTime();
+        const elapsedDays = (Date.now() - lastSentTime) / (1000 * 60 * 60 * 24);
+        nextDueDays = Math.max(0, Math.ceil(frequencyDays - elapsedDays));
+      }
+
+      res.json({
+        success: true,
+        enabled,
+        frequencyDays,
+        lastSentAt,
+        nextDueDays,
+        summaryData,
+        recipients
+      });
+    } catch (err: any) {
+      console.error("Error retrieving unapproved summary status:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to retrieve status" });
+    }
+  });
+
+  // POST /api/send-unapproved-summary-email - Trigger on-demand or test summary email
+  app.post("/api/send-unapproved-summary-email", async (req, res) => {
+    try {
+      const { recipients, forceSend = true } = req.body || {};
+      const reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : undefined);
+      const result = await dispatchUnapprovedSummaryEmail({
+        customRecipients: recipients,
+        force: forceSend,
+        reqOrigin
+      });
+      res.json(result);
+    } catch (err: any) {
+      console.error("Error sending unapproved summary email:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to send summary email" });
     }
   });
 
@@ -6741,6 +7147,40 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
       }
     } catch (e) {
       console.error("[Health Slack Alert Scheduler Error]:", e);
+    }
+  }, 15 * 60 * 1000);
+
+  // Automated Bi-Weekly (14-day) Unapproved Requisitions Digest Runner (Checks every 15 minutes)
+  setInterval(async () => {
+    try {
+      const systemSettings = getSystemSettingsObject();
+      if (systemSettings.unapprovedSummaryEmailEnabled === false) return;
+
+      const frequencyDays = systemSettings.unapprovedSummaryEmailFrequencyDays || 14;
+      const lastSentAt = systemSettings.lastUnapprovedSummaryEmailSentAt;
+      const now = new Date();
+
+      let isDue = false;
+      if (!lastSentAt) {
+        const data = getUnapprovedRequisitionsSummaryData();
+        if (data.totalCount > 0) {
+          isDue = true;
+        }
+      } else {
+        const lastSentTime = new Date(lastSentAt).getTime();
+        const elapsedDays = (now.getTime() - lastSentTime) / (1000 * 60 * 60 * 24);
+        if (elapsedDays >= frequencyDays) {
+          isDue = true;
+        }
+      }
+
+      if (isDue) {
+        console.log(`[Bi-Weekly Unapproved Summary Scheduler] 14-day cycle reached. Dispatched automated digest email...`);
+        await dispatchUnapprovedSummaryEmail({ isAutomatedCron: true });
+        console.log("[Bi-Weekly Unapproved Summary Scheduler] Successfully completed dispatch.");
+      }
+    } catch (e) {
+      console.error("[Bi-Weekly Unapproved Summary Scheduler Error]:", e);
     }
   }, 15 * 60 * 1000);
 

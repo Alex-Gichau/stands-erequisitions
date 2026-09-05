@@ -280,6 +280,10 @@ export interface ISettings extends Document {
   vendorListViewLevel?: string;
   isSystemOffline?: boolean;
   requisitionExpiryDays?: number;
+  unapprovedSummaryEmailEnabled?: boolean;
+  unapprovedSummaryEmailFrequencyDays?: number;
+  lastUnapprovedSummaryEmailSentAt?: string;
+  unapprovedSummaryEmailRecipients?: string;
   [key: string]: any;
 }
 const SettingsSchema = new Schema<ISettings>({

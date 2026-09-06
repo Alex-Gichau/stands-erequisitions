@@ -1803,6 +1803,7 @@ import { ReceiptTemplateGenerator } from "./ReceiptTemplateGenerator";
 import { ReceiptGallery } from "./ReceiptGallery";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
+import { ExportConfirmationModal, ExportConfirmationParams, ExportFormat } from "./ExportConfirmationModal";
 import { CachedImage } from "./CachedImage";
 import { getCachedMediaUrl, preloadMediaBatch } from "../lib/mediaCache";
 
@@ -2547,6 +2548,33 @@ export const RequisitionsPanel: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
   const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [exportModalParams, setExportModalParams] = useState<ExportConfirmationParams | null>(null);
+
+  const triggerRequisitionsExportConfirmation = (reqsToExport: Requisition[], reportTitle: string, defaultFmt: ExportFormat = "pdf") => {
+    setExportModalParams({
+      title: "Confirm Requisitions Data Export",
+      reportType: reportTitle,
+      fiscalYear: `FY ${systemSettings?.currentFiscalYear || 2026}`,
+      groupName: "All Groups & Departments",
+      statusFilter: filterStatus === "ALL" ? "All Approval Statuses" : filterStatus,
+      recordCount: reqsToExport.length,
+      totalAmount: reqsToExport.reduce((sum, r) => sum + (r.amount || 0), 0),
+      defaultFormat: defaultFmt,
+      onConfirm: (selectedFmt) => {
+        setShowExportDropdown(false);
+        if (selectedFmt === "csv") {
+          downloadRequisitionsCsv(reqsToExport, reportTitle);
+        } else if (selectedFmt === "pdf") {
+          downloadRequisitionsPdf(reqsToExport, reportTitle, currentUser);
+        } else if (selectedFmt === "html") {
+          downloadRequisitionsHtml(reqsToExport, reportTitle, currentUser);
+        } else if (selectedFmt === "print") {
+          printRequisitions(reqsToExport, reportTitle, currentUser);
+        }
+      },
+      onCancel: () => setExportModalParams(null)
+    });
+  };
   
   const [editingReq, setEditingReq] = useState<Requisition | null>(null);
   const [requisitionToDelete, setRequisitionToDelete] = useState<Requisition | null>(null);
@@ -2922,12 +2950,12 @@ export const RequisitionsPanel: React.FC = () => {
 
   const handleBulkPrint = () => {
     const selectedReqs = requisitions.filter(r => selectedIds.has(r.id));
-    printRequisitions(selectedReqs, "Consolidated Transaction Report", currentUser);
+    triggerRequisitionsExportConfirmation(selectedReqs, "Selected Requisitions Report", "print");
   };
 
   const handleBulkExportCsv = () => {
     const selectedReqs = requisitions.filter(r => selectedIds.has(r.id));
-    downloadRequisitionsCsv(selectedReqs, "Bulk_Export_Transactions");
+    triggerRequisitionsExportConfirmation(selectedReqs, "Selected Requisitions Report", "csv");
   };
 
   const handleBulkDelete = async () => {
@@ -3065,8 +3093,8 @@ export const RequisitionsPanel: React.FC = () => {
                   </div>
                   <button
                     onClick={() => {
-                      downloadRequisitionsPdf(filtered, "Requisitions List Ledger", currentUser);
                       setShowExportDropdown(false);
+                      triggerRequisitionsExportConfirmation(filtered, "Requisitions List Ledger", "pdf");
                     }}
                     className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer flex items-center gap-2"
                   >
@@ -3075,8 +3103,8 @@ export const RequisitionsPanel: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      downloadRequisitionsCsv(filtered, "Requisitions List Ledger");
                       setShowExportDropdown(false);
+                      triggerRequisitionsExportConfirmation(filtered, "Requisitions List Ledger", "csv");
                     }}
                     className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer flex items-center gap-2"
                   >
@@ -3085,8 +3113,8 @@ export const RequisitionsPanel: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
-                      downloadRequisitionsHtml(filtered, "Requisitions List Ledger", currentUser);
                       setShowExportDropdown(false);
+                      triggerRequisitionsExportConfirmation(filtered, "Requisitions List Ledger", "html");
                     }}
                     className="w-full px-4 py-2 text-left text-xs text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-2"
                   >
@@ -5121,6 +5149,13 @@ export const RequisitionsPanel: React.FC = () => {
           />
         )}
       </AnimatePresence>
+
+      {/* Export Confirmation Safeguard Modal */}
+      <ExportConfirmationModal
+        isOpen={!!exportModalParams}
+        params={exportModalParams}
+        onClose={() => setExportModalParams(null)}
+      />
     </div>
   );
 };

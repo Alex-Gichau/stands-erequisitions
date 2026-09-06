@@ -62,8 +62,9 @@ import { getProjectRequisitions } from "../utils/budgetUtils";
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { motion, AnimatePresence } from "motion/react";
 import { databaseService } from "../lib/databaseService";
-import { printRequisitionVoucher, printInstallmentVoucher } from "../utils/exportUtils";
+import { printRequisitionVoucher, printInstallmentVoucher, downloadRequisitionsCsv, downloadRequisitionsPdf, downloadRequisitionsHtml, printRequisitions } from "../utils/exportUtils";
 import { ConfirmationModal } from "./ConfirmationModal";
+import { ExportConfirmationModal, ExportConfirmationParams, ExportFormat } from "./ExportConfirmationModal";
 import { useBackgroundRefresh } from "../hooks/useBackgroundRefresh";
 
 const numberToWords = (numStr: string): string => {
@@ -685,6 +686,7 @@ export const FinanceLedgerPanel: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("ALL");
   const [activeTab, setActiveTab] = useState<"ledgers" | "budgets" | "ministry_ledgers">(isFinanceOrAdmin ? "ledgers" : "budgets");
   const [expandedReqId, setExpandedReqId] = useState<string | null>(null);
+  const [exportModalParams, setExportModalParams] = useState<ExportConfirmationParams | null>(null);
 
   // Ministry Ledger Books State
   const [selectedLedgerMinistry, setSelectedLedgerMinistry] = useState("");
@@ -1123,18 +1125,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     printRequisitionVoucher(req, currentUser);
   };
 
-  // Export general ledger transactions to CSV for Excel/Google Sheets
-  const handleDownloadCSV = async () => {
-    if (!canExport) {
-      alert("Permission Denied: You do not possess authority to export financial ledger reports.");
-      return;
-    }
-
-    if (ledgerEntries.length === 0) {
-      alert("No transaction logs found to export.");
-      return;
-    }
-
+  const executeCsvDownload = async () => {
     // Define columns
     const headers = [
       "Voucher ID",
@@ -1158,9 +1149,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     const escapeCSV = (val: any) => {
       if (val === null || val === undefined) return "";
       let str = String(val);
-      // Escape double quotes by doubling them
       str = str.replace(/"/g, '""');
-      // Wrap in double quotes if it contains commas, double quotes, or newlines
       if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
         return `"${str}"`;
       }
@@ -1203,7 +1192,6 @@ export const FinanceLedgerPanel: React.FC = () => {
     link.click();
     document.body.removeChild(link);
 
-    // Optional system log auditing
     try {
       await addSystemLog(
         "LEDGER_EXPORT",
@@ -1213,6 +1201,42 @@ export const FinanceLedgerPanel: React.FC = () => {
     } catch (e) {
       console.warn("Failed to log ledger export:", e);
     }
+  };
+
+  // Export general ledger transactions with parameter confirmation modal
+  const handleDownloadCSV = async () => {
+    if (!canExport) {
+      alert("Permission Denied: You do not possess authority to export financial ledger reports.");
+      return;
+    }
+
+    if (ledgerEntries.length === 0) {
+      alert("No transaction logs found to export.");
+      return;
+    }
+
+    setExportModalParams({
+      title: "Confirm General Ledger Export",
+      reportType: "General Ledger Transactions",
+      fiscalYear: `FY ${activeYear || 2026}`,
+      groupName: selectedProjectId === "ALL" ? "All Projects & Ministries" : "Selected Account",
+      statusFilter: statusFilter === "ALL" ? "All Approval Statuses" : statusFilter,
+      recordCount: ledgerEntries.length,
+      totalAmount: ledgerEntries.reduce((sum, r) => sum + (r.amount || 0), 0),
+      defaultFormat: "csv",
+      onConfirm: async (selectedFmt) => {
+        if (selectedFmt === "csv") {
+          await executeCsvDownload();
+        } else if (selectedFmt === "pdf") {
+          downloadRequisitionsPdf(ledgerEntries, "General Ledger Export", currentUser);
+        } else if (selectedFmt === "html") {
+          downloadRequisitionsHtml(ledgerEntries, "General Ledger Export", currentUser);
+        } else if (selectedFmt === "print") {
+          printRequisitions(ledgerEntries, "General Ledger Export", currentUser);
+        }
+      },
+      onCancel: () => setExportModalParams(null)
+    });
   };
 
   // Render Yearly Budgeting & Fiscal Books
@@ -4262,6 +4286,13 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Export Confirmation Safeguard Modal */}
+      <ExportConfirmationModal
+        isOpen={!!exportModalParams}
+        params={exportModalParams}
+        onClose={() => setExportModalParams(null)}
+      />
 
     </div>
   );

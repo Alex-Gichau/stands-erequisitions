@@ -28,6 +28,7 @@ import { getTimeUntilMidnightPT } from "../lib/errorMonitor";
 import { AuditSummaryWidget } from "./AuditSummaryWidget";
 import { EmailHistoryAuditPanel } from "./EmailHistoryAuditPanel";
 import { AuditLogsTerminalModal } from "./AuditLogsTerminalModal";
+import { ExportConfirmationModal, ExportConfirmationParams, ExportFormat } from "./ExportConfirmationModal";
 
 export const AuditLogsPanel: React.FC = () => {
   const { systemLogs, currentUser, systemLogLimit, setSystemLogLimit, syncingTargets, canAccess } = useRequisitions();
@@ -37,6 +38,7 @@ export const AuditLogsPanel: React.FC = () => {
   const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('TODAY');
   const [activeTab, setActiveTab] = useState<'LOGS' | 'EMAILS'>('LOGS');
   const [showTerminal, setShowTerminal] = useState<boolean>(false);
+  const [exportModalParams, setExportModalParams] = useState<ExportConfirmationParams | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 15;
@@ -97,7 +99,7 @@ export const AuditLogsPanel: React.FC = () => {
     );
   }
 
-  const exportLogsCsv = () => {
+  const executeLogsCsvDownload = () => {
     const headers = ["Timestamp", "Action", "Details", "Performed By"];
     const content = filteredLogs.map(l => [
       l.timestamp,
@@ -112,6 +114,20 @@ export const AuditLogsPanel: React.FC = () => {
     link.href = url;
     link.download = "system_audit_logs.csv";
     link.click();
+  };
+
+  const exportLogsCsv = () => {
+    setExportModalParams({
+      title: "Confirm System Audit Trail Export",
+      reportType: "System Activity & Audit Trail Logs",
+      statusFilter: selectedActionFilter === "ALL" ? "All Security Actions" : selectedActionFilter,
+      recordCount: filteredLogs.length,
+      defaultFormat: "csv",
+      onConfirm: () => {
+        executeLogsCsvDownload();
+      },
+      onCancel: () => setExportModalParams(null)
+    });
   };
 
   const getLogIcon = (action: string) => {
@@ -508,6 +524,12 @@ export const AuditLogsPanel: React.FC = () => {
         logs={systemLogs}
         systemLogLimit={systemLogLimit}
         onSetSystemLogLimit={setSystemLogLimit}
+      />
+      {/* Export Confirmation Safeguard Modal */}
+      <ExportConfirmationModal
+        isOpen={!!exportModalParams}
+        params={exportModalParams}
+        onClose={() => setExportModalParams(null)}
       />
     </div>
   );

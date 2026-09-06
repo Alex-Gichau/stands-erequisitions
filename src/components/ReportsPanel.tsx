@@ -47,6 +47,7 @@ import {
   downloadAiSummaryPdf,
   printAiSummaryReport
 } from "../utils/exportUtils";
+import { ExportConfirmationModal, ExportConfirmationParams, ExportFormat } from "./ExportConfirmationModal";
 
 export const ReportsPanel: React.FC = () => {
   const { requisitions, projects, currentUser, saveReport, reports, fiscalYears, systemSettings, syncingTargets } = useRequisitions();
@@ -59,6 +60,41 @@ export const ReportsPanel: React.FC = () => {
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("CURRENT");
   const [isSaving, setIsSaving] = useState(false);
   const [showDownloadType, setShowDownloadType] = useState(false);
+  const [exportModalParams, setExportModalParams] = useState<ExportConfirmationParams | null>(null);
+
+  // Trigger Confirmation Modal for Export Actions
+  const triggerExportConfirmation = (defaultFmt: ExportFormat = "pdf") => {
+    const currentFyStr = selectedFiscalYear === "ALL" 
+      ? "All Fiscal Periods" 
+      : selectedFiscalYear === "CURRENT" 
+        ? `FY ${systemSettings?.currentFiscalYear || 2026}` 
+        : `FY ${selectedFiscalYear}`;
+        
+    setExportModalParams({
+      title: "Confirm Periodic Ledger Report Export",
+      reportType: "Audit Periodic Ledger Summary",
+      fiscalYear: currentFyStr,
+      dateRange: { start: startDate, end: endDate },
+      groupName: selectedGroup === "ALL" ? "All Church Groups & Departments" : selectedGroup,
+      statusFilter: selectedStatus === "ALL" ? "All Approval Stages" : selectedStatus,
+      recordCount: filteredRequisitions.length,
+      totalAmount: filteredRequisitions.reduce((sum, r) => sum + (r.amount || 0), 0),
+      defaultFormat: defaultFmt,
+      onConfirm: (selectedFmt) => {
+        setShowDownloadType(false);
+        if (selectedFmt === "csv") {
+          downloadRequisitionsCsv(filteredRequisitions, "Audit Periodic Summary");
+        } else if (selectedFmt === "pdf") {
+          downloadRequisitionsPdf(filteredRequisitions, "Audit Periodic Summary", currentUser, filterDescription);
+        } else if (selectedFmt === "html") {
+          downloadRequisitionsHtml(filteredRequisitions, "Audit Periodic Summary", currentUser, filterDescription);
+        } else if (selectedFmt === "print") {
+          printRequisitions(filteredRequisitions, "Audit Periodic Summary", currentUser, filterDescription);
+        }
+      },
+      onCancel: () => setExportModalParams(null)
+    });
+  };
 
   // AI 1-Pager Summary States
   const [aiSummary, setAiSummary] = useState<any>(null);
@@ -217,21 +253,11 @@ export const ReportsPanel: React.FC = () => {
   }, [startDate, endDate, selectedGroup, selectedStatus]);
 
   const handlePrintReport = () => {
-    printRequisitions(
-      filteredRequisitions,
-      "Audit Periodic Ledger Summary",
-      currentUser,
-      filterDescription
-    );
+    triggerExportConfirmation("html");
   };
 
   const handleDownloadReport = () => {
-    downloadRequisitionsHtml(
-      filteredRequisitions,
-      "Audit Periodic Ledger Summary",
-      currentUser,
-      filterDescription
-    );
+    triggerExportConfirmation("pdf");
   };
 
   const handleGenerateAiSummary = async () => {
@@ -422,8 +448,8 @@ export const ReportsPanel: React.FC = () => {
                     </div>
                     <button
                       onClick={() => {
-                        downloadRequisitionsPdf(filteredRequisitions, "Audit Periodic Summary", currentUser, filterDescription);
                         setShowDownloadType(false);
+                        triggerExportConfirmation("pdf");
                       }}
                       className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer flex items-center gap-2"
                     >
@@ -432,8 +458,8 @@ export const ReportsPanel: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        downloadRequisitionsCsv(filteredRequisitions, "Audit Periodic Summary");
                         setShowDownloadType(false);
+                        triggerExportConfirmation("csv");
                       }}
                       className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 font-bold transition-colors cursor-pointer flex items-center gap-2"
                     >
@@ -442,8 +468,8 @@ export const ReportsPanel: React.FC = () => {
                     </button>
                     <button
                       onClick={() => {
-                        downloadRequisitionsHtml(filteredRequisitions, "Audit Periodic Summary", currentUser, filterDescription);
                         setShowDownloadType(false);
+                        triggerExportConfirmation("html");
                       }}
                       className="w-full px-4 py-2 text-left text-xs text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer flex items-center gap-2"
                     >
@@ -1085,6 +1111,12 @@ export const ReportsPanel: React.FC = () => {
           </p>
         </div>
       </div>
+      {/* Export Confirmation Safeguard Modal */}
+      <ExportConfirmationModal
+        isOpen={!!exportModalParams}
+        params={exportModalParams}
+        onClose={() => setExportModalParams(null)}
+      />
     </div>
   );
 };

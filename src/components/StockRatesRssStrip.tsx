@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { TrendingUp, TrendingDown, RefreshCw, Rss, ArrowUpRight, ArrowDownRight, ExternalLink, Activity, Info, ChevronRight, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "../lib/utils";
+import { useMarketRssFeedsQuery } from "../hooks/usePortalQueries";
 
 export interface StockRateItem {
   symbol: string;
@@ -213,87 +214,42 @@ const GOOGLE_FINANCE_RSS_FALLBACK_URLS = [
 export const StockRatesRssStrip: React.FC = () => {
   const [stocks, setStocks] = useState<StockRateItem[]>(DEFAULT_STOCKS);
   const [isPaused, setIsPaused] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedStock, setSelectedStock] = useState<StockRateItem | null>(null);
   const [rssArticles, setRssArticles] = useState<{ title: string; link: string; pubDate: string; source?: string }[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-  // Fetch Google Finance RSS news items
-  const fetchRssFeeds = async () => {
-    setIsRefreshing(true);
-    try {
-      let allArticles: { title: string; link: string; pubDate: string; source?: string }[] = [];
-      
-      // 1. Primary: Direct backend Google Finance RSS endpoint
-      try {
-        const backendRes = await fetch("/api/market-rss-feeds");
-        if (backendRes.ok) {
-          const backendData = await backendRes.json();
-          if (backendData?.items && Array.isArray(backendData.items) && backendData.items.length > 0) {
-            allArticles = backendData.items.slice(0, 20).map((item: any) => ({
-              title: item.title,
-              link: item.link,
-              pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-              source: item.source || "Google Finance",
-            }));
-          }
-        }
-      } catch (backendErr) {
-        console.warn("Backend Google Finance RSS fetch failed, falling back to direct RSS proxy:", backendErr);
-      }
+  // TanStack Query for Google Finance RSS feeds with auto-deduplication & background cache revalidation
+  const { data: rssData, isFetching: isQueryFetching } = useMarketRssFeedsQuery();
 
-      // 2. Fallback: Query Google Finance RSS feeds via proxy if backend endpoint returned no items
-      if (allArticles.length === 0) {
-        for (const url of GOOGLE_FINANCE_RSS_FALLBACK_URLS) {
-          try {
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              if (data?.items && Array.isArray(data.items)) {
-                data.items.slice(0, 5).forEach((item: any) => {
-                  allArticles.push({
-                    title: item.title,
-                    link: item.link || item.guid,
-                    pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-                    source: item.author || "Google Finance",
-                  });
-                });
-              }
-            }
-          } catch (e) {
-            // Ignore individual CORS/network failures
-          }
-        }
-      }
+  // Sync articles whenever TanStack Query updates or revalidates in the background
+  useEffect(() => {
+    if (rssData?.items && Array.isArray(rssData.items) && rssData.items.length > 0) {
+      const formatted = rssData.items.slice(0, 20).map((item: any) => ({
+        title: item.title,
+        link: item.link,
+        pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        source: item.source || "Google Finance",
+      }));
 
-      if (allArticles.length > 0) {
-        setRssArticles(allArticles);
-        // Merge Google Finance headlines into stock items
-        setStocks((prev) =>
-          prev.map((s, idx) => {
-            const matchingArticle = allArticles[idx % allArticles.length];
-            return {
-              ...s,
-              rssHeadline: matchingArticle ? matchingArticle.title : s.rssHeadline,
-              rssLink: matchingArticle ? matchingArticle.link : s.rssLink,
-              rssPubDate: matchingArticle ? matchingArticle.pubDate : s.rssPubDate,
-              rssSource: matchingArticle?.source || s.rssSource || "Google Finance",
-            };
-          })
-        );
-      }
-    } catch (err) {
-      console.warn("Google Finance RSS Feed fetch fallback:", err);
-    } finally {
-      setIsRefreshing(false);
+      setRssArticles(formatted);
+      setStocks((prev) =>
+        prev.map((s, idx) => {
+          const matchingArticle = formatted[idx % formatted.length];
+          return {
+            ...s,
+            rssHeadline: matchingArticle ? matchingArticle.title : s.rssHeadline,
+            rssLink: matchingArticle ? matchingArticle.link : s.rssLink,
+            rssPubDate: matchingArticle ? matchingArticle.pubDate : s.rssPubDate,
+            rssSource: matchingArticle?.source || s.rssSource || "Google Finance",
+          };
+        })
+      );
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     }
-  };
+  }, [rssData]);
 
   // Live price jitter simulator to mimic dynamic financial market tickers
   useEffect(() => {
-    fetchRssFeeds();
-
     const interval = setInterval(() => {
       setStocks((prevStocks) =>
         prevStocks.map((stock) => {

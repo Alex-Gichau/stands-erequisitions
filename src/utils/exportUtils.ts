@@ -1963,7 +1963,7 @@ export function printInstallmentVoucher(req: Requisition, installment: Requisiti
 }
 
 /**
- * Downloads a high-resolution 1-page PDF for the AI Executive Report Summary.
+ * Downloads a comprehensive high-resolution PDF for the AI Executive Financial & Cashflow Report.
  */
 export function downloadAiSummaryPdf(aiData: any, filtersInfo: string): void {
   try {
@@ -1977,112 +1977,223 @@ export function downloadAiSummaryPdf(aiData: any, filtersInfo: string): void {
     doc.setFillColor(15, 23, 42); // slate-900
     doc.rect(0, 0, 210, 26, "F");
 
-    // Gold/Primary Accent Line
+    // Primary Accent Line
     doc.setFillColor(79, 70, 229); // primary indigo
-    doc.rect(0, 26, 210, 2, "F");
+    doc.rect(0, 26, 210, 2.5, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(255, 255, 255);
-    doc.text("ST. ANDREW'S PCEA CHURCH", 14, 12);
+    doc.text("ST. ANDREW'S PCEA CHURCH", 14, 11);
 
     doc.setFontSize(8.5);
     doc.setTextColor(148, 163, 184); // slate-400
-    doc.text("AI EXECUTIVE FINANCIAL REPORT SUMMARY (1-PAGER)", 14, 19);
+    doc.text("AI EXECUTIVE FINANCIAL, CASHFLOW & SPENDERS AUDIT REPORT", 14, 18);
 
     doc.setFontSize(8);
     doc.setTextColor(226, 232, 240);
-    doc.text(`Scope: ${filtersInfo || "Global Ledger"}`, 196, 12, { align: "right" });
+    doc.text(`Scope: ${filtersInfo || "Global Ledger"}`, 196, 11, { align: "right" });
     const genDate = aiData.generatedAt ? new Date(aiData.generatedAt).toLocaleDateString("en-KE") : new Date().toLocaleDateString("en-KE");
-    doc.text(`Generated: ${genDate}`, 196, 19, { align: "right" });
+    doc.text(`Generated: ${genDate}`, 196, 18, { align: "right" });
 
-    let y = 36;
+    let y = 35;
 
     // Report Title & Period Label
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(13.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(aiData.title || "Executive Financial Summary", 14, y);
+    doc.text(aiData.title || "Executive Financial & Cashflow Summary", 14, y);
     y += 5;
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(79, 70, 229);
-    doc.text(`PERIOD: ${aiData.periodLabel || filtersInfo}`, 14, y);
-    y += 9;
+    doc.text(`AUDIT PERIOD: ${aiData.periodLabel || filtersInfo}`, 14, y);
+    y += 8;
 
     // 1. Executive Narrative
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
+    doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
-    doc.text("1. EXECUTIVE SUMMARY NARRATIVE", 14, y);
-    y += 5;
+    doc.text("1. EXECUTIVE NARRATIVE & GOVERNANCE OVERVIEW", 14, y);
+    y += 4.5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(51, 65, 85);
     const narrativeLines = doc.splitTextToSize(aiData.executiveNarrative || "No narrative content provided.", 182);
     doc.text(narrativeLines, 14, y);
-    y += (narrativeLines.length * 4.2) + 7;
+    y += (narrativeLines.length * 3.8) + 6;
 
-    // 2. Key Highlights
+    // 2. Detailed Cashflow Description during Month
+    if (aiData.cashflowAnalysis) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text("2. MONTHLY CASHFLOW DYNAMICS & LIQUIDITY ANALYSIS", 14, y);
+      y += 4.5;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(51, 65, 85);
+      const cfLines = doc.splitTextToSize(aiData.cashflowAnalysis.detailedDescription || "", 182);
+      doc.text(cfLines, 14, y);
+      y += (cfLines.length * 3.8) + 4;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(79, 70, 229);
+      if (aiData.cashflowAnalysis.peakOutflowWindow) {
+        doc.text(`• Peak Outflow Window: ${aiData.cashflowAnalysis.peakOutflowWindow}`, 16, y);
+        y += 4;
+      }
+      if (aiData.cashflowAnalysis.burnRateCommentary) {
+        doc.text(`• Burn Rate & Velocity: ${aiData.cashflowAnalysis.burnRateCommentary}`, 16, y);
+        y += 4;
+      }
+      if (aiData.cashflowAnalysis.disbursedVsPendingNarrative) {
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(71, 85, 105);
+        const pipeLines = doc.splitTextToSize(`• Pipeline Balance: ${aiData.cashflowAnalysis.disbursedVsPendingNarrative}`, 178);
+        doc.text(pipeLines, 16, y);
+        y += (pipeLines.length * 3.8) + 4;
+      }
+      y += 3;
+    }
+
+    // Check page space for Department Spenders Ranking
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // 3. Department Expenditure Ranking (Biggest to Least Spenders)
+    if (aiData.spendersRanking && Array.isArray(aiData.spendersRanking) && aiData.spendersRanking.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text("3. DEPARTMENTAL EXPENDITURE RANKING (BIGGEST TO LEAST SPENDERS)", 14, y);
+      y += 4.5;
+
+      if (aiData.spendersAnalysis?.narrative) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        const spLines = doc.splitTextToSize(aiData.spendersAnalysis.narrative, 182);
+        doc.text(spLines, 14, y);
+        y += (spLines.length * 3.6) + 4;
+      }
+
+      // Compact Spenders Table
+      autoTable(doc, {
+        startY: y,
+        head: [["Rank", "Ministry / Church Group", "Disbursed (KES)", "Requested (KES)", "Pending (KES)", "Share %", "Tier"]],
+        body: aiData.spendersRanking.slice(0, 8).map((sp: any, i: number) => [
+          `#${sp.rank || i + 1}`,
+          sp.groupName || sp.name || "General",
+          Number(sp.disbursedAmount || 0).toLocaleString(),
+          Number(sp.requestedAmount || sp.amount || 0).toLocaleString(),
+          Number(sp.pendingAmount || 0).toLocaleString(),
+          `${sp.shareOfDisbursedPct || 0}%`,
+          sp.tier || (i === 0 ? "Biggest Spender" : "Standard")
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: "bold" },
+        styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [30, 41, 59] },
+        columnStyles: {
+          0: { cellWidth: 12, halign: "center" },
+          1: { cellWidth: 50 },
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "center" },
+          6: { halign: "center" },
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    // Check page space for Monthly & Weekly Data
+    if (y > 220) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // 4. Monthly Requisitions & Cashflow Summary
+    if (aiData.monthlyData && Array.isArray(aiData.monthlyData) && aiData.monthlyData.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text("4. MONTHLY REQUISITIONS & SETTLEMENT SUMMARY", 14, y);
+      y += 4;
+
+      autoTable(doc, {
+        startY: y,
+        head: [["Month", "Total Requisitions", "Requested (KES)", "Disbursed (KES)", "Pending (KES)", "Settlement Rate"]],
+        body: aiData.monthlyData.map((m: any) => [
+          m.monthLabel || m.monthKey,
+          m.totalCount,
+          Number(m.requestedAmount).toLocaleString(),
+          Number(m.disbursedAmount).toLocaleString(),
+          Number(m.pendingAmount).toLocaleString(),
+          `${m.settlementRate || 0}%`
+        ]),
+        theme: "grid",
+        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: "bold" },
+        styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [30, 41, 59] },
+        columnStyles: {
+          0: { cellWidth: 32 },
+          1: { halign: "center" },
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+          5: { halign: "center" }
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      y = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    // Check page space for Key Highlights & Recommendations
+    if (y > 230) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // 5. Strategic Highlights & Governance
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
+    doc.setFontSize(10);
     doc.setTextColor(15, 23, 42);
-    doc.text("2. KEY FINANCIAL HIGHLIGHTS", 14, y);
-    y += 5;
+    doc.text("5. STRATEGIC TREASURY & AUDIT RECOMMENDATIONS", 14, y);
+    y += 4.5;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    (aiData.keyHighlights || []).forEach((item: string) => {
-      const lines = doc.splitTextToSize(`• ${item}`, 178);
-      doc.text(lines, 16, y);
-      y += (lines.length * 4) + 1.2;
-    });
-    y += 5;
-
-    // 3. Audit & Governance Observations
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("3. AUDIT & GOVERNANCE OBSERVATIONS", 14, y);
-    y += 5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    (aiData.auditObservations || []).forEach((item: string) => {
-      const lines = doc.splitTextToSize(`• ${item}`, 178);
-      doc.text(lines, 16, y);
-      y += (lines.length * 4) + 1.2;
-    });
-    y += 5;
-
-    // 4. Strategic Treasury Recommendations
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("4. STRATEGIC TREASURY RECOMMENDATIONS", 14, y);
-    y += 5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
     (aiData.treasuryRecommendations || []).forEach((item: string) => {
       const lines = doc.splitTextToSize(`• ${item}`, 178);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85);
       doc.text(lines, 16, y);
-      y += (lines.length * 4) + 1.2;
+      y += (lines.length * 3.6) + 1.2;
     });
 
     // Footer
-    doc.setFillColor(241, 245, 249); // slate-100
-    doc.rect(0, 280, 210, 17, "F");
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(100, 116, 139);
-    doc.text("ST. ANDREW'S PCEA eREQUISITIONS PORTAL — OFFICIAL AI AUDIT SUMMARY 1-PAGER", 14, 289);
-    doc.setFont("helvetica", "normal");
-    doc.text("PAGE 1 OF 1", 196, 289, { align: "right" });
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFillColor(241, 245, 249); // slate-100
+      doc.rect(0, 282, 210, 15, "F");
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 116, 139);
+      doc.text("ST. ANDREW'S PCEA eREQUISITIONS PORTAL — OFFICIAL AI AUDIT & CASHFLOW REPORT", 14, 289);
+      doc.setFont("helvetica", "normal");
+      doc.text(`PAGE ${i} OF ${pageCount}`, 196, 289, { align: "right" });
+    }
 
-    const fileName = `St_Andrews_AI_Financial_Summary_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const fileName = `St_Andrews_AI_Financial_Cashflow_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(fileName);
   } catch (err) {
     console.error("Failed to generate AI summary PDF:", err);
@@ -2090,7 +2201,7 @@ export function downloadAiSummaryPdf(aiData: any, filtersInfo: string): void {
 }
 
 /**
- * Prints a formatted 1-page printable document for the AI Report Summary.
+ * Prints a formatted printable document for the AI Report Summary including monthly, weekly, cashflow, and spenders ranking.
  */
 export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
   const fileDate = new Date().toLocaleDateString("en-KE", {
@@ -2112,7 +2223,7 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       color: #0f172a;
       background: #ffffff;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
       line-height: 1.5;
       font-size: 11px;
     }
@@ -2127,8 +2238,8 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       justify-content: space-between;
       align-items: center;
       border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 14px;
-      margin-bottom: 18px;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
     }
     .brand {
       display: flex;
@@ -2136,8 +2247,8 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       gap: 12px;
     }
     .brand-logo {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       background-color: #0f172a;
       color: #ffffff;
       border-radius: 8px;
@@ -2145,10 +2256,10 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       align-items: center;
       justify-content: center;
       font-weight: 900;
-      font-size: 20px;
+      font-size: 18px;
     }
     .title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -2156,7 +2267,7 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       margin: 0;
     }
     .subtitle {
-      font-size: 9.5px;
+      font-size: 9px;
       font-weight: 700;
       color: #4f46e5;
       margin-top: 2px;
@@ -2166,9 +2277,9 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
     .badge {
       background: #4f46e5;
       color: #ffffff;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 6px;
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -2185,45 +2296,67 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
       margin-bottom: 6px;
     }
     .narrative {
-      font-size: 10.5px;
+      font-size: 10px;
       color: #334155;
       text-align: justify;
-      margin-bottom: 14px;
-      line-height: 1.6;
+      margin-bottom: 12px;
+      line-height: 1.55;
       background: #f8fafc;
-      padding: 12px;
+      padding: 10px 12px;
       border-radius: 8px;
       border: 1px solid #e2e8f0;
     }
-    .grid {
+    .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 14px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
     .box {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      margin-bottom: 10px;
+      font-size: 9.5px;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 5px 8px;
+      text-align: left;
+    }
+    th {
+      background: #0f172a;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
     }
     ul {
       margin: 0;
       padding-left: 16px;
     }
     li {
-      margin-bottom: 4px;
+      margin-bottom: 3px;
       color: #334155;
-      font-size: 10px;
+      font-size: 9.5px;
     }
     .footer {
-      margin-top: 20px;
+      margin-top: 18px;
       border-top: 1px dashed #cbd5e1;
-      padding-top: 10px;
+      padding-top: 8px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 8.5px;
+      font-size: 8px;
       color: #64748b;
       font-weight: 700;
     }
@@ -2236,27 +2369,96 @@ export function printAiSummaryReport(aiData: any, filtersInfo: string): void {
         <div class="brand-logo">✝</div>
         <div>
           <h1 class="title">St. Andrew's PCEA</h1>
-          <p class="subtitle">AI Executive Financial Report Summary (1-Pager)</p>
+          <p class="subtitle">AI Executive Financial, Cashflow & Spenders Audit</p>
         </div>
       </div>
       <div style="text-align: right;">
-        <span class="badge">AI Certified</span>
-        <div style="font-size: 9px; font-weight: 700; color: #64748b; margin-top: 4px;">DATE: ${fileDate}</div>
+        <span class="badge">Certified AI Audit</span>
+        <div style="font-size: 8.5px; font-weight: 700; color: #64748b; margin-top: 3px;">DATE: ${fileDate}</div>
         <div style="font-size: 8px; font-family: monospace; color: #94a3b8;">SCOPE: ${filtersInfo}</div>
       </div>
     </div>
 
     <div class="section-title">${aiData.title || "Executive Financial Summary"}</div>
-    <div style="font-size: 9px; font-weight: 800; color: #4f46e5; margin-bottom: 8px; text-transform: uppercase;">
+    <div style="font-size: 8.5px; font-weight: 800; color: #4f46e5; margin-bottom: 6px; text-transform: uppercase;">
       PERIOD: ${aiData.periodLabel || filtersInfo}
     </div>
 
-    <div class="section-title">Executive Summary Narrative</div>
+    <div class="section-title">1. Executive Governance & Financial Narrative</div>
     <div class="narrative">
       ${aiData.executiveNarrative}
     </div>
 
-    <div class="grid">
+    ${aiData.cashflowAnalysis ? `
+    <div class="section-title">2. Monthly Cashflow Dynamics & Liquidity</div>
+    <div class="narrative">
+      <p style="margin: 0 0 6px 0;"><strong>Cashflow Overview:</strong> ${aiData.cashflowAnalysis.detailedDescription}</p>
+      ${aiData.cashflowAnalysis.peakOutflowWindow ? `<p style="margin: 0 0 4px 0;"><strong>Peak Outflow Period:</strong> ${aiData.cashflowAnalysis.peakOutflowWindow}</p>` : ''}
+      ${aiData.cashflowAnalysis.burnRateCommentary ? `<p style="margin: 0 0 4px 0;"><strong>Disbursement Velocity & Burn Rate:</strong> ${aiData.cashflowAnalysis.burnRateCommentary}</p>` : ''}
+      ${aiData.cashflowAnalysis.disbursedVsPendingNarrative ? `<p style="margin: 0;"><strong>Disbursed vs Pending Pipeline:</strong> ${aiData.cashflowAnalysis.disbursedVsPendingNarrative}</p>` : ''}
+    </div>
+    ` : ''}
+
+    ${aiData.spendersRanking && aiData.spendersRanking.length > 0 ? `
+    <div class="section-title">3. Departmental Expenditure Ranking (Biggest to Least Spenders)</div>
+    ${aiData.spendersAnalysis?.narrative ? `<div class="narrative" style="margin-bottom: 6px;">${aiData.spendersAnalysis.narrative}</div>` : ''}
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40px; text-align: center;">Rank</th>
+          <th>Ministry / Church Group</th>
+          <th style="text-align: right;">Disbursed (KES)</th>
+          <th style="text-align: right;">Requested (KES)</th>
+          <th style="text-align: right;">Pending (KES)</th>
+          <th style="text-align: center;">Share %</th>
+          <th style="text-align: center;">Tier</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${aiData.spendersRanking.map((sp: any, i: number) => `
+          <tr>
+            <td style="text-align: center; font-weight: bold;">#${sp.rank || i + 1}</td>
+            <td><strong>${sp.groupName || sp.name || "General"}</strong></td>
+            <td style="text-align: right; color: #059669; font-weight: bold;">KES ${Number(sp.disbursedAmount || 0).toLocaleString()}</td>
+            <td style="text-align: right;">KES ${Number(sp.requestedAmount || sp.amount || 0).toLocaleString()}</td>
+            <td style="text-align: right; color: #d97706;">KES ${Number(sp.pendingAmount || 0).toLocaleString()}</td>
+            <td style="text-align: center; font-weight: bold;">${sp.shareOfDisbursedPct || 0}%</td>
+            <td style="text-align: center; font-size: 8.5px;">${sp.tier || (i === 0 ? "Biggest Spender" : "Standard")}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ` : ''}
+
+    ${aiData.monthlyData && aiData.monthlyData.length > 0 ? `
+    <div class="section-title">4. Monthly Requisitions & Settlement Breakdown</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: center;">Count</th>
+          <th style="text-align: right;">Requested (KES)</th>
+          <th style="text-align: right;">Disbursed (KES)</th>
+          <th style="text-align: right;">Pending (KES)</th>
+          <th style="text-align: center;">Settlement Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${aiData.monthlyData.map((m: any) => `
+          <tr>
+            <td><strong>${m.monthLabel || m.monthKey}</strong></td>
+            <td style="text-align: center;">${m.totalCount}</td>
+            <td style="text-align: right;">KES ${Number(m.requestedAmount).toLocaleString()}</td>
+            <td style="text-align: right; color: #059669; font-weight: bold;">KES ${Number(m.disbursedAmount).toLocaleString()}</td>
+            <td style="text-align: right; color: #d97706;">KES ${Number(m.pendingAmount).toLocaleString()}</td>
+            <td style="text-align: center; font-weight: bold;">${m.settlementRate || 0}%</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    ` : ''}
+
+    <div class="grid-2">
       <div class="box">
         <div class="section-title" style="margin-top:0;">Key Financial Highlights</div>
         <ul>

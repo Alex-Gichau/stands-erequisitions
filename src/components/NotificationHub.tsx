@@ -715,14 +715,14 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           senderRole: "Authentication",
           avatarGradient: "bg-gradient-to-tr from-emerald-500 via-teal-600 to-cyan-600",
           icon: <LogIn size={14} className="text-emerald-500" />,
-          badgeColor: "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60",
-          badgeLabel: "New Login",
+          badgeColor: "",
+          badgeLabel: "",
           title: `New Login Detected: ${userEmail}`,
           message: `A new session was authenticated for ${userEmail} via ${authMethod}.\n\nDevice / Environment: ${userAgent}`,
           snippet: `🌐 Authenticated via ${authMethod} (${userEmail})`,
           actionLabel: "Verify Login Session",
           timestamp: log.timestamp || now,
-          tags: ["#NEW_LOGIN", `#${authMethod.replace(/\s+/g, "_")}`, "Session Audit"],
+          tags: [],
           metadata: log.metadata,
           action: () => {
             triggerToast({
@@ -1679,13 +1679,15 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                             <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-100">
                               {selectedItem.senderName}
                             </h3>
-                            <span className={cn(
-                              "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1",
-                              selectedItem.badgeColor
-                            )}>
-                              {selectedItem.icon}
-                              <span>{selectedItem.badgeLabel}</span>
-                            </span>
+                            {selectedItem.badgeLabel && selectedItem.type !== "NEW_LOGIN" && selectedItem.badgeLabel.toLowerCase() !== "new login" && (
+                              <span className={cn(
+                                "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1",
+                                selectedItem.badgeColor
+                              )}>
+                                {selectedItem.icon}
+                                <span>{selectedItem.badgeLabel}</span>
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
                             {selectedItem.senderEmail} {selectedItem.senderRole ? `• ${selectedItem.senderRole}` : ''}
@@ -1705,17 +1707,19 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                       {selectedItem.title}
                     </h2>
 
-                    {/* Category Tags */}
-                    <div className="flex items-center gap-2 flex-wrap pt-1">
-                      {selectedItem.tags.map((tag, tIdx) => (
-                        <span 
-                          key={tIdx}
-                          className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                    {/* Category Tags (filter out #hashtags) */}
+                    {selectedItem.tags && selectedItem.tags.filter(tag => !tag.startsWith("#")).length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        {selectedItem.tags.filter(tag => !tag.startsWith("#")).map((tag, tIdx) => (
+                          <span 
+                            key={tIdx}
+                            className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Message Body */}
@@ -1724,8 +1728,8 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                       {selectedItem.message}
                     </p>
 
-                    {/* Interactive Action Callout Box */}
-                    <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4 my-4">
+                    {/* Interactive Action Callout Box (Event Directive with transparent background) */}
+                    <div className="p-5 rounded-2xl bg-transparent border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4 my-4">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="space-y-0.5">
                           <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 font-mono">

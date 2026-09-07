@@ -2,20 +2,21 @@ import {
   Requisition, 
   Project, 
   UserProfile, 
-  SystemLog,
-  BudgetAlert,
-  FiscalYear,
-  Transaction,
-  ForecastMonth,
-  SavedReport,
-  PermissionConfig,
-  AlertThreshold,
-  ChurchGroup,
-  LedgerBook,
-  SupplementaryBudgetRequest,
+  SystemLog, 
+  BudgetAlert, 
+  FiscalYear, 
+  Transaction, 
+  ForecastMonth, 
+  SavedReport, 
+  PermissionConfig, 
+  AlertThreshold, 
+  ChurchGroup, 
+  LedgerBook, 
+  SupplementaryBudgetRequest, 
   Vendor 
 } from "../types";
 import { getAuth } from "firebase/auth";
+import { invalidatePortalQueries } from "../hooks/usePortalQueries";
 
 // Helper for making API calls
 async function apiCall(endpoint: string, method: string = "GET", body?: any): Promise<any> {
@@ -49,7 +50,18 @@ async function apiCall(endpoint: string, method: string = "GET", body?: any): Pr
     }
     throw new Error(`DB API Error ${response.status}: ${text || response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+
+  // Invalidate TanStack query cache on modifying methods (POST, PUT, PATCH, DELETE)
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
+    if (endpoint.includes("/requisitions")) {
+      invalidatePortalQueries(["requisitions", "db-collection"]);
+    } else if (endpoint.includes("/projects") || endpoint.includes("/ledger_books")) {
+      invalidatePortalQueries(["db-collection"]);
+    }
+  }
+
+  return data;
 }
 
 export const databaseService = {

@@ -29,6 +29,7 @@ import {
   Workflow
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
+import { useSystemHealthQuery } from "../hooks/usePortalQueries";
 
 export const SystemHealth: React.FC<{ updateInterval?: number }> = ({ updateInterval = 2500 }) => {
   const { addSystemLog, requisitions = [] } = useRequisitions();
@@ -65,33 +66,15 @@ export const SystemHealth: React.FC<{ updateInterval?: number }> = ({ updateInte
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [uptimeSeconds, setUptimeSeconds] = useState(144210); // Simulated baseline: ~40 hours
 
-  // Real Database Health State
-  const [realHealth, setRealHealth] = useState<any>(null);
-  const [isHealthLoading, setIsHealthLoading] = useState(false);
-
-  const fetchRealHealth = async () => {
-    setIsHealthLoading(true);
-    try {
-      const res = await fetch("/api/system-health");
-      if (res.ok) {
-        const data = await res.json();
-        setRealHealth(data);
-        if (data.mongodb) {
-          setDbLatency(15); // baseline fast response for local mongo
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to fetch system health. Retrying later...", err);
-    } finally {
-      setIsHealthLoading(false);
-    }
-  };
+  // Real Database Health State via TanStack Query (automated caching, polling, and deduplication)
+  const { data: realHealthData, isLoading: isHealthLoading, refetch: fetchRealHealth } = useSystemHealthQuery();
+  const realHealth = realHealthData || null;
 
   useEffect(() => {
-    fetchRealHealth();
-    const hInterval = setInterval(fetchRealHealth, 30000); // Check every 30s
-    return () => clearInterval(hInterval);
-  }, []);
+    if (realHealth?.mongodb) {
+      setDbLatency(15);
+    }
+  }, [realHealth]);
 
   // Helper to trigger advanced summaries/alerts from express server
   const triggerSlackCommand = async (url: string, bodyData: any, label: string) => {

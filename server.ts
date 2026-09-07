@@ -6112,6 +6112,220 @@ Your response MUST adhere strictly to the JSON schema specified.
 
 
 
+  // =========================================================================
+  // DISASTER RECOVERY & AES-256-GCM BACKUP ENCRYPTION ENGINE
+  // =========================================================================
+
+  const DEFAULT_BACKUP_ENCRYPTION_SECRET = 
+    process.env.BACKUP_ENCRYPTION_SECRET || "STANDS_PCEA_EREQS_MASTER_SECURE_KEY_2026";
+
+  const getDrSnapshotsDir = () => {
+    const dir = path.join(getBaseDataDir(), "disaster_recovery_snapshots");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+
+  const getEmailBackupsDir = () => {
+    const dir = path.join(getBaseDataDir(), "email_json_backups");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+
+  interface EncryptedBackupEnvelope {
+    format: "STANDS_AES_256_GCM";
+    version: "1.0.0";
+    algorithm: "AES-256-GCM";
+    timestamp: string;
+    keyDerivation: {
+      kdf: "PBKDF2";
+      hash: "SHA-256";
+      iterations: number;
+      saltHex: string;
+    };
+    ivHex: string;
+    authTagHex: string;
+    checksumSha256: string;
+    ciphertextBase64: string;
+    metadata: {
+      originalFilename?: string;
+      unencryptedSizeKb?: number;
+      summary?: any;
+      isEncrypted: true;
+      createdVia?: string;
+    };
+  }
+
+  // Encrypt JSON payload using AES-256-GCM with PBKDF2 key derivation and SHA-256 checksum
+  const encryptBackupPayload = (data: any, customPassphrase?: string, createdVia = "AUTOSEND_SERVICE") => {
+    const secret = (customPassphrase && customPassphrase.trim().length > 0) 
+      ? customPassphrase.trim() 
+      : DEFAULT_BACKUP_ENCRYPTION_SECRET;
+    
+    const plaintext = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+    const checksumSha256 = crypto.createHash("sha256").update(plaintext, "utf-8").digest("hex");
+    
+    const salt = crypto.randomBytes(16);
+    const iv = crypto.randomBytes(12); // 96-bit standard IV for AES-GCM
+    const iterations = 100000;
+    const key = crypto.pbkdf2Sync(secret, salt, iterations, 32, "sha256");
+    
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    cipher.setAAD(Buffer.from("STANDS_PCEA_DISASTER_RECOVERY_ENCRYPTION", "utf-8"));
+    
+    const encrypted = Buffer.concat([cipher.update(plaintext, "utf-8"), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    
+    const envelope: EncryptedBackupEnvelope = {
+      format: "STANDS_AES_256_GCM",
+      version: "1.0.0",
+      algorithm: "AES-256-GCM",
+      timestamp: new Date().toISOString(),
+      keyDerivation: {
+        kdf: "PBKDF2",
+        hash: "SHA-256",
+        iterations,
+        saltHex: salt.toString("hex")
+      },
+      ivHex: iv.toString("hex"),
+      authTagHex: authTag.toString("hex"),
+      checksumSha256,
+      ciphertextBase64: encrypted.toString("base64"),
+      metadata: {
+        unencryptedSizeKb: Math.round(Buffer.byteLength(plaintext, "utf-8") / 1024),
+        summary: typeof data === "object" ? data?.summary : undefined,
+        isEncrypted: true,
+        createdVia
+      }
+    };
+    
+    const jsonString = JSON.stringify(envelope, null, 2);
+    return {
+      envelope,
+      jsonString,
+      sizeKb: Math.round(Buffer.byteLength(jsonString, "utf-8") / 1024),
+      checksumSha256
+    };
+  };
+
+  // Decrypt backup payload (supports both AES-256-GCM envelopes and legacy plain JSON)
+  const decryptBackupPayload = (envelopeOrRaw: any, customPassphrase?: string): { 
+    success: boolean; 
+    data?: any; 
+    error?: string; 
+    checksumVerified?: boolean;
+    isEncrypted?: boolean;
+  } => {
+    try {
+      let envelope: any = envelopeOrRaw;
+      if (typeof envelopeOrRaw === "string") {
+        try {
+          envelope = JSON.parse(envelopeOrRaw);
+        } catch (e: any) {
+          return { success: false, error: "Invalid file format. Must be a valid JSON backup file." };
+        }
+      }
+
+      // 1. Check if it's an unencrypted legacy backup
+      if (!envelope || envelope.format !== "STANDS_AES_256_GCM") {
+        if (envelope && (envelope.requisitions || envelope.users || envelope.churchGroups || envelope.summary)) {
+          return { success: true, data: envelope, checksumVerified: true, isEncrypted: false };
+        }
+        return { success: false, error: "Unrecognized backup structure. Missing core database collections." };
+      }
+
+      // 2. Decrypt AES-256-GCM Envelope
+      const secret = (customPassphrase && customPassphrase.trim().length > 0) 
+        ? customPassphrase.trim() 
+        : DEFAULT_BACKUP_ENCRYPTION_SECRET;
+
+      if (!envelope.keyDerivation?.saltHex || !envelope.ivHex || !envelope.authTagHex || !envelope.ciphertextBase64) {
+        return { success: false, error: "Corrupted encrypted backup envelope. Missing cryptographic parameters." };
+      }
+
+      const salt = Buffer.from(envelope.keyDerivation.saltHex, "hex");
+      const iv = Buffer.from(envelope.ivHex, "hex");
+      const authTag = Buffer.from(envelope.authTagHex, "hex");
+      const iterations = envelope.keyDerivation?.iterations || 100000;
+
+      const key = crypto.pbkdf2Sync(secret, salt, iterations, 32, "sha256");
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAAD(Buffer.from("STANDS_PCEA_DISASTER_RECOVERY_ENCRYPTION", "utf-8"));
+      decipher.setAuthTag(authTag);
+
+      const ciphertext = Buffer.from(envelope.ciphertextBase64, "base64");
+      const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      const plaintext = decrypted.toString("utf-8");
+
+      // Verify SHA-256 Checksum
+      const calculatedChecksum = crypto.createHash("sha256").update(plaintext, "utf-8").digest("hex");
+      const checksumVerified = !envelope.checksumSha256 || envelope.checksumSha256 === calculatedChecksum;
+
+      if (!checksumVerified) {
+        return { 
+          success: false, 
+          error: "Integrity check failed: SHA-256 checksum mismatch. Backup data may have been altered or corrupted." 
+        };
+      }
+
+      const parsedData = JSON.parse(plaintext);
+      return { success: true, data: parsedData, checksumVerified: true, isEncrypted: true };
+    } catch (err: any) {
+      if (err?.message?.includes("Unsupported state or unable to authenticate data")) {
+        return { 
+          success: false, 
+          error: "Decryption failed: Incorrect encryption passphrase or damaged authentication tag." 
+        };
+      }
+      return { success: false, error: err?.message || "Failed to decrypt and restore backup data." };
+    }
+  };
+
+  // Compile full system backup payload
+  const compileSystemBackupPayload = (targetEmail = "ict.team@pceastandrews.org", policy = "MANUAL") => {
+    const requisitions = readJsonCollection("requisitions") || [];
+    const users = readJsonCollection("users") || [];
+    const projects = readJsonCollection("projects") || [];
+    const churchGroups = readJsonCollection("church_groups") || [];
+    const ledgerBooks = readJsonCollection("ledger_books") || [];
+    const systemLogs = readJsonCollection("system_logs") || [];
+    const customCalendarEvents = readJsonCollection("custom_calendar_events") || [];
+    const fiscalYears = readJsonCollection("fiscal_years") || [];
+    const vendors = readJsonCollection("vendors") || [];
+    const supplementaryBudgets = readJsonCollection("supplementary_budgets") || [];
+    const settings = readJsonCollection("settings") || {};
+
+    const timestamp = new Date().toISOString();
+    return {
+      timestamp,
+      targetAccount: targetEmail,
+      version: "4.2.0",
+      encryptionStandard: "AES-256-GCM",
+      schedulePolicy: policy,
+      systemSettings: settings,
+      users,
+      requisitions,
+      projects,
+      churchGroups,
+      ledgerBooks,
+      systemLogs,
+      customCalendarEvents,
+      fiscalYears,
+      vendors,
+      supplementaryBudgets,
+      summary: {
+        totalRequisitions: requisitions.length,
+        totalUsers: users.length,
+        totalProjects: projects.length,
+        totalGroups: churchGroups.length,
+        totalLedgers: ledgerBooks.length,
+        totalFiscalYears: fiscalYears.length,
+        totalVendors: vendors.length,
+        totalLogs: systemLogs.length,
+        totalCalendarEvents: customCalendarEvents.length
+      }
+    };
+  };
+
   // Helper storage functions for Backup Email Autosend
   const backupEmailLogsPath = path.join(getBaseDataDir(), "backup_email_logs.json");
   const backupEmailConfigPath = path.join(getBaseDataDir(), "backup_email_config.json");
@@ -6275,6 +6489,9 @@ Your response MUST adhere strictly to the JSON schema specified.
       dayOfMonth: 1,
       lastSentTimestamp: null,
       totalBackupsSent: 0,
+      encryptionEnabled: true,
+      encryptionAlgorithm: "AES-256-GCM",
+      backupPassphrase: "",
       features: {
         sendEmail: true,
         saveServerDiskSnapshot: true,
@@ -6329,51 +6546,38 @@ Your response MUST adhere strictly to the JSON schema specified.
       };
 
       const targetEmail = (config.targetEmail || "geeshau.standsmedia@gmail.com").trim();
-      const requisitions = readJsonCollection("requisitions") || [];
-      const users = readJsonCollection("users") || [];
-      const projects = readJsonCollection("projects") || [];
-      const churchGroups = readJsonCollection("church_groups") || [];
-      const ledgerBooks = features.includeCalendarAndLedger ? (readJsonCollection("ledger_books") || []) : [];
-      const systemLogs = features.includeAuditLogs ? (readJsonCollection("system_logs") || []) : [];
-      const customCalendarEvents = features.includeCalendarAndLedger ? (readJsonCollection("custom_calendar_events") || []) : [];
-
       const timestamp = new Date().toISOString();
       const dateStr = timestamp.replace(/[:.]/g, "-").slice(0, 16);
       const freqLabel = config.frequency || "WEEKLY";
-      const fileName = `STANDS_eReqs_${freqLabel}_Backup_${dateStr}.json`;
+      const isEncrypted = config.encryptionEnabled !== false;
+      const fileExt = isEncrypted ? "enc.json" : "json";
+      const fileName = `STANDS_eReqs_${freqLabel}_Backup_${dateStr}.${fileExt}`;
 
-      const backupPayload = {
-        timestamp,
-        targetAccount: targetEmail,
-        version: "4.2.0",
-        schedulePolicy: `${freqLabel} at ${config.scheduleTime || "04:00"}`,
-        systemSettings: readJsonCollection("settings") || {},
-        users,
-        requisitions,
-        projects,
-        churchGroups,
-        ledgerBooks,
-        systemLogs,
-        customCalendarEvents,
-        summary: {
-          totalRequisitions: requisitions.length,
-          totalUsers: users.length,
-          totalProjects: projects.length,
-          totalGroups: churchGroups.length,
-          totalLedgers: ledgerBooks.length
-        }
-      };
+      const rawPayload = compileSystemBackupPayload(targetEmail, `${freqLabel} at ${config.scheduleTime || "04:00"}`);
 
-      const jsonContent = JSON.stringify(backupPayload, null, 2);
-      const jsonBuffer = Buffer.from(jsonContent, "utf-8");
-      const sizeKb = Math.round(jsonBuffer.length / 1024);
+      let fileContent: string;
+      let sizeKb: number;
+      let checksum = "";
+
+      if (isEncrypted) {
+        const encryptedResult = encryptBackupPayload(rawPayload, config.backupPassphrase, `SCHEDULED_${freqLabel}`);
+        fileContent = encryptedResult.jsonString;
+        sizeKb = encryptedResult.sizeKb;
+        checksum = encryptedResult.checksumSha256;
+      } else {
+        fileContent = JSON.stringify(rawPayload, null, 2);
+        sizeKb = Math.round(Buffer.byteLength(fileContent, "utf-8") / 1024);
+        checksum = crypto.createHash("sha256").update(fileContent, "utf-8").digest("hex");
+      }
+
+      const fileBuffer = Buffer.from(fileContent, "utf-8");
 
       let emailStatus = "DELIVERED";
       let warning = null;
 
       // 1. Send Email Attachment if feature enabled
       if (features.sendEmail !== false) {
-        const subject = `[${freqLabel} BACKUP - ${config.scheduleTime || "04:00"}] STANDS Database Snapshot (${dateStr})`;
+        const subject = `[${freqLabel} BACKUP ${isEncrypted ? "🔒 AES-256 ENCRYPTED" : ""} - ${config.scheduleTime || "04:00"}] STANDS Database Snapshot (${dateStr})`;
         const html = `
           <div style="font-family: Arial, sans-serif; max-width: 620px; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 20px;">
@@ -6382,14 +6586,19 @@ Your response MUST adhere strictly to the JSON schema specified.
               </div>
             </div>
             <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; text-align: center; font-weight: 800;">
-              Database Snapshot Attached
+              ${isEncrypted ? "🔒 AES-256-GCM Encrypted Snapshot Attached" : "Database Snapshot Attached"}
             </h2>
             <p style="font-size: 14px; color: #475569; line-height: 1.6;">
               Hello Super Administrator,
             </p>
             <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-              Your scheduled automated system database snapshot (${freqLabel} cycle at ${config.scheduleTime || "04:00"}) has been compiled and attached for recipient <strong>${targetEmail}</strong>.
+              Your scheduled automated system database snapshot (${freqLabel} cycle at ${config.scheduleTime || "04:00"}) has been compiled and securely attached for recipient <strong>${targetEmail}</strong>.
             </p>
+
+            ${isEncrypted ? `
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 10px; margin: 16px 0; font-size: 13px; color: #1e40af;">
+              🔒 <strong>Disaster Recovery AES-256-GCM Encryption Active:</strong> This backup snapshot is cryptographically encrypted at rest using PBKDF2 (100,000 iterations) and AES-256-GCM authenticated cipher with SHA-256 integrity verification.
+            </div>` : ""}
 
             <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
               <h4 style="margin: 0 0 14px 0; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 1px; font-weight: 800;">
@@ -6405,6 +6614,10 @@ Your response MUST adhere strictly to the JSON schema specified.
                   <td style="padding: 8px 0; font-weight: bold; color: #4f46e5; text-align: right;">${targetEmail}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 8px 0; color: #64748b;">Security Standard:</td>
+                  <td style="padding: 8px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM Authenticated" : "Plaintext JSON"}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 8px 0; color: #64748b;">File Attachment:</td>
                   <td style="padding: 8px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName}</td>
                 </tr>
@@ -6414,15 +6627,15 @@ Your response MUST adhere strictly to the JSON schema specified.
                 </tr>
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 8px 0; color: #64748b;">Total Requisitions:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalRequisitions}</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 8px 0; color: #64748b;">Registered Users:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalUsers}</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalUsers}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #f1f5f9;">
                   <td style="padding: 8px 0; color: #64748b;">Church Groups/Ministries:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalGroups}</td>
+                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalGroups}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; color: #64748b;">Dispatched Timestamp:</td>
@@ -6446,7 +6659,7 @@ Your response MUST adhere strictly to the JSON schema specified.
             attachments: [
               {
                 filename: fileName,
-                content: jsonBuffer,
+                content: fileBuffer,
                 contentType: "application/json"
               }
             ]
@@ -6460,11 +6673,13 @@ Your response MUST adhere strictly to the JSON schema specified.
         emailStatus = "DISABLED_IN_CONFIG";
       }
 
-      // 2. Save Server Disk Snapshot if enabled
+      // 2. Save Server Disk Snapshot if enabled (in both email backups and DR snapshots dirs)
       if (features.saveServerDiskSnapshot !== false) {
-        const backupDir = path.join(getBaseDataDir(), "email_json_backups");
-        if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-        fs.writeFileSync(path.join(backupDir, fileName), jsonContent, "utf-8");
+        const emailDir = getEmailBackupsDir();
+        fs.writeFileSync(path.join(emailDir, fileName), fileContent, "utf-8");
+
+        const drDir = getDrSnapshotsDir();
+        fs.writeFileSync(path.join(drDir, fileName), fileContent, "utf-8");
       }
 
       // 3. Slack / Webhook Alert Notification if enabled
@@ -6474,7 +6689,7 @@ Your response MUST adhere strictly to the JSON schema specified.
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              text: `🛡️ *STANDS eRequisitions Database Backup Complete*\n• Schedule: *${freqLabel} (${config.scheduleTime || "04:00"})*\n• Target Recipient: *${targetEmail}*\n• Snapshot: \`${fileName}\` (${sizeKb} KB)\n• Status: *${emailStatus}*`
+              text: `🛡️ *STANDS eRequisitions Database Backup Complete*\n• Schedule: *${freqLabel} (${config.scheduleTime || "04:00"})*\n• Target Recipient: *${targetEmail}*\n• Snapshot: \`${fileName}\` (${sizeKb} KB)\n• Encryption: *${isEncrypted ? "🔒 AES-256-GCM" : "Plaintext"}*\n• Status: *${emailStatus}*`
             })
           });
         } catch (slackErr) {
@@ -6494,7 +6709,10 @@ Your response MUST adhere strictly to the JSON schema specified.
         sizeKb,
         status: emailStatus,
         warning,
-        summary: backupPayload.summary,
+        isEncrypted,
+        algorithm: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
+        checksumSha256: checksum,
+        summary: rawPayload.summary,
         triggerType
       };
 
@@ -6532,7 +6750,7 @@ Your response MUST adhere strictly to the JSON schema specified.
         logs,
         totalLogs: logs.length,
         nextScheduledRun,
-        scheduleDescription: "Every End of Week (Friday 04:00 AM)",
+        scheduleDescription: `${config.frequency || "WEEKLY"} schedule`,
         isDueNow
       });
     } catch (err: any) {
@@ -6547,7 +6765,9 @@ Your response MUST adhere strictly to the JSON schema specified.
       const updated = {
         ...current,
         ...req.body,
-        targetEmail: req.body?.targetEmail ? req.body.targetEmail.trim() : current.targetEmail
+        targetEmail: req.body?.targetEmail ? req.body.targetEmail.trim() : current.targetEmail,
+        encryptionEnabled: req.body?.encryptionEnabled !== undefined ? Boolean(req.body.encryptionEnabled) : current.encryptionEnabled,
+        backupPassphrase: req.body?.backupPassphrase !== undefined ? req.body.backupPassphrase : current.backupPassphrase
       };
       saveBackupEmailConfig(updated);
       res.json({ success: true, config: updated });
@@ -6576,45 +6796,56 @@ Your response MUST adhere strictly to the JSON schema specified.
       }
 
       const targetEmail = (req.body?.email || config.targetEmail || "geeshau.standsmedia@gmail.com").trim();
-      
-      const requisitions = req.body?.requisitions || readJsonCollection("requisitions") || [];
-      const users = req.body?.users || readJsonCollection("users") || [];
-      const projects = req.body?.projects || readJsonCollection("projects") || [];
-      const churchGroups = req.body?.churchGroups || readJsonCollection("church_groups") || [];
-      const ledgerBooks = req.body?.ledgerBooks || readJsonCollection("ledger_books") || [];
-      const systemLogs = req.body?.systemLogs || readJsonCollection("system_logs") || [];
-      const customCalendarEvents = req.body?.customCalendarEvents || readJsonCollection("custom_calendar_events") || [];
-
       const timestamp = new Date().toISOString();
       const dateStr = timestamp.replace(/[:.]/g, "-").slice(0, 16);
-      const fileName = `STANDS_eReqs_Backup_${dateStr}.json`;
+      const isEncrypted = req.body?.encrypt !== undefined ? Boolean(req.body.encrypt) : (config.encryptionEnabled !== false);
+      const fileExt = isEncrypted ? "enc.json" : "json";
+      const fileName = `STANDS_eReqs_Backup_${dateStr}.${fileExt}`;
 
-      const backupPayload = {
+      const rawPayload = {
         timestamp,
         targetAccount: targetEmail,
         version: "4.2.0",
+        encryptionStandard: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
         systemSettings: req.body?.systemSettings || readJsonCollection("settings") || {},
-        users,
-        requisitions,
-        projects,
-        churchGroups,
-        ledgerBooks,
-        systemLogs,
-        customCalendarEvents,
+        users: req.body?.users || readJsonCollection("users") || [],
+        requisitions: req.body?.requisitions || readJsonCollection("requisitions") || [],
+        projects: req.body?.projects || readJsonCollection("projects") || [],
+        churchGroups: req.body?.churchGroups || readJsonCollection("church_groups") || [],
+        ledgerBooks: req.body?.ledgerBooks || readJsonCollection("ledger_books") || [],
+        systemLogs: req.body?.systemLogs || readJsonCollection("system_logs") || [],
+        customCalendarEvents: req.body?.customCalendarEvents || readJsonCollection("custom_calendar_events") || [],
+        fiscalYears: readJsonCollection("fiscal_years") || [],
+        vendors: readJsonCollection("vendors") || [],
+        supplementaryBudgets: readJsonCollection("supplementary_budgets") || [],
         summary: {
-          totalRequisitions: requisitions.length,
-          totalUsers: users.length,
-          totalProjects: projects.length,
-          totalGroups: churchGroups.length,
-          totalLedgers: ledgerBooks.length
+          totalRequisitions: (req.body?.requisitions || readJsonCollection("requisitions") || []).length,
+          totalUsers: (req.body?.users || readJsonCollection("users") || []).length,
+          totalProjects: (req.body?.projects || readJsonCollection("projects") || []).length,
+          totalGroups: (req.body?.churchGroups || readJsonCollection("church_groups") || []).length,
+          totalLedgers: (req.body?.ledgerBooks || readJsonCollection("ledger_books") || []).length
         }
       };
 
-      const jsonContent = JSON.stringify(backupPayload, null, 2);
-      const jsonBuffer = Buffer.from(jsonContent, "utf-8");
-      const sizeKb = Math.round(jsonBuffer.length / 1024);
+      let fileContent: string;
+      let sizeKb: number;
+      let checksum = "";
 
-      const subject = `[AUTOSEND BACKUP] System Database Snapshot JSON (${dateStr})`;
+      if (isEncrypted) {
+        const passphrase = req.body?.passphrase || config.backupPassphrase;
+        const encryptedResult = encryptBackupPayload(rawPayload, passphrase, "MANUAL_DISPATCH");
+        fileContent = encryptedResult.jsonString;
+        sizeKb = encryptedResult.sizeKb;
+        checksum = encryptedResult.checksumSha256;
+      } else {
+        fileContent = JSON.stringify(rawPayload, null, 2);
+        sizeKb = Math.round(Buffer.byteLength(fileContent, "utf-8") / 1024);
+        checksum = crypto.createHash("sha256").update(fileContent, "utf-8").digest("hex");
+      }
+
+      const fileBuffer = Buffer.from(fileContent, "utf-8");
+
+      const subject = `[AUTOSEND BACKUP ${isEncrypted ? "🔒 AES-256 ENCRYPTED" : ""}] System Database Snapshot (${dateStr})`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 620px; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; margin: 0 auto;">
           <div style="text-align: center; margin-bottom: 20px;">
@@ -6623,14 +6854,19 @@ Your response MUST adhere strictly to the JSON schema specified.
             </div>
           </div>
           <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; text-align: center; font-weight: 800;">
-            Database Snapshot Attached
+            ${isEncrypted ? "🔒 AES-256-GCM Encrypted Snapshot Attached" : "Database Snapshot Attached"}
           </h2>
           <p style="font-size: 14px; color: #475569; line-height: 1.6;">
             Hello Super Administrator,
           </p>
           <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-            An automated backup snapshot of the STANDS eRequisitions database has been compiled and attached as a JSON file for recipient <strong>${targetEmail}</strong>.
+            A system backup snapshot of the STANDS eRequisitions database has been compiled and securely attached as a file for recipient <strong>${targetEmail}</strong>.
           </p>
+
+          ${isEncrypted ? `
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 10px; margin: 16px 0; font-size: 13px; color: #1e40af;">
+            🔒 <strong>Disaster Recovery AES-256-GCM Encryption Active:</strong> This backup snapshot is cryptographically encrypted at rest using PBKDF2 (100,000 iterations) and AES-256-GCM authenticated cipher with SHA-256 integrity verification.
+          </div>` : ""}
 
           <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
             <h4 style="margin: 0 0 14px 0; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 1px; font-weight: 800;">
@@ -6642,6 +6878,10 @@ Your response MUST adhere strictly to the JSON schema specified.
                 <td style="padding: 8px 0; font-weight: bold; color: #4f46e5; text-align: right;">${targetEmail}</td>
               </tr>
               <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 8px 0; color: #64748b;">Security Standard:</td>
+                <td style="padding: 8px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM Authenticated" : "Plaintext JSON"}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b;">File Attachment:</td>
                 <td style="padding: 8px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName}</td>
               </tr>
@@ -6651,15 +6891,15 @@ Your response MUST adhere strictly to the JSON schema specified.
               </tr>
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b;">Total Requisitions:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalRequisitions}</td>
+                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
               </tr>
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b;">Registered Users:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalUsers}</td>
+                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalUsers}</td>
               </tr>
               <tr style="border-bottom: 1px solid #f1f5f9;">
                 <td style="padding: 8px 0; color: #64748b;">Church Groups/Ministries:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${backupPayload.summary.totalGroups}</td>
+                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalGroups}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; color: #64748b;">Dispatched Timestamp:</td>
@@ -6668,7 +6908,7 @@ Your response MUST adhere strictly to the JSON schema specified.
             </table>
           </div>
 
-          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; pt-16px;">
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
             This is an automated system security backup dispatch from PCEA St. Andrews STANDS eRequisitions.
           </p>
         </div>
@@ -6686,7 +6926,7 @@ Your response MUST adhere strictly to the JSON schema specified.
           attachments: [
             {
               filename: fileName,
-              content: jsonBuffer,
+              content: fileBuffer,
               contentType: "application/json"
             }
           ]
@@ -6698,10 +6938,11 @@ Your response MUST adhere strictly to the JSON schema specified.
       }
 
       // Write backup file locally for disk fallback
-      const backupDir = path.join(getBaseDataDir(), "email_json_backups");
-      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-      const localFilePath = path.join(backupDir, fileName);
-      fs.writeFileSync(localFilePath, jsonContent, "utf-8");
+      const emailDir = getEmailBackupsDir();
+      fs.writeFileSync(path.join(emailDir, fileName), fileContent, "utf-8");
+
+      const drDir = getDrSnapshotsDir();
+      fs.writeFileSync(path.join(drDir, fileName), fileContent, "utf-8");
 
       // Update Config & Logs
       config.lastSentTimestamp = timestamp;
@@ -6716,7 +6957,10 @@ Your response MUST adhere strictly to the JSON schema specified.
         sizeKb,
         status: emailStatus,
         warning,
-        summary: backupPayload.summary,
+        isEncrypted,
+        algorithm: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
+        checksumSha256: checksum,
+        summary: rawPayload.summary,
         triggerType: req.body?.triggerType || "MANUAL"
       };
 
@@ -6725,7 +6969,7 @@ Your response MUST adhere strictly to the JSON schema specified.
 
       persistActivity({
         action: "AUTOSEND_BACKUP_EMAIL",
-        details: `Dispatched JSON backup snapshot (${sizeKb} KB) to ${targetEmail} (${emailStatus})`,
+        details: `Dispatched ${isEncrypted ? 'AES-256 encrypted' : 'plain'} JSON backup snapshot (${sizeKb} KB) to ${targetEmail} (${emailStatus})`,
         performedBy: "SUPER_ADMIN_SYSTEM",
         timestamp
       });
@@ -6737,9 +6981,12 @@ Your response MUST adhere strictly to the JSON schema specified.
         fileName,
         sizeKb,
         timestamp,
-        summary: backupPayload.summary,
+        isEncrypted,
+        algorithm: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
+        checksumSha256: checksum,
+        summary: rawPayload.summary,
         warning,
-        message: `JSON backup snapshot successfully compiled (${sizeKb} KB) and auto-sent to ${targetEmail}.`
+        message: `${isEncrypted ? "AES-256-GCM Encrypted" : "JSON"} backup snapshot successfully compiled (${sizeKb} KB) and auto-sent to ${targetEmail}.`
       });
     } catch (err: any) {
       console.error("[/api/backup-autosend-email error]:", err);
@@ -6747,6 +6994,447 @@ Your response MUST adhere strictly to the JSON schema specified.
         success: false,
         error: err.message || "Failed to execute JSON backup email dispatch"
       });
+    }
+  });
+
+  // =========================================================================
+  // DISASTER RECOVERY & SYSTEM RESTORATION API ENDPOINTS
+  // =========================================================================
+
+  // GET /api/disaster-recovery/readiness - Assess DR RPO/RTO metrics & system backup health
+  app.get("/api/disaster-recovery/readiness", async (req, res) => {
+    try {
+      const config = getBackupEmailConfig();
+      const logs = getBackupEmailLogs();
+      const drDir = getDrSnapshotsDir();
+      const emailDir = getEmailBackupsDir();
+
+      const getDirFiles = (dir: string) => {
+        if (!fs.existsSync(dir)) return [];
+        return fs.readdirSync(dir).filter(f => f.endsWith(".json") || f.endsWith(".enc.json") || f.endsWith(".standsbak"));
+      };
+
+      const allFiles = Array.from(new Set([...getDirFiles(drDir), ...getDirFiles(emailDir)]));
+      let totalBytes = 0;
+      allFiles.forEach(f => {
+        const p = fs.existsSync(path.join(drDir, f)) ? path.join(drDir, f) : path.join(emailDir, f);
+        try {
+          totalBytes += fs.statSync(p).size;
+        } catch {}
+      });
+
+      const now = Date.now();
+      const lastSentTime = config.lastSentTimestamp ? new Date(config.lastSentTimestamp).getTime() : null;
+      const hoursSinceLastBackup = lastSentTime ? Math.round((now - lastSentTime) / (1000 * 60 * 60)) : null;
+      
+      // Calculate DR Score (0 - 100)
+      let score = 50;
+      if (config.enabled) score += 15;
+      if (config.encryptionEnabled) score += 20;
+      if (allFiles.length > 0) score += 10;
+      if (hoursSinceLastBackup !== null && hoursSinceLastBackup <= 168) score += 5; // within a week
+
+      const requisitions = readJsonCollection("requisitions") || [];
+      const users = readJsonCollection("users") || [];
+      const churchGroups = readJsonCollection("church_groups") || [];
+      const ledgerBooks = readJsonCollection("ledger_books") || [];
+
+      res.json({
+        success: true,
+        readiness: {
+          score: Math.min(100, score),
+          grade: score >= 90 ? "A+" : score >= 75 ? "A" : score >= 60 ? "B" : "C",
+          encryptionActive: config.encryptionEnabled !== false,
+          encryptionAlgorithm: "AES-256-GCM (PBKDF2 100k iters)",
+          rpoTarget: "Max 7 Days (Configurable: Daily / Weekly / 5-Hours)",
+          rpoCurrentHours: hoursSinceLastBackup,
+          rtoTarget: "< 2 Minutes Instant Rollback",
+          totalAvailableSnapshots: allFiles.length,
+          totalSnapshotStorageKb: Math.round(totalBytes / 1024),
+          lastBackupTimestamp: config.lastSentTimestamp,
+          nextScheduledRun: getNextScheduledRunServer(config),
+          activeCollectionsSummary: {
+            requisitions: requisitions.length,
+            users: users.length,
+            groups: churchGroups.length,
+            ledgers: ledgerBooks.length
+          },
+          storageLocation: drDir
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/disaster-recovery/snapshots - List all local recovery points
+  app.get("/api/disaster-recovery/snapshots", async (req, res) => {
+    try {
+      const drDir = getDrSnapshotsDir();
+      const emailDir = getEmailBackupsDir();
+
+      const fileMap = new Map<string, { path: string; name: string; mtime: Date; size: number }>();
+
+      const scanDir = (dir: string) => {
+        if (!fs.existsSync(dir)) return;
+        const files = fs.readdirSync(dir);
+        files.forEach(f => {
+          if (f.endsWith(".json") || f.endsWith(".enc.json") || f.endsWith(".standsbak")) {
+            const fullPath = path.join(dir, f);
+            try {
+              const stat = fs.statSync(fullPath);
+              if (!fileMap.has(f) || fileMap.get(f)!.mtime < stat.mtime) {
+                fileMap.set(f, { path: fullPath, name: f, mtime: stat.mtime, size: stat.size });
+              }
+            } catch {}
+          }
+        });
+      };
+
+      scanDir(drDir);
+      scanDir(emailDir);
+
+      const snapshots = Array.from(fileMap.values()).map(file => {
+        const isEncrypted = file.name.includes(".enc.") || file.name.endsWith(".standsbak");
+        let checksum = "";
+        let summary: any = null;
+        let createdVia = "FILE_SYSTEM";
+
+        try {
+          const content = fs.readFileSync(file.path, "utf-8");
+          checksum = crypto.createHash("sha256").update(content, "utf-8").digest("hex");
+          const parsed = JSON.parse(content);
+          if (parsed.format === "STANDS_AES_256_GCM") {
+            summary = parsed.metadata?.summary;
+            createdVia = parsed.metadata?.createdVia || "ENCRYPTED_SNAPSHOT";
+          } else if (parsed.summary) {
+            summary = parsed.summary;
+          }
+        } catch {}
+
+        return {
+          fileName: file.name,
+          sizeKb: Math.round(file.size / 1024),
+          createdAt: file.mtime.toISOString(),
+          isEncrypted,
+          algorithm: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
+          checksumSha256: checksum,
+          summary,
+          createdVia
+        };
+      });
+
+      // Sort newest first
+      snapshots.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json({
+        success: true,
+        count: snapshots.length,
+        snapshots
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/disaster-recovery/snapshot - Create an immediate emergency encrypted snapshot
+  app.post("/api/disaster-recovery/snapshot", async (req, res) => {
+    try {
+      const config = getBackupEmailConfig();
+      const isEncrypted = req.body?.encrypt !== undefined ? Boolean(req.body.encrypt) : true;
+      const customPassphrase = req.body?.passphrase || config.backupPassphrase;
+      const targetTag = req.body?.tag || "EMERGENCY_SNAPSHOT";
+
+      const timestamp = new Date().toISOString();
+      const dateStr = timestamp.replace(/[:.]/g, "-").slice(0, 19);
+      const fileExt = isEncrypted ? "enc.json" : "json";
+      const fileName = `STANDS_DR_Snapshot_${dateStr}.${fileExt}`;
+
+      const rawPayload = compileSystemBackupPayload("system.admin@pceastandrews.org", targetTag);
+
+      let fileContent: string;
+      let sizeKb: number;
+      let checksum = "";
+
+      if (isEncrypted) {
+        const enc = encryptBackupPayload(rawPayload, customPassphrase, targetTag);
+        fileContent = enc.jsonString;
+        sizeKb = enc.sizeKb;
+        checksum = enc.checksumSha256;
+      } else {
+        fileContent = JSON.stringify(rawPayload, null, 2);
+        sizeKb = Math.round(Buffer.byteLength(fileContent, "utf-8") / 1024);
+        checksum = crypto.createHash("sha256").update(fileContent, "utf-8").digest("hex");
+      }
+
+      const drDir = getDrSnapshotsDir();
+      const filePath = path.join(drDir, fileName);
+      fs.writeFileSync(filePath, fileContent, "utf-8");
+
+      persistActivity({
+        action: "DISASTER_RECOVERY_SNAPSHOT_CREATED",
+        details: `Created ${isEncrypted ? "AES-256 encrypted" : "plain"} emergency recovery snapshot: ${fileName} (${sizeKb} KB)`,
+        performedBy: "SUPER_ADMIN",
+        timestamp
+      });
+
+      res.json({
+        success: true,
+        fileName,
+        sizeKb,
+        timestamp,
+        isEncrypted,
+        algorithm: isEncrypted ? "AES-256-GCM" : "PLAINTEXT",
+        checksumSha256: checksum,
+        summary: rawPayload.summary,
+        message: `Disaster Recovery Snapshot ${fileName} (${sizeKb} KB) successfully compiled and stored.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/disaster-recovery/verify - Verify uploaded file integrity and inspect contents
+  app.post("/api/disaster-recovery/verify", async (req, res) => {
+    try {
+      const { payload, fileName, passphrase } = req.body;
+      let rawData = payload;
+
+      // If user selected existing filename on disk
+      if (!rawData && fileName) {
+        const drDir = getDrSnapshotsDir();
+        const emailDir = getEmailBackupsDir();
+        const p = fs.existsSync(path.join(drDir, fileName)) ? path.join(drDir, fileName) : path.join(emailDir, fileName);
+        if (fs.existsSync(p)) {
+          rawData = fs.readFileSync(p, "utf-8");
+        } else {
+          return res.status(404).json({ success: false, error: `Snapshot file '${fileName}' not found on server.` });
+        }
+      }
+
+      if (!rawData) {
+        return res.status(400).json({ success: false, error: "No backup data or filename provided for verification." });
+      }
+
+      const decryptedResult = decryptBackupPayload(rawData, passphrase);
+      if (!decryptedResult.success || !decryptedResult.data) {
+        return res.status(400).json({
+          success: false,
+          error: decryptedResult.error || "Failed to verify backup integrity."
+        });
+      }
+
+      const d = decryptedResult.data;
+      const summary = {
+        timestamp: d.timestamp || "Unknown",
+        version: d.version || "1.0.0",
+        encryptionStandard: decryptedResult.isEncrypted ? "AES-256-GCM" : "Plaintext",
+        checksumVerified: decryptedResult.checksumVerified,
+        counts: {
+          requisitions: Array.isArray(d.requisitions) ? d.requisitions.length : 0,
+          users: Array.isArray(d.users) ? d.users.length : 0,
+          churchGroups: Array.isArray(d.churchGroups) ? d.churchGroups.length : 0,
+          projects: Array.isArray(d.projects) ? d.projects.length : 0,
+          ledgerBooks: Array.isArray(d.ledgerBooks) ? d.ledgerBooks.length : 0,
+          systemLogs: Array.isArray(d.systemLogs) ? d.systemLogs.length : 0,
+          calendarEvents: Array.isArray(d.customCalendarEvents) ? d.customCalendarEvents.length : 0,
+          fiscalYears: Array.isArray(d.fiscalYears) ? d.fiscalYears.length : 0,
+          vendors: Array.isArray(d.vendors) ? d.vendors.length : 0
+        },
+        hasSettings: !!d.systemSettings
+      };
+
+      res.json({
+        success: true,
+        verified: true,
+        summary
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/disaster-recovery/restore - Execute Full or Selective Disaster Recovery Restore
+  app.post("/api/disaster-recovery/restore", async (req, res) => {
+    try {
+      const { payload, fileName, passphrase, selectedCollections, performedBy } = req.body;
+      let rawData = payload;
+
+      // If user selected existing filename on disk
+      if (!rawData && fileName) {
+        const drDir = getDrSnapshotsDir();
+        const emailDir = getEmailBackupsDir();
+        const p = fs.existsSync(path.join(drDir, fileName)) ? path.join(drDir, fileName) : path.join(emailDir, fileName);
+        if (fs.existsSync(p)) {
+          rawData = fs.readFileSync(p, "utf-8");
+        } else {
+          return res.status(404).json({ success: false, error: `Snapshot file '${fileName}' not found on server.` });
+        }
+      }
+
+      if (!rawData) {
+        return res.status(400).json({ success: false, error: "No backup data or filename provided for restoration." });
+      }
+
+      const decryptedResult = decryptBackupPayload(rawData, passphrase);
+      if (!decryptedResult.success || !decryptedResult.data) {
+        return res.status(400).json({
+          success: false,
+          error: decryptedResult.error || "Failed to decrypt and restore backup payload."
+        });
+      }
+
+      const backup = decryptedResult.data;
+
+      // 1. CREATE PRE-RESTORE SAFETY CHECKPOINT SNAPSHOT BEFORE APPLYING RESTORE!
+      try {
+        const safetyPayload = compileSystemBackupPayload("system.safety@pceastandrews.org", "PRE_RESTORE_SAFETY_CHECKPOINT");
+        const safetyEncrypted = encryptBackupPayload(safetyPayload, undefined, "PRE_RESTORE_CHECKPOINT");
+        const checkpointFileName = `PRE_RESTORE_SAFETY_CHECKPOINT_${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.enc.json`;
+        const checkpointPath = path.join(getDrSnapshotsDir(), checkpointFileName);
+        fs.writeFileSync(checkpointPath, safetyEncrypted.jsonString, "utf-8");
+        console.log(`[Disaster Recovery] Created Pre-Restoration Safety Checkpoint: ${checkpointFileName}`);
+      } catch (safetyErr) {
+        console.warn("[Disaster Recovery] Warning creating pre-restore checkpoint:", safetyErr);
+      }
+
+      // 2. Perform restoration for designated collections
+      const restoredCollections: string[] = [];
+      const restoredCounts: { [key: string]: number } = {};
+
+      const shouldRestore = (col: string) => {
+        if (!selectedCollections || !Array.isArray(selectedCollections) || selectedCollections.length === 0) {
+          return true; // restore all by default
+        }
+        return selectedCollections.includes(col);
+      };
+
+      if (shouldRestore("requisitions") && Array.isArray(backup.requisitions)) {
+        writeJsonCollection("requisitions", backup.requisitions);
+        restoredCollections.push("requisitions");
+        restoredCounts["requisitions"] = backup.requisitions.length;
+      }
+
+      if (shouldRestore("users") && Array.isArray(backup.users)) {
+        writeJsonCollection("users", backup.users);
+        restoredCollections.push("users");
+        restoredCounts["users"] = backup.users.length;
+      }
+
+      if (shouldRestore("church_groups") && (Array.isArray(backup.churchGroups) || Array.isArray(backup.church_groups))) {
+        const list = backup.churchGroups || backup.church_groups;
+        writeJsonCollection("church_groups", list);
+        restoredCollections.push("church_groups");
+        restoredCounts["church_groups"] = list.length;
+      }
+
+      if (shouldRestore("projects") && Array.isArray(backup.projects)) {
+        writeJsonCollection("projects", backup.projects);
+        restoredCollections.push("projects");
+        restoredCounts["projects"] = backup.projects.length;
+      }
+
+      if (shouldRestore("ledger_books") && Array.isArray(backup.ledgerBooks)) {
+        writeJsonCollection("ledger_books", backup.ledgerBooks);
+        restoredCollections.push("ledger_books");
+        restoredCounts["ledger_books"] = backup.ledgerBooks.length;
+      }
+
+      if (shouldRestore("system_logs") && Array.isArray(backup.systemLogs)) {
+        writeJsonCollection("system_logs", backup.systemLogs);
+        restoredCollections.push("system_logs");
+        restoredCounts["system_logs"] = backup.systemLogs.length;
+      }
+
+      if (shouldRestore("custom_calendar_events") && Array.isArray(backup.customCalendarEvents)) {
+        writeJsonCollection("custom_calendar_events", backup.customCalendarEvents);
+        restoredCollections.push("custom_calendar_events");
+        restoredCounts["custom_calendar_events"] = backup.customCalendarEvents.length;
+      }
+
+      if (shouldRestore("fiscal_years") && Array.isArray(backup.fiscalYears)) {
+        writeJsonCollection("fiscal_years", backup.fiscalYears);
+        restoredCollections.push("fiscal_years");
+        restoredCounts["fiscal_years"] = backup.fiscalYears.length;
+      }
+
+      if (shouldRestore("vendors") && Array.isArray(backup.vendors)) {
+        writeJsonCollection("vendors", backup.vendors);
+        restoredCollections.push("vendors");
+        restoredCounts["vendors"] = backup.vendors.length;
+      }
+
+      if (shouldRestore("settings") && backup.systemSettings && typeof backup.systemSettings === "object") {
+        writeJsonCollection("settings", Array.isArray(backup.systemSettings) ? backup.systemSettings : [backup.systemSettings]);
+        restoredCollections.push("settings");
+        restoredCounts["settings"] = 1;
+      }
+
+      const timestamp = new Date().toISOString();
+      persistActivity({
+        action: "DISASTER_RECOVERY_RESTORE_EXECUTED",
+        details: `Restored ${restoredCollections.length} database collections from snapshot (${Object.entries(restoredCounts).map(([k, v]) => `${k}: ${v}`).join(", ")})`,
+        performedBy: performedBy || "SUPER_ADMIN",
+        timestamp
+      });
+
+      res.json({
+        success: true,
+        restoredCollections,
+        restoredCounts,
+        timestamp,
+        sourceTimestamp: backup.timestamp,
+        message: `Disaster Recovery completed successfully! Restored ${restoredCollections.length} collections.`
+      });
+    } catch (err: any) {
+      console.error("[Disaster Recovery Restore Error]:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to execute disaster recovery restoration." });
+    }
+  });
+
+  // GET /api/disaster-recovery/download/:fileName - Download raw snapshot file
+  app.get("/api/disaster-recovery/download/:fileName", async (req, res) => {
+    try {
+      const fileName = path.basename(req.params.fileName);
+      const drDir = getDrSnapshotsDir();
+      const emailDir = getEmailBackupsDir();
+
+      const p = fs.existsSync(path.join(drDir, fileName)) ? path.join(drDir, fileName) : path.join(emailDir, fileName);
+      if (!fs.existsSync(p)) {
+        return res.status(404).json({ error: "Snapshot file not found." });
+      }
+
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("Content-Type", "application/json");
+      res.sendFile(p);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/disaster-recovery/snapshot/:fileName - Delete snapshot file
+  app.delete("/api/disaster-recovery/snapshot/:fileName", async (req, res) => {
+    try {
+      const fileName = path.basename(req.params.fileName);
+      const drDir = getDrSnapshotsDir();
+      const emailDir = getEmailBackupsDir();
+
+      let deleted = false;
+      [drDir, emailDir].forEach(dir => {
+        const p = path.join(dir, fileName);
+        if (fs.existsSync(p)) {
+          fs.unlinkSync(p);
+          deleted = true;
+        }
+      });
+
+      if (!deleted) {
+        return res.status(404).json({ success: false, error: "Snapshot file not found." });
+      }
+
+      res.json({ success: true, message: `Snapshot ${fileName} deleted successfully.` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

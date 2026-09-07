@@ -23,6 +23,7 @@ export interface StockRateItem {
   rssHeadline?: string;
   rssLink?: string;
   rssPubDate?: string;
+  rssSource?: string;
 }
 
 const DEFAULT_STOCKS: StockRateItem[] = [
@@ -38,7 +39,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     dayLow: "1,739.10",
     volume: "14.2M",
     rssHeadline: "NSE 20 Index gains 0.48% as banking sector posts strong Q3 earnings",
-    rssLink: "https://www.nse.co.ke",
+    rssLink: "https://news.google.com/search?q=Nairobi+Securities+Exchange",
+    rssSource: "Google Finance",
   },
   {
     symbol: "SCOM",
@@ -53,7 +55,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "8.4M",
     marketCap: "KES 715.1B",
     rssHeadline: "Safaricom M-Pesa transaction volumes surge 18% year-on-year",
-    rssLink: "https://www.safaricom.co.ke",
+    rssLink: "https://news.google.com/search?q=Safaricom+Plc+Kenya",
+    rssSource: "Google Finance",
   },
   {
     symbol: "EQTY",
@@ -68,7 +71,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "3.2M",
     marketCap: "KES 181.9B",
     rssHeadline: "Equity Group expands regional footprint with digital banking push",
-    rssLink: "https://equitygroupholdings.com",
+    rssLink: "https://news.google.com/search?q=Equity+Group+Holdings",
+    rssSource: "Google Finance",
   },
   {
     symbol: "KCB",
@@ -83,7 +87,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "2.1M",
     marketCap: "KES 104.4B",
     rssHeadline: "KCB Group reports robust dividend yield following SME loan expansion",
-    rssLink: "https://kcbgroup.com",
+    rssLink: "https://news.google.com/search?q=KCB+Group+Plc",
+    rssSource: "Google Finance",
   },
   {
     symbol: "EABL",
@@ -98,7 +103,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "950K",
     marketCap: "KES 114.6B",
     rssHeadline: "EABL premium spirits portfolio drives export volume in East Africa",
-    rssLink: "https://www.eabl.com",
+    rssLink: "https://news.google.com/search?q=East+African+Breweries",
+    rssSource: "Google Finance",
   },
   {
     symbol: "USD/KES",
@@ -111,7 +117,8 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     dayHigh: "129.40",
     dayLow: "128.50",
     rssHeadline: "CBK Forex Reserve buffer holds firm amidst agricultural export inflows",
-    rssLink: "https://www.centralbank.go.ke",
+    rssLink: "https://news.google.com/search?q=USD+KES+exchange+rate",
+    rssSource: "Google Finance",
   },
   {
     symbol: "NCBA",
@@ -126,6 +133,7 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "1.4M",
     marketCap: "KES 69.3B",
     rssHeadline: "NCBA asset finance division maintains lead in commercial vehicle funding",
+    rssSource: "Google Finance",
   },
   {
     symbol: "COOP",
@@ -140,6 +148,7 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     volume: "1.8M",
     marketCap: "KES 76.5B",
     rssHeadline: "Co-op Bank Kingdom Securities notes steady institutional buying",
+    rssSource: "Google Finance",
   },
   {
     symbol: "EUR/KES",
@@ -151,6 +160,7 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     direction: "up",
     dayHigh: "142.60",
     dayLow: "141.80",
+    rssSource: "Google Finance",
   },
   {
     symbol: "GBP/KES",
@@ -162,6 +172,7 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     direction: "up",
     dayHigh: "169.10",
     dayLow: "167.90",
+    rssSource: "Google Finance",
   },
   {
     symbol: "GOLD",
@@ -174,6 +185,7 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     dayHigh: "2,498.00",
     dayLow: "2,480.10",
     rssHeadline: "Global gold prices rally on central bank reserve accumulation trends",
+    rssSource: "Google Finance",
   },
   {
     symbol: "BRENT",
@@ -186,13 +198,16 @@ const DEFAULT_STOCKS: StockRateItem[] = [
     dayHigh: "79.20",
     dayLow: "77.80",
     rssHeadline: "Global crude oil futures stabilize amid OPEC+ production targets",
+    rssSource: "Google Finance",
   },
 ];
 
-// Business & financial RSS feed endpoints to poll
-const RSS_FEED_URLS = [
+// Google Finance & business RSS feed endpoints to poll
+const GOOGLE_FINANCE_RSS_FALLBACK_URLS = [
+  "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fnews.google.com%2Frss%2Fheadlines%2Fsection%2Ftopic%2FBUSINESS%3Fhl%3Den-US%26gl%3DUS%26ceid%3DUS%3Aen",
+  "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fnews.google.com%2Frss%2Fsearch%3Fq%3DGoogle%2BFinance%2Bmarkets%2Bstocks%2Bcurrencies%26hl%3Den-US%26gl%3DUS%26ceid%3DUS%3Aen",
+  "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fnews.google.com%2Frss%2Fsearch%3Fq%3DNairobi%2BSecurities%2BExchange%2BOR%2BKenya%2Bfinance%2Bmarkets%26hl%3Den-KE%26gl%3DKE%26ceid%3DKE%3Aen",
   "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.businessdailyafrica.com%2Fbd%2Fnews%2Frss.xml",
-  "https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Ffeeds.finance.yahoo.com%2Frss%2F2.0%2Fheadline%3Fs%3D%5ENSEI%26region%3DUS%26lang%3Den-US",
 ];
 
 export const StockRatesRssStrip: React.FC = () => {
@@ -200,38 +215,60 @@ export const StockRatesRssStrip: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedStock, setSelectedStock] = useState<StockRateItem | null>(null);
-  const [rssArticles, setRssArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
+  const [rssArticles, setRssArticles] = useState<{ title: string; link: string; pubDate: string; source?: string }[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>(() => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
-  // Fetch external RSS news items
+  // Fetch Google Finance RSS news items
   const fetchRssFeeds = async () => {
     setIsRefreshing(true);
     try {
-      const allArticles: { title: string; link: string; pubDate: string }[] = [];
+      let allArticles: { title: string; link: string; pubDate: string; source?: string }[] = [];
       
-      for (const url of RSS_FEED_URLS) {
-        try {
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.items && Array.isArray(data.items)) {
-              data.items.slice(0, 5).forEach((item: any) => {
-                allArticles.push({
-                  title: item.title,
-                  link: item.link || item.guid,
-                  pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-                });
-              });
-            }
+      // 1. Primary: Direct backend Google Finance RSS endpoint
+      try {
+        const backendRes = await fetch("/api/market-rss-feeds");
+        if (backendRes.ok) {
+          const backendData = await backendRes.json();
+          if (backendData?.items && Array.isArray(backendData.items) && backendData.items.length > 0) {
+            allArticles = backendData.items.slice(0, 20).map((item: any) => ({
+              title: item.title,
+              link: item.link,
+              pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+              source: item.source || "Google Finance",
+            }));
           }
-        } catch (e) {
-          // Ignore individual CORS/network failures
+        }
+      } catch (backendErr) {
+        console.warn("Backend Google Finance RSS fetch failed, falling back to direct RSS proxy:", backendErr);
+      }
+
+      // 2. Fallback: Query Google Finance RSS feeds via proxy if backend endpoint returned no items
+      if (allArticles.length === 0) {
+        for (const url of GOOGLE_FINANCE_RSS_FALLBACK_URLS) {
+          try {
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.items && Array.isArray(data.items)) {
+                data.items.slice(0, 5).forEach((item: any) => {
+                  allArticles.push({
+                    title: item.title,
+                    link: item.link || item.guid,
+                    pubDate: item.pubDate ? new Date(item.pubDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+                    source: item.author || "Google Finance",
+                  });
+                });
+              }
+            }
+          } catch (e) {
+            // Ignore individual CORS/network failures
+          }
         }
       }
 
       if (allArticles.length > 0) {
         setRssArticles(allArticles);
-        // Merge headlines into stock items if applicable
+        // Merge Google Finance headlines into stock items
         setStocks((prev) =>
           prev.map((s, idx) => {
             const matchingArticle = allArticles[idx % allArticles.length];
@@ -240,12 +277,13 @@ export const StockRatesRssStrip: React.FC = () => {
               rssHeadline: matchingArticle ? matchingArticle.title : s.rssHeadline,
               rssLink: matchingArticle ? matchingArticle.link : s.rssLink,
               rssPubDate: matchingArticle ? matchingArticle.pubDate : s.rssPubDate,
+              rssSource: matchingArticle?.source || s.rssSource || "Google Finance",
             };
           })
         );
       }
     } catch (err) {
-      console.warn("RSS Feed fetch fallback:", err);
+      console.warn("Google Finance RSS Feed fetch fallback:", err);
     } finally {
       setIsRefreshing(false);
       setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -360,7 +398,7 @@ export const StockRatesRssStrip: React.FC = () => {
         {/* Right Info Indicator */}
         <div className="z-10 bg-slate-950/90 border-l border-slate-800 px-3 py-1.5 h-full shrink-0 hidden lg:flex items-center gap-2 text-[10px] text-slate-400 font-mono">
           <Activity size={12} className="text-emerald-400" />
-          <span>Sync: {lastUpdated}</span>
+          <span>Google Finance RSS: {lastUpdated}</span>
         </div>
       </div>
 
@@ -445,13 +483,25 @@ export const StockRatesRssStrip: React.FC = () => {
               {/* RSS Headline Section */}
               {selectedStock.rssHeadline && (
                 <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-900/60 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-400 tracking-wider">
-                    <Rss size={12} />
-                    <span>Associated Financial RSS Bulletin</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-indigo-400 tracking-wider">
+                      <Rss size={12} />
+                      <span>Google Finance RSS Bulletin</span>
+                    </div>
+                    {selectedStock.rssSource && (
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-800/80 px-2 py-0.5 rounded-md">
+                        {selectedStock.rssSource}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-200 font-medium leading-relaxed">
                     "{selectedStock.rssHeadline}"
                   </p>
+                  {selectedStock.rssPubDate && (
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      Published: {selectedStock.rssPubDate}
+                    </p>
+                  )}
                   {selectedStock.rssLink && (
                     <a
                       href={selectedStock.rssLink}
@@ -459,7 +509,7 @@ export const StockRatesRssStrip: React.FC = () => {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline mt-1"
                     >
-                      <span>Read full report</span>
+                      <span>Read full report on Google Finance / News</span>
                       <ExternalLink size={12} />
                     </a>
                   )}

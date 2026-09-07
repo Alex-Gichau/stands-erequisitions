@@ -2174,6 +2174,123 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
     res.json(report);
   });
 
+  // In-memory cache for Google Finance RSS feed
+  let cachedGoogleFinanceRss: { items: any[]; lastFetched: number } = { items: [], lastFetched: 0 };
+
+  // XML Parser helper for Google Finance RSS feeds
+  function parseGoogleFinanceRssXml(xml: string): any[] {
+    const items: any[] = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/gi;
+    let match;
+    while ((match = itemRegex.exec(xml)) !== null) {
+      const itemContent = match[1];
+      const titleMatch = /<title[^>]*>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/title>/i.exec(itemContent);
+      const linkMatch = /<link[^>]*>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/link>/i.exec(itemContent);
+      const pubDateMatch = /<pubDate[^>]*>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/pubDate>/i.exec(itemContent);
+      const sourceMatch = /<source[^>]*>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([\s\S]*?))<\/source>/i.exec(itemContent);
+
+      const rawTitle = (titleMatch ? (titleMatch[1] || titleMatch[2] || "") : "").trim();
+      const rawLink = (linkMatch ? (linkMatch[1] || linkMatch[2] || "") : "").trim();
+      const rawPubDate = (pubDateMatch ? (pubDateMatch[1] || pubDateMatch[2] || "") : "").trim();
+      const rawSource = (sourceMatch ? (sourceMatch[1] || sourceMatch[2] || "") : "").trim();
+
+      if (rawTitle) {
+        const cleanTitle = rawTitle
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, "\"")
+          .replace(/&#39;/g, "'")
+          .replace(/&apos;/g, "'");
+
+        items.push({
+          title: cleanTitle,
+          link: rawLink,
+          pubDate: rawPubDate,
+          source: rawSource || "Google Finance",
+        });
+      }
+    }
+    return items;
+  }
+
+  // GET endpoint to fetch real-time financial news from Google Finance RSS feeds
+  app.get("/api/market-rss-feeds", async (_req, res) => {
+    const now = Date.now();
+    // Use cache if fetched within the last 3 minutes
+    if (cachedGoogleFinanceRss.items.length > 0 && (now - cachedGoogleFinanceRss.lastFetched) < 180000) {
+      return res.json({
+        success: true,
+        source: "Google Finance RSS",
+        items: cachedGoogleFinanceRss.items,
+        cached: true,
+        lastUpdated: new Date(cachedGoogleFinanceRss.lastFetched).toISOString()
+      });
+    }
+
+    const feedUrls = [
+      "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en",
+      "https://news.google.com/rss/search?q=Nairobi+Securities+Exchange+OR+Kenya+finance+OR+CBK+OR+Safaricom+OR+Equity+Bank&hl=en-KE&gl=KE&ceid=KE:en",
+      "https://news.google.com/rss/search?q=Google+Finance+stock+market+economy+currencies&hl=en-US&gl=US&ceid=US:en"
+    ];
+
+    try {
+      const allArticles: any[] = [];
+      const seenTitles = new Set<string>();
+
+      for (const url of feedUrls) {
+        try {
+          const feedRes = await fetch(url, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          });
+          if (feedRes.ok) {
+            const xml = await feedRes.text();
+            const parsed = parseGoogleFinanceRssXml(xml);
+            for (const item of parsed) {
+              const lowerTitle = item.title.toLowerCase();
+              if (!seenTitles.has(lowerTitle)) {
+                seenTitles.add(lowerTitle);
+                allArticles.push(item);
+              }
+            }
+          }
+        } catch (feedErr) {
+          console.warn("[Google Finance RSS Fetch Warning]:", (feedErr as any).message);
+        }
+      }
+
+      if (allArticles.length > 0) {
+        cachedGoogleFinanceRss = {
+          items: allArticles,
+          lastFetched: now
+        };
+      }
+
+      return res.json({
+        success: true,
+        source: "Google Finance RSS",
+        items: cachedGoogleFinanceRss.items.length > 0 ? cachedGoogleFinanceRss.items : allArticles,
+        cached: false,
+        lastUpdated: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("[Google Finance RSS Error]:", err);
+      // If error occurs but we have cached items, return cached items
+      if (cachedGoogleFinanceRss.items.length > 0) {
+        return res.json({
+          success: true,
+          source: "Google Finance RSS",
+          items: cachedGoogleFinanceRss.items,
+          cached: true,
+          lastUpdated: new Date(cachedGoogleFinanceRss.lastFetched).toISOString()
+        });
+      }
+      return res.status(500).json({ error: "Failed to fetch Google Finance RSS feeds", message: err.message });
+    }
+  });
+
 
   // Helper to cleanly extract a user's first name from their name or email address
   function extractFirstName(name?: string, email?: string): string {
@@ -2762,6 +2879,37 @@ Your response MUST adhere strictly to the JSON schema specified. Write in an exe
               </div>
             `;
             nextStepsText = `Click the button below to view the requisition thread and join the discussion.`;
+            break;
+
+          case "EDITED":
+          case "REQUISITION_EDITED":
+            subject = `[Requisition Updated] ${reqName}`;
+            headerTitle = "Requisition Details Updated";
+            mainMessage = isRequester
+              ? `Your requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been updated in the portal.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> for <strong>${ministryName}</strong> has been edited and updated.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #0d9488; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #115e59; text-transform: uppercase; letter-spacing: 0.5px;">Update Summary</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #134e4a;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Updated By:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #0f766e;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #0f766e;">${ministryName}</td>
+                  </tr>
+                  ${cleanCommentText ? `
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Update Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #134e4a;">"${cleanCommentText}"</td>
+                  </tr>
+                  ` : ""}
+                </table>
+              </div>
+            `;
+            nextStepsText = `All stakeholders and members receiving updates for this requisition have been notified. Click the button below to review the updated details in the portal.`;
             break;
 
           default:

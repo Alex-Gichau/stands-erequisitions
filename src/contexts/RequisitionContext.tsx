@@ -3371,7 +3371,30 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     const isCustomPersonal = Boolean(customRecipientEmail);
-    const notificationEmailsList = isCustomPersonal ? [] : (req.notificationEmails || []);
+    const notificationEmailsListSet = new Set<string>();
+
+    if (!isCustomPersonal && Array.isArray(req.notificationEmails)) {
+      req.notificationEmails.forEach(e => {
+        if (e && typeof e === "string" && e.trim()) {
+          notificationEmailsListSet.add(e.trim().toLowerCase());
+        }
+      });
+    }
+
+    if (!isCustomPersonal && req.groupName && Array.isArray(users)) {
+      const grpLower = req.groupName.trim().toLowerCase();
+      users.forEach(u => {
+        if (!u.email) return;
+        const uGrp = (u.group || "").trim().toLowerCase();
+        const inGroups = Array.isArray(u.groups) && u.groups.some(g => (g || "").trim().toLowerCase() === grpLower);
+        const inDept = (u.department || "").trim().toLowerCase() === grpLower;
+        if (uGrp === grpLower || inGroups || inDept) {
+          notificationEmailsListSet.add(u.email.trim().toLowerCase());
+        }
+      });
+    }
+
+    const notificationEmailsList = Array.from(notificationEmailsListSet);
 
     if (!targetEmail && notificationEmailsList.length === 0) {
       console.log("Cannot send email: Requisition has no requesterEmail and no notificationEmails", req.id);
@@ -4043,8 +4066,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       await addSystemLog("REQUISITION_EDITED", `Requisition '${id}' updated`, { requisitionId: id, updates });
 
-      if (updates.status === RequisitionStatus.SUBMITTED && updatedReq.status === RequisitionStatus.SUBMITTED) {
+      if (updates.status === RequisitionStatus.SUBMITTED && updatedReq.status === RequisitionStatus.SUBMITTED && currentReq?.status === RequisitionStatus.DRAFT) {
         sendEmailNotification(updatedReq, "SUBMITTED").catch(() => {});
+      } else {
+        const editorName = resolveSenderName(currentUser, users) || currentUser?.name || currentUser?.email || "Reviewing Official";
+        const updateNote = updates.description ? `Updated Description: "${updates.description}"` : `Requisition details updated by ${editorName}`;
+        sendEmailNotification(updatedReq, "EDITED", updateNote, editorName).catch(() => {});
       }
 
       if (updatedReq.projectId) {

@@ -933,7 +933,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const canAccess = useCallback((viewId: string) => {
     if (!currentUser) return false;
     if (currentUser.role === UserRole.SUPER_ADMIN) return true;
-    if (viewId === "settings" || viewId === "help") return true;
+    if (viewId === "settings" || viewId === "help" || viewId === "gallery" || viewId === "uploads" || viewId === "uploadsGallery" || viewId === "projectorHub" || viewId === "fileHub") return true;
     
     if (viewId === "finance") {
       return [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2, UserRole.FINANCE, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);

@@ -4,11 +4,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { X, Maximize2, ExternalLink, Download, ZoomIn, ZoomOut, RotateCw, RotateCcw, RefreshCw } from "lucide-react";
+import { X, Maximize2, ExternalLink, Download, ZoomIn, ZoomOut, RotateCw, RotateCcw, RefreshCw, Cast } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn, normalizeAttachmentUrl, getAttachmentFileName, handleImageError } from "../lib/utils";
 import { CachedImage } from "./CachedImage";
 import { preloadMediaBatch } from "../lib/mediaCache";
+import { AttachmentProjectionModal } from "./AttachmentProjectionModal";
 
 interface ReceiptGalleryProps {
   receipts: string[];
@@ -18,6 +19,8 @@ interface ReceiptGalleryProps {
 
 export const ReceiptGallery: React.FC<ReceiptGalleryProps> = ({ receipts, requisitionTitle, groupName }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isProjectorOpen, setIsProjectorOpen] = useState<boolean>(false);
+  const [projectorIndex, setProjectorIndex] = useState<number>(0);
   const [zoom, setZoom] = useState<number>(1);
   const [rotation, setRotation] = useState<number>(0);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -105,6 +108,18 @@ export const ReceiptGallery: React.FC<ReceiptGalleryProps> = ({ receipts, requis
         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
           Attached Receipts ({receipts.length})
         </label>
+        <button
+          type="button"
+          onClick={() => {
+            setProjectorIndex(0);
+            setIsProjectorOpen(true);
+          }}
+          className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-bold border border-indigo-500/20 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+          title="Open in Projector Mode for meetings"
+        >
+          <Cast size={12} />
+          <span>Project Receipts</span>
+        </button>
       </div>
       
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
@@ -286,6 +301,16 @@ export const ReceiptGallery: React.FC<ReceiptGalleryProps> = ({ receipts, requis
           </div>
         )}
       </AnimatePresence>
+
+      {isProjectorOpen && (
+        <AttachmentProjectionModal
+          attachments={receipts}
+          initialIndex={projectorIndex}
+          onClose={() => setIsProjectorOpen(false)}
+          title={requisitionTitle || "Receipts Gallery Projection"}
+          groupName={groupName || "Diocese Ministry Group"}
+        />
+      )}
     </div>
   );
 };

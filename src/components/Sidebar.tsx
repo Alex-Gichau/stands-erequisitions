@@ -21,7 +21,8 @@ import {
   Bell,
   Store,
   MoreHorizontal,
-  Activity
+  Activity,
+  Images
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { UserRole } from "../types";
@@ -118,6 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "notifications", label: "Notification", icon: Bell },
     { id: "requisitions", label: "Requisitions", icon: FileText },
+    { id: "gallery", label: "Uploads Gallery", icon: Images },
     { id: "transactions", label: "Transactions", icon: Activity },
     { id: "vendors", label: "STANDS Vendors", icon: Store },
     { id: "approvals", label: "Approvals", icon: CheckCircle },

@@ -78,7 +78,8 @@ import {
   Layers,
   Split,
   Banknote,
-  CheckCircle2
+  CheckCircle2,
+  Cast
 } from "lucide-react";
 import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentFormatUtils";
 import { motion, AnimatePresence } from "motion/react";
@@ -1806,6 +1807,7 @@ import { ConfirmationModal } from "./ConfirmationModal";
 import { ExportConfirmationModal, ExportConfirmationParams, ExportFormat } from "./ExportConfirmationModal";
 import { CachedImage } from "./CachedImage";
 import { getCachedMediaUrl, preloadMediaBatch } from "../lib/mediaCache";
+import { AttachmentProjectionModal } from "./AttachmentProjectionModal";
 
 
 
@@ -1827,6 +1829,7 @@ const DocumentPreviewModal = ({
   const [activeDocIndex, setActiveDocIndex] = useState(initialIndex);
   const [showDetailsPanel, setShowDetailsPanel] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isProjectorOpen, setIsProjectorOpen] = useState(false);
 
   // Prepare document objects for react-doc-viewer
   const docs = useMemo(() => {
@@ -1959,6 +1962,16 @@ const DocumentPreviewModal = ({
             </button>
 
 
+
+            {/* Projector Mode */}
+            <button
+              onClick={() => setIsProjectorOpen(true)}
+              className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Launch Attachment Projector View (Auditorium / Big Screen)"
+            >
+              <Cast size={15} />
+              <span className="hidden sm:inline">Projector</span>
+            </button>
 
             {/* Download */}
             {currentDoc?.uri && (
@@ -2240,6 +2253,16 @@ const DocumentPreviewModal = ({
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {isProjectorOpen && (
+        <AttachmentProjectionModal
+          attachments={attachments}
+          initialIndex={activeDocIndex}
+          onClose={() => setIsProjectorOpen(false)}
+          title={requisition?.title || "Requisition Document Projection"}
+          groupName={requisition?.groupName || "Diocese Committee Review"}
+        />
+      )}
     </div>
   );
 };
@@ -2475,6 +2498,7 @@ export const RequisitionsPanel: React.FC = () => {
   const { 
     requisitions, 
     projects,
+    vendors,
     deleteRequisition, 
     restoreRequisition,
     currentUser, 
@@ -2708,6 +2732,16 @@ export const RequisitionsPanel: React.FC = () => {
     return map;
   }, [projects]);
 
+  const vendorsMap = useMemo(() => {
+    const map = new Map<string, typeof vendors[0]>();
+    (vendors || []).forEach(v => {
+      if (v?.name) {
+        map.set(v.name.trim().toLowerCase(), v);
+      }
+    });
+    return map;
+  }, [vendors]);
+
   const filtered = requisitions.filter(req => {
     const term = globalSearchTerm.toLowerCase();
     
@@ -2719,9 +2753,10 @@ export const RequisitionsPanel: React.FC = () => {
       const inGroup = req.groupName.toLowerCase().includes(term);
       const inRequester = req.requesterName?.toLowerCase().includes(term);
       const inId = req.id.toLowerCase().includes(term);
+      const inVendor = req.payableTo ? req.payableTo.toLowerCase().includes(term) : false;
 
       if (searchFilter === "ALL") {
-        matchesSearch = inTitle || inGroup || inRequester || inId;
+        matchesSearch = inTitle || inGroup || inRequester || inId || inVendor;
       } else if (searchFilter === "TITLE") {
         matchesSearch = inTitle;
       } else if (searchFilter === "GROUP") {
@@ -3436,6 +3471,7 @@ export const RequisitionsPanel: React.FC = () => {
                   </div>
                 </th>
                 <th className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">Requisition Ownership</th>
+                <th className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4">Vendor</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-right">Amount</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-center">Status</th>
                 <th className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">Days Old</th>
@@ -3590,6 +3626,31 @@ export const RequisitionsPanel: React.FC = () => {
                             <RequisitionOwnershipDiscussionRow req={req} users={users} />
                           </div>
                         </td>
+                        <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                          {req.payableTo && req.payableTo.trim() ? (
+                            <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                              <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-[11px] md:text-xs truncate">
+                                <Store size={13} className="text-indigo-500 shrink-0" />
+                                <span className="truncate" title={req.payableTo}>
+                                  <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                                </span>
+                              </div>
+                              {(() => {
+                                const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                                if (v?.offerings) {
+                                  return (
+                                    <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                      {v.offerings}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                          )}
+                        </td>
                         <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
                           <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
                         </td>
@@ -3679,7 +3740,7 @@ export const RequisitionsPanel: React.FC = () => {
                           transition={{ duration: 0.2 }}
                           className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
                         >
-                          <td colSpan={7} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
+                          <td colSpan={8} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
                             <RequisitionInstallmentScheduleBreakdown req={req} />
                           </td>
                         </motion.tr>
@@ -3697,6 +3758,8 @@ export const RequisitionsPanel: React.FC = () => {
                   <td className="px-6 py-4 text-xs font-black uppercase tracking-wider" colSpan={2}>
                     Total Active Requisitions
                   </td>
+                  <td className="hidden lg:table-cell" />
+                  <td className="hidden md:table-cell" />
                   <td className="px-6 py-4 text-right font-mono text-xs text-rose-600 font-extrabold whitespace-nowrap">
                     {formatCurrency(activeList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
                   </td>
@@ -3788,9 +3851,17 @@ export const RequisitionsPanel: React.FC = () => {
 
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
-                        💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
+                          💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                        </span>
+                        {req.payableTo && req.payableTo.trim() && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 border border-indigo-200/60 text-indigo-700 rounded-md text-[9px] font-extrabold truncate max-w-[160px]">
+                            <Store size={10} className="shrink-0 text-indigo-600" />
+                            <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
@@ -3970,6 +4041,7 @@ export const RequisitionsPanel: React.FC = () => {
                   </div>
                 </th>
                 <th className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">Requisition Ownership</th>
+                <th className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4">Vendor</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-right">Amount</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-center">Status</th>
                 <th className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">Date Disbursed</th>
@@ -4079,6 +4151,31 @@ export const RequisitionsPanel: React.FC = () => {
                           <RequisitionOwnershipDiscussionRow req={req} users={users} />
                         </div>
                       </td>
+                      <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                        {req.payableTo && req.payableTo.trim() ? (
+                          <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                            <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-[11px] md:text-xs truncate">
+                              <Store size={13} className="text-indigo-500 shrink-0" />
+                              <span className="truncate" title={req.payableTo}>
+                                <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                              </span>
+                            </div>
+                            {(() => {
+                              const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                              if (v?.offerings) {
+                                return (
+                                  <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                    {v.offerings}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                        )}
+                      </td>
                       <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
                         <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
                       </td>
@@ -4132,7 +4229,7 @@ export const RequisitionsPanel: React.FC = () => {
                         transition={{ duration: 0.2 }}
                         className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
                       >
-                        <td colSpan={7} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
+                        <td colSpan={8} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
                           <RequisitionInstallmentScheduleBreakdown req={req} />
                         </td>
                       </motion.tr>
@@ -4150,6 +4247,8 @@ export const RequisitionsPanel: React.FC = () => {
                   <td className="px-6 py-4 text-xs font-black uppercase tracking-wider" colSpan={2}>
                     Total Disbursed Funds
                   </td>
+                  <td className="hidden lg:table-cell" />
+                  <td className="hidden md:table-cell" />
                   <td className="px-6 py-4 text-right font-mono text-xs text-blue-600 font-extrabold whitespace-nowrap">
                     {formatCurrency(disbursedList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
                   </td>
@@ -4217,9 +4316,17 @@ export const RequisitionsPanel: React.FC = () => {
 
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50/80 border border-blue-200/50 text-blue-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
-                        💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50/80 border border-blue-200/50 text-blue-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
+                          💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                        </span>
+                        {req.payableTo && req.payableTo.trim() && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 border border-indigo-200/60 text-indigo-700 rounded-md text-[9px] font-extrabold truncate max-w-[160px]">
+                            <Store size={10} className="shrink-0 text-indigo-600" />
+                            <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
@@ -4378,6 +4485,7 @@ export const RequisitionsPanel: React.FC = () => {
                   </div>
                 </th>
                 <th className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">Requisition Ownership</th>
+                <th className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4">Vendor</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-right">Amount</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-center">Status</th>
                 <th className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">Date Updated</th>
@@ -4448,6 +4556,31 @@ export const RequisitionsPanel: React.FC = () => {
                         <RequisitionOwnershipDiscussionRow req={req} users={users} />
                       </div>
                     </td>
+                    <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                      {req.payableTo && req.payableTo.trim() ? (
+                        <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                          <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-[11px] md:text-xs truncate">
+                            <Store size={13} className="text-indigo-500 shrink-0" />
+                            <span className="truncate" title={req.payableTo}>
+                              <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                            </span>
+                          </div>
+                          {(() => {
+                            const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                            if (v?.offerings) {
+                              return (
+                                <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                  {v.offerings}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                      )}
+                    </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
                       <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
                     </td>
@@ -4497,6 +4630,8 @@ export const RequisitionsPanel: React.FC = () => {
                   <td className="px-6 py-4 text-xs font-black uppercase tracking-wider" colSpan={2}>
                     Total Rejected / Cancelled Value
                   </td>
+                  <td className="hidden lg:table-cell" />
+                  <td className="hidden md:table-cell" />
                   <td className="px-6 py-4 text-right font-mono text-xs text-rose-600 font-extrabold whitespace-nowrap">
                     {formatCurrency(rejectedList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
                   </td>
@@ -4556,9 +4691,17 @@ export const RequisitionsPanel: React.FC = () => {
 
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50/80 border border-rose-200/50 text-rose-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
-                        💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50/80 border border-rose-200/50 text-rose-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
+                          💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                        </span>
+                        {req.payableTo && req.payableTo.trim() && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 border border-indigo-200/60 text-indigo-700 rounded-md text-[9px] font-extrabold truncate max-w-[160px]">
+                            <Store size={10} className="shrink-0 text-indigo-600" />
+                            <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
@@ -4657,6 +4800,7 @@ export const RequisitionsPanel: React.FC = () => {
                   </div>
                 </th>
                 <th className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">Requisition Ownership</th>
+                <th className="hidden md:table-cell px-4 md:px-6 py-3 md:py-4">Vendor</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-right">Amount</th>
                 <th className="px-4 md:px-6 py-3 md:py-4 text-center">Status</th>
                 <th className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">Date Deleted</th>
@@ -4727,6 +4871,31 @@ export const RequisitionsPanel: React.FC = () => {
                         <RequisitionOwnershipDiscussionRow req={req} users={users} />
                       </div>
                     </td>
+                    <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                      {req.payableTo && req.payableTo.trim() ? (
+                        <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold text-[11px] md:text-xs truncate">
+                            <Store size={13} className="text-slate-400 shrink-0" />
+                            <span className="truncate line-through" title={req.payableTo}>
+                              <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                            </span>
+                          </div>
+                          {(() => {
+                            const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                            if (v?.offerings) {
+                              return (
+                                <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                  {v.offerings}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                      )}
+                    </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
                       <span className="font-mono font-bold text-slate-500 line-through text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
                     </td>
@@ -4786,6 +4955,8 @@ export const RequisitionsPanel: React.FC = () => {
                   <td className="px-6 py-4 text-xs font-black uppercase tracking-wider" colSpan={2}>
                     Total Deleted Requisitions Value
                   </td>
+                  <td className="hidden lg:table-cell" />
+                  <td className="hidden md:table-cell" />
                   <td className="px-6 py-4 text-right font-mono text-xs text-slate-600 font-extrabold whitespace-nowrap">
                     {formatCurrency(deletedList.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
                   </td>
@@ -4846,9 +5017,17 @@ export const RequisitionsPanel: React.FC = () => {
 
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <div className="flex flex-col gap-1 min-w-0">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
-                        💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-[9px] font-extrabold uppercase tracking-wider w-fit">
+                          💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                        </span>
+                        {req.payableTo && req.payableTo.trim() && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 border border-indigo-200/60 text-indigo-700 rounded-md text-[9px] font-extrabold truncate max-w-[160px]">
+                            <Store size={10} className="shrink-0 text-indigo-600" />
+                            <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-slate-500 font-semibold truncate">
                         By {req.requesterName}
                       </span>
@@ -5201,6 +5380,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   }, [req?.id, req?.comments?.length, currentUser]);
   const [loading, setLoading] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [isProjectorOpen, setIsProjectorOpen] = useState(false);
   const [isTimelineMinimizedManually, setIsTimelineMinimizedManually] = useState<boolean | null>(null);
   const isTimelineMinimized = isTimelineMinimizedManually !== null ? isTimelineMinimizedManually : (previewIndex !== null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -6114,21 +6294,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             <p className="text-[8px] md:text-[10px] font-mono text-slate-400 uppercase tracking-widest truncate">{req.id}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0 relative z-50">
-          <motion.button 
-            type="button"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            onClick={onClose} 
-            title="Close and go back (Esc)"
-            className="flex sticky items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-full transition-all font-bold text-xs cursor-pointer shadow-lg shadow-rose-600/20 border border-rose-500/50 backdrop-blur-md"
-          >
-            <X size={16} className="stroke-[2.5]" />
-            <span className="hidden sm:inline">Close & Go Back</span>
-            <span className="sm:hidden">Close</span>
-          </motion.button>
-        </div>
       </div>
 
       <div ref={modalScrollRef} className="flex-1 min-h-0 flex flex-col overflow-y-auto">
@@ -6557,7 +6722,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               </section>
 
               <section className="space-y-3 md:space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       Attachments (Documents)
@@ -6566,6 +6731,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       {normalizedAttachments.length}
                     </span>
                   </div>
+                  {normalizedAttachments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsProjectorOpen(true)}
+                      className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-bold border border-indigo-500/20 transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-auto cursor-pointer"
+                      title="Launch Attachment Projector View for presentations / reviews"
+                    >
+                      <Cast size={13} />
+                      <span>Project Attachments</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Main Visual Thumbnail Grid */}
@@ -7816,20 +7992,33 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           </div>
         </div>
 
-        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-end gap-3 w-full max-w-full shrink-0 sticky bottom-0 z-40 shadow-xs">
-          {/* More Options Dropdown */}
-          <div ref={moreMenuRef} className="relative shrink-0">
+        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between gap-3 w-full max-w-full shrink-0 sticky bottom-0 z-40 shadow-xs">
+          {/* Left-aligned navigation and options */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Close button: aligned left on mobile */}
             <button 
-              onClick={() => setIsMoreOpen(!isMoreOpen)}
-              className="px-3.5 sm:px-5 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5"
-              title="More Options"
+              type="button"
+              onClick={onClose} 
+              title="Close (Esc)"
+              className="md:hidden px-3.5 sm:px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white border border-rose-500/50 rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5 active:scale-95 shadow-md shadow-rose-600/20 shrink-0"
             >
-              <MoreVertical size={14} />
-              <span>Options</span>
-              <ChevronDown size={12} className={cn("transition-transform duration-200", isMoreOpen && "rotate-180")} />
+              <X size={14} className="stroke-[2.5]" />
+              <span>Close</span>
             </button>
-            {isMoreOpen && (
-              <div className="absolute bottom-full left-0 sm:left-auto sm:right-0 mb-2 w-56 max-w-[calc(100vw-2.5rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[100] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+
+            {/* More Options Dropdown */}
+            <div ref={moreMenuRef} className="relative shrink-0">
+              <button 
+                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                className="px-3.5 sm:px-5 py-2.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5"
+                title="More Options"
+              >
+                <MoreVertical size={14} />
+                <span>Options</span>
+                <ChevronDown size={12} className={cn("transition-transform duration-200", isMoreOpen && "rotate-180")} />
+              </button>
+              {isMoreOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-56 max-w-[calc(100vw-2.5rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-[100] py-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
                 {/* Print Receipt */}
                 <button 
                   onClick={() => {
@@ -7921,6 +8110,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               </div>
             )}
           </div>
+        </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end flex-wrap sm:flex-nowrap">
             {/* Direct Edit Button for Church Groups / Requesters / Admins */}
@@ -7989,6 +8179,17 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 ASSIGN TO BUDGET
               </button>
             )}
+
+            {/* Close button: aligned right on medium and large screens at the far end */}
+            <button 
+              type="button"
+              onClick={onClose} 
+              title="Close (Esc)"
+              className="hidden md:flex px-3.5 sm:px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white border border-rose-500/50 rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest items-center gap-1.5 active:scale-95 shadow-md shadow-rose-600/20 shrink-0"
+            >
+              <X size={14} className="stroke-[2.5]" />
+              <span>Close</span>
+            </button>
           </div>
         </div>
 
@@ -8053,6 +8254,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               initialIndex={previewIndex}
               onClose={() => setPreviewIndex(null)} 
               requisition={req}
+            />
+          )}
+          {isProjectorOpen && normalizedAttachments.length > 0 && (
+            <AttachmentProjectionModal
+              attachments={normalizedAttachments}
+              initialIndex={0}
+              onClose={() => setIsProjectorOpen(false)}
+              title={req.title || "Requisition Document Projection"}
+              groupName={req.groupName || "Diocese Committee Review"}
             />
           )}
           {isCameraOpen && (

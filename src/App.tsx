@@ -33,6 +33,8 @@ import { VendorsPanel } from "./components/VendorsPanel";
 import { AuditLogsPanel } from "./components/AuditLogsPanel";
 import { HelpPanel } from "./components/HelpPanel";
 import { TransactionsPanel } from "./components/TransactionsPanel";
+import { UploadsGalleryPanel } from "./components/UploadsGalleryPanel";
+import { FileUploadProjectionCenter } from "./components/FileUploadProjectionCenter";
 import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator";
 import { NotificationHub } from "./components/NotificationHub";
 import { WaitingRoom } from "./components/WaitingRoom";
@@ -1933,6 +1935,19 @@ function AppContent() {
         case "dashboard": return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
         case "notifications": return <NotificationHub onSelectRequisition={(req) => { setSelectedRequisition(req); setCurrentView("requisitions"); }} />;
         case "requisitions": return <RequisitionsPanel />;
+        case "gallery":
+        case "uploads":
+        case "uploadsGallery":
+        case "projectorHub":
+        case "fileHub": return (
+          <UploadsGalleryPanel 
+            onViewRequisition={(req) => { 
+              setSelectedRequisition(req); 
+              setCurrentView("requisitions"); 
+            }} 
+            onClose={() => setCurrentView("dashboard")} 
+          />
+        );
         case "vendors": return <VendorsPanel />;
         case "approvals": return <ApprovalsPanel />;
         case "settings": return <SettingsPanel />;

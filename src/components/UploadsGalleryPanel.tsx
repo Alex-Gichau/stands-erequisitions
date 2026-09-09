@@ -12,7 +12,7 @@ import {
   List, 
   Download, 
   ExternalLink, 
-  Cast, 
+  Eye, 
   Copy, 
   Check, 
   Upload, 
@@ -38,7 +38,11 @@ import {
   FolderOpen,
   ArrowUpDown,
   Sparkles,
-  Info
+  Info,
+  Save,
+  Globe,
+  ShieldCheck,
+  Users
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useRequisitions } from "../contexts/RequisitionContext";
@@ -47,7 +51,7 @@ import {
   cn, 
   normalizeAttachmentUrl, 
   getAttachmentFileName, 
-  getAbsoluteAttachmentUrl,
+  getAbsoluteAttachmentUrl, 
   formatCurrency, 
   formatDate,
   handleImageError
@@ -61,6 +65,16 @@ import { processFileToAttachmentStrings } from "../lib/pdfUtils";
 export type UploadCategory = "ALL" | "RECEIPT" | "INVOICE" | "QUOTATION" | "DELIVERY" | "MEMO" | "OTHER";
 export type FileFormatFilter = "ALL" | "IMAGE" | "PDF" | "SPREADSHEET" | "DOCUMENT";
 export type SortOption = "NEWEST" | "OLDEST" | "TITLE_AZ" | "GROUP_AZ" | "AMOUNT_HIGH";
+export type ScopeVisibilityFilter = "ALL_EVER" | "MY_ALLOCATED";
+
+export interface StagedUploadFile {
+  id: string;
+  file: File;
+  name: string;
+  size: string;
+  previewUrl: string;
+  formattedData: string;
+}
 
 export interface GalleryItem {
   id: string;
@@ -94,10 +108,40 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     churchGroups, 
     currentUser, 
     triggerToast,
-    setSelectedRequisition
+    setSelectedRequisition,
+    updateRequisition
   } = useRequisitions();
 
-  // View & Filter States
+  // Role permissions check
+  const isAdminOrFinance = useMemo(() => {
+    if (!currentUser) return false;
+    return (
+      currentUser.role === UserRole.SUPER_ADMIN ||
+      currentUser.role === UserRole.ADMIN ||
+      currentUser.role === UserRole.FINANCE ||
+      currentUser.role === UserRole.APPROVER_L1 ||
+      currentUser.role === UserRole.APPROVER_L2
+    );
+  }, [currentUser]);
+
+  // User allocated ministry groups
+  const userAllocatedGroups = useMemo<string[]>(() => {
+    if (!currentUser) return [];
+    const groups: string[] = [];
+    if (currentUser.group) groups.push(currentUser.group);
+    if (Array.isArray(currentUser.groups)) {
+      currentUser.groups.forEach(g => {
+        if (g && !groups.includes(g)) groups.push(g);
+      });
+    }
+    return groups;
+  }, [currentUser]);
+
+  // View & Scope Filter States
+  const [scopeFilter, setScopeFilter] = useState<ScopeVisibilityFilter>(() => {
+    return isAdminOrFinance ? "ALL_EVER" : "MY_ALLOCATED";
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<UploadCategory>("ALL");
   const [selectedFormat, setSelectedFormat] = useState<FileFormatFilter>("ALL");
@@ -112,12 +156,14 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   const [projectionInitialIndex, setProjectionInitialIndex] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Direct Upload & Camera Staging State
+  // Direct Upload & Staged Files Drawer State
   const [isUploadDrawerOpen, setIsUploadDrawerOpen] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadCategory, setUploadCategory] = useState<UploadCategory>("RECEIPT");
   const [uploadTargetRequisitionId, setUploadTargetRequisitionId] = useState<string>("");
+  const [stagedFiles, setStagedFiles] = useState<StagedUploadFile[]>([]);
+  
   const [localDirectUploads, setLocalDirectUploads] = useState<GalleryItem[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -165,8 +211,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     return "other";
   };
 
-  // Build Master Aggregation of all uploads across the system
-  const masterUploadsList = useMemo<GalleryItem[]>(() => {
+  // Build Master Aggregation of ALL uploads ever uploaded across the system
+  const allMasterUploadsList = useMemo<GalleryItem[]>(() => {
     const items: GalleryItem[] = [];
     const seenUrls = new Set<string>();
 
@@ -235,7 +281,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         });
       });
 
-      // (c) Comments attachments if any
+      // (c) Comments attachments
       (req.comments || []).forEach((c, cIdx) => {
         if (Array.isArray(c.attachments)) {
           c.attachments.forEach((cAtt, cAttIdx) => {
@@ -276,9 +322,34 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     return items;
   }, [requisitions, localDirectUploads]);
 
+  // Role and Allocated Group Filtering
+  const scopedUploadsList = useMemo<GalleryItem[]>(() => {
+    // If scope is ALL_EVER, or user is Super Admin / Finance / Admin / Approver, show all
+    if (scopeFilter === "ALL_EVER" || isAdminOrFinance) {
+      return allMasterUploadsList;
+    }
+
+    // Otherwise filter for documents belonging to user's allocated group/ministry or submitted by user
+    return allMasterUploadsList.filter((item) => {
+      const isMyGroup = userAllocatedGroups.some(g => 
+        (item.groupName && item.groupName.toLowerCase() === g.toLowerCase()) ||
+        (item.requisition?.groupName && item.requisition.groupName.toLowerCase() === g.toLowerCase()) ||
+        (item.requisition?.groupId && item.requisition.groupId.toLowerCase() === g.toLowerCase())
+      );
+
+      const isMySubmission = 
+        (currentUser?.email && item.requisition?.requesterEmail?.toLowerCase() === currentUser.email.toLowerCase()) ||
+        (currentUser?.name && item.requisition?.requesterName?.toLowerCase() === currentUser.name.toLowerCase());
+
+      const isDirectUpload = item.sourceType === "DIRECT_UPLOAD";
+
+      return isMyGroup || isMySubmission || isDirectUpload;
+    });
+  }, [allMasterUploadsList, scopeFilter, isAdminOrFinance, userAllocatedGroups, currentUser]);
+
   // Filter and Search Logic
   const filteredUploads = useMemo(() => {
-    return masterUploadsList.filter((item) => {
+    return scopedUploadsList.filter((item) => {
       // Category filter
       if (selectedCategory !== "ALL" && item.category !== selectedCategory) {
         return false;
@@ -334,27 +405,27 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       }
       return 0;
     });
-  }, [masterUploadsList, selectedCategory, selectedFormat, selectedGroup, selectedStatus, searchQuery, sortBy]);
+  }, [scopedUploadsList, selectedCategory, selectedFormat, selectedGroup, selectedStatus, searchQuery, sortBy]);
 
   // Distinct groups for filter dropdown
   const availableGroups = useMemo(() => {
     const groups = new Set<string>();
-    masterUploadsList.forEach((item) => {
+    allMasterUploadsList.forEach((item) => {
       if (item.groupName) groups.add(item.groupName);
     });
     return Array.from(groups).sort();
-  }, [masterUploadsList]);
+  }, [allMasterUploadsList]);
 
   // Metric counts
   const metrics = useMemo(() => {
-    const total = masterUploadsList.length;
-    const images = masterUploadsList.filter(i => i.fileType === "image").length;
-    const pdfs = masterUploadsList.filter(i => i.fileType === "pdf").length;
-    const receipts = masterUploadsList.filter(i => i.category === "RECEIPT").length;
-    const invoices = masterUploadsList.filter(i => i.category === "INVOICE").length;
-    const quotations = masterUploadsList.filter(i => i.category === "QUOTATION").length;
+    const total = scopedUploadsList.length;
+    const images = scopedUploadsList.filter(i => i.fileType === "image").length;
+    const pdfs = scopedUploadsList.filter(i => i.fileType === "pdf").length;
+    const receipts = scopedUploadsList.filter(i => i.category === "RECEIPT").length;
+    const invoices = scopedUploadsList.filter(i => i.category === "INVOICE").length;
+    const quotations = scopedUploadsList.filter(i => i.category === "QUOTATION").length;
     return { total, images, pdfs, receipts, invoices, quotations };
-  }, [masterUploadsList]);
+  }, [scopedUploadsList]);
 
   // Handle Multi-selection
   const toggleSelectItem = (id: string, e?: React.MouseEvent) => {
@@ -384,12 +455,23 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     setIsProjectionOpen(true);
   };
 
-  // Projection attachment URLs list
-  const projectionAttachmentsList = useMemo(() => {
-    if (selectedItemIds.size > 0) {
-      return filteredUploads.filter(i => selectedItemIds.has(i.id)).map(i => i.url);
-    }
-    return filteredUploads.map(i => i.url);
+  // Projection items list mapping
+  const projectionItemsList = useMemo(() => {
+    const sourceList = selectedItemIds.size > 0 
+      ? filteredUploads.filter(i => selectedItemIds.has(i.id))
+      : filteredUploads;
+
+    return sourceList.map(item => ({
+      url: item.url,
+      fileName: item.fileName,
+      requisition: item.requisition,
+      requisitionId: item.requisitionId,
+      requisitionTitle: item.requisitionTitle,
+      groupName: item.groupName,
+      amount: item.amount,
+      status: item.status,
+      category: item.category
+    }));
   }, [filteredUploads, selectedItemIds]);
 
   // Copy URI Helper
@@ -452,77 +534,128 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     });
   };
 
-  // Handle Direct File Uploads
+  // Staging files when selected
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    await processUploadedFiles(Array.from(files));
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const processUploadedFiles = async (fileList: File[]) => {
-    setIsUploading(true);
-    const newItems: GalleryItem[] = [];
-
-    for (const file of fileList) {
+    
+    const newStaged: StagedUploadFile[] = [];
+    for (const file of Array.from(files)) {
       try {
         const formattedArray = await processFileToAttachmentStrings(file);
         const formattedStr = formattedArray[0] || "";
-        let dataUrl = formattedStr;
-
-        // Attempt server upload
-        try {
-          const res = await fetch("/api/attachments/upload", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              data: formattedStr,
-              fileName: file.name,
-              fileType: file.type
-            })
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (data.url) dataUrl = data.url;
-          }
-        } catch (serverErr) {
-          console.warn("Direct upload fallback to client storage:", serverErr);
-        }
-
-        const linkedReq = uploadTargetRequisitionId 
-          ? requisitions?.find(r => r.id === uploadTargetRequisitionId) 
-          : null;
-
-        const newItem: GalleryItem = {
-          id: `direct-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          url: dataUrl,
-          fileName: file.name,
-          fileType: inferFormat(dataUrl, file.name),
-          category: uploadCategory,
-          date: new Date().toISOString(),
-          sourceType: "DIRECT_UPLOAD",
-          requisition: linkedReq,
-          requisitionId: linkedReq?.id,
-          requisitionTitle: linkedReq?.title,
-          groupName: linkedReq?.groupName || currentUser?.group || "General Parish Uploads",
-          amount: linkedReq?.amount,
-          status: linkedReq?.status,
-          rawSize: `${(file.size / 1024).toFixed(1)} KB`
-        };
-
-        newItems.push(newItem);
+        const previewUrl = formattedStr.includes("::") ? formattedStr.split("::").slice(1).join("::") : formattedStr;
+        
+        newStaged.push({
+          id: `staged-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          file,
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          previewUrl,
+          formattedData: formattedStr
+        });
       } catch (err) {
-        console.error("Failed to process file:", file.name, err);
+        console.error("Error reading file for staging:", file.name, err);
       }
     }
 
-    if (newItems.length > 0) {
-      setLocalDirectUploads(prev => [...newItems, ...prev]);
+    setStagedFiles(prev => [...prev, ...newStaged]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleRemoveStagedFile = (id: string) => {
+    setStagedFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  // Commit & Save Staged Documents
+  const handleSaveStagedDocuments = async () => {
+    if (stagedFiles.length === 0) return;
+    setIsUploading(true);
+
+    const newGalleryItems: GalleryItem[] = [];
+    const newAttachmentUrlsForRequisition: string[] = [];
+
+    for (const staged of stagedFiles) {
+      let dataUrl = staged.previewUrl;
+
+      // Attempt server upload
+      try {
+        const res = await fetch("/api/attachments/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: staged.formattedData,
+            fileName: staged.name,
+            fileType: staged.file.type
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.url) dataUrl = data.url;
+        }
+      } catch (serverErr) {
+        console.warn("Direct upload fallback to client storage:", serverErr);
+      }
+
+      const linkedReq = uploadTargetRequisitionId 
+        ? requisitions?.find(r => r.id === uploadTargetRequisitionId) 
+        : null;
+
+      const formattedAttachmentStr = `${staged.name}::${dataUrl}`;
+      newAttachmentUrlsForRequisition.push(formattedAttachmentStr);
+
+      const newItem: GalleryItem = {
+        id: `direct-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        url: dataUrl,
+        fileName: staged.name,
+        fileType: inferFormat(dataUrl, staged.name),
+        category: uploadCategory,
+        date: new Date().toISOString(),
+        sourceType: "DIRECT_UPLOAD",
+        requisition: linkedReq,
+        requisitionId: linkedReq?.id,
+        requisitionTitle: linkedReq?.title,
+        groupName: linkedReq?.groupName || currentUser?.group || "General Parish Uploads",
+        amount: linkedReq?.amount,
+        status: linkedReq?.status,
+        rawSize: staged.size
+      };
+
+      newGalleryItems.push(newItem);
+    }
+
+    // If linked to a requisition, permanently update requisition's attachments
+    if (uploadTargetRequisitionId && updateRequisition) {
+      const targetReq = requisitions?.find(r => r.id === uploadTargetRequisitionId);
+      if (targetReq) {
+        try {
+          if (uploadCategory === "RECEIPT") {
+            const existingReceipts = Array.isArray(targetReq.receipts) ? targetReq.receipts : [];
+            await updateRequisition(targetReq.id, {
+              receipts: [...existingReceipts, ...newAttachmentUrlsForRequisition],
+              updatedAt: new Date().toISOString()
+            });
+          } else {
+            const existingAtts = Array.isArray(targetReq.attachments) ? targetReq.attachments : [];
+            await updateRequisition(targetReq.id, {
+              attachments: [...existingAtts, ...newAttachmentUrlsForRequisition],
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (updateErr) {
+          console.error("Failed to link uploaded document to requisition:", updateErr);
+        }
+      }
+    }
+
+    if (newGalleryItems.length > 0) {
+      setLocalDirectUploads(prev => [...newGalleryItems, ...prev]);
+      setStagedFiles([]);
       setIsUploadDrawerOpen(false);
       triggerToast?.({
         type: "SYSTEM_INFO",
-        message: `Successfully added ${newItems.length} document(s) to Uploads Gallery`,
+        message: `Saved ${newGalleryItems.length} document(s) successfully${uploadTargetRequisitionId ? ` & linked to requisition #${uploadTargetRequisitionId}` : ""}`,
         severity: "LOW",
         timestamp: new Date().toISOString()
       });
@@ -533,7 +666,25 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
 
   const handleCameraCapture = async (file: File) => {
     setIsCameraActive(false);
-    await processUploadedFiles([file]);
+    try {
+      const formattedArray = await processFileToAttachmentStrings(file);
+      const formattedStr = formattedArray[0] || "";
+      const previewUrl = formattedStr.includes("::") ? formattedStr.split("::").slice(1).join("::") : formattedStr;
+      
+      setStagedFiles(prev => [
+        ...prev,
+        {
+          id: `staged-cam-${Date.now()}`,
+          file,
+          name: `Camera_Scan_${formatDate(new Date().toISOString()).replace(/[^a-zA-Z0-9]/g, "_")}.jpg`,
+          size: `${(file.size / 1024).toFixed(1)} KB`,
+          previewUrl,
+          formattedData: formattedStr
+        }
+      ]);
+    } catch (e) {
+      console.error("Camera staging error:", e);
+    }
   };
 
   return (
@@ -546,16 +697,22 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             <Images className="w-7 h-7" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Uploads Gallery
+                Uploads & Documents Gallery
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-bold border border-indigo-200 dark:border-indigo-800">
-                {masterUploadsList.length} Uploads
+                {scopedUploadsList.length} Uploads
               </span>
+              {isAdminOrFinance && (
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
+                  <ShieldCheck size={13} />
+                  <span>Finance & Admin Master Access</span>
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
-              Central repository of all receipts, tax invoices, vouchers, and requisition attachments with built-in theater projection.
+              Central parish repository for receipts, tax invoices, quotations, and requisition attachments.
             </p>
           </div>
         </div>
@@ -564,19 +721,11 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         <div className="flex flex-wrap items-center gap-2.5 relative z-10">
           <button
             type="button"
-            onClick={() => handleOpenProjection(0)}
-            disabled={filteredUploads.length === 0}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
-            title="Launch full-screen projection / slideshow of all files"
-          >
-            <Cast className="w-4 h-4" />
-            <span>Projector View</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsUploadDrawerOpen(true)}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-slate-700/50 shadow-sm transition-all cursor-pointer"
+            onClick={() => {
+              setStagedFiles([]);
+              setIsUploadDrawerOpen(true);
+            }}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Upload Documents</span>
@@ -587,10 +736,50 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
       </div>
 
+      {/* Scope Visibility Segmented Pill (Show all documents ever uploaded vs My Allocated Ministry) */}
+      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Globe size={16} className="text-indigo-500" />
+          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Document Scope:</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setScopeFilter("ALL_EVER")}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              scopeFilter === "ALL_EVER"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            <Globe size={13} />
+            <span>All Documents Ever Uploaded ({allMasterUploadsList.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setScopeFilter("MY_ALLOCATED")}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              scopeFilter === "MY_ALLOCATED"
+                ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            <Users size={13} />
+            <span>
+              My Allocated Ministry {userAllocatedGroups.length > 0 ? `(${userAllocatedGroups[0]})` : ""}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Summary KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Total Uploads</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Scope Total</span>
           <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{metrics.total}</div>
         </div>
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -647,9 +836,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               onChange={(e) => setSelectedGroup(e.target.value)}
               className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
             >
-              <option value="ALL">All Groups</option>
-              {availableGroups.map((grp) => (
-                <option key={grp} value={grp}>{grp}</option>
+              <option value="ALL">All Ministries</option>
+              {availableGroups.map((g) => (
+                <option key={g} value={g}>{g}</option>
               ))}
             </select>
 
@@ -659,25 +848,23 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="px-3 py-2.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
             >
-              <option value="NEWEST">Newest First</option>
+              <option value="NEWEST">Newest Uploads</option>
               <option value="OLDEST">Oldest First</option>
               <option value="TITLE_AZ">File Name (A-Z)</option>
               <option value="GROUP_AZ">Ministry (A-Z)</option>
-              <option value="AMOUNT_HIGH">Amount (Highest)</option>
+              <option value="AMOUNT_HIGH">Highest Amount</option>
             </select>
 
-            {/* View Mode Toggle */}
-            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0">
+            {/* Grid / Table View Switcher */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
                 className={cn(
-                  "p-1.5 rounded-xl transition-all cursor-pointer",
-                  viewMode === "grid" 
-                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  "p-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                  viewMode === "grid" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
                 )}
-                title="Bento Grid View"
+                title="Grid View"
               >
                 <Grid className="w-4 h-4" />
               </button>
@@ -685,12 +872,10 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 type="button"
                 onClick={() => setViewMode("table")}
                 className={cn(
-                  "p-1.5 rounded-xl transition-all cursor-pointer",
-                  viewMode === "table" 
-                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  "p-2 rounded-xl text-xs font-bold transition-all cursor-pointer",
+                  viewMode === "table" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-800 dark:hover:text-white"
                 )}
-                title="Table List View"
+                title="Table View"
               >
                 <List className="w-4 h-4" />
               </button>
@@ -698,126 +883,125 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
           </div>
         </div>
 
-        {/* Category & Format Filter Chips */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          {/* Category Chips */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {[
-              { id: "ALL", label: "All Categories" },
-              { id: "RECEIPT", label: "Receipts" },
-              { id: "INVOICE", label: "Invoices" },
-              { id: "QUOTATION", label: "Quotations / LPOs" },
-              { id: "DELIVERY", label: "Delivery Notes" },
-              { id: "MEMO", label: "Memos" },
-              { id: "OTHER", label: "Other" }
-            ].map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setSelectedCategory(cat.id as UploadCategory)}
-                className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer",
-                  selectedCategory === cat.id
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                )}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
+        {/* Category Pills Strip */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+          {[
+            { id: "ALL", label: "All Types" },
+            { id: "RECEIPT", label: "Receipts" },
+            { id: "INVOICE", label: "Tax Invoices" },
+            { id: "QUOTATION", label: "Quotations / LPOs" },
+            { id: "DELIVERY", label: "Delivery Notes" },
+            { id: "MEMO", label: "Approvals & Memos" },
+            { id: "OTHER", label: "Other Attachments" }
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setSelectedCategory(cat.id as UploadCategory)}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border",
+                selectedCategory === cat.id
+                  ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                  : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750"
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
+
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1 shrink-0" />
 
           {/* Format Chips */}
-          <div className="flex items-center gap-1">
-            {[
-              { id: "ALL", label: "All Formats" },
-              { id: "IMAGE", label: "Images" },
-              { id: "PDF", label: "PDFs" },
-              { id: "SPREADSHEET", label: "Excel" }
-            ].map((fmt) => (
-              <button
-                key={fmt.id}
-                type="button"
-                onClick={() => setSelectedFormat(fmt.id as FileFormatFilter)}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer",
-                  selectedFormat === fmt.id
-                    ? "bg-slate-800 dark:bg-white text-white dark:text-slate-900"
-                    : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                )}
-              >
-                {fmt.label}
-              </button>
-            ))}
-          </div>
+          {[
+            { id: "ALL", label: "All Formats" },
+            { id: "IMAGE", label: "Images" },
+            { id: "PDF", label: "PDFs" },
+            { id: "SPREADSHEET", label: "Excel" },
+            { id: "DOCUMENT", label: "Docs" }
+          ].map((fmt) => (
+            <button
+              key={`fmt-${fmt.id}`}
+              type="button"
+              onClick={() => setSelectedFormat(fmt.id as FileFormatFilter)}
+              className={cn(
+                "px-3 py-1 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border",
+                selectedFormat === fmt.id
+                  ? "bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 border-transparent shadow-sm"
+                  : "bg-transparent border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              )}
+            >
+              {fmt.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Multi-Selection Action Toolbar */}
-      <div className="flex items-center justify-between px-2 text-xs font-bold text-slate-500 dark:text-slate-400">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={selectAllFiltered}
-            className="flex items-center gap-1.5 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
-          >
-            {selectedItemIds.size > 0 && selectedItemIds.size === filteredUploads.length ? (
-              <CheckSquare className="w-4 h-4 text-indigo-600" />
-            ) : (
-              <Square className="w-4 h-4" />
-            )}
-            <span>
-              {selectedItemIds.size > 0 ? `Selected (${selectedItemIds.size})` : "Select All"}
+      {/* Batch Actions Strip (When files selected) */}
+      {selectedItemIds.size > 0 && (
+        <div className="bg-indigo-600 text-white px-5 py-3 rounded-2xl flex items-center justify-between shadow-lg shadow-indigo-600/30">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-black uppercase tracking-wider bg-indigo-700 px-2.5 py-1 rounded-lg">
+              {selectedItemIds.size} Selected
             </span>
-          </button>
-          <span>•</span>
-          <span>Showing {filteredUploads.length} of {masterUploadsList.length} files</span>
-        </div>
+            <button
+              type="button"
+              onClick={selectAllFiltered}
+              className="text-xs font-bold hover:underline cursor-pointer"
+            >
+              {selectedItemIds.size === filteredUploads.length ? "Deselect All" : "Select All"}
+            </button>
+          </div>
 
-        {selectedItemIds.size > 0 && (
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => handleOpenProjection(0)}
-              className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 bg-white text-indigo-600 hover:bg-indigo-50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
             >
-              <Cast className="w-3.5 h-3.5" />
-              <span>Project Selected ({selectedItemIds.size})</span>
+              <Eye size={14} />
+              <span>View Selected ({selectedItemIds.size})</span>
             </button>
             <button
               type="button"
               onClick={handleBatchDownload}
-              className="px-3 py-1 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Selected</span>
+              <Download size={14} />
+              <span>Download Batch</span>
             </button>
             <button
               type="button"
               onClick={() => setSelectedItemIds(new Set())}
-              className="text-xs text-rose-500 hover:underline cursor-pointer ml-1"
+              className="p-1.5 hover:bg-indigo-700 rounded-lg text-white/80 hover:text-white cursor-pointer"
             >
-              Clear
+              <X size={15} />
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       {filteredUploads.length === 0 ? (
-        <div className="w-full py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 flex flex-col items-center justify-center text-center p-6 space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
-            <FolderOpen className="w-8 h-8" />
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-12 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-4">
+            <FolderOpen size={32} />
           </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">No uploads found</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              {searchQuery || selectedCategory !== "ALL" || selectedFormat !== "ALL"
-                ? "Try clearing filters or search terms to see all documents."
-                : "No files have been uploaded yet. Upload receipts or attachments to populate the gallery."}
-            </p>
-          </div>
-          {(searchQuery || selectedCategory !== "ALL" || selectedFormat !== "ALL") && (
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">No documents matched your criteria</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            {scopeFilter === "MY_ALLOCATED" 
+              ? "No documents found for your allocated ministry. Try switching to 'All Documents Ever Uploaded' to view parish archives."
+              : "Try adjusting your search query, format filters, or document category."}
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            {scopeFilter === "MY_ALLOCATED" && (
+              <button
+                type="button"
+                onClick={() => setScopeFilter("ALL_EVER")}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Show All Documents Ever Uploaded
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -825,286 +1009,226 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 setSelectedCategory("ALL");
                 setSelectedFormat("ALL");
                 setSelectedGroup("ALL");
+                setSelectedStatus("ALL");
               }}
-              className="px-4 py-2 bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
             >
               Reset Filters
             </button>
-          )}
+          </div>
         </div>
       ) : viewMode === "grid" ? (
-        /* Bento Grid Layout */
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        /* GRID VIEW */
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filteredUploads.map((item, idx) => {
             const isSelected = selectedItemIds.has(item.id);
-            const isPdf = item.fileType === "pdf";
-            const isImage = item.fileType === "image";
-
             return (
-              <motion.div
+              <div
                 key={item.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2, delay: Math.min(idx * 0.02, 0.3) }}
                 className={cn(
-                  "group relative bg-white dark:bg-slate-900 rounded-3xl border transition-all duration-300 overflow-hidden flex flex-col shadow-sm hover:shadow-md",
-                  isSelected 
-                    ? "border-indigo-500 ring-2 ring-indigo-500/20 shadow-indigo-500/10" 
+                  "bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden shadow-sm transition-all group hover:shadow-md flex flex-col relative",
+                  isSelected
+                    ? "border-indigo-500 ring-2 ring-indigo-500/20"
                     : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                 )}
               >
-                {/* Media Preview Container */}
+                {/* Media Preview Box */}
                 <div 
+                  className="aspect-video bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex items-center justify-center cursor-pointer"
                   onClick={() => handleOpenProjection(idx)}
-                  className="relative aspect-4/3 w-full bg-slate-100 dark:bg-slate-950/80 overflow-hidden cursor-pointer flex items-center justify-center"
                 >
-                  {isPdf ? (
-                    <div className="w-full h-full flex items-center justify-center p-2">
-                      <PdfThumbnailPreview
-                        url={item.url}
-                        title={item.fileName}
-                        className="w-full h-full object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-300"
-                        showOverlayBadge={false}
-                      />
-                    </div>
-                  ) : isImage ? (
+                  {item.fileType === "image" ? (
                     <CachedImage
                       src={item.url}
                       alt={item.fileName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
+                  ) : item.fileType === "pdf" ? (
+                    <div className="w-full h-full p-2 flex items-center justify-center">
+                      <PdfThumbnailPreview
+                        url={item.url}
+                        title={item.fileName}
+                        className="w-full h-full max-h-32 object-contain shadow-sm rounded-lg"
+                      />
+                    </div>
+                  ) : item.fileType === "spreadsheet" ? (
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                      <FileSpreadsheet size={28} />
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-4 text-slate-400 bg-slate-100 dark:bg-slate-900">
-                      {item.fileType === "spreadsheet" ? (
-                        <FileSpreadsheet className="w-12 h-12 text-emerald-500 mb-2" />
-                      ) : (
-                        <FileText className="w-12 h-12 text-indigo-500 mb-2" />
-                      )}
-                      <span className="text-[11px] font-bold text-slate-500 truncate max-w-full px-2">
-                        {item.fileName}
-                      </span>
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                      <FileText size={28} />
                     </div>
                   )}
 
-                  {/* Top Overlay Badges */}
-                  <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                  {/* Multi-select checkbox overlay */}
+                  <div 
+                    onClick={(e) => toggleSelectItem(item.id, e)}
+                    className="absolute top-2 left-2 z-10 p-1 rounded-lg bg-slate-950/60 backdrop-blur-md text-white hover:bg-slate-900 transition-all cursor-pointer"
+                  >
+                    {isSelected ? <CheckSquare size={16} className="text-indigo-400" /> : <Square size={16} className="text-slate-400" />}
+                  </div>
+
+                  {/* Category Pill Overlay */}
+                  <div className="absolute top-2 right-2">
                     <span className={cn(
-                      "px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm pointer-events-auto",
+                      "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider backdrop-blur-md",
                       item.category === "RECEIPT" && "bg-emerald-500/90 text-white",
                       item.category === "INVOICE" && "bg-blue-500/90 text-white",
-                      item.category === "QUOTATION" && "bg-indigo-500/90 text-white",
-                      item.category === "DELIVERY" && "bg-amber-500/90 text-white",
+                      item.category === "QUOTATION" && "bg-amber-500/90 text-white",
+                      item.category === "DELIVERY" && "bg-cyan-500/90 text-white",
                       item.category === "MEMO" && "bg-purple-500/90 text-white",
-                      item.category === "OTHER" && "bg-slate-800/90 text-white"
+                      item.category === "OTHER" && "bg-slate-800/90 text-slate-200"
                     )}>
                       {item.category}
                     </span>
-
-                    {/* Selection Checkbox */}
-                    <button
-                      type="button"
-                      onClick={(e) => toggleSelectItem(item.id, e)}
-                      className={cn(
-                        "w-7 h-7 rounded-xl flex items-center justify-center transition-all backdrop-blur-md pointer-events-auto cursor-pointer shadow-sm",
-                        isSelected 
-                          ? "bg-indigo-600 text-white" 
-                          : "bg-black/30 hover:bg-black/50 text-white opacity-0 group-hover:opacity-100"
-                      )}
-                    >
-                      {isSelected ? <Check className="w-4 h-4 stroke-[3]" /> : <Square className="w-4 h-4" />}
-                    </button>
                   </div>
 
-                  {/* Hover Quick Project Action Overlay */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none">
-                    <span className="px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white text-xs font-bold flex items-center gap-1.5 shadow-lg backdrop-blur-md transform translate-y-2 group-hover:translate-y-0 transition-transform">
-                      <Cast className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Project View</span>
-                    </span>
+                  {/* Hover Overlay Button to Open Document */}
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenProjection(idx);
+                      }}
+                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg cursor-pointer"
+                    >
+                      <Eye size={14} />
+                      <span>Open File</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Card Information Footer */}
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                  <div className="space-y-1.5">
-                    <div className="flex items-start justify-between gap-1">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" title={item.fileName}>
-                        {item.fileName}
-                      </h4>
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0 uppercase">
-                        {item.fileType}
-                      </span>
-                    </div>
+                {/* Details Footer */}
+                <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                  <div>
+                    <h4 
+                      className="text-xs font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400" 
+                      title={item.fileName}
+                      onClick={() => handleOpenProjection(idx)}
+                    >
+                      {item.fileName}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {item.groupName || "Diocese Ministry"}
+                    </p>
+                  </div>
 
-                    {/* Linked Requisition / Group Info */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
                     {item.requisition ? (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           if (item.requisition) {
                             setSelectedRequisition(item.requisition);
                             onViewRequisition?.(item.requisition);
                           }
                         }}
-                        className="text-left group/req flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer w-full truncate"
+                        className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer truncate max-w-[120px]"
                       >
-                        <Building2 className="w-3 h-3 shrink-0 text-slate-400 group-hover/req:text-indigo-500" />
-                        <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">
-                          {item.requisition.id}
-                        </span>
-                        <span className="text-slate-400 truncate">
-                          • {item.groupName}
-                        </span>
+                        #{item.requisition.id}
                       </button>
                     ) : (
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 truncate">
-                        <Tag className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{item.groupName || "Parish Document"}</span>
-                      </div>
+                      <span className="text-slate-400 text-[10px]">Direct Upload</span>
                     )}
-                  </div>
-
-                  {/* Actions & Timestamp Strip */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>{formatDate(item.date)}</span>
 
                     <div className="flex items-center gap-1">
-                      {/* Copy URI */}
                       <button
                         type="button"
-                        onClick={(e) => handleCopyUri(item, e)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Copy Attachment URI"
+                        onClick={() => handleOpenProjection(idx)}
+                        className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        title="View Document"
                       >
-                        {copiedId === item.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <Eye size={13} />
                       </button>
-
-                      {/* Download */}
                       <button
                         type="button"
                         onClick={(e) => handleDownload(item, e)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Download File"
+                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        title="Download file"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download size={13} />
                       </button>
-
-                      {/* Direct Project Trigger */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenProjection(idx);
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 transition-colors cursor-pointer"
-                        title="Launch Projector for this document"
+                        onClick={(e) => handleCopyUri(item, e)}
+                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        title="Copy URL"
                       >
-                        <Cast className="w-3.5 h-3.5" />
+                        {copiedId === item.id ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                       </button>
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       ) : (
-        /* Detailed Table List Layout */
+        /* TABLE VIEW */
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 uppercase font-black tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="py-3 px-4 w-10 text-center">
-                    <button onClick={selectAllFiltered} className="cursor-pointer">
-                      {selectedItemIds.size > 0 && selectedItemIds.size === filteredUploads.length ? (
-                        <CheckSquare className="w-4 h-4 text-indigo-600" />
+                  <th className="py-3 px-4 w-10">
+                    <button type="button" onClick={selectAllFiltered} className="cursor-pointer">
+                      {selectedItemIds.size === filteredUploads.length && filteredUploads.length > 0 ? (
+                        <CheckSquare size={15} className="text-indigo-600" />
                       ) : (
-                        <Square className="w-4 h-4" />
+                        <Square size={15} />
                       )}
                     </button>
                   </th>
-                  <th className="py-3 px-4">Preview</th>
-                  <th className="py-3 px-4">File Name</th>
+                  <th className="py-3 px-4">Document File</th>
                   <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Linked Requisition</th>
+                  <th className="py-3 px-4">Requisition</th>
                   <th className="py-3 px-4">Ministry Group</th>
-                  <th className="py-3 px-4">Date Uploaded</th>
+                  <th className="py-3 px-4">Upload Date</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredUploads.map((item, idx) => {
                   const isSelected = selectedItemIds.has(item.id);
-                  const isPdf = item.fileType === "pdf";
-                  const isImage = item.fileType === "image";
-
                   return (
                     <tr 
                       key={item.id}
                       className={cn(
-                        "hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors",
-                        isSelected && "bg-indigo-50/50 dark:bg-indigo-950/20"
+                        "hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors",
+                        isSelected && "bg-indigo-50/50 dark:bg-indigo-950/30"
                       )}
                     >
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => toggleSelectItem(item.id, e)}
-                          className="cursor-pointer"
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="w-4 h-4 text-indigo-600" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-400" />
-                          )}
+                      <td className="py-3 px-4">
+                        <button type="button" onClick={(e) => toggleSelectItem(item.id, e)} className="cursor-pointer">
+                          {isSelected ? <CheckSquare size={15} className="text-indigo-600" /> : <Square size={15} className="text-slate-400" />}
                         </button>
                       </td>
-
-                      {/* Thumbnail */}
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
                         <div 
+                          className="flex items-center gap-2.5 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                           onClick={() => handleOpenProjection(idx)}
-                          className="w-12 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer flex items-center justify-center shrink-0"
                         >
-                          {isPdf ? (
-                            <PdfThumbnailPreview url={item.url} title={item.fileName} className="w-full h-full object-contain" />
-                          ) : isImage ? (
-                            <CachedImage src={item.url} alt={item.fileName} className="w-full h-full object-cover" />
-                          ) : (
-                            <FileText className="w-5 h-5 text-slate-400" />
-                          )}
+                          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                            {item.fileType === "pdf" ? <FileText size={14} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={14} /> : <Images size={14} />}
+                          </div>
+                          <span className="truncate max-w-xs">{item.fileName}</span>
                         </div>
                       </td>
-
-                      {/* File Name */}
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white max-w-xs truncate">
-                          {item.fileName}
-                        </div>
-                        <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                          {item.fileType}
-                        </span>
-                      </td>
-
-                      {/* Category Badge */}
                       <td className="py-3 px-4">
                         <span className={cn(
-                          "px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider",
-                          item.category === "RECEIPT" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-                          item.category === "INVOICE" && "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-                          item.category === "QUOTATION" && "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-                          item.category === "DELIVERY" && "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-                          item.category === "MEMO" && "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
-                          item.category === "OTHER" && "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                          "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase",
+                          item.category === "RECEIPT" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+                          item.category === "INVOICE" && "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+                          item.category === "QUOTATION" && "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+                          item.category === "DELIVERY" && "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
+                          item.category === "MEMO" && "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
+                          item.category === "OTHER" && "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300"
                         )}>
                           {item.category}
                         </span>
                       </td>
-
-                      {/* Requisition */}
                       <td className="py-3 px-4">
                         {item.requisition ? (
                           <button
@@ -1117,33 +1241,27 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             }}
                             className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
                           >
-                            {item.requisition.id}
+                            #{item.requisition.id}
                           </button>
                         ) : (
                           <span className="text-slate-400 italic">Standalone</span>
                         )}
                       </td>
-
-                      {/* Ministry Group */}
                       <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-medium">
                         {item.groupName || "Diocese Ministry"}
                       </td>
-
-                      {/* Date */}
                       <td className="py-3 px-4 text-slate-500">
                         {formatDate(item.date)}
                       </td>
-
-                      {/* Actions */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenProjection(idx)}
                             className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 cursor-pointer"
-                            title="Projector View"
+                            title="View Document"
                           >
-                            <Cast className="w-4 h-4" />
+                            <Eye size={14} />
                           </button>
                           <button
                             type="button"
@@ -1151,7 +1269,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
                             title="Download"
                           >
-                            <Download className="w-4 h-4" />
+                            <Download size={14} />
                           </button>
                           <button
                             type="button"
@@ -1159,7 +1277,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
                             title="Copy URI"
                           >
-                            {copiedId === item.id ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                            {copiedId === item.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                           </button>
                         </div>
                       </td>
@@ -1173,17 +1291,25 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       )}
 
       {/* Projection Modal */}
-      {isProjectionOpen && projectionAttachmentsList.length > 0 && (
+      {isProjectionOpen && projectionItemsList.length > 0 && (
         <AttachmentProjectionModal
-          attachments={projectionAttachmentsList}
+          attachments={projectionItemsList.map(i => i.url)}
+          items={projectionItemsList}
           initialIndex={projectionInitialIndex}
           onClose={() => setIsProjectionOpen(false)}
+          onViewRequisition={(req) => {
+            setIsProjectionOpen(false);
+            if (req) {
+              setSelectedRequisition(req);
+              onViewRequisition?.(req);
+            }
+          }}
           title="Parish Uploads Master Gallery"
           groupName="All Diocese Ministry Uploads"
         />
       )}
 
-      {/* Upload Documents Modal Drawer */}
+      {/* Upload Documents Modal Drawer with Staged Files & Save Button */}
       <AnimatePresence>
         {isUploadDrawerOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -1191,8 +1317,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden p-6 space-y-5"
+              className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden p-6 space-y-5"
             >
+              {/* Drawer Header */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
@@ -1213,7 +1340,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               </div>
 
               {/* Upload Form Details */}
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
                 {/* Category Selection */}
                 <div>
                   <label className="text-[11px] font-black uppercase text-slate-400 tracking-wider block mb-1.5">
@@ -1258,7 +1385,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     <option value="">-- Standalone Parish Document --</option>
                     {(requisitions || []).map((req) => (
                       <option key={req.id} value={req.id}>
-                        {req.id} - {req.title} ({req.groupName || "Parish"})
+                        #{req.id} - {req.title} ({req.groupName || "Parish"})
                       </option>
                     ))}
                   </select>
@@ -1267,7 +1394,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 {/* Dropzone Container */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-2xl p-6 text-center cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-800/30 hover:bg-indigo-50/20 flex flex-col items-center justify-center space-y-2"
+                  className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-2xl p-5 text-center cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-800/30 hover:bg-indigo-50/20 flex flex-col items-center justify-center space-y-2"
                 >
                   <input
                     ref={fileInputRef}
@@ -1277,8 +1404,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     onChange={handleFilesSelected}
                     className="hidden"
                   />
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                    <Upload className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <Upload className="w-5 h-5" />
                   </div>
                   <div>
                     <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
@@ -1292,16 +1419,97 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 </div>
 
                 {/* Camera Trigger */}
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsCameraActive(true)}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Camera className="w-4 h-4 text-indigo-500" />
-                    <span>Scan with Camera / Webcam</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCameraActive(true)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Camera className="w-4 h-4 text-indigo-500" />
+                  <span>Scan with Camera / Webcam</span>
+                </button>
+
+                {/* Staged Files Preview List */}
+                {stagedFiles.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                        Staged Documents ({stagedFiles.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setStagedFiles([])}
+                        className="text-[10px] text-rose-500 hover:underline cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                      {stagedFiles.map((staged) => (
+                        <div
+                          key={staged.id}
+                          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                              <FileText size={15} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[240px]">
+                                {staged.name}
+                              </p>
+                              <span className="text-[10px] text-slate-400">{staged.size}</span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveStagedFile(staged.id)}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                            title="Remove file"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons with Prominent Save Button */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStagedFiles([]);
+                    setIsUploadDrawerOpen(false);
+                  }}
+                  disabled={isUploading}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 rounded-2xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveStagedDocuments}
+                  disabled={stagedFiles.length === 0 || isUploading}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  {isUploading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>
+                    {isUploading 
+                      ? "Saving Documents..." 
+                      : stagedFiles.length > 0 
+                        ? `Save ${stagedFiles.length} Document${stagedFiles.length > 1 ? "s" : ""}` 
+                        : "Save Documents"}
+                  </span>
+                </button>
               </div>
             </motion.div>
           </div>

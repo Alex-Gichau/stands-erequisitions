@@ -11,30 +11,23 @@ import {
   ZoomIn, 
   ZoomOut, 
   RotateCw, 
-  RotateCcw, 
   Download, 
   ChevronLeft, 
   ChevronRight, 
-  Cast, 
-  Sun, 
-  Moon, 
-  Contrast, 
   FileText, 
   FileSpreadsheet, 
   Eye, 
   EyeOff, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Clock, 
   ExternalLink, 
   Printer, 
-  Sparkles,
-  Layers,
-  Grid,
-  Search,
-  Crosshair,
-  Sliders,
-  Share2
+  Layers, 
+  CheckCircle2,
+  Clock,
+  Pin,
+  PinOff,
+  Building2,
+  Tag,
+  FolderOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -47,14 +40,29 @@ import {
 } from "../lib/utils";
 import { CachedImage } from "./CachedImage";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
-import { Requisition, UserRole, RequisitionStatus } from "../types";
+import { Requisition, RequisitionStatus } from "../types";
 
-export type ProjectionTheme = "cinema" | "daylight" | "inverted" | "blueprint";
+export interface ProjectorGalleryItem {
+  url: string;
+  fileName?: string;
+  title?: string;
+  requisition?: Requisition | null;
+  requisitionId?: string;
+  requisitionTitle?: string;
+  groupName?: string;
+  amount?: number;
+  amountWords?: string;
+  requesterName?: string;
+  status?: string;
+  category?: string;
+}
 
 export interface AttachmentProjectionModalProps {
   attachments: string[];
+  items?: ProjectorGalleryItem[];
   initialIndex?: number;
   onClose: () => void;
+  onViewRequisition?: (req: Requisition) => void;
   requisition?: Requisition | null;
   title?: string;
   groupName?: string;
@@ -66,9 +74,11 @@ export interface AttachmentProjectionModalProps {
 
 export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps> = ({
   attachments: rawAttachments = [],
+  items = [],
   initialIndex = 0,
   onClose,
-  requisition,
+  onViewRequisition,
+  requisition: initialRequisition,
   title: customTitle,
   groupName: customGroupName,
   amount: customAmount,
@@ -78,11 +88,17 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
 }) => {
   // Normalize attachments array
   const attachments = useMemo(() => {
-    if (!rawAttachments) return [];
-    if (Array.isArray(rawAttachments)) return rawAttachments.filter(Boolean);
-    if (typeof rawAttachments === "string" && rawAttachments) return [rawAttachments];
+    if (rawAttachments && Array.isArray(rawAttachments) && rawAttachments.length > 0) {
+      return rawAttachments.filter(Boolean);
+    }
+    if (items && items.length > 0) {
+      return items.map(i => i.url).filter(Boolean);
+    }
+    if (typeof rawAttachments === "string" && rawAttachments) {
+      return [rawAttachments];
+    }
     return [];
-  }, [rawAttachments]);
+  }, [rawAttachments, items]);
 
   const [currentIndex, setCurrentIndex] = useState<number>(() => {
     if (initialIndex >= 0 && initialIndex < attachments.length) return initialIndex;
@@ -95,21 +111,33 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [theme, setTheme] = useState<ProjectionTheme>("cinema");
-  const [showMetadataOverlay, setShowMetadataOverlay] = useState<boolean>(true);
+  
+  // Side Requisition Details Panel State
+  const [showSideDetails, setShowSideDetails] = useState<boolean>(true);
   const [showThumbnailsStrip, setShowThumbnailsStrip] = useState<boolean>(true);
-  const [isLaserActive, setIsLaserActive] = useState<boolean>(false);
-  const [laserPos, setLaserPos] = useState<{ x: number; y: number }>({ x: -100, y: -100 });
   const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Autohide Header State
+  const [isHeaderVisible, setIsHeaderVisible] = useState<boolean>(true);
+  const [isHeaderPinned, setIsHeaderPinned] = useState<boolean>(false);
+  const hideHeaderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Active attachment resolution
+  // Active item and attachment resolution
   const currentAttachment = attachments[currentIndex] || "";
   const currentUrl = useMemo(() => normalizeAttachmentUrl(currentAttachment), [currentAttachment]);
-  const currentFileName = useMemo(() => getAttachmentFileName(currentAttachment) || `Document_${currentIndex + 1}`, [currentAttachment, currentIndex]);
+  
+  const currentItem = useMemo<ProjectorGalleryItem | null>(() => {
+    if (items && items[currentIndex]) return items[currentIndex];
+    return null;
+  }, [items, currentIndex]);
+
+  const currentFileName = useMemo(() => {
+    return currentItem?.fileName || getAttachmentFileName(currentAttachment) || `Document_${currentIndex + 1}`;
+  }, [currentItem, currentAttachment, currentIndex]);
 
   const fileExt = useMemo(() => {
     const ext = currentFileName.split(".").pop()?.toLowerCase() || "";
@@ -144,18 +172,48 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
     );
   }, [fileExt, currentFileName]);
 
-  const isDoc = useMemo(() => {
-    return fileExt === "docx" || fileExt === "doc" || /\.(docx|doc)$/i.test(currentFileName);
-  }, [fileExt, currentFileName]);
+  // Dynamically resolve linked Requisition for active document
+  const activeRequisition = useMemo<Requisition | null>(() => {
+    if (currentItem?.requisition) return currentItem.requisition;
+    if (initialRequisition) return initialRequisition;
+    return null;
+  }, [currentItem, initialRequisition]);
 
-  // Derived Requisition Info
-  const displayTitle = customTitle || requisition?.title || "Requisition Supporting Document";
-  const displayGroupName = customGroupName || requisition?.groupName || "Diocese Ministry";
-  const displayAmount = customAmount !== undefined ? customAmount : requisition?.amount;
-  const displayAmountWords = customAmountWords || requisition?.amountWords;
-  const displayRequester = customRequesterName || requisition?.requesterName || "Authorized Member";
-  const displayStatus = customStatus || requisition?.status || RequisitionStatus.SUBMITTED;
-  const reqId = requisition?.id || "";
+  // Derived Requisition Display Info
+  const displayTitle = currentItem?.requisitionTitle || currentItem?.title || customTitle || activeRequisition?.title || currentFileName;
+  const displayGroupName = currentItem?.groupName || customGroupName || activeRequisition?.groupName || "Diocese Ministry";
+  const displayAmount = currentItem?.amount !== undefined ? currentItem.amount : (customAmount !== undefined ? customAmount : activeRequisition?.amount);
+  const displayAmountWords = currentItem?.amountWords || customAmountWords || activeRequisition?.amountWords;
+  const displayRequester = currentItem?.requesterName || customRequesterName || activeRequisition?.requesterName || "Authorized Member";
+  const displayStatus = currentItem?.status || customStatus || activeRequisition?.status || RequisitionStatus.SUBMITTED;
+  const reqId = currentItem?.requisitionId || activeRequisition?.id || "";
+
+  // All attachments for the currently active requisition (for side panel document switcher)
+  const requisitionAttachments = useMemo(() => {
+    if (!activeRequisition) return [];
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    const rawAtts = Array.isArray(activeRequisition.attachments)
+      ? activeRequisition.attachments
+      : (activeRequisition.attachments ? [activeRequisition.attachments] : []);
+
+    const rawRcpts = Array.isArray(activeRequisition.receipts)
+      ? activeRequisition.receipts
+      : (activeRequisition.receipts ? [activeRequisition.receipts] : []);
+
+    [...rawAtts, ...rawRcpts].forEach((att) => {
+      if (att && typeof att === "string") {
+        const norm = normalizeAttachmentUrl(att);
+        if (norm && !seen.has(norm)) {
+          seen.add(norm);
+          list.push(norm);
+        }
+      }
+    });
+
+    return list;
+  }, [activeRequisition]);
 
   // Reset viewport when navigating attachments
   useEffect(() => {
@@ -165,13 +223,43 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
     setIsDragging(false);
   }, [currentIndex]);
 
+  // Autohide Header Timer logic
+  const resetHeaderTimer = useCallback(() => {
+    setIsHeaderVisible(true);
+    if (hideHeaderTimeoutRef.current) {
+      clearTimeout(hideHeaderTimeoutRef.current);
+    }
+    if (!isHeaderPinned) {
+      hideHeaderTimeoutRef.current = setTimeout(() => {
+        setIsHeaderVisible(false);
+      }, 3000);
+    }
+  }, [isHeaderPinned]);
+
+  useEffect(() => {
+    if (isHeaderPinned) {
+      setIsHeaderVisible(true);
+      if (hideHeaderTimeoutRef.current) {
+        clearTimeout(hideHeaderTimeoutRef.current);
+      }
+    } else {
+      resetHeaderTimer();
+    }
+    return () => {
+      if (hideHeaderTimeoutRef.current) {
+        clearTimeout(hideHeaderTimeoutRef.current);
+      }
+    };
+  }, [isHeaderPinned, resetHeaderTimer]);
+
   // Keyboard Navigation & Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in an input
       if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
+
+      resetHeaderTimer();
 
       switch (e.key) {
         case "ArrowRight":
@@ -210,25 +298,15 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           e.preventDefault();
           setRotation((prev) => (prev + 90) % 360);
           break;
-        case "l":
-        case "L":
+        case "d":
+        case "D":
           e.preventDefault();
-          setIsLaserActive((prev) => !prev);
-          break;
-        case "h":
-        case "H":
-          e.preventDefault();
-          setShowMetadataOverlay((prev) => !prev);
+          setShowSideDetails((prev) => !prev);
           break;
         case "t":
         case "T":
           e.preventDefault();
           setShowThumbnailsStrip((prev) => !prev);
-          break;
-        case "i":
-        case "I":
-          e.preventDefault();
-          setTheme((prev) => (prev === "inverted" ? "cinema" : "inverted"));
           break;
         case "f":
         case "F":
@@ -244,7 +322,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, attachments.length, onClose]);
+  }, [currentIndex, attachments.length, onClose, resetHeaderTimer]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -264,14 +342,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isLaserActive && stageRef.current) {
-      const rect = stageRef.current.getBoundingClientRect();
-      setLaserPos({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
-
+    resetHeaderTimer();
     if (!isDragging || zoom <= 1) return;
     setOffset({
       x: e.clientX - dragStart.x,
@@ -286,66 +357,11 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   // Mouse wheel zoom
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    resetHeaderTimer();
     if (e.deltaY < 0) {
       setZoom((prev) => Math.min(prev + 0.15, 4));
     } else {
       setZoom((prev) => Math.max(prev - 0.15, 0.5));
-    }
-  };
-
-  // Pop-out Projector Window for Dual Displays / HDMI Projectors
-  const openExternalProjectorWindow = () => {
-    const projectorData = {
-      url: currentUrl,
-      title: displayTitle,
-      fileName: currentFileName,
-      amount: displayAmount,
-      group: displayGroupName,
-      status: displayStatus,
-    };
-
-    const newWin = window.open(
-      "",
-      `StAndrewsProjector_${Date.now()}`,
-      "width=1280,height=800,menubar=no,toolbar=no,location=no,status=no"
-    );
-
-    if (newWin) {
-      newWin.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Projector — ${displayTitle}</title>
-            <style>
-              body { margin: 0; background: #07090e; color: #fff; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-              .header { padding: 12px 24px; background: #0f1422; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; }
-              .content { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
-              img { max-width: 95vw; max-height: 85vh; object-fit: contain; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
-              iframe { width: 95vw; height: 85vh; border: none; border-radius: 8px; }
-              .badge { background: #3b82f6; color: white; padding: 4px 10px; border-radius: 999px; font-weight: bold; font-size: 11px; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <div>
-                <strong style="font-size: 16px;">${displayTitle}</strong>
-                <div style="font-size: 12px; color: #94a3b8;">${displayGroupName} &bull; ${displayRequester}</div>
-              </div>
-              <div>
-                <span class="badge">${displayStatus}</span>
-              </div>
-            </div>
-            <div class="content">
-              ${
-                isPdf
-                  ? `<iframe src="${currentUrl}"></iframe>`
-                  : `<img src="${currentUrl}" alt="${currentFileName}" />`
-              }
-            </div>
-          </body>
-        </html>
-      `);
-      newWin.document.close();
     }
   };
 
@@ -391,17 +407,25 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
     }
   };
 
-  // Theme styling helpers
-  const themeClasses = {
-    cinema: "bg-slate-950 text-slate-100",
-    daylight: "bg-slate-100 text-slate-900",
-    inverted: "bg-black text-amber-300 filter invert contrast-125",
-    blueprint: "bg-slate-900 text-cyan-400 font-mono",
+  // Switch to specific attachment URL
+  const handleSelectRequisitionAttachment = (attUrl: string) => {
+    const existingIndex = attachments.findIndex(a => normalizeAttachmentUrl(a) === normalizeAttachmentUrl(attUrl));
+    if (existingIndex >= 0) {
+      setCurrentIndex(existingIndex);
+    }
+  };
+
+  // Open Requisition Details in main app
+  const handleOpenRequisitionDetails = () => {
+    if (activeRequisition && onViewRequisition) {
+      onClose();
+      onViewRequisition(activeRequisition);
+    }
   };
 
   if (attachments.length === 0) {
     return (
-      <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-6">
+      <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-6">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center text-white shadow-2xl">
           <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
             <FileText size={32} />
@@ -411,8 +435,9 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
             There are no supporting vouchers, receipts, or documents attached to this record.
           </p>
           <button
+            type="button"
             onClick={onClose}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all w-full"
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all w-full cursor-pointer"
           >
             Close Projector
           </button>
@@ -424,35 +449,37 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   return (
     <div
       ref={containerRef}
-      className={cn(
-        "fixed inset-0 z-[160] flex flex-col select-none overflow-hidden transition-colors duration-300",
-        themeClasses[theme]
-      )}
+      className="fixed inset-0 z-[160] flex flex-col select-none overflow-hidden bg-slate-950 text-slate-100"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
     >
-      {/* Laser Pointer Spotlight */}
-      {isLaserActive && laserPos.x >= 0 && (
-        <div
-          className="pointer-events-none fixed z-[200] -translate-x-1/2 -translate-y-1/2"
-          style={{ left: laserPos.x, top: laserPos.y }}
-        >
-          <div className="w-4 h-4 rounded-full bg-rose-500 shadow-[0_0_20px_6px_rgba(244,63,94,0.9)] animate-pulse" />
-          <div className="absolute inset-0 w-4 h-4 rounded-full bg-white scale-50" />
-        </div>
-      )}
+      {/* Top Edge Trigger Area for Autohide Header */}
+      <div 
+        className="fixed top-0 left-0 right-0 h-4 z-[170]"
+        onMouseEnter={() => setIsHeaderVisible(true)}
+      />
 
-      {/* TOP PROJECTION CONTROL BAR */}
-      <header className="px-6 py-3.5 bg-slate-950/80 backdrop-blur-md border-b border-white/10 flex items-center justify-between gap-4 z-40 shrink-0">
-        {/* Left: Branding & Current Attachment Title */}
+      {/* AUTOHIDE TOP PROJECTION CONTROL BAR */}
+      <motion.header
+        initial={{ y: 0 }}
+        animate={{ y: isHeaderVisible ? 0 : -80 }}
+        transition={{ duration: 0.25, ease: "easeInOut" }}
+        onMouseEnter={() => {
+          if (hideHeaderTimeoutRef.current) clearTimeout(hideHeaderTimeoutRef.current);
+          setIsHeaderVisible(true);
+        }}
+        onMouseLeave={resetHeaderTimer}
+        className="fixed top-0 left-0 right-0 px-6 py-3 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-4 z-[180] shadow-2xl"
+      >
+        {/* Left: Current Attachment & Requisition Info */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shadow-sm shrink-0">
-            <Cast size={18} />
+            <FileText size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-black uppercase tracking-wider font-mono">
-                ATTACHMENT PROJECTOR
+                DOCUMENT VIEWER
               </span>
               <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[9px] font-bold uppercase font-mono">
                 {currentIndex + 1} OF {attachments.length}
@@ -463,17 +490,18 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 </span>
               )}
             </div>
-            <h2 className="text-sm font-bold text-white truncate mt-0.5 max-w-md md:max-w-xl">
+            <h2 className="text-xs md:text-sm font-bold text-white truncate mt-0.5 max-w-sm md:max-w-md lg:max-w-lg">
               {currentFileName}
             </h2>
           </div>
         </div>
 
-        {/* Center: Stage Tools (Zoom, Rotate, Laser, Stamp, Presets) */}
+        {/* Center: Stage Tools (Zoom, Rotate, Stamp) */}
         <div className="hidden lg:flex items-center gap-1.5 bg-white/5 p-1 rounded-2xl border border-white/10">
           <button
+            type="button"
             onClick={() => setZoom((prev) => Math.max(prev - 0.25, 0.5))}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all"
+            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Zoom Out (-)"
           >
             <ZoomOut size={16} />
@@ -482,301 +510,419 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
             {Math.round(zoom * 100)}%
           </span>
           <button
+            type="button"
             onClick={() => setZoom((prev) => Math.min(prev + 0.25, 4))}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all"
+            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Zoom In (+)"
           >
             <ZoomIn size={16} />
           </button>
           <button
+            type="button"
             onClick={() => {
               setZoom(1);
               setOffset({ x: 0, y: 0 });
               setRotation(0);
             }}
-            className="px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+            className="px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer"
             title="Reset Zoom & Rotation (0)"
           >
             Reset
           </button>
           <div className="w-px h-5 bg-white/10 mx-1" />
           <button
+            type="button"
             onClick={() => setRotation((prev) => (prev + 90) % 360)}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all"
+            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Rotate 90° Clockwise (R)"
           >
             <RotateCw size={16} />
           </button>
-          <button
-            onClick={() => setIsLaserActive((prev) => !prev)}
-            className={cn(
-              "p-2 rounded-xl transition-all flex items-center gap-1 text-[11px] font-bold",
-              isLaserActive ? "bg-rose-600 text-white shadow-lg shadow-rose-950" : "hover:bg-white/10 text-white"
-            )}
-            title="Toggle Laser Pointer Spotlight (L)"
-          >
-            <Crosshair size={16} />
-            <span className="hidden xl:inline">Laser</span>
-          </button>
           <div className="w-px h-5 bg-white/10 mx-1" />
-          {/* Theme Selector */}
           <button
-            onClick={() => setTheme("cinema")}
+            type="button"
+            onClick={() => setSelectedStamp((prev) => (prev ? null : "VERIFIED"))}
             className={cn(
-              "px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
-              theme === "cinema" ? "bg-white/20 text-white" : "text-slate-400 hover:text-white"
+              "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+              selectedStamp ? "bg-emerald-600 text-white shadow-md" : "text-slate-300 hover:bg-white/10"
             )}
+            title="Toggle Audit Verified Stamp"
           >
-            Cinema
-          </button>
-          <button
-            onClick={() => setTheme("daylight")}
-            className={cn(
-              "px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
-              theme === "daylight" ? "bg-white/20 text-white" : "text-slate-400 hover:text-white"
-            )}
-          >
-            Daylight
-          </button>
-          <button
-            onClick={() => setTheme("inverted")}
-            className={cn(
-              "px-2 py-1 rounded-lg text-[10px] font-bold transition-all",
-              theme === "inverted" ? "bg-white/20 text-white" : "text-slate-400 hover:text-white"
-            )}
-            title="Invert High-Contrast for thermal receipts (I)"
-          >
-            Invert
+            {selectedStamp ? "Stamped" : "+ Stamp"}
           </button>
         </div>
 
-        {/* Right: Actions (Pop-out, Overlay Toggle, Fullscreen, Print, Download, Close) */}
+        {/* Right: Actions (Open Requisition Detail, Side Panel Toggle, Fullscreen, Print, Download, Close) */}
         <div className="flex items-center gap-2">
+          {/* Open Requisition Details Button */}
+          {activeRequisition && (
+            <button
+              type="button"
+              onClick={handleOpenRequisitionDetails}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950 cursor-pointer"
+              title="Open Requisition Details (shows all attachment documents)"
+            >
+              <FileText size={14} />
+              <span className="hidden sm:inline">Open Requisition Detail</span>
+            </button>
+          )}
+
+          {/* Toggle Side Requisition Details Panel */}
           <button
-            onClick={() => setShowMetadataOverlay((prev) => !prev)}
+            type="button"
+            onClick={() => setShowSideDetails((prev) => !prev)}
             className={cn(
-              "p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5",
-              showMetadataOverlay
-                ? "bg-indigo-600 border-indigo-500 text-white"
+              "p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer",
+              showSideDetails
+                ? "bg-indigo-600 border-indigo-500 text-white shadow-lg"
                 : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
             )}
-            title="Toggle Financial Header Banner (H)"
+            title="Toggle Requisition Details Side Panel (D)"
           >
-            {showMetadataOverlay ? <Eye size={15} /> : <EyeOff size={15} />}
-            <span className="hidden md:inline">Header</span>
+            <Layers size={15} />
+            <span className="hidden md:inline">Requisition Info</span>
+          </button>
+
+          {/* Pin/Unpin Header */}
+          <button
+            type="button"
+            onClick={() => setIsHeaderPinned((prev) => !prev)}
+            className={cn(
+              "p-2.5 rounded-xl border transition-all text-xs font-bold cursor-pointer hidden md:flex",
+              isHeaderPinned
+                ? "bg-white/20 border-white/30 text-white"
+                : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+            )}
+            title={isHeaderPinned ? "Header Pinned (Always Visible)" : "Autohide Header Enabled"}
+          >
+            {isHeaderPinned ? <Pin size={15} /> : <PinOff size={15} />}
           </button>
 
           <button
-            onClick={openExternalProjectorWindow}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all"
-            title="Open in Dedicated Projector Window / Secondary Screen"
-          >
-            <ExternalLink size={16} />
-          </button>
-
-          <button
+            type="button"
             onClick={handlePrint}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all"
+            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Print Document"
           >
             <Printer size={16} />
           </button>
 
           <button
+            type="button"
             onClick={downloadCurrentAttachment}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all"
+            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Download File"
           >
             <Download size={16} />
           </button>
 
           <button
+            type="button"
             onClick={toggleFullscreen}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all"
+            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
             title="Toggle Fullscreen (F)"
           >
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-2.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl transition-all ml-2"
+            className="p-2.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl transition-all ml-1 cursor-pointer"
             title="Exit Projector (ESC)"
           >
             <X size={18} />
           </button>
         </div>
-      </header>
+      </motion.header>
 
-      {/* MAIN PROJECTION CANVAS STAGE */}
-      <main
-        ref={stageRef}
-        className="flex-1 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-4 md:p-8"
-        onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
-      >
-        {/* Floating Presentation Info Overlay Banner */}
-        <AnimatePresence>
-          {showMetadataOverlay && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-6 left-6 z-30 max-w-xl w-full bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-2xl p-4 shadow-2xl text-white pointer-events-auto"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold">
-                      {displayGroupName}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold uppercase">
-                      {displayStatus}
-                    </span>
-                    {displayAmount !== undefined && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold">
-                        {formatCurrency(displayAmount)}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-base font-bold text-white mt-1.5 truncate">
-                    {displayTitle}
-                  </h3>
-                  {displayAmountWords && (
-                    <p className="text-[11px] text-slate-300 italic truncate mt-0.5">
-                      "{displayAmountWords}"
-                    </p>
-                  )}
-                  <div className="flex items-center gap-4 mt-2 text-[11px] text-slate-400">
-                    <span>
-                      Requester: <strong className="text-white">{displayRequester}</strong>
-                    </span>
-                    {requisition?.payableTo && (
-                      <span>
-                        Payee: <strong className="text-white">{requisition.payableTo}</strong>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Stamp Tag Button */}
-                <div className="flex flex-col gap-1.5 shrink-0">
-                  <button
-                    onClick={() => setSelectedStamp((prev) => (prev ? null : "APPROVED L2"))}
-                    className={cn(
-                      "px-3 py-1 rounded-xl text-[9px] font-black tracking-wider uppercase border transition-all",
-                      selectedStamp
-                        ? "bg-emerald-600 border-emerald-400 text-white shadow-lg"
-                        : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-                    )}
-                  >
-                    {selectedStamp ? `STAMP: ${selectedStamp}` : "+ AUDIT STAMP"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Projection Stage Media Content */}
-        <div
-          className="transition-transform duration-75 flex items-center justify-center max-w-full max-h-full"
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-            transformOrigin: "center center",
-          }}
+      {/* MAIN PROJECTION BODY (Stage + Right Side Details Panel) */}
+      <div className="flex-1 flex overflow-hidden relative pt-14">
+        {/* CENTER PROJECTION STAGE */}
+        <main
+          ref={stageRef}
+          className="flex-1 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-4 md:p-8"
+          onMouseDown={handleMouseDown}
+          onWheel={handleWheel}
         >
-          {isImage ? (
-            <div className="relative group shadow-2xl rounded-xl overflow-hidden max-h-[82vh] max-w-[90vw]">
-              <img
-                src={currentUrl}
-                alt={currentFileName}
-                className="max-h-[82vh] max-w-[90vw] object-contain rounded-xl select-none"
-                draggable={false}
-              />
-              {selectedStamp && (
-                <div className="absolute top-10 right-10 rotate-[-12deg] pointer-events-none">
-                  <div className="border-4 border-emerald-500 text-emerald-500 font-black text-2xl px-6 py-2 rounded-2xl tracking-widest uppercase bg-slate-950/70 backdrop-blur-sm shadow-2xl">
-                    {selectedStamp}
+          {/* Projection Stage Media Content */}
+          <div
+            className="transition-transform duration-75 flex items-center justify-center max-w-full max-h-full"
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+              transformOrigin: "center center",
+            }}
+          >
+            {isImage ? (
+              <div className="relative group shadow-2xl rounded-2xl overflow-hidden max-h-[80vh] max-w-[85vw] border border-white/10 bg-slate-900/60">
+                <img
+                  src={currentUrl}
+                  alt={currentFileName}
+                  className="max-h-[80vh] max-w-[85vw] object-contain rounded-2xl select-none"
+                  draggable={false}
+                />
+                {selectedStamp && (
+                  <div className="absolute top-8 right-8 rotate-[-12deg] pointer-events-none">
+                    <div className="border-4 border-emerald-400 text-emerald-400 font-black text-2xl px-6 py-2 rounded-2xl tracking-widest uppercase bg-slate-950/80 backdrop-blur-md shadow-2xl">
+                      {selectedStamp}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ) : isPdf ? (
-            <div className="w-[85vw] h-[82vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
-              <iframe
-                src={`${currentUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-                title={currentFileName}
-                className="w-full h-full border-none"
-              />
-            </div>
-          ) : isExcel ? (
-            <div className="p-12 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
-              <div className="w-20 h-20 rounded-3xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30 shadow-lg">
-                <FileSpreadsheet size={40} />
+                )}
               </div>
-              <h4 className="text-lg font-bold text-white">{currentFileName}</h4>
-              <p className="text-xs text-slate-400 mt-2 mb-6">
-                Excel Spreadsheet Attachment &bull; Download to inspect detailed budget sheets and formulas.
-              </p>
-              <div className="flex gap-3 justify-center">
+            ) : isPdf ? (
+              <div className="w-[82vw] md:w-[70vw] lg:w-[60vw] h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
+                <iframe
+                  src={`${currentUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                  title={currentFileName}
+                  className="w-full h-full border-none"
+                />
+              </div>
+            ) : isExcel ? (
+              <div className="p-10 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30 shadow-lg">
+                  <FileSpreadsheet size={36} />
+                </div>
+                <h4 className="text-base font-bold text-white truncate">{currentFileName}</h4>
+                <p className="text-xs text-slate-400 mt-2 mb-6">
+                  Excel Spreadsheet Attachment &bull; Download to inspect detailed budget sheets and formulas.
+                </p>
                 <button
+                  type="button"
                   onClick={downloadCurrentAttachment}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 mx-auto cursor-pointer"
                 >
-                  <Download size={16} />
+                  <Download size={15} />
                   <span>Download Spreadsheet</span>
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="p-12 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
-              <div className="w-20 h-20 rounded-3xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 shadow-lg">
-                <FileText size={40} />
+            ) : (
+              <div className="p-10 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 shadow-lg">
+                  <FileText size={36} />
+                </div>
+                <h4 className="text-base font-bold text-white truncate">{currentFileName}</h4>
+                <p className="text-xs text-slate-400 mt-2 mb-6">
+                  Document Attachment &bull; Download or inspect using system office suite.
+                </p>
+                <button
+                  type="button"
+                  onClick={downloadCurrentAttachment}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 mx-auto cursor-pointer"
+                >
+                  <Download size={15} />
+                  <span>Download Document</span>
+                </button>
               </div>
-              <h4 className="text-lg font-bold text-white">{currentFileName}</h4>
-              <p className="text-xs text-slate-400 mt-2 mb-6">
-                Document File &bull; Download or inspect using system office suite.
-              </p>
-              <button
-                onClick={downloadCurrentAttachment}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 mx-auto"
-              >
-                <Download size={16} />
-                <span>Download Document</span>
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Carousel Slide Left / Right Arrows */}
-        {attachments.length > 1 && (
-          <>
-            <button
-              onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
-              disabled={currentIndex === 0}
-              className="absolute left-6 top-1/2 -translate-y-1/2 p-4 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30"
-              title="Previous Attachment (Left Arrow)"
+          {/* Carousel Slide Left / Right Arrows */}
+          {attachments.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
+                disabled={currentIndex === 0}
+                className="absolute left-6 top-1/2 -translate-y-1/2 p-3.5 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
+                title="Previous Attachment (Left Arrow)"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, attachments.length - 1))}
+                disabled={currentIndex === attachments.length - 1}
+                className="absolute right-6 top-1/2 -translate-y-1/2 p-3.5 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
+                title="Next Attachment (Right Arrow)"
+              >
+                <ChevronRight size={22} />
+              </button>
+            </>
+          )}
+        </main>
+
+        {/* SIDE REQUISITION DETAILS PANEL (Just like Requisition Details) */}
+        <AnimatePresence>
+          {showSideDetails && (
+            <motion.aside
+              initial={{ x: 380, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 380, opacity: 0 }}
+              transition={{ type: "spring", damping: 26, stiffness: 240 }}
+              className="w-80 sm:w-96 bg-slate-900/95 backdrop-blur-2xl border-l border-white/10 flex flex-col h-full z-40 shrink-0 shadow-2xl overflow-y-auto"
             >
-              <ChevronLeft size={24} />
-            </button>
-            <button
-              onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, attachments.length - 1))}
-              disabled={currentIndex === attachments.length - 1}
-              className="absolute right-6 top-1/2 -translate-y-1/2 p-4 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30"
-              title="Next Attachment (Right Arrow)"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </>
-        )}
-      </main>
+              {/* Side Panel Header */}
+              <div className="p-4 border-b border-white/10 flex items-center justify-between gap-2 bg-slate-950/60 sticky top-0 z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                    <Layers size={14} />
+                  </div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                    Requisition Details
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSideDetails(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Close Side Panel"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Side Panel Body */}
+              <div className="p-4 space-y-5 text-xs text-slate-300">
+                {/* Requisition ID & Status Badges */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {reqId ? (
+                      <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold">
+                        #{reqId}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-bold">
+                        Standalone Upload
+                      </span>
+                    )}
+                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                      {displayStatus}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white leading-snug">
+                    {displayTitle}
+                  </h4>
+                </div>
+
+                {/* Ministry & Financial Info */}
+                <div className="bg-slate-950/60 rounded-2xl p-3.5 border border-white/5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Ministry / Group</span>
+                    <span className="font-bold text-slate-200">{displayGroupName}</span>
+                  </div>
+                  {displayAmount !== undefined && (
+                    <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Requisition Amount</span>
+                      <span className="font-mono font-black text-amber-300 text-sm">
+                        {formatCurrency(displayAmount)}
+                      </span>
+                    </div>
+                  )}
+                  {displayAmountWords && (
+                    <p className="text-[10px] text-slate-400 italic pt-1 border-t border-white/5">
+                      "{displayAmountWords}"
+                    </p>
+                  )}
+                </div>
+
+                {/* Requester & Payee Details */}
+                <div className="space-y-2 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Requester:</span>
+                    <strong className="text-white">{displayRequester}</strong>
+                  </div>
+                  {activeRequisition?.payableTo && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Payable To:</span>
+                      <strong className="text-white">{activeRequisition.payableTo}</strong>
+                    </div>
+                  )}
+                  {activeRequisition?.createdAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Date Created:</span>
+                      <span className="text-slate-300">{formatDate(activeRequisition.createdAt)}</span>
+                    </div>
+                  )}
+                  {(activeRequisition?.description || (activeRequisition as any)?.purpose) && (
+                    <div className="pt-2 border-t border-white/5">
+                      <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Expenditure Purpose</span>
+                      <p className="text-slate-300 text-[11px] leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                        {activeRequisition.description || (activeRequisition as any).purpose}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attachments (Documents) Section in Side Panel */}
+                <div className="space-y-2.5 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <FileText size={13} className="text-indigo-400" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                        Attachment Documents ({requisitionAttachments.length || attachments.length})
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    {(requisitionAttachments.length > 0 ? requisitionAttachments : attachments).map((att, idx) => {
+                      const url = normalizeAttachmentUrl(att);
+                      const name = getAttachmentFileName(att) || `Document_${idx + 1}`;
+                      const isCurrent = normalizeAttachmentUrl(currentAttachment) === url;
+
+                      return (
+                        <div
+                          key={`side-doc-${idx}`}
+                          onClick={() => handleSelectRequisitionAttachment(url)}
+                          className={cn(
+                            "p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 group",
+                            isCurrent
+                              ? "bg-indigo-600/30 border-indigo-400 text-white shadow-md"
+                              : "bg-slate-950/40 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={cn(
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs",
+                              isCurrent ? "bg-indigo-600 text-white" : "bg-white/5 text-slate-400 group-hover:text-white"
+                            )}>
+                              {idx + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-bold truncate max-w-[160px] text-slate-200">
+                                {name}
+                              </p>
+                              {isCurrent && (
+                                <span className="text-[9px] font-mono text-emerald-400 font-bold uppercase block">
+                                  Currently Viewing
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Eye size={13} className={cn("shrink-0", isCurrent ? "text-emerald-400" : "opacity-0 group-hover:opacity-100")} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Primary Action Button: Open Actual Requisition Detail */}
+                {activeRequisition && (
+                  <div className="pt-3 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={handleOpenRequisitionDetails}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-950 cursor-pointer"
+                    >
+                      <ExternalLink size={14} />
+                      <span>Open Full Requisition Details</span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 text-center mt-1.5">
+                      View full approval ledger, vouchers, and thread discussion
+                    </p>
+                  </div>
+                )}
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* BOTTOM THUMBNAILS CAROUSEL & KEYBOARD HINTS */}
       {showThumbnailsStrip && attachments.length > 1 && (
-        <footer className="px-6 py-3 bg-slate-950/90 backdrop-blur-xl border-t border-white/10 flex items-center justify-between gap-4 z-40 shrink-0 overflow-x-auto">
+        <footer className="px-6 py-2.5 bg-slate-950/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-between gap-4 z-40 shrink-0 overflow-x-auto">
           {/* Thumbnails strip */}
-          <div className="flex items-center gap-3 overflow-x-auto py-1">
+          <div className="flex items-center gap-2.5 overflow-x-auto py-1">
             {attachments.map((att, idx) => {
               const url = normalizeAttachmentUrl(att);
               const name = getAttachmentFileName(att) || `Doc ${idx + 1}`;
@@ -784,9 +930,10 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
               return (
                 <button
                   key={`thumb-${idx}`}
+                  type="button"
                   onClick={() => setCurrentIndex(idx)}
                   className={cn(
-                    "relative w-16 h-12 rounded-xl overflow-hidden border-2 transition-all shrink-0 group flex items-center justify-center bg-slate-900",
+                    "relative w-14 h-11 rounded-xl overflow-hidden border-2 transition-all shrink-0 group flex items-center justify-center bg-slate-900 cursor-pointer",
                     isSelected
                       ? "border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)] scale-105"
                       : "border-white/10 hover:border-white/40 opacity-60 hover:opacity-100"
@@ -816,7 +963,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
               <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">R</kbd> Rotate
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">L</kbd> Laser
+              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">D</kbd> Details
             </span>
             <span>
               <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">F</kbd> Fullscreen

@@ -10,7 +10,6 @@ import {
   FileSpreadsheet, 
   Image as ImageIcon, 
   Camera, 
-  Cast, 
   Trash2, 
   Download, 
   Plus, 
@@ -285,14 +284,14 @@ export const FileUploadProjectionCenter: React.FC<FileUploadProjectionCenterProp
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                File Upload & Attachment Projection Hub
+                File Upload & Document Processing Hub
               </h3>
               <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase font-mono border border-indigo-200 dark:border-indigo-800/40">
-                PROJECTION READY
+                ACTIVE
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Upload invoices, vouchers, and spreadsheets with high-contrast meeting projection support
+              Upload invoices, vouchers, receipts, and spreadsheets with instant document preview support
             </p>
           </div>
         </div>
@@ -304,10 +303,10 @@ export const FileUploadProjectionCenter: React.FC<FileUploadProjectionCenterProp
               <button
                 onClick={() => openProjectorForIndex(0)}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
-                title="Project all uploaded files on screen"
+                title="View uploaded files"
               >
-                <Cast size={15} />
-                <span>Project All ({items.length})</span>
+                <Eye size={15} />
+                <span>View All ({items.length})</span>
               </button>
 
               <button
@@ -422,7 +421,7 @@ export const FileUploadProjectionCenter: React.FC<FileUploadProjectionCenterProp
                     <div 
                       onClick={() => openProjectorForIndex(idx)}
                       className="w-14 h-14 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 flex items-center justify-center cursor-pointer relative group/thumb shadow-sm"
-                      title="Click to Project"
+                      title="Click to View Document"
                     >
                       {isImg ? (
                         <img
@@ -443,14 +442,17 @@ export const FileUploadProjectionCenter: React.FC<FileUploadProjectionCenterProp
                       )}
 
                       <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
-                        <Cast size={16} />
+                        <Eye size={16} />
                       </div>
                     </div>
 
                     {/* Metadata & Category Controls */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <h5 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                        <h5 
+                          className="text-xs font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                          onClick={() => openProjectorForIndex(idx)}
+                        >
                           {item.name}
                         </h5>
                         <button
@@ -492,13 +494,14 @@ export const FileUploadProjectionCenter: React.FC<FileUploadProjectionCenterProp
                           ))}
                         </select>
 
-                        {/* Quick Project Button */}
+                        {/* Quick View Button */}
                         <button
                           onClick={() => openProjectorForIndex(idx)}
-                          className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1"
+                          className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                          title="View Document"
                         >
-                          <Cast size={11} />
-                          <span>Project</span>
+                          <Eye size={11} />
+                          <span>View</span>
                         </button>
 
                         <button

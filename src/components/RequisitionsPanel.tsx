@@ -78,8 +78,7 @@ import {
   Layers,
   Split,
   Banknote,
-  CheckCircle2,
-  Cast
+  CheckCircle2
 } from "lucide-react";
 import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentFormatUtils";
 import { motion, AnimatePresence } from "motion/react";
@@ -1963,16 +1962,6 @@ const DocumentPreviewModal = ({
 
 
 
-            {/* Projector Mode */}
-            <button
-              onClick={() => setIsProjectorOpen(true)}
-              className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-              title="Launch Attachment Projector View (Auditorium / Big Screen)"
-            >
-              <Cast size={15} />
-              <span className="hidden sm:inline">Projector</span>
-            </button>
-
             {/* Download */}
             {currentDoc?.uri && (
               <button
@@ -2259,6 +2248,7 @@ const DocumentPreviewModal = ({
           attachments={attachments}
           initialIndex={activeDocIndex}
           onClose={() => setIsProjectorOpen(false)}
+          requisition={requisition}
           title={requisition?.title || "Requisition Document Projection"}
           groupName={requisition?.groupName || "Diocese Committee Review"}
         />
@@ -6731,17 +6721,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       {normalizedAttachments.length}
                     </span>
                   </div>
-                  {normalizedAttachments.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsProjectorOpen(true)}
-                      className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl text-[10px] font-bold border border-indigo-500/20 transition-all flex items-center gap-1.5 shadow-sm self-start sm:self-auto cursor-pointer"
-                      title="Launch Attachment Projector View for presentations / reviews"
-                    >
-                      <Cast size={13} />
-                      <span>Project Attachments</span>
-                    </button>
-                  )}
                 </div>
 
                 {/* Main Visual Thumbnail Grid */}
@@ -8261,6 +8240,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               attachments={normalizedAttachments}
               initialIndex={0}
               onClose={() => setIsProjectorOpen(false)}
+              requisition={req}
               title={req.title || "Requisition Document Projection"}
               groupName={req.groupName || "Diocese Committee Review"}
             />

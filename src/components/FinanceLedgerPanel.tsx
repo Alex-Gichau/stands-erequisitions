@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   Coins,
   BookOpen,
@@ -1085,6 +1085,31 @@ export const FinanceLedgerPanel: React.FC = () => {
     }
   };
 
+  // Payout Queue Pagination state (15 rows)
+  const [payoutQueuePage, setPayoutQueuePage] = useState(1);
+  const payoutQueueItemsPerPage = 15;
+
+  const payoutQueueEntries = useMemo(() => {
+    return requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED);
+  }, [requisitions]);
+
+  const paginatedPayoutQueue = useMemo(() => {
+    const startIndex = (payoutQueuePage - 1) * payoutQueueItemsPerPage;
+    return payoutQueueEntries.slice(startIndex, startIndex + payoutQueueItemsPerPage);
+  }, [payoutQueueEntries, payoutQueuePage]);
+
+  const totalPayoutQueuePages = Math.max(1, Math.ceil(payoutQueueEntries.length / payoutQueueItemsPerPage));
+
+  useEffect(() => {
+    if (payoutQueuePage > totalPayoutQueuePages) {
+      setPayoutQueuePage(totalPayoutQueuePages);
+    }
+  }, [totalPayoutQueuePages, payoutQueuePage]);
+
+  // Double-Entry Ledger Books Pagination state (15 rows)
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const ledgerItemsPerPage = 15;
+
   // Filtered list of requisitions specifically acting as General Ledger Line Items
   const ledgerEntries = useMemo(() => {
     return requisitions.filter(req => {
@@ -1119,6 +1144,24 @@ export const FinanceLedgerPanel: React.FC = () => {
       return dateB - dateA;
     });
   }, [requisitions, searchTerm, statusFilter, selectedProjectId]);
+
+  const paginatedLedgerEntries = useMemo(() => {
+    const startIndex = (ledgerPage - 1) * ledgerItemsPerPage;
+    return ledgerEntries.slice(startIndex, startIndex + ledgerItemsPerPage);
+  }, [ledgerEntries, ledgerPage]);
+
+  const totalLedgerPages = Math.max(1, Math.ceil(ledgerEntries.length / ledgerItemsPerPage));
+
+  useEffect(() => {
+    if (ledgerPage > totalLedgerPages) {
+      setLedgerPage(totalLedgerPages);
+    }
+  }, [totalLedgerPages, ledgerPage]);
+
+  // Reset ledger page to 1 when filters or search change
+  useEffect(() => {
+    setLedgerPage(1);
+  }, [searchTerm, statusFilter, selectedProjectId]);
 
   // Double entry voucher layout generator window trigger
   const printLedgerVoucher = (req: Requisition) => {
@@ -2057,20 +2100,25 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
 
           {/* 5. Awaiting Disbursement Box */}
-          {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED).length > 0 && (
+          {payoutQueueEntries.length > 0 && (
             <div className="bg-amber-50/50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-inner">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <ShieldAlert className="text-amber-600" size={18} />
+                  <ShieldAlert className="text-amber-600 shrink-0" size={18} />
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Payout Queue ({metrics.pendingDisbursalCount})</h3>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">
+                      Payout Queue ({payoutQueueEntries.length})
+                    </h3>
                     <p className="text-[10px] text-slate-500">Authorized requests ready for immediate payment processing.</p>
                   </div>
+                </div>
+                <div className="text-[10px] text-amber-800/80 font-mono font-bold bg-amber-100/70 border border-amber-200 px-2.5 py-1 rounded-lg self-start sm:self-auto">
+                  Showing {(payoutQueuePage - 1) * payoutQueueItemsPerPage + 1} - {Math.min(payoutQueuePage * payoutQueueItemsPerPage, payoutQueueEntries.length)} of {payoutQueueEntries.length}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {requisitions.filter(r => r.status === RequisitionStatus.APPROVED_L2 || r.status === RequisitionStatus.PARTIALLY_DISBURSED).map((req) => {
+                {paginatedPayoutQueue.map((req) => {
                   const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
                   const remaining = req.remainingBalance ?? Math.max(0, (req.amount || 0) - (req.disbursedAmount || 0));
                   const nextPendingInst = req.enableInstallments && Array.isArray(req.installments) 
@@ -2132,6 +2180,33 @@ export const FinanceLedgerPanel: React.FC = () => {
                   );
                 })}
               </div>
+
+              {totalPayoutQueuePages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between border-t border-amber-200/60 pt-3 text-xs font-bold text-slate-600 gap-2">
+                  <p className="text-[10px] text-amber-900/70 uppercase tracking-wider">
+                    Showing {(payoutQueuePage - 1) * payoutQueueItemsPerPage + 1} - {Math.min(payoutQueuePage * payoutQueueItemsPerPage, payoutQueueEntries.length)} of {payoutQueueEntries.length} requests
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={payoutQueuePage === 1}
+                      onClick={() => setPayoutQueuePage(p => Math.max(p - 1, 1))}
+                      className="px-3 py-1.5 bg-white border border-amber-200 hover:bg-amber-100/60 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-xs font-bold text-slate-700"
+                    >
+                      Previous
+                    </button>
+                    <span className="font-mono text-[10px] text-slate-600 px-1">
+                      Page {payoutQueuePage} of {totalPayoutQueuePages}
+                    </span>
+                    <button
+                      disabled={payoutQueuePage === totalPayoutQueuePages}
+                      onClick={() => setPayoutQueuePage(p => Math.min(p + 1, totalPayoutQueuePages))}
+                      className="px-3 py-1.5 bg-white border border-amber-200 hover:bg-amber-100/60 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-xs font-bold text-slate-700"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2143,7 +2218,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                 <p className="text-[10px] text-slate-500">Every payout and reserve commitment balance ledger transaction.</p>
               </div>
               <div className="text-[10px] text-slate-400 font-bold">
-                Showing {ledgerEntries.length} entries
+                {ledgerEntries.length > 0 
+                  ? `Showing ${(ledgerPage - 1) * ledgerItemsPerPage + 1}-${Math.min(ledgerPage * ledgerItemsPerPage, ledgerEntries.length)} of ${ledgerEntries.length} entries`
+                  : "Showing 0 entries"}
               </div>
             </div>
 
@@ -2165,7 +2242,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {ledgerEntries.map((req) => {
+                    {paginatedLedgerEntries.map((req) => {
                       const isExpanded = expandedReqId === req.id;
                       const codeInfo = getAccountingCode(req.groupId);
                       const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
@@ -2405,6 +2482,34 @@ export const FinanceLedgerPanel: React.FC = () => {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Double-Entry Ledger Pagination Footer */}
+            {totalLedgerPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 px-6 py-4 gap-3 text-xs font-bold text-slate-600 bg-slate-50/40">
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">
+                  Showing {(ledgerPage - 1) * ledgerItemsPerPage + 1} - {Math.min(ledgerPage * ledgerItemsPerPage, ledgerEntries.length)} of {ledgerEntries.length} transactions
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={ledgerPage === 1}
+                    onClick={() => setLedgerPage(p => Math.max(p - 1, 1))}
+                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-xs font-bold text-slate-700"
+                  >
+                    Previous
+                  </button>
+                  <span className="font-mono text-[10px] text-slate-600 px-1">
+                    Page {ledgerPage} of {totalLedgerPages}
+                  </span>
+                  <button
+                    disabled={ledgerPage === totalLedgerPages}
+                    onClick={() => setLedgerPage(p => Math.min(p + 1, totalLedgerPages))}
+                    className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-xs font-bold text-slate-700"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

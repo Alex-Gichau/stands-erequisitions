@@ -5,6 +5,7 @@ export const COMMITTED_REQUISITION_STATUSES = [
   RequisitionStatus.APPROVED_L1,
   RequisitionStatus.ESCALATED,
   RequisitionStatus.APPROVED_L2,
+  RequisitionStatus.PARTIALLY_DISBURSED,
   RequisitionStatus.DISBURSED
 ];
 

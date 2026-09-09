@@ -11,6 +11,7 @@ import { processFileToAttachmentStrings } from "../lib/pdfUtils";
 import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
+import { COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
@@ -25,7 +26,22 @@ interface NewRequisitionFormProps {
 export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose, editReq, req, isPage }) => {
   const targetReq = editReq || req;
   const isEditMode = Boolean(targetReq);
-  const { addRequisition, updateRequisition, startBackgroundUploadTask, currentUser, users, projects, churchGroups, addChurchGroup, vendors, addVendor, triggerToast } = useRequisitions();
+  const { 
+    addRequisition, 
+    updateRequisition, 
+    startBackgroundUploadTask, 
+    currentUser, 
+    users, 
+    projects, 
+    churchGroups, 
+    addChurchGroup, 
+    vendors, 
+    addVendor, 
+    triggerToast,
+    requisitions,
+    ledgerBooks,
+    systemSettings
+  } = useRequisitions();
   const activeYear = getActiveFiscalYear();
   const [amount, setAmount] = useState<string>(targetReq?.amount !== undefined ? targetReq.amount.toString() : "");
   const [amountWords, setAmountWords] = useState<string>(targetReq?.amountWords || (targetReq?.amount ? numberToWords(targetReq.amount) : ""));
@@ -142,6 +158,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [addingGroup, setAddingGroup] = useState(false);
   const [showDraftConfirm, setShowDraftConfirm] = useState(false);
+  const [showOverBudgetWarningModal, setShowOverBudgetWarningModal] = useState(false);
+  const [hasConfirmedOverBudget, setHasConfirmedOverBudget] = useState(false);
 
   const handleAddNewGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -235,6 +253,73 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       return Array.from(set);
     });
   };
+
+  // Group Budget & Remaining Balance Calculation
+  const effectiveGroupName = selectedGroup || targetReq?.groupName || currentUser?.group || (churchGroups?.[0]?.name || "");
+
+  const matchingProject = React.useMemo(() => {
+    const clean = (effectiveGroupName || "").trim().toLowerCase();
+    if (!clean) return undefined;
+    return projects?.find(p => {
+      const pGroup = (p.groupId || "").trim().toLowerCase();
+      const pName = (p.name || "").trim().toLowerCase();
+      return pGroup === clean || pName === clean || pGroup.includes(clean) || clean.includes(pGroup);
+    });
+  }, [projects, effectiveGroupName]);
+
+  const matchingLedger = React.useMemo(() => {
+    const clean = (effectiveGroupName || "").trim().toLowerCase();
+    if (!clean) return undefined;
+    return ledgerBooks?.find(lb => {
+      const lbName = (lb.ministryName || "").trim().toLowerCase();
+      const lbId = (lb.ministryId || "").trim().toLowerCase();
+      return lbName === clean || lbId === clean || lbName.includes(clean) || clean.includes(lbName);
+    });
+  }, [ledgerBooks, effectiveGroupName]);
+
+  const groupAllocatedBudget = React.useMemo(() => {
+    if (matchingProject && Number(matchingProject.allocatedBudget) > 0) {
+      return Number(matchingProject.allocatedBudget);
+    }
+    if (matchingLedger && Number(matchingLedger.budgetLimit) > 0) {
+      return Number(matchingLedger.budgetLimit);
+    }
+    return 0;
+  }, [matchingProject, matchingLedger]);
+
+  const groupExistingCommitments = React.useMemo(() => {
+    if (!requisitions || requisitions.length === 0) return 0;
+    const clean = (effectiveGroupName || "").trim().toLowerCase();
+    if (!clean) return 0;
+    const currentFiscalYear = systemSettings?.currentFiscalYear || 2026;
+
+    const committedReqs = requisitions.filter(r => {
+      // Exclude current requisition in edit mode
+      if (isEditMode && targetReq && r.id === targetReq.id) return false;
+      // Check status
+      if (!COMMITTED_REQUISITION_STATUSES.includes(r.status)) return false;
+      // Check fiscal year
+      if (r.fiscalYear && r.fiscalYear !== currentFiscalYear) return false;
+
+      const rGroup = (r.groupName || r.groupId || "").trim().toLowerCase();
+      const matchesGroup = rGroup === clean || rGroup.includes(clean) || clean.includes(rGroup);
+      const matchesProject = matchingProject && r.projectId === matchingProject.id;
+      return matchesGroup || matchesProject;
+    });
+
+    return committedReqs.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  }, [requisitions, effectiveGroupName, isEditMode, targetReq, systemSettings, matchingProject]);
+
+  const groupRemainingBalance = React.useMemo(() => {
+    if (groupAllocatedBudget <= 0) return 0;
+    return Math.max(0, groupAllocatedBudget - groupExistingCommitments);
+  }, [groupAllocatedBudget, groupExistingCommitments]);
+
+  const parsedAmountNum = Number(amount) || 0;
+  const isBudgetConfigured = groupAllocatedBudget > 0;
+  const totalProjectedCommitment = groupExistingCommitments + parsedAmountNum;
+  const isOverBudget = isBudgetConfigured && parsedAmountNum > 0 && (totalProjectedCommitment > groupAllocatedBudget);
+  const budgetDeficit = isOverBudget ? totalProjectedCommitment - groupAllocatedBudget : 0;
 
   // Compute members assigned to the currently selected ministry group
   const ministryMembers = React.useMemo(() => {
@@ -752,24 +837,32 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>, bypassBudgetWarning = false) => {
+    if (e) e.preventDefault();
     if (!navigator.onLine) {
       alert("Submission Blocked: You are currently offline. Please connect to the internet to save requisitions.");
       return;
     }
+
+    const parsedAmount = Number(amount);
+    if (parsedAmount <= 0) {
+      setLoading(false);
+      alert("Amount must be greater than 0.");
+      return;
+    }
+
+    if (isOverBudget && !hasConfirmedOverBudget && !bypassBudgetWarning) {
+      setLoading(false);
+      setShowOverBudgetWarningModal(true);
+      return;
+    }
+
     setLoading(true);
 
     const groupVal = selectedGroup || currentUser?.group || "General Group";
     const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
 
     try {
-      const parsedAmount = Number(amount);
-      if (parsedAmount <= 0) {
-        setLoading(false);
-        alert("Amount must be greater than 0.");
-        return;
-      }
 
       // Encode local attachment files to strings
       const readPromises = attachments.map((file) => processFileToAttachmentStrings(file));
@@ -1774,10 +1867,50 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                     type="number" 
                     required 
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
+                    onChange={(e) => {
+                      setAmount(e.target.value);
+                      setHasConfirmedOverBudget(false);
+                    }}
                     className="input-field pl-12 font-mono font-bold text-primary text-xs md:text-sm"
                     placeholder="0.00"
                   />
+                </div>
+
+                {/* Muted indicator below the requisition amount showing group remaining balance */}
+                <div className="mt-1.5 px-0.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-tight">
+                    <span className="text-slate-500 dark:text-slate-400">
+                      Remaining Balance ({effectiveGroupName || "Group"}):
+                    </span>
+                    {isBudgetConfigured ? (
+                      <span className={cn(
+                        "font-bold font-mono",
+                        groupRemainingBalance <= 0 
+                          ? "text-rose-600 dark:text-rose-400" 
+                          : "text-slate-600 dark:text-slate-300"
+                      )}>
+                        KES {groupRemainingBalance.toLocaleString()}
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal font-sans ml-1">
+                          / KES {groupAllocatedBudget.toLocaleString()}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500 text-[10px] italic">
+                        No allocation limit set
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Warning alert if Requisition Amount + Existing Commitments > Allocated Budget */}
+                  {isOverBudget && parsedAmountNum > 0 && (
+                    <div className="p-2.5 bg-amber-500/10 dark:bg-amber-500/15 border border-amber-300/60 dark:border-amber-700/60 rounded-xl text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2 animate-in fade-in duration-200">
+                      <AlertCircle size={14} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5 leading-tight">
+                        <span className="font-bold">Budget Warning:</span> Requisition amount (KES {parsedAmountNum.toLocaleString()}) + existing commitments (KES {groupExistingCommitments.toLocaleString()}) exceeds the allocated budget (KES {groupAllocatedBudget.toLocaleString()}) by <strong className="font-mono text-amber-800 dark:text-amber-100">KES {budgetDeficit.toLocaleString()}</strong>.
+                        <span className="block text-[10px] text-amber-700 dark:text-amber-400 font-medium">You can still continue to submit this requisition for administrative review.</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -2199,6 +2332,22 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
           }
           setShowDraftConfirm(false);
           onClose();
+        }}
+      />
+
+      <ConfirmationModal 
+        isOpen={showOverBudgetWarningModal}
+        title="Budget Limit Advisory"
+        message={`This requisition amount of KES ${parsedAmountNum.toLocaleString()} plus existing commitments (KES ${groupExistingCommitments.toLocaleString()}) brings total commitments for '${effectiveGroupName}' to KES ${totalProjectedCommitment.toLocaleString()}, which exceeds the allocated budget of KES ${groupAllocatedBudget.toLocaleString()} by KES ${budgetDeficit.toLocaleString()}.\n\nWould you like to continue and submit this requisition for administrative review?`}
+        confirmText="CONTINUE & SUBMIT"
+        cancelText="ADJUST AMOUNT"
+        onConfirm={() => {
+          setShowOverBudgetWarningModal(false);
+          setHasConfirmedOverBudget(true);
+          handleSubmit(undefined, true);
+        }}
+        onCancel={() => {
+          setShowOverBudgetWarningModal(false);
         }}
       />
     </div>

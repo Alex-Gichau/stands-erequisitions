@@ -32,7 +32,7 @@ import {
   BackgroundUploadTask,
   RequisitionInstallment
 } from "../types";
-import { getProjectRequisitions } from "../utils/budgetUtils";
+import { getProjectRequisitions, COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
 import { databaseService } from "../lib/databaseService";
 import { AuthContext, AuthContextType } from "./AuthContext";
 import { NotificationContext, NotificationContextType } from "./NotificationContext";
@@ -3406,6 +3406,35 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       : "https://stands-erequisitions.org";
     const requisitionUrl = `${origin}?reqId=${encodeURIComponent(req.id)}`;
 
+    const effectiveApprover = approverName || resolveSenderName(currentUser, users) || currentUser?.name || "Reviewing Official";
+    const rawApprover = (effectiveApprover || "").trim();
+    const isGeneric = !rawApprover || ["Reviewing Official", "Finance Official", "System", "SYSTEM", "Administrator"].includes(rawApprover);
+    const actor = !isGeneric ? rawApprover : "";
+    const requester = req.requesterName || "A requester";
+    
+    let computedSubject = actor ? `${actor} updated "${req.title}" requisition` : `Update on "${req.title}" requisition`;
+    if (status === "SUBMITTED") {
+      computedSubject = `${requester} has submitted "${req.title}" requisition`;
+    } else if (status === "APPROVED_L1") {
+      computedSubject = actor ? `${actor} has approved "${req.title}" requisition (Level 1)` : `Level 1 approval granted for "${req.title}" requisition`;
+    } else if (status === "APPROVED_L2" || status === "APPROVED") {
+      computedSubject = actor ? `${actor} has approved "${req.title}" requisition` : `"${req.title}" requisition has been approved`;
+    } else if (status === "PARTIALLY_DISBURSED") {
+      computedSubject = actor ? `${actor} has disbursed an installment for "${req.title}" requisition` : `Installment disbursed for "${req.title}" requisition`;
+    } else if (status === "DISBURSED") {
+      computedSubject = actor ? `${actor} has disbursed funds for "${req.title}" requisition` : `Funds have been disbursed for "${req.title}" requisition`;
+    } else if (status === "REJECTED") {
+      computedSubject = actor ? `${actor} has returned "${req.title}" requisition for review` : `"${req.title}" requisition has been returned for review`;
+    } else if (status === "DELETED") {
+      computedSubject = actor ? `${actor} has deleted "${req.title}" requisition` : `"${req.title}" requisition has been deleted`;
+    } else if (status === "Comment Mention") {
+      computedSubject = actor ? `${actor} mentioned you in a comment on "${req.title}" requisition` : `You were mentioned in a comment on "${req.title}" requisition`;
+    } else if (status === "New Comment Thread Activity" || status === "COMMENT") {
+      computedSubject = actor ? `${actor} commented on "${req.title}" requisition` : `New comment on "${req.title}" requisition`;
+    } else if (status === "EDITED" || status === "REQUISITION_EDITED") {
+      computedSubject = actor ? `${actor} has updated "${req.title}" requisition` : `"${req.title}" requisition has been updated`;
+    }
+
     try {
       const resp = await fetch("/api/send-email", {
         method: "POST",
@@ -3426,7 +3455,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           description: req.description || "",
           payableTo: req.payableTo || "N/A",
           submittedAt: req.submittedAt || new Date().toISOString(),
-          approverName: approverName || resolveSenderName(currentUser, users),
+          approverName: effectiveApprover,
           approvalReason: details || ""
         })
       });
@@ -3437,13 +3466,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // Log to system audit trail
       await addSystemLog(
         isSimulated ? "EMAIL_SIMULATED" : "EMAIL_DISPATCH",
-        `Email notification (${status}) sent to <${targetEmail || notificationEmailsList[0] || "recipient"}> regarding '${req.title}'`,
+        `Email notification (${status}) sent to <${targetEmail || notificationEmailsList[0] || "recipient"}>: "${computedSubject}"`,
         {
           recipientEmail: targetEmail || notificationEmailsList[0] || "",
           recipientName: customRecipientName || req.requesterName,
           notificationEmails: notificationEmailsList,
           requisitionId: req.id,
           requisitionTitle: req.title,
+          subject: computedSubject,
           status: isSimulated ? "SIMULATED" : "DELIVERED",
           workflowStatus: status,
           amount: req.amount,
@@ -3474,12 +3504,43 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const expiryDays = systemSettings?.requisitionExpiryDays ?? 7;
     const expiresAt = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000); // dynamic days from now
 
-    // Requisition Limit Check: Every single requisition must be within the group's requisition limit
+    // Requisition & Budget Limit Evaluation
     const matchingProj = projects.find(p => p.id === reqData.projectId || p.groupId === reqData.groupId || p.name === reqData.groupName);
+    let isAuditFlagged = reqData.flaggedForAudit !== undefined ? reqData.flaggedForAudit : false;
+
     if (matchingProj) {
-      const requisitionLimit = matchingProj.requisitionLimit || matchingProj.allocatedBudget || 0;
-      if (reqData.amount > requisitionLimit) {
-        throw new Error(`Group is not allocated a budget : Requisition Limit Violation. This requisition amount of KES ${reqData.amount.toLocaleString()} exceeds the group's ('${matchingProj.name}') maximum requisition limit of KES ${requisitionLimit.toLocaleString()}.`);
+      // Explicit single-requisition ceiling check (if specifically configured on the project)
+      if (matchingProj.requisitionLimit && matchingProj.requisitionLimit > 0 && reqData.amount > matchingProj.requisitionLimit) {
+        throw new Error(`Requisition Limit Violation: Single requisition amount of KES ${reqData.amount.toLocaleString()} exceeds the group's ('${matchingProj.name}') maximum single-request limit of KES ${matchingProj.requisitionLimit.toLocaleString()}.`);
+      }
+
+      // Cumulative Budget Check: Requisition Amount + Existing Commitments > Allocated Budget
+      const allocatedBudget = Number(matchingProj.allocatedBudget) || 0;
+      if (allocatedBudget > 0) {
+        const currentFiscalYear = systemSettings?.currentFiscalYear || 2026;
+        const existingGroupCommitments = requisitions
+          .filter(r => 
+            COMMITTED_REQUISITION_STATUSES.includes(r.status) &&
+            (!r.fiscalYear || r.fiscalYear === currentFiscalYear) &&
+            (r.projectId === matchingProj.id || r.groupId === matchingProj.groupId || r.groupName === matchingProj.name)
+          )
+          .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+        const totalProjected = existingGroupCommitments + reqData.amount;
+        if (totalProjected > allocatedBudget) {
+          isAuditFlagged = true;
+          const deficit = totalProjected - allocatedBudget;
+          const alertId = `budget-warning-${id}`;
+          const newAlert: BudgetAlert = {
+            id: alertId,
+            type: "OVERSHOOT",
+            severity: "HIGH",
+            message: `BUDGET DEFICIT WARNING: Requisition '${reqData.title}' (KES ${reqData.amount.toLocaleString()}) for '${matchingProj.name}' exceeds the remaining budget by KES ${deficit.toLocaleString()} (Total Commitments: KES ${totalProjected.toLocaleString()} / Allocated: KES ${allocatedBudget.toLocaleString()}).`,
+            timestamp: now.toISOString(),
+            isRead: false,
+          };
+          setAlerts(prev => [newAlert, ...prev.filter(a => a.id !== alertId)]);
+        }
       }
     }
 
@@ -3493,7 +3554,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       expiresAt: expiresAt.toISOString(),
       escalationLevel: 0,
       approvalHistory: [],
-      flaggedForAudit: reqData.flaggedForAudit !== undefined ? reqData.flaggedForAudit : false,
+      flaggedForAudit: isAuditFlagged,
       fiscalYear: systemSettings.currentFiscalYear || 2026,
       attachments: safeNormalizeAttachments(reqData.attachments),
     };

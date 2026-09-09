@@ -2837,7 +2837,12 @@ Your response MUST adhere strictly to the JSON schema specified.
 
         const firstName = extractFirstName(resolvedFullName, recEmail);
 
-        let subject = `[Requisition Update] ${reqName}`;
+        const rawActor = approverName && typeof approverName === "string" && approverName.trim() ? approverName.trim() : "";
+        const isGenericActor = !rawActor || ["Reviewing Official", "Finance Official", "System", "SYSTEM", "Administrator"].includes(rawActor);
+        const actor = !isGenericActor ? rawActor : "";
+        const requester = requesterName && typeof requesterName === "string" && requesterName.trim() ? requesterName.trim() : "A requester";
+
+        let subject = actor ? `${actor} updated "${reqName}" requisition` : `Update on "${reqName}" requisition`;
         let headerTitle = "Requisition Update";
         let mainMessage = isRequester
           ? `There is a new status update regarding your requisition "<strong>${reqName}</strong>".`
@@ -2847,7 +2852,7 @@ Your response MUST adhere strictly to the JSON schema specified.
 
         switch (status) {
           case "SUBMITTED":
-            subject = `[Submitted] Requisition: ${reqName}`;
+            subject = `${requester} has submitted "${reqName}" requisition`;
             headerTitle = "Requisition Submitted";
             mainMessage = isRequester
               ? `Your requisition "<strong>${reqName}</strong>" has been submitted successfully and entered the approval pipeline.`
@@ -2864,7 +2869,9 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           case "APPROVED_L1":
-            subject = `[L1 Approved] Requisition: ${reqName}`;
+            subject = actor 
+              ? `${actor} has approved "${reqName}" requisition (Level 1)`
+              : `Level 1 approval granted for "${reqName}" requisition`;
             headerTitle = "Level 1 Approval Granted";
             mainMessage = isRequester
               ? `Your requisition "<strong>${reqName}</strong>" has passed Level 1 Compliance & Verification review.`
@@ -2892,7 +2899,10 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           case "APPROVED_L2":
-            subject = `[Approved] Requisition: ${reqName}`;
+          case "APPROVED":
+            subject = actor 
+              ? `${actor} has approved "${reqName}" requisition`
+              : `"${reqName}" requisition has been approved`;
             headerTitle = "Final Authorization Granted";
             mainMessage = isRequester
               ? `Excellent news! Your requisition "<strong>${reqName}</strong>" has received final Level 2 executive authorization.`
@@ -2919,8 +2929,40 @@ Your response MUST adhere strictly to the JSON schema specified.
             nextStepsText = `The Finance Treasury team has been notified to prepare the funds for settlement and disbursement.`;
             break;
 
+          case "PARTIALLY_DISBURSED":
+            subject = actor 
+              ? `${actor} has disbursed an installment for "${reqName}" requisition`
+              : `Installment disbursed for "${reqName}" requisition`;
+            headerTitle = "Installment Disbursed";
+            mainMessage = isRequester
+              ? `An installment payment for your requisition "<strong>${reqName}</strong>" has been disbursed and released!`
+              : `An installment payment for requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been disbursed.`;
+            decisionBoxHtml = `
+              <div style="margin-top: 16px; padding: 16px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px;">
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Installment Disbursement Details</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #78350f;">
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; width: 35%;">Disbursed By:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${actualApprover}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${ministryName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Disbursement Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Installment funds released to specified vendor or payee account."}</td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            nextStepsText = `Please check your bank or mobile money account (${payableTo || requesterName}) to confirm receipt of this installment.`;
+            break;
+
           case "DISBURSED":
-            subject = `[Disbursed] Requisition: ${reqName}`;
+            subject = actor 
+              ? `${actor} has disbursed funds for "${reqName}" requisition`
+              : `Funds have been disbursed for "${reqName}" requisition`;
             headerTitle = "Funds Disbursed";
             mainMessage = isRequester
               ? `Payment disbursement for your requisition "<strong>${reqName}</strong>" has been completed and released!`
@@ -2948,7 +2990,9 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           case "REJECTED":
-            subject = `[Returned] Requisition: ${reqName}`;
+            subject = actor 
+              ? `${actor} has returned "${reqName}" requisition for review`
+              : `"${reqName}" requisition has been returned for review`;
             headerTitle = "Requisition Returned / Declined";
             mainMessage = isRequester
               ? `Your requisition "<strong>${reqName}</strong>" has been returned by the reviewing official and requires your attention.`
@@ -2976,7 +3020,9 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           case "DELETED":
-            subject = `[Deleted] Requisition Notice: ${reqName}`;
+            subject = actor 
+              ? `${actor} has deleted "${reqName}" requisition`
+              : `"${reqName}" requisition has been deleted`;
             headerTitle = "Requisition Deleted";
             mainMessage = isRequester
               ? `The requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been deleted from the eRequisitions portal.`
@@ -3010,7 +3056,9 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           case "Comment Mention":
-            subject = `[Comment Mention] ${actualApprover} mentioned you on: ${reqName}`;
+            subject = actor 
+              ? `${actor} mentioned you in a comment on "${reqName}" requisition`
+              : `You were mentioned in a comment on "${reqName}" requisition`;
             headerTitle = "You Were Mentioned in a Comment";
             mainMessage = `<strong>${actualApprover}</strong> mentioned you in a comment on requisition "<strong>${reqName}</strong>".`;
             decisionBoxHtml = `
@@ -3028,7 +3076,9 @@ Your response MUST adhere strictly to the JSON schema specified.
 
           case "New Comment Thread Activity":
           case "COMMENT":
-            subject = `[New Comment] ${actualApprover} commented on: ${reqName}`;
+            subject = actor 
+              ? `${actor} commented on "${reqName}" requisition`
+              : `New comment on "${reqName}" requisition`;
             headerTitle = "New Comment Posted";
             mainMessage = `<strong>${actualApprover}</strong> posted a new comment on requisition "<strong>${reqName}</strong>".`;
             decisionBoxHtml = `
@@ -3046,7 +3096,9 @@ Your response MUST adhere strictly to the JSON schema specified.
 
           case "EDITED":
           case "REQUISITION_EDITED":
-            subject = `[Requisition Updated] ${reqName}`;
+            subject = actor 
+              ? `${actor} has updated "${reqName}" requisition`
+              : `"${reqName}" requisition has been updated`;
             headerTitle = "Requisition Details Updated";
             mainMessage = isRequester
               ? `Your requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been updated in the portal.`
@@ -3076,7 +3128,9 @@ Your response MUST adhere strictly to the JSON schema specified.
             break;
 
           default:
-            subject = `[Update] Requisition: ${reqName}`;
+            subject = actor 
+              ? `${actor} updated "${reqName}" requisition`
+              : `Update on "${reqName}" requisition`;
             headerTitle = "Requisition Status Update";
             mainMessage = isRequester
               ? `There is a new update for your requisition "<strong>${reqName}</strong>". Current Status: <strong>${status}</strong>.`

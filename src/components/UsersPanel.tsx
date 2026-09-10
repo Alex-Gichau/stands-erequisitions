@@ -1518,14 +1518,14 @@ export const UsersPanel: React.FC = () => {
       {/* Registration/Edit Modals via AnimatePresence */}
       <AnimatePresence>
         {(isModalOpen || editingUser) && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 flex flex-col"
+              className="bg-white rounded-2xl md:rounded-3xl w-full max-w-xl max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col my-auto"
             >
-              <div className="px-4 md:px-8 py-4 md:py-6 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-10">
+              <div className="px-4 md:px-8 py-4 md:py-6 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-20 shrink-0">
                 <div>
                   <h3 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-[0.2em]">
                     {isModalOpen ? "New Member Credentials" : "Update Member Transaction"}
@@ -1534,13 +1534,13 @@ export const UsersPanel: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => { setIsModalOpen(false); setEditingUser(null); setError(null); setSuccess(null); setGeneratedInvite(null); }}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
                 >
                   <X size={20} className="text-slate-500 md:w-5 md:h-5" />
                 </button>
               </div>
 
-              <form onSubmit={isModalOpen ? handleRegister : handleEditSave} className="p-4 md:p-8 space-y-4 md:space-y-6">
+              <form onSubmit={isModalOpen ? handleRegister : handleEditSave} className="p-4 md:p-8 space-y-4 md:space-y-6 flex-1 overflow-y-auto min-h-0 overscroll-contain">
                  {isModalOpen && (
                    <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl w-full mb-2">
                      <button
@@ -1985,19 +1985,19 @@ export const UsersPanel: React.FC = () => {
       {/* Church Group Registration Modal */}
       <AnimatePresence>
         {isGroupModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-md h-full md:h-auto shadow-2xl overflow-hidden border-t md:border border-slate-200 flex flex-col"
+              className="bg-white rounded-2xl md:rounded-3xl w-full max-w-md max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col my-auto"
             >
-              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10 bg-white">
+              <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10 bg-white shrink-0">
                 <div>
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">New Church Group</h3>
                   <p className="text-[10px] text-slate-400 font-mono tracking-widest mt-1">SYS_STRUCT_MOD</p>
                 </div>
-                <button onClick={() => setIsGroupModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                <button onClick={() => setIsGroupModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
                   <X size={20} className="text-slate-400" />
                 </button>
               </div>
@@ -2014,7 +2014,7 @@ export const UsersPanel: React.FC = () => {
                 } finally {
                   setIsGroupSubmitting(false);
                 }
-              }} className="p-8 space-y-6">
+              }} className="p-6 md:p-8 space-y-6 flex-1 overflow-y-auto min-h-0">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Group Name</label>
                   <input 

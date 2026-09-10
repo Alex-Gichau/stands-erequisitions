@@ -9,32 +9,106 @@ import { resolveSenderName } from "../lib/utils";
 
 const STORAGE_KEY_PREFIX = "st_andrews_comments_read_v1_";
 const UPDATE_EVENT_NAME = "requisition_comments_read_updated";
+const LAST_ACTIVE_USER_KEY = "st_andrews_last_active_user_email";
 
 /**
- * Derives a consistent storage key for the current logged in user
+ * Returns a sanitized document ID for storing read comment timestamps in database
  */
-export function getUserCommentsStorageKey(currentUser: any): string {
-  if (!currentUser) return `${STORAGE_KEY_PREFIX}anonymous`;
-  const keyIdentifier = (
-    currentUser.id || 
-    currentUser.uid || 
-    currentUser.email || 
-    currentUser.name || 
-    "user"
+export function getDbDocIdForUser(currentUser: any): string {
+  const raw = (
+    currentUser?.email || 
+    currentUser?.id || 
+    currentUser?.uid || 
+    "global"
   ).toLowerCase().trim();
-  return `${STORAGE_KEY_PREFIX}${keyIdentifier}`;
+  const sanitized = raw.replace(/[^a-z0-9]/g, "_");
+  return `comment_reads_${sanitized}`;
 }
 
 /**
- * Retrieves the map of { [reqId: string]: number (timestamp in ms) } for the given user
+ * Derives consistent storage keys for the current logged in user.
+ * Prioritizes email as the invariant canonical key, while also providing
+ * fallbacks to id and uid for seamless backward compatibility.
+ */
+export function getUserCommentsStorageKeys(currentUser: any): string[] {
+  const keys: string[] = [];
+  if (!currentUser) {
+    if (typeof window !== "undefined") {
+      try {
+        const lastEmail = localStorage.getItem(LAST_ACTIVE_USER_KEY);
+        if (lastEmail) {
+          keys.push(`${STORAGE_KEY_PREFIX}${lastEmail.toLowerCase().trim()}`);
+        }
+      } catch (err) {}
+    }
+    keys.push(`${STORAGE_KEY_PREFIX}anonymous`);
+    return keys;
+  }
+
+  const email = currentUser.email ? String(currentUser.email).toLowerCase().trim() : "";
+  const id = currentUser.id ? String(currentUser.id).toLowerCase().trim() : "";
+  const uid = currentUser.uid ? String(currentUser.uid).toLowerCase().trim() : "";
+  const username = currentUser.username ? String(currentUser.username).toLowerCase().trim() : "";
+
+  // Canonical key is email (or id if email is not available)
+  if (email) {
+    keys.push(`${STORAGE_KEY_PREFIX}${email}`);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(LAST_ACTIVE_USER_KEY, email);
+      } catch (err) {}
+    }
+  }
+  if (id && !keys.includes(`${STORAGE_KEY_PREFIX}${id}`)) {
+    keys.push(`${STORAGE_KEY_PREFIX}${id}`);
+  }
+  if (uid && !keys.includes(`${STORAGE_KEY_PREFIX}${uid}`)) {
+    keys.push(`${STORAGE_KEY_PREFIX}${uid}`);
+  }
+  if (username && !keys.includes(`${STORAGE_KEY_PREFIX}${username}`)) {
+    keys.push(`${STORAGE_KEY_PREFIX}${username}`);
+  }
+
+  if (keys.length === 0) {
+    keys.push(`${STORAGE_KEY_PREFIX}user`);
+  }
+
+  return keys;
+}
+
+export function getUserCommentsStorageKey(currentUser: any): string {
+  const keys = getUserCommentsStorageKeys(currentUser);
+  return keys[0] || `${STORAGE_KEY_PREFIX}anonymous`;
+}
+
+/**
+ * Retrieves the map of { [reqId: string]: number (timestamp in ms) } for the given user,
+ * merging keys across email and ID records to ensure no read history is lost.
  */
 export function getReadTimestampsMap(currentUser: any): Record<string, number> {
-  if (typeof window === "undefined" || !currentUser) return {};
+  if (typeof window === "undefined") return {};
   try {
-    const key = getUserCommentsStorageKey(currentUser);
-    const raw = localStorage.getItem(key);
-    if (!raw) return {};
-    return JSON.parse(raw);
+    const keys = getUserCommentsStorageKeys(currentUser);
+    const merged: Record<string, number> = {};
+    
+    for (const k of keys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            for (const [reqId, ts] of Object.entries(parsed)) {
+              const num = Number(ts);
+              if (!isNaN(num) && num > 0) {
+                merged[reqId] = Math.max(merged[reqId] || 0, num);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    return merged;
   } catch (err) {
     console.error("Failed to parse comment read timestamps:", err);
     return {};
@@ -42,20 +116,96 @@ export function getReadTimestampsMap(currentUser: any): Record<string, number> {
 }
 
 /**
+ * Persists read map to backend database asynchronously
+ */
+export async function persistReadMapToBackend(currentUser: any, map: Record<string, number>): Promise<void> {
+  if (typeof window === "undefined" || !currentUser) return;
+  const docId = getDbDocIdForUser(currentUser);
+  try {
+    await fetch(`/api/db/notification_states/${docId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: docId,
+        userEmail: currentUser.email || "",
+        userId: currentUser.id || currentUser.uid || "",
+        commentReadTimestamps: map,
+        updatedAt: new Date().toISOString()
+      })
+    });
+  } catch (err) {
+    console.warn("[Comment Tracker] Could not persist read state to database:", err);
+  }
+}
+
+/**
+ * Fetches read map from backend database
+ */
+export async function fetchReadMapFromBackend(currentUser: any): Promise<Record<string, number>> {
+  if (typeof window === "undefined" || !currentUser) return {};
+  const docId = getDbDocIdForUser(currentUser);
+  try {
+    const res = await fetch(`/api/db/notification_states/${docId}`);
+    if (!res.ok) return {};
+    const data = await res.json();
+    const rawMap = data.comment_read_timestamps || data.commentReadTimestamps || {};
+    if (rawMap && typeof rawMap === "object") {
+      const valid: Record<string, number> = {};
+      for (const [k, v] of Object.entries(rawMap)) {
+        const num = Number(v);
+        if (!isNaN(num) && num > 0) {
+          valid[k] = num;
+        }
+      }
+      return valid;
+    }
+  } catch (err) {
+    console.warn("[Comment Tracker] Could not fetch read state from database:", err);
+  }
+  return {};
+}
+
+/**
  * Saves the read timestamp for a specific requisition
  */
-export function markRequisitionCommentsAsRead(reqId: string, currentUser: any, timestamp: number = Date.now()): void {
+export function markRequisitionCommentsAsRead(
+  reqId: string, 
+  currentUser: any, 
+  timestamp?: number,
+  req?: Requisition
+): void {
   if (typeof window === "undefined" || !currentUser || !reqId) return;
   try {
-    const key = getUserCommentsStorageKey(currentUser);
+    const keys = getUserCommentsStorageKeys(currentUser);
     const map = getReadTimestampsMap(currentUser);
-    map[reqId] = timestamp;
-    localStorage.setItem(key, JSON.stringify(map));
+
+    // If a requisition is provided, ensure timestamp is at least 1s higher than any existing comment
+    let effectiveTimestamp = timestamp || Date.now();
+    if (req && Array.isArray(req.comments) && req.comments.length > 0) {
+      const allComments = extractAllCommentsAndReplies(req);
+      for (const c of allComments) {
+        const rawTime = c.createdAt || c.timestamp || (c as any).created_at;
+        const timeMs = rawTime ? new Date(rawTime).getTime() : 0;
+        if (timeMs > effectiveTimestamp) {
+          effectiveTimestamp = timeMs + 1000;
+        }
+      }
+    }
+
+    map[reqId] = effectiveTimestamp;
+
+    // Save to all associated keys in localStorage
+    for (const key of keys) {
+      localStorage.setItem(key, JSON.stringify(map));
+    }
+
+    // Persist to backend database for permanent persistence across reloads/devices
+    persistReadMapToBackend(currentUser, map);
 
     // Dispatch global custom event for instant reactivity across components
     window.dispatchEvent(
       new CustomEvent(UPDATE_EVENT_NAME, {
-        detail: { reqId, timestamp, userId: currentUser.id || currentUser.email }
+        detail: { reqId, timestamp: effectiveTimestamp, userId: currentUser.id || currentUser.email }
       })
     );
   } catch (err) {
@@ -69,15 +219,33 @@ export function markRequisitionCommentsAsRead(reqId: string, currentUser: any, t
 export function markAllRequisitionsCommentsAsRead(requisitions: Requisition[], currentUser: any): void {
   if (typeof window === "undefined" || !currentUser || !Array.isArray(requisitions)) return;
   try {
-    const key = getUserCommentsStorageKey(currentUser);
+    const keys = getUserCommentsStorageKeys(currentUser);
     const map = getReadTimestampsMap(currentUser);
     const now = Date.now();
+    
     requisitions.forEach(req => {
       if (req && req.id) {
-        map[req.id] = now;
+        let reqTs = now;
+        if (Array.isArray(req.comments) && req.comments.length > 0) {
+          const allComments = extractAllCommentsAndReplies(req);
+          for (const c of allComments) {
+            const rawTime = c.createdAt || c.timestamp || (c as any).created_at;
+            const timeMs = rawTime ? new Date(rawTime).getTime() : 0;
+            if (timeMs > reqTs) {
+              reqTs = timeMs + 1000;
+            }
+          }
+        }
+        map[req.id] = reqTs;
       }
     });
-    localStorage.setItem(key, JSON.stringify(map));
+
+    for (const key of keys) {
+      localStorage.setItem(key, JSON.stringify(map));
+    }
+
+    // Persist to backend database
+    persistReadMapToBackend(currentUser, map);
 
     window.dispatchEvent(
       new CustomEvent(UPDATE_EVENT_NAME, {
@@ -241,10 +409,46 @@ export function useUnreadCommentsTracker(
   const [readMap, setReadMap] = useState<Record<string, number>>(() => getReadTimestampsMap(currentUser));
   const [version, setVersion] = useState(0);
 
-  // Reload read map whenever the active user changes
+  // Reload read map whenever the active user changes, and fetch latest state from database
   useEffect(() => {
-    setReadMap(getReadTimestampsMap(currentUser));
-  }, [currentUser?.id, currentUser?.email]);
+    let isMounted = true;
+    const initialMap = getReadTimestampsMap(currentUser);
+    setReadMap(initialMap);
+
+    if (currentUser) {
+      fetchReadMapFromBackend(currentUser).then(remoteMap => {
+        if (!isMounted || !remoteMap || Object.keys(remoteMap).length === 0) return;
+        const currentLocal = getReadTimestampsMap(currentUser);
+        let hasNew = false;
+        const merged: Record<string, number> = { ...currentLocal };
+
+        for (const [rId, ts] of Object.entries(remoteMap)) {
+          const num = Number(ts);
+          if (!isNaN(num) && num > 0) {
+            if (!merged[rId] || num > merged[rId]) {
+              merged[rId] = num;
+              hasNew = true;
+            }
+          }
+        }
+
+        if (hasNew) {
+          const keys = getUserCommentsStorageKeys(currentUser);
+          for (const k of keys) {
+            try {
+              localStorage.setItem(k, JSON.stringify(merged));
+            } catch (e) {}
+          }
+          setReadMap(merged);
+          setVersion(v => v + 1);
+        }
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id, currentUser?.email, currentUser?.uid]);
 
   // Listen for real-time comment read events across the application and tabs
   useEffect(() => {
@@ -254,8 +458,8 @@ export function useUnreadCommentsTracker(
     };
 
     const handleStorage = (e: StorageEvent) => {
-      const expectedKey = getUserCommentsStorageKey(currentUser);
-      if (e.key === expectedKey) {
+      const expectedKeys = getUserCommentsStorageKeys(currentUser);
+      if (e.key && expectedKeys.includes(e.key)) {
         setReadMap(getReadTimestampsMap(currentUser));
         setVersion(v => v + 1);
       }
@@ -321,13 +525,11 @@ export function useUnreadCommentsTracker(
   }, [unreadInfoMap, currentUser, users, readMap]);
 
   const markAsRead = useCallback((reqId: string) => {
-    markRequisitionCommentsAsRead(reqId, currentUser);
-    setReadMap(prev => ({
-      ...prev,
-      [reqId]: Date.now()
-    }));
+    const targetReq = requisitions.find(r => r.id === reqId);
+    markRequisitionCommentsAsRead(reqId, currentUser, undefined, targetReq);
+    setReadMap(getReadTimestampsMap(currentUser));
     setVersion(v => v + 1);
-  }, [currentUser]);
+  }, [currentUser, requisitions]);
 
   const markAllAsRead = useCallback(() => {
     markAllRequisitionsCommentsAsRead(requisitions, currentUser);

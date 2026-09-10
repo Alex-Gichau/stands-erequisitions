@@ -50,7 +50,24 @@ async function apiCall(endpoint: string, method: string = "GET", body?: any): Pr
     }
     throw new Error(`DB API Error ${response.status}: ${text || response.statusText}`);
   }
-  const data = await response.json();
+
+  const contentType = response.headers.get("content-type") || "";
+  const rawText = await response.text();
+  if (!rawText || rawText.trim() === "") {
+    return { success: true };
+  }
+  if (contentType.includes("text/html") || rawText.trim().startsWith("<!doctype") || rawText.trim().startsWith("<html")) {
+    console.warn(`[DatabaseService] API endpoint '${endpoint}' returned HTML fallback response instead of JSON. (Method: ${method})`);
+    return { success: true, isHtmlFallback: true };
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (err) {
+    console.warn(`[DatabaseService] Failed to parse JSON response from ${method} ${endpoint}:`, rawText.slice(0, 100));
+    data = { success: true, raw: rawText };
+  }
 
   // Invalidate TanStack query cache on modifying methods (POST, PUT, PATCH, DELETE)
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())) {
@@ -68,7 +85,7 @@ export const databaseService = {
   // --- USER OPERATIONS ---
   async saveUserProfile(user: UserProfile): Promise<void> {
     console.log(`[DatabaseService] Saving user profile to MongoDB: ${user.email}`);
-    await apiCall(`/api/db/users/${user.id}`, "POST", {
+    await apiCall(`/api/db/users/${encodeURIComponent(user.id)}`, "POST", {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -93,7 +110,7 @@ export const databaseService = {
   // --- PROJECT OPERATIONS ---
   async saveProject(project: Project): Promise<void> {
     console.log(`[DatabaseService] Saving project to MongoDB: ${project.name}`);
-    await apiCall(`/api/db/projects/${project.id}`, "POST", {
+    await apiCall(`/api/db/projects/${encodeURIComponent(project.id)}`, "POST", {
       id: project.id,
       name: project.name,
       group_id: project.groupId,
@@ -122,17 +139,17 @@ export const databaseService = {
     if (updates.requisitionLimit !== undefined) mapped.requisition_limit = updates.requisitionLimit;
     if (updates.accountNumber !== undefined) mapped.account_number = updates.accountNumber;
     mapped.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/projects/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/projects/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   async deleteProject(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting project from MongoDB: ${id}`);
-    await apiCall(`/api/db/projects/${id}`, "DELETE");
+    await apiCall(`/api/db/projects/${encodeURIComponent(id)}`, "DELETE");
   },
 
   async saveChurchGroup(group: ChurchGroup): Promise<void> {
     console.log(`[DatabaseService] Saving church group to MongoDB: ${group.name}`);
-    await apiCall(`/api/db/church_groups/${group.id}`, "POST", {
+    await apiCall(`/api/db/church_groups/${encodeURIComponent(group.id)}`, "POST", {
       id: group.id,
       name: group.name,
       description: group.description || null,
@@ -142,12 +159,12 @@ export const databaseService = {
 
   async deleteChurchGroup(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting church group from MongoDB: ${id}`);
-    await apiCall(`/api/db/church_groups/${id}`, "DELETE");
+    await apiCall(`/api/db/church_groups/${encodeURIComponent(id)}`, "DELETE");
   },
 
   async saveLedgerBook(book: LedgerBook): Promise<void> {
     console.log(`[DatabaseService] Saving ledger book to MongoDB: ${book.ministryName}`);
-    await apiCall(`/api/db/ledger_books/${book.id}`, "POST", {
+    await apiCall(`/api/db/ledger_books/${encodeURIComponent(book.id)}`, "POST", {
       id: book.id,
       ministry_id: book.ministryId || null,
       ministry_name: book.ministryName,
@@ -174,13 +191,13 @@ export const databaseService = {
     if (data.status !== undefined) mappedData.status = data.status;
     if (data.notes !== undefined) mappedData.notes = data.notes;
 
-    await apiCall(`/api/db/ledger_books/${id}`, "PATCH", mappedData);
+    await apiCall(`/api/db/ledger_books/${encodeURIComponent(id)}`, "PATCH", mappedData);
   },
 
   // --- REQUISITION OPERATIONS ---
   async saveRequisition(req: Requisition): Promise<void> {
     console.log(`[DatabaseService] Saving requisition to MongoDB: ${req.title}`);
-    await apiCall(`/api/db/requisitions/${req.id}`, "POST", {
+    await apiCall(`/api/db/requisitions/${encodeURIComponent(req.id)}`, "POST", {
       id: req.id,
       project_id: req.projectId || null,
       title: req.title,
@@ -271,19 +288,20 @@ export const databaseService = {
     if (updates.receipts !== undefined) payload.receipts = updates.receipts;
     if (updates.status !== undefined) payload.status = updates.status;
     payload.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/requisitions/${id}`, "PATCH", payload);
+    await apiCall(`/api/db/requisitions/${encodeURIComponent(id)}`, "PATCH", payload);
   },
 
   async deleteRequisition(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting requisition from MongoDB: ${id}`);
-    await apiCall(`/api/db/requisitions/${id}`, "DELETE");
+    await apiCall(`/api/db/requisitions/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- FISCAL YEAR OPERATIONS ---
   async saveFiscalYear(fy: FiscalYear): Promise<void> {
     console.log(`[DatabaseService] Saving fiscal year to MongoDB: ${fy.year}`);
-    await apiCall(`/api/db/fiscal_years/${fy.id || fy.year}`, "POST", {
-      id: String(fy.id || fy.year),
+    const fyId = String(fy.id || fy.year);
+    await apiCall(`/api/db/fiscal_years/${encodeURIComponent(fyId)}`, "POST", {
+      id: fyId,
       year: fy.year,
       label: fy.label,
       start_date: fy.startDate ? new Date(fy.startDate).toISOString() : null,
@@ -304,18 +322,18 @@ export const databaseService = {
     if (updates.startDate !== undefined) mapped.start_date = updates.startDate ? new Date(updates.startDate).toISOString() : null;
     if (updates.endDate !== undefined) mapped.end_date = updates.endDate ? new Date(updates.endDate).toISOString() : null;
     mapped.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/fiscal_years/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/fiscal_years/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   async deleteFiscalYear(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting fiscal year from MongoDB: ${id}`);
-    await apiCall(`/api/db/fiscal_years/${id}`, "DELETE");
+    await apiCall(`/api/db/fiscal_years/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- VENDOR OPERATIONS ---
   async saveVendor(vendor: Vendor): Promise<void> {
     console.log(`[DatabaseService] Saving vendor to MongoDB: ${vendor.name}`);
-    await apiCall(`/api/db/vendors/${vendor.id}`, "POST", {
+    await apiCall(`/api/db/vendors/${encodeURIComponent(vendor.id)}`, "POST", {
       id: vendor.id,
       name: vendor.name,
       contact: vendor.contact || null,
@@ -342,18 +360,18 @@ export const databaseService = {
     if (updates.status !== undefined) mapped.status = updates.status;
     if (updates.addedBy !== undefined) mapped.added_by = updates.addedBy;
     mapped.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/vendors/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/vendors/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   async deleteVendor(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting vendor from MongoDB: ${id}`);
-    await apiCall(`/api/db/vendors/${id}`, "DELETE");
+    await apiCall(`/api/db/vendors/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- SUPPLEMENTARY BUDGET OPERATIONS ---
   async saveSupplementaryBudget(sb: SupplementaryBudgetRequest): Promise<void> {
     console.log(`[DatabaseService] Saving supplementary budget to MongoDB: ${sb.id}`);
-    await apiCall(`/api/db/supplementary_budgets/${sb.id}`, "POST", {
+    await apiCall(`/api/db/supplementary_budgets/${encodeURIComponent(sb.id)}`, "POST", {
       id: sb.id,
       project_id: sb.projectId,
       project_name: sb.projectName,
@@ -371,7 +389,7 @@ export const databaseService = {
   // --- ALERT OPERATIONS ---
   async saveAlert(alert: BudgetAlert): Promise<void> {
     console.log(`[DatabaseService] Saving budget alert to MongoDB: ${alert.id}`);
-    await apiCall(`/api/db/alerts/${alert.id}`, "POST", {
+    await apiCall(`/api/db/alerts/${encodeURIComponent(alert.id)}`, "POST", {
       id: alert.id,
       message: alert.message,
       type: alert.type,
@@ -393,12 +411,12 @@ export const databaseService = {
       mapped.isRead = updates.isRead;
     }
     if (updates.message !== undefined) mapped.message = updates.message;
-    await apiCall(`/api/db/alerts/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/alerts/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   async deleteAlert(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting alert from MongoDB: ${id}`);
-    await apiCall(`/api/db/alerts/${id}`, "DELETE");
+    await apiCall(`/api/db/alerts/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- THRESHOLD OPERATIONS ---
@@ -415,13 +433,13 @@ export const databaseService = {
       mapped.notifyEmail = updates.notifyEmail;
     }
     if (updates.type !== undefined) mapped.type = updates.type;
-    await apiCall(`/api/db/thresholds/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/thresholds/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   // --- REPORT OPERATIONS ---
   async saveReport(report: SavedReport): Promise<void> {
     console.log(`[DatabaseService] Saving report to MongoDB: ${report.title}`);
-    await apiCall(`/api/db/reports/${report.id}`, "POST", {
+    await apiCall(`/api/db/reports/${encodeURIComponent(report.id)}`, "POST", {
       id: report.id,
       title: report.title,
       description: report.description || null,
@@ -450,7 +468,7 @@ export const databaseService = {
 
   async savePermission(roleId: string, permissions: any): Promise<void> {
     console.log(`[DatabaseService] Saving permissions to MongoDB for role: ${roleId}`);
-    await apiCall(`/api/db/permissions/${roleId}`, "POST", {
+    await apiCall(`/api/db/permissions/${encodeURIComponent(roleId)}`, "POST", {
       id: roleId,
       ...permissions,
       updated_at: new Date().toISOString()
@@ -460,7 +478,7 @@ export const databaseService = {
   // --- TRANSACTION OPERATIONS ---
   async saveTransaction(tx: Transaction): Promise<void> {
     console.log(`[DatabaseService] Saving transaction to MongoDB: ${tx.id}`);
-    await apiCall(`/api/db/transactions/${tx.id}`, "POST", {
+    await apiCall(`/api/db/transactions/${encodeURIComponent(tx.id)}`, "POST", {
       id: tx.id,
       external_ref: tx.externalRef,
       externalRef: tx.externalRef,
@@ -480,13 +498,13 @@ export const databaseService = {
 
   async deleteTransaction(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting transaction from MongoDB: ${id}`);
-    await apiCall(`/api/db/transactions/${id}`, "DELETE");
+    await apiCall(`/api/db/transactions/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- USER OPERATIONS ---
   async saveUser(user: Partial<UserProfile> & { id: string }): Promise<void> {
     console.log(`[DatabaseService] Saving user to MongoDB: ${user.email || user.id}`);
-    await apiCall(`/api/db/users/${user.id}`, "POST", {
+    await apiCall(`/api/db/users/${encodeURIComponent(user.id)}`, "POST", {
       id: user.id,
       name: user.name || "",
       email: user.email || "",
@@ -521,13 +539,13 @@ export const databaseService = {
     if (updates.isSuspended !== undefined) mapped.is_suspended = updates.isSuspended;
     if (updates.forceLogout !== undefined) mapped.force_logout = updates.forceLogout;
     mapped.updated_at = new Date().toISOString();
-    await apiCall(`/api/db/users/${id}`, "PATCH", mapped);
+    await apiCall(`/api/db/users/${encodeURIComponent(id)}`, "PATCH", mapped);
   },
 
   // --- DELETE USER ---
   async deleteUser(id: string): Promise<void> {
     console.log(`[DatabaseService] Deleting user from MongoDB: ${id}`);
-    await apiCall(`/api/db/users/${id}`, "DELETE");
+    await apiCall(`/api/db/users/${encodeURIComponent(id)}`, "DELETE");
   },
 
   // --- WINDOWING & PAGINATION METHODS ---
@@ -580,14 +598,14 @@ export const databaseService = {
     const query = new URLSearchParams();
     if (params.page !== undefined) query.set("page", String(params.page));
     if (params.limit !== undefined) query.set("limit", String(params.limit));
-    return apiCall(`/api/db/${collection}?${query.toString()}`, "GET");
+    return apiCall(`/api/db/${encodeURIComponent(collection)}?${query.toString()}`, "GET");
   },
 
   // --- SYSTEM LOGS OPERATIONS ---
   async saveAuditLog(log: SystemLog): Promise<void> {
     console.log(`[DatabaseService] Saving audit log to MongoDB`);
     const id = log.id || (log as any)._id || `log-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-    await apiCall(`/api/db/audit_logs/${id}`, "POST", {
+    await apiCall(`/api/db/audit_logs/${encodeURIComponent(id)}`, "POST", {
       id,
       action: log.action,
       details: log.details,
@@ -616,7 +634,7 @@ export const databaseService = {
     previousEmoji?: string | null;
   }): Promise<void> {
     console.log(`[DatabaseService] Persisting reaction history record to MongoDB: ${history.id} (${history.action} ${history.emoji})`);
-    await apiCall(`/api/db/user_reaction_histories/${history.id}`, "POST", {
+    await apiCall(`/api/db/user_reaction_histories/${encodeURIComponent(history.id)}`, "POST", {
       id: history.id,
       requisition_id: history.requisitionId,
       comment_id: history.commentId,

@@ -22,5 +22,47 @@
     "performed_by": "gichaumburu@gmail.com",
     "timestamp": "2026-07-25T14:09:28.663Z",
     "document_id": "log-1784988568663"
+  },
+  {
+    "id": "log-1789011666560-ucva1gnpt",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Digital Audio Mixer & Microphones Maintenance'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-09-10T03:41:06.560Z",
+    "group_id": "ICT Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_001"
+    },
+    "document_id": "log-1789011666560-ucva1gnpt"
+  },
+  {
+    "id": "log-1789011670865-awwlflt7m",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Digital Audio Mixer & Microphones Maintenance'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-09-10T03:41:10.865Z",
+    "group_id": "ICT Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_001"
+    },
+    "document_id": "log-1789011670865-awwlflt7m"
+  },
+  {
+    "id": "log-1789012385773-4996eaj3y",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Digital Audio Mixer & Microphones Maintenance'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-09-10T03:53:05.773Z",
+    "group_id": "ICT Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_001"
+    },
+    "document_id": "log-1789012385773-4996eaj3y"
+  },
+  {
+    "id": "log_test",
+    "action": "TEST",
+    "details": "test",
+    "document_id": "log_test"
   }
 ]

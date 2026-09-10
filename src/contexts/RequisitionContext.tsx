@@ -824,13 +824,20 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       try {
         const res = await fetch("/api/db/notification_states/user_global");
         if (res.ok) {
-          const json = await res.json();
-          const doc = json.data || json;
-          if (doc) {
-            if (Array.isArray(doc.readNoticeIds)) setReadNoticeIds(doc.readNoticeIds);
-            if (Array.isArray(doc.starredNoticeIds)) setStarredNoticeIds(doc.starredNoticeIds);
-            if (Array.isArray(doc.archivedNoticeIds)) setArchivedNoticeIds(doc.archivedNoticeIds);
-            if (Array.isArray(doc.deletedNoticeIds)) setDeletedNoticeIds(doc.deletedNoticeIds);
+          const text = await res.text();
+          if (text && !text.trim().startsWith("<")) {
+            try {
+              const json = JSON.parse(text);
+              const doc = json.data || json;
+              if (doc) {
+                if (Array.isArray(doc.readNoticeIds)) setReadNoticeIds(doc.readNoticeIds);
+                if (Array.isArray(doc.starredNoticeIds)) setStarredNoticeIds(doc.starredNoticeIds);
+                if (Array.isArray(doc.archivedNoticeIds)) setArchivedNoticeIds(doc.archivedNoticeIds);
+                if (Array.isArray(doc.deletedNoticeIds)) setDeletedNoticeIds(doc.deletedNoticeIds);
+              }
+            } catch (err) {
+              console.warn("[MongoDB Sync] Failed parsing notification states JSON:", err);
+            }
           }
         }
       } catch (e) {
@@ -1114,8 +1121,19 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         try {
           const res = await fetch(`/api/auth/get-profile-by-email?email=${encodeURIComponent(userEmail || "")}`);
-          const data = await res.json();
-          if (res.ok && data.exists && data.profile) {
+          let data: any = null;
+          if (res.ok) {
+            const text = await res.text();
+            if (text && !text.trim().startsWith("<")) {
+              try {
+                data = JSON.parse(text);
+              } catch (parseErr) {
+                console.warn("[Auth Sync] Non-JSON profile response:", parseErr);
+              }
+            }
+          }
+
+          if (data && data.exists && data.profile) {
             const dbUser = data.profile;
             
             // Self-healing / alignment: if the profile's ID in database is different from the Firebase Auth UID
@@ -1283,9 +1301,16 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       let profile: any = null;
       try {
         const res = await fetch(`/api/auth/get-profile-by-email?email=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (res.ok && data.exists && data.profile) {
-          profile = data.profile;
+        if (res.ok) {
+          const text = await res.text();
+          if (text && !text.trim().startsWith("<")) {
+            try {
+              const data = JSON.parse(text);
+              if (data.exists && data.profile) {
+                profile = data.profile;
+              }
+            } catch {}
+          }
         }
       } catch (e) {}
 
@@ -2916,8 +2941,16 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       email = email.trim().toLowerCase();
       const checkRes = await fetch(`/api/auth/get-profile-by-email?email=${encodeURIComponent(email)}`);
-      const checkData = await checkRes.json();
-      if (checkRes.ok && checkData.exists && !checkData.profile?.temp_password && !checkData.profile?.tempPassword) {
+      let checkData: any = {};
+      if (checkRes.ok) {
+        const text = await checkRes.text();
+        if (text && !text.trim().startsWith("<")) {
+          try {
+            checkData = JSON.parse(text);
+          } catch {}
+        }
+      }
+      if (checkData.exists && !checkData.profile?.temp_password && !checkData.profile?.tempPassword) {
         throw new Error("A user with this email already exists. Please login instead.");
       }
 
@@ -4077,43 +4110,51 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     try {
       let updatedReq: Requisition | undefined;
 
-      setRequisitions(prev => {
-        const currentReq = prev.find(r => r.id === id);
-        if (currentReq) {
-          const cleanedUpdates = {
-            ...updates,
-            updatedAt: new Date().toISOString(),
-            flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
-          };
-          if (updates.attachments) {
-            cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
-          }
-          updatedReq = { ...currentReq, ...cleanedUpdates };
-          return prev.map(r => r.id === id ? updatedReq! : r);
+      // Synchronously derive updatedReq from currentReq or existing state
+      const targetReq = currentReq || requisitions.find(r => r.id === id);
+      if (targetReq) {
+        const cleanedUpdates = {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (targetReq.flaggedForAudit || false)
+        };
+        if (updates.attachments) {
+          cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
         }
-        return prev;
-      });
+        updatedReq = { ...targetReq, ...cleanedUpdates };
+        setRequisitions(prev => prev.map(r => r.id === id ? updatedReq! : r));
+      }
 
+      // Fallback: If not in local state, fetch from backend API safely
       if (!updatedReq) {
         try {
-          const res = await fetch(`/api/db/requisitions/${id}`);
+          const res = await fetch(`/api/db/requisitions/${encodeURIComponent(id)}`, {
+            headers: { Accept: "application/json" }
+          });
           if (res.ok) {
-            const dbReq = await res.json();
-            if (dbReq && dbReq.id) {
-              const camelReq = mapSnakeToCamel(dbReq);
-              const cleanedUpdates = {
-                ...updates,
-                updatedAt: new Date().toISOString()
-              };
-              if (updates.attachments) {
-                cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
+            const text = await res.text();
+            if (text && !text.trim().startsWith("<")) {
+              try {
+                const dbReq = JSON.parse(text);
+                if (dbReq && dbReq.id) {
+                  const camelReq = mapSnakeToCamel(dbReq);
+                  const cleanedUpdates = {
+                    ...updates,
+                    updatedAt: new Date().toISOString()
+                  };
+                  if (updates.attachments) {
+                    cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);
+                  }
+                  updatedReq = {
+                    ...camelReq,
+                    ...cleanedUpdates,
+                    id
+                  } as Requisition;
+                  setRequisitions(prev => [updatedReq!, ...prev.filter(r => r.id !== id)]);
+                }
+              } catch (parseErr) {
+                console.warn("[updateRequisition] Non-JSON payload received from backend:", parseErr);
               }
-              updatedReq = {
-                ...camelReq,
-                ...cleanedUpdates,
-                id
-              } as Requisition;
-              setRequisitions(prev => [updatedReq!, ...prev.filter(r => r.id !== id)]);
             }
           }
         } catch (e) {

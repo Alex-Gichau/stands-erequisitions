@@ -579,7 +579,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     filtered.sort((a, b) => a.name.localeCompare(b.name));
 
     return filtered;
-  }, [projects, reservesSearchQuery]);
+  }, [projects, reservesSearchQuery, activeYear, isFinanceOrAdmin, currentUser]);
 
   const paginatedProjects = useMemo(() => {
     const startIndex = (reservesPage - 1) * itemsPerPage;
@@ -3282,30 +3282,94 @@ export const FinanceLedgerPanel: React.FC = () => {
                 </div>
               )}
 
-              {totalReservesPages > 1 && (
-                <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-slate-600">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">
-                    Showing {(reservesPage - 1) * itemsPerPage + 1} - {Math.min(reservesPage * itemsPerPage, processedProjects.length)} of {processedProjects.length} reserves
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={reservesPage === 1}
-                      onClick={() => setReservesPage(p => Math.max(p - 1, 1))}
-                      className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-50 transition-colors cursor-pointer"
-                    >
-                      Previous
-                    </button>
-                    <span className="font-mono text-[10px] text-slate-500">
-                      Page {reservesPage} of {totalReservesPages}
+              {/* 15-Row Pagination Controls for Ministry Group Budget Reserves */}
+              {processedProjects.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs font-bold text-slate-600">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+                      Showing <span className="font-bold text-slate-800">{(reservesPage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-slate-800">{Math.min(reservesPage * itemsPerPage, processedProjects.length)}</span> of <span className="font-bold text-slate-800">{processedProjects.length}</span> reserves
+                    </p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      15 Rows Per Page
                     </span>
-                    <button
-                      disabled={reservesPage === totalReservesPages}
-                      onClick={() => setReservesPage(p => Math.min(p + 1, totalReservesPages))}
-                      className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-50 transition-colors cursor-pointer"
-                    >
-                      Next
-                    </button>
                   </div>
+
+                  {totalReservesPages > 1 && (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        disabled={reservesPage === 1}
+                        onClick={() => setReservesPage(1)}
+                        className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="First Page"
+                      >
+                        «
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reservesPage === 1}
+                        onClick={() => setReservesPage(p => Math.max(p - 1, 1))}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        Previous
+                      </button>
+
+                      {/* Numbered Page Buttons */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalReservesPages }, (_, i) => i + 1)
+                          .filter(page => {
+                            // Show first, last, current, and pages within 1 of current
+                            return (
+                              page === 1 ||
+                              page === totalReservesPages ||
+                              Math.abs(page - reservesPage) <= 1
+                            );
+                          })
+                          .map((page, idx, arr) => {
+                            const prevPage = arr[idx - 1];
+                            const showEllipsis = prevPage && page - prevPage > 1;
+
+                            return (
+                              <React.Fragment key={`reserves-pg-${page}`}>
+                                {showEllipsis && (
+                                  <span className="px-1 text-slate-400 text-xs">...</span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setReservesPage(page)}
+                                  className={cn(
+                                    "w-7 h-7 flex items-center justify-center rounded-lg text-[11px] font-black transition-all cursor-pointer",
+                                    reservesPage === page
+                                      ? "bg-indigo-600 text-white shadow-xs"
+                                      : "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                  )}
+                                >
+                                  {page}
+                                </button>
+                              </React.Fragment>
+                            );
+                          })}
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={reservesPage === totalReservesPages}
+                        onClick={() => setReservesPage(p => Math.min(p + 1, totalReservesPages))}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                      >
+                        Next
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reservesPage === totalReservesPages}
+                        onClick={() => setReservesPage(totalReservesPages)}
+                        className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-[10px] tracking-wider uppercase disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        title="Last Page"
+                      >
+                        »
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

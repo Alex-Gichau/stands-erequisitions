@@ -5365,7 +5365,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   // Mark comments as read when requisition detail is viewed
   useEffect(() => {
     if (req?.id && currentUser) {
-      markRequisitionCommentsAsRead(req.id, currentUser);
+      markRequisitionCommentsAsRead(req.id, currentUser, undefined, req);
     }
   }, [req?.id, req?.comments?.length, currentUser]);
   const [loading, setLoading] = useState(false);

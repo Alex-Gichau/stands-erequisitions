@@ -4107,6 +4107,19 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return withDbLoading("Saving requisition changes...", async () => {
       const currentReq = requisitions.find(r => r.id === id);
 
+      if (
+        currentReq &&
+        (currentReq.status === RequisitionStatus.DISBURSED ||
+          currentReq.status === RequisitionStatus.REJECTED ||
+          currentReq.status === RequisitionStatus.DELETED ||
+          currentReq.isDeleted ||
+          Boolean((currentReq as any).is_deleted))
+      ) {
+        throw new Error(
+          `Modifications are locked: Requisition "${currentReq.title}" is in ${currentReq.status} status and cannot be edited.`
+        );
+      }
+
     try {
       let updatedReq: Requisition | undefined;
 

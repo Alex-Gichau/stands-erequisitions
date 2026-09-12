@@ -8,7 +8,7 @@ import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionCon
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError, getAttachmentFileName, getAbsoluteAttachmentUrl } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
+import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
 import { COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
@@ -985,6 +985,39 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       setLoading(false);
     }
   };
+
+  if (
+    targetReq &&
+    (targetReq.status === RequisitionStatus.DISBURSED ||
+      targetReq.status === RequisitionStatus.REJECTED ||
+      targetReq.status === RequisitionStatus.DELETED ||
+      targetReq.isDeleted ||
+      Boolean((targetReq as any).is_deleted))
+  ) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/40">
+            <Lock size={30} />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-wider">
+              Editing Locked
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Requisition <strong className="text-slate-800 dark:text-slate-200 font-bold">{targetReq.title}</strong> ({targetReq.id}) is in <span className="font-black text-slate-800 dark:text-slate-200 uppercase">{targetReq.status}</span> status. Disbursed, rejected, and deleted requisitions are finalized and cannot be modified.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-sm">

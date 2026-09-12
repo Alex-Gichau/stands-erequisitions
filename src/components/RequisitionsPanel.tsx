@@ -150,9 +150,19 @@ export function isRequisitionEditableByUser(
   canPerform?: (action: keyof PermissionConfig["actions"]) => boolean
 ): boolean {
   if (!currentUser || !req) return false;
-  if (req.status === RequisitionStatus.REJECTED) return false;
 
-  // Super Admin & Admin can edit any non-rejected requisition
+  // Editing is strictly forbidden on DISBURSED, REJECTED, and DELETED requisitions for all users/roles
+  if (
+    req.status === RequisitionStatus.DISBURSED ||
+    req.status === RequisitionStatus.REJECTED ||
+    req.status === RequisitionStatus.DELETED ||
+    req.isDeleted ||
+    Boolean((req as any).is_deleted)
+  ) {
+    return false;
+  }
+
+  // Super Admin & Admin can edit active (non-disbursed, non-rejected, non-deleted) requisitions
   if (currentUser.role === UserRole.SUPER_ADMIN || currentUser.role === UserRole.ADMIN) {
     return true;
   }
@@ -2594,6 +2604,7 @@ export const RequisitionsPanel: React.FC = () => {
   const [requisitionToDelete, setRequisitionToDelete] = useState<Requisition | null>(null);
   const [isDeletingReq, setIsDeletingReq] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkRestoring, setIsBulkRestoring] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   // Listen for navigation button clicks to always open home section of requisitions
@@ -3018,6 +3029,44 @@ export const RequisitionsPanel: React.FC = () => {
     }
   };
 
+  const handleBulkRestore = async () => {
+    if (selectedIds.size === 0 || isBulkRestoring) return;
+    const deletedSelectedReqs = requisitions.filter(r => selectedIds.has(r.id) && (r.status === RequisitionStatus.DELETED || r.isDeleted));
+    if (deletedSelectedReqs.length === 0) return;
+    if (window.confirm(`Are you sure you want to restore ${deletedSelectedReqs.length} deleted requisition(s)?`)) {
+      setIsBulkRestoring(true);
+      try {
+        const count = deletedSelectedReqs.length;
+        for (const r of deletedSelectedReqs) {
+          if (restoreRequisition) {
+            await restoreRequisition(r.id);
+          }
+        }
+        setSelectedIds(new Set());
+        if (triggerToast) {
+          triggerToast({
+            type: "SYSTEM_INFO",
+            severity: "LOW",
+            message: `Successfully restored ${count} requisition(s) to active submitted status.`,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (err: any) {
+        console.error("Bulk restore failed:", err);
+        if (triggerToast) {
+          triggerToast({
+            type: "SECURITY_UPDATE",
+            severity: "HIGH",
+            message: err?.message || "Failed to restore selected requisitions.",
+            timestamp: new Date().toISOString()
+          });
+        }
+      } finally {
+        setIsBulkRestoring(false);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 lg:space-y-8 animate-pulse p-4 md:p-8">
@@ -3061,19 +3110,35 @@ export const RequisitionsPanel: React.FC = () => {
           setRequisitionToDelete(viewingReq);
           setViewingReq(null);
         }}
+        onRestore={() => {
+          handleRestoreReq(viewingReq);
+          setViewingReq(null);
+        }}
         onGenerateReceipt={() => {
           setIsGeneratingReceipt(viewingReq);
         }}
-        onEdit={() => {
+        onEdit={isRequisitionEditableByUser(viewingReq, currentUser, canPerform) ? () => {
           setEditingReq(viewingReq);
           setViewingReq(null);
-        }}
+        } : undefined}
         isPage={true}
       />
     );
   }
 
   if (editingReq) {
+    // Editing is strictly forbidden on DISBURSED, REJECTED, and DELETED requisitions
+    if (
+      editingReq.status === RequisitionStatus.DISBURSED ||
+      editingReq.status === RequisitionStatus.REJECTED ||
+      editingReq.status === RequisitionStatus.DELETED ||
+      editingReq.isDeleted ||
+      Boolean((editingReq as any).is_deleted)
+    ) {
+      setEditingReq(null);
+      return null;
+    }
+
     return (
       <NewRequisitionForm 
         editReq={editingReq} 
@@ -4927,10 +4992,11 @@ export const RequisitionsPanel: React.FC = () => {
                         {restoreRequisition && (
                           <button 
                             onClick={(e) => handleRestoreReq(req, e)}
-                            className="p-2 hover:bg-emerald-50 rounded-lg border border-transparent hover:border-emerald-200 text-slate-400 hover:text-emerald-600 transition-all flex items-center gap-1"
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 text-emerald-700 transition-all flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider cursor-pointer shadow-xs"
                             title="Restore Requisition"
                           >
-                            <RotateCcw size={16} />
+                            <RotateCcw size={13} />
+                            <span>Restore</span>
                           </button>
                         )}
                       </div>
@@ -5171,16 +5237,34 @@ export const RequisitionsPanel: React.FC = () => {
                 <Download size={16} className="text-emerald-400" />
                 Export Table
               </button>
-              {canPerform('canDeleteRequisition') && (
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={isBulkDeleting}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 disabled:opacity-50"
-                >
-                  {isBulkDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                  <span>{isBulkDeleting ? `Deleting (${selectedIds.size})...` : "Delete Selected"}</span>
-                </button>
-              )}
+              {(() => {
+                const selectedReqs = requisitions.filter(r => selectedIds.has(r.id));
+                const allSelectedAreDeleted = selectedReqs.length > 0 && selectedReqs.every(r => r.status === RequisitionStatus.DELETED || r.isDeleted);
+                
+                if (allSelectedAreDeleted) {
+                  return (
+                    <button
+                      onClick={handleBulkRestore}
+                      disabled={isBulkRestoring}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 disabled:opacity-50 shadow-lg shadow-emerald-600/20"
+                    >
+                      {isBulkRestoring ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                      <span>{isBulkRestoring ? `Restoring (${selectedIds.size})...` : "Restore Selected"}</span>
+                    </button>
+                  );
+                }
+
+                return canPerform('canDeleteRequisition') && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={isBulkDeleting}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 disabled:opacity-50"
+                  >
+                    {isBulkDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    <span>{isBulkDeleting ? `Deleting (${selectedIds.size})...` : "Delete Selected"}</span>
+                  </button>
+                );
+              })()}
             </div>
 
             <button
@@ -5209,20 +5293,24 @@ export const RequisitionsPanel: React.FC = () => {
               setRequisitionToDelete(viewingReq);
               setViewingReq(null);
             }}
+            onRestore={() => {
+              handleRestoreReq(viewingReq);
+              setViewingReq(null);
+            }}
             onGenerateReceipt={() => {
               setIsGeneratingReceipt(viewingReq);
             }}
-            onEdit={() => {
+            onEdit={isRequisitionEditableByUser(viewingReq, currentUser, canPerform) ? () => {
               setEditingReq(viewingReq);
               setViewingReq(null);
-            }}
+            } : undefined}
           />
         )}
       </AnimatePresence>
 
       {/* Modal for Editing */}
       <AnimatePresence>
-        {editingReq && (
+        {editingReq && !editingReq.isDeleted && editingReq.status !== RequisitionStatus.DELETED && editingReq.status !== RequisitionStatus.DISBURSED && editingReq.status !== RequisitionStatus.REJECTED && (
           <NewRequisitionForm 
             editReq={editingReq} 
             onClose={() => setEditingReq(null)} 
@@ -5333,14 +5421,45 @@ export interface DetailModalProps {
   req: Requisition;
   onClose: () => void;
   onDelete: () => void;
+  onRestore?: () => void;
   onGenerateReceipt: () => void;
   onEdit?: () => void;
   isPage?: boolean;
 }
 
-export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initialReq, onClose, onDelete, onGenerateReceipt, onEdit, isPage }) => {
-  const { currentUser, updateRequisitionStatus, updateRequisition, sendEmailNotification, uploadReceipts, globalSearchTerm, projects, triggerToast, vendors, requisitions, users, addAlert, canPerform } = useRequisitions();
+export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initialReq, onClose, onDelete, onRestore, onGenerateReceipt, onEdit, isPage }) => {
+  const { currentUser, updateRequisitionStatus, updateRequisition, restoreRequisition, sendEmailNotification, uploadReceipts, globalSearchTerm, projects, triggerToast, vendors, requisitions, users, addAlert, canPerform } = useRequisitions();
   const req = requisitions.find(r => r.id === initialReq.id) || initialReq;
+  const isDeleted = req.status === RequisitionStatus.DELETED || req.isDeleted || Boolean((req as any).is_deleted);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleRestore = async () => {
+    if (isRestoring) return;
+    setIsRestoring(true);
+    try {
+      if (onRestore) {
+        onRestore();
+      } else if (restoreRequisition) {
+        await restoreRequisition(req.id);
+        triggerToast?.({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: `Requisition "${req.title}" (${req.id}) successfully restored to active submitted status.`,
+          timestamp: new Date().toISOString()
+        });
+        onClose();
+      }
+    } catch (err: any) {
+      triggerToast?.({
+        type: "SECURITY_UPDATE",
+        severity: "HIGH",
+        message: err?.message || "Failed to restore requisition",
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  };
   const normalizedAttachments = React.useMemo(() => {
     const fromReq = safeNormalizeAttachments(req.attachments);
     if (fromReq.length > 0) return fromReq;
@@ -6204,6 +6323,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
   const canAct = () => {
     if (!currentUser) return false;
+    if (isDeleted) return false;
+    if (req.status === RequisitionStatus.DISBURSED || req.status === RequisitionStatus.REJECTED || req.status === RequisitionStatus.DELETED) return false;
     if (currentUser.role === UserRole.SUPER_ADMIN) return true;
     if (canPerform('canApproveL1') && req.status === RequisitionStatus.SUBMITTED) return true;
     if (canPerform('canApproveL2') && (req.status === RequisitionStatus.APPROVED_L1 || req.status === RequisitionStatus.ESCALATED)) return true;
@@ -8074,24 +8195,50 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   </button>
                 )}
 
-                {/* Delete Document */}
-                <button 
-                  onClick={() => {
-                    setIsMoreOpen(false);
-                    onDelete();
-                    onClose();
-                  }}
-                  className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
-                >
-                  <Trash2 size={15} className="shrink-0" />
-                  <span>Delete Document</span>
-                </button>
+                {/* Delete or Restore Document */}
+                {isDeleted ? (
+                  <button 
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      handleRestore();
+                    }}
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
+                  >
+                    <RotateCcw size={15} className="shrink-0" />
+                    <span>Restore Requisition</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setIsMoreOpen(false);
+                      onDelete();
+                      onClose();
+                    }}
+                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors border-t border-slate-100 dark:border-slate-800 mt-1 pt-2 cursor-pointer whitespace-nowrap"
+                  >
+                    <Trash2 size={15} className="shrink-0" />
+                    <span>Delete Document</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end flex-wrap sm:flex-nowrap">
+            {/* Restore Action Button for Deleted Requisitions */}
+            {isDeleted && (
+              <button 
+                onClick={handleRestore}
+                disabled={isRestoring}
+                className="px-4 sm:px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-[10px] md:text-xs font-black transition-all cursor-pointer uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                title="Restore Requisition"
+              >
+                <RotateCcw size={14} className={isRestoring ? "animate-spin" : ""} />
+                <span>{isRestoring ? "Restoring..." : "Restore Requisition"}</span>
+              </button>
+            )}
+
             {/* Direct Edit Button for Church Groups / Requesters / Admins */}
             {onEdit && isRequisitionEditableByUser(req, currentUser, canPerform) && (
               <button 

@@ -16,6 +16,14 @@ import { getAuth } from "firebase-admin/auth";
 import uploadsRouter from "./uploads.ts";
 import mime from "mime-types";
 import { getCachedJson, invalidateCollectionCache, getValkeyStatus, flushValkeyCache, setValkeyKey } from "./server/valkey.ts";
+import {
+  securityHeadersMiddleware,
+  apiRateLimiter,
+  sensitiveActionLimiter,
+  requestSanitizerMiddleware,
+  safeApiErrorHandler,
+  getSecurityStatus
+} from "./server/security/apiProtection.ts";
 
 dotenv.config();
 
@@ -790,10 +798,31 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Standard API health check endpoint
+  // L7 Network & Proxy Ingress Configuration: Enable reverse proxy trust (Cloud Run / Nginx)
+  app.set("trust proxy", 1);
+
+  // L7 Security Hardening: Disable Express fingerprinting
+  app.disable("x-powered-by");
+
+  // L7 Security Headers (X-Content-Type-Options, HSTS, Referrer-Policy, COOP, CORP)
+  app.use(securityHeadersMiddleware);
+
+  // L7 Request Sanitizer (Blocks Path Traversal, Null Bytes, Prototype Pollution)
+  app.use(requestSanitizerMiddleware);
+
+  // Standard API health check endpoint (Exempt from rate limits)
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  // L7 Security Protection Status & Diagnostics endpoint
+  app.get("/api/security/status", (_req, res) => {
+    res.json(getSecurityStatus());
+  });
+
+  // L7 Rate Limiting & Abuse Prevention Middleware (General & Sensitive routes)
+  app.use("/api", apiRateLimiter);
+  app.use("/api", sensitiveActionLimiter);
 
   // Gzip / Brotli payload compression middleware for lightning-fast responses
   app.use(compression({
@@ -803,12 +832,6 @@ async function startServer() {
     },
     level: 6
   }));
-
-  // Security / COOP Policy middleware for OAuth & Firebase Auth popups
-  app.use((_req, res, next) => {
-    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    next();
-  });
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -8249,6 +8272,9 @@ Your response MUST adhere strictly to the JSON schema specified.
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.originalUrl}` });
   });
+
+  // L7 Safe Centralized API Error Handler (Zero internal stack trace or path leakage)
+  app.use("/api", safeApiErrorHandler);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

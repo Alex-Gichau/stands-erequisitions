@@ -92,7 +92,8 @@ import {
   Megaphone,
   Wrench,
   MoreHorizontal,
-  CheckCircle2
+  CheckCircle2,
+  RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PerformanceTracker } from "./components/PerformanceTracker";
@@ -506,7 +507,8 @@ function AppContent() {
     systemLogs,
     alerts,
     selectedRequisition,
-    setSelectedRequisition
+    setSelectedRequisition,
+    restoreRequisition
   } = useRequisitions();
 
   const handleNavigate = useCallback((view: string) => {
@@ -1832,7 +1834,7 @@ function AppContent() {
             </p>
           </div>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={() => {
                 // Remove reqId parameter from URL without page reload
@@ -1847,11 +1849,41 @@ function AppContent() {
                 setTargetReqId(null);
                 setCurrentView("dashboard");
               }}
-              className="px-8 py-3 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 mx-auto"
+              className="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <ArrowLeft size={16} />
               <span>Return to Dashboard</span>
             </button>
+
+            {restoreRequisition && (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN || canPerform?.('canDeleteRequisition')) && (
+              <button
+                onClick={async () => {
+                  try {
+                    await restoreRequisition(deletedReqId);
+                    triggerToast?.({
+                      type: "SYSTEM_INFO",
+                      severity: "LOW",
+                      message: `Requisition #${deletedReqId} successfully restored to active submitted status.`,
+                      timestamp: new Date().toISOString()
+                    });
+                    setDeletedReqId(null);
+                    setTargetReqId(null);
+                    setCurrentView("requisitions");
+                  } catch (err: any) {
+                    triggerToast?.({
+                      type: "SECURITY_UPDATE",
+                      severity: "HIGH",
+                      message: err.message || "Failed to restore requisition",
+                      timestamp: new Date().toISOString()
+                    });
+                  }
+                }}
+                className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={16} />
+                <span>Restore Requisition</span>
+              </button>
+            )}
           </div>
         </div>
       );

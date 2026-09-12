@@ -193,6 +193,8 @@ export interface Requisition {
   fiscalYear?: number;
   createdBy?: string;
   createdAt?: string;
+  isDeleted?: boolean;
+  is_deleted?: boolean;
 }
 
 export interface FiscalYear {

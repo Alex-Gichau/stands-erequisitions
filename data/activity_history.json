@@ -1,0 +1,60 @@
+[
+  {
+    "action": "SIMULATED_UNAPPROVED_SUMMARY_EMAIL",
+    "details": "Bi-weekly unapproved requisitions digest (4 unapproved, KES 148,500) dispatched to 1 recipients (ict.team@pceastandrews.org)",
+    "performedBy": "BIWEEKLY_CRON_SCHEDULER",
+    "timestamp": "2026-09-13T00:48:36.072Z",
+    "metadata": {
+      "category": "DIGEST_SUMMARY",
+      "totalCount": 4,
+      "totalAmount": 148500,
+      "recipients": [
+        "ict.team@pceastandrews.org"
+      ],
+      "isAutomatedCron": true,
+      "delivered": false,
+      "error": "Connection timeout"
+    }
+  },
+  {
+    "action": "EMAIL_DISPATCH",
+    "details": "Diagnostic Test Email successfully delivered to <ict.team@pceastandrews.org> regarding 'Automated Digest SMTP Connectivity Test'",
+    "performedBy": "SUPER_ADMIN",
+    "timestamp": "2026-09-13T01:06:46.656Z",
+    "metadata": {
+      "testType": "DIAGNOSTIC_VERIFICATION",
+      "recipientEmail": "ict.team@pceastandrews.org",
+      "subject": "Automated Digest SMTP Connectivity Test",
+      "status": "DELIVERED"
+    }
+  },
+  {
+    "action": "DISPATCH_UNAPPROVED_SUMMARY_EMAIL",
+    "details": "Bi-weekly unapproved requisitions digest (4 unapproved, KES 148,500) dispatched to 1 recipients (ict.team@pceastandrews.org)",
+    "performedBy": "SUPER_ADMIN",
+    "timestamp": "2026-09-13T01:06:52.687Z",
+    "metadata": {
+      "category": "DIGEST_SUMMARY",
+      "totalCount": 4,
+      "totalAmount": 148500,
+      "recipients": [
+        "ict.team@pceastandrews.org"
+      ],
+      "isAutomatedCron": false,
+      "delivered": true,
+      "error": null
+    }
+  },
+  {
+    "action": "EMAIL_DISPATCH",
+    "details": "Diagnostic Test Email successfully delivered to <ict.team@pceastandrews.org> regarding 'STANDS System Email Diagnostic Test'",
+    "performedBy": "SUPER_ADMIN",
+    "timestamp": "2026-09-13T01:41:39.721Z",
+    "metadata": {
+      "testType": "DIAGNOSTIC_VERIFICATION",
+      "recipientEmail": "ict.team@pceastandrews.org",
+      "subject": "STANDS System Email Diagnostic Test",
+      "status": "DELIVERED"
+    }
+  }
+]

@@ -3660,6 +3660,22 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const req = localReq;
       if (!req) return;
 
+      // Idempotency guard: If requisition is already in the requested status, exit cleanly to prevent duplicate transactions/emails
+      if (req.status === status) {
+        console.warn(`[Workflow Guard] Requisition ${id} is already in status '${status}'. Action skipped.`);
+        return;
+      }
+
+      // Terminal state guard: Disbursed requisitions are immutable
+      if (req.status === RequisitionStatus.DISBURSED && status !== RequisitionStatus.DISBURSED) {
+        throw new Error("Financial Governance Violation: This requisition has already been DISBURSED. No further status transitions are permitted.");
+      }
+
+      // Workflow sequence guard: Cannot jump directly to DISBURSED without prior Level 2 Approval
+      if (status === RequisitionStatus.DISBURSED && req.status !== RequisitionStatus.APPROVED_L2 && req.status !== RequisitionStatus.PARTIALLY_DISBURSED) {
+        throw new Error(`Workflow Sequence Violation: Requisition must achieve Level 2 Approval before disbursement. Current status: ${req.status}.`);
+      }
+
       // Security check: Verify permission rights for specific workflow transitions
       if (status === RequisitionStatus.APPROVED_L1 && !canPerform('canApproveL1')) {
         throw new Error("Permission Denied: You do not possess Level 1 Approval Authority.");

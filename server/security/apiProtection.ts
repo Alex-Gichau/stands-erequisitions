@@ -157,12 +157,17 @@ export function securityHeadersMiddleware(req: Request, res: Response, next: Nex
 export function apiRateLimiter(req: Request, res: Response, next: NextFunction): void {
   metrics.totalInspected++;
 
+  const rawPath = (req.originalUrl || req.url || req.path || "").split("?")[0];
+  const normalizedPath = rawPath.startsWith("/api") ? rawPath : `/api${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+
   // Exempt health checks, static assets, and favicon from rate limiting
   if (
-    req.path === "/api/health" || 
-    req.path === "/favicon.ico" ||
-    req.path.startsWith("/uploads") ||
-    req.path.startsWith("/api/attachments/") && req.method === "GET"
+    normalizedPath === "/api/health" || 
+    normalizedPath === "/api/security/status" ||
+    rawPath === "/favicon.ico" ||
+    normalizedPath.startsWith("/api/uploads") ||
+    rawPath.startsWith("/uploads") ||
+    (normalizedPath.startsWith("/api/attachments/") && req.method === "GET")
   ) {
     return next();
   }
@@ -210,7 +215,10 @@ export function sensitiveActionLimiter(req: Request, res: Response, next: NextFu
     "/api/slack/"
   ];
 
-  const isSensitive = sensitivePaths.some(p => req.path.startsWith(p));
+  const rawPath = (req.originalUrl || req.url || req.path || "").split("?")[0];
+  const normalizedPath = rawPath.startsWith("/api") ? rawPath : `/api${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+
+  const isSensitive = sensitivePaths.some(p => normalizedPath.startsWith(p) || rawPath.startsWith(p));
   if (!isSensitive) {
     return next();
   }

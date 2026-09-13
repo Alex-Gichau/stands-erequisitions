@@ -24,5 +24,5 @@ export function useBackgroundRefresh(intervalMs: number = 60000) {
     const intervalId = setInterval(runValidation, intervalMs);
 
     return () => clearInterval(intervalId);
-  }, [systemSettings.currentFiscalYear, currentUser, intervalMs]);
+  }, [systemSettings.currentFiscalYear, currentUser?.id, currentUser?.role, intervalMs]);
 }

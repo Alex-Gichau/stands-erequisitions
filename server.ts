@@ -155,16 +155,132 @@ function writeJsonCollection(collection: string, data: any[]): void {
 const serverFilename = typeof __filename !== "undefined" ? __filename : process.cwd();
 const serverDirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(serverFilename);
 
-// Email Config
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: parseInt(process.env.SMTP_PORT || "587"),
-  secure: process.env.SMTP_PORT === "465",
-  auth: {
-    user: process.env.SMTP_USER || "ict.team@pceastandrews.org",
-    pass: process.env.SMTP_PASS,
+// Email Config & Resilient Mail Transport
+function normalizeSmtpPort(rawPort?: string | number): number {
+  const p = parseInt(String(rawPort || "587"), 10);
+  // Correct common typographic slip: 547 -> 587
+  if (p === 547) {
+    return 587;
+  }
+  // If port is not a recognized SMTP port (25, 465, 587, 2525), fall back to 587
+  if (![25, 465, 587, 2525].includes(p)) {
+    return 587;
+  }
+  return p;
+}
+
+function cleanSmtpPassword(rawPass?: string): string {
+  if (!rawPass) return "";
+  // Google App Passwords are 16 alphanumeric characters often generated or pasted with spaces (e.g. 'xxxx xxxx xxxx xxxx')
+  return rawPass.replace(/\s+/g, "").trim();
+}
+
+let cachedActiveSmtpUser: string | null = null;
+
+function buildTransportInstance(username: string, overridePort?: number) {
+  const port = overridePort || normalizeSmtpPort(process.env.SMTP_PORT);
+  const pass = cleanSmtpPassword(process.env.SMTP_PASS);
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const isSecure = port === 465;
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: isSecure,
+    auth: {
+      user: username,
+      pass,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
+}
+
+function getActiveSmtpContext(): { transport: nodemailer.Transporter; username: string } {
+  const primaryUser = process.env.SMTP_USER || "ict.team@pceastandrews.org";
+  const user = cachedActiveSmtpUser || primaryUser;
+  return {
+    transport: buildTransportInstance(user),
+    username: user,
+  };
+}
+
+const transporter = {
+  async sendMail(mailOptions: nodemailer.SendMailOptions): Promise<any> {
+    const primaryUser = process.env.SMTP_USER || "ict.team@pceastandrews.org";
+    const fallbackUser = "ict.team@pceastandrews.org";
+    const { transport, username } = getActiveSmtpContext();
+
+    try {
+      const info = await transport.sendMail(mailOptions);
+      cachedActiveSmtpUser = username;
+      return info;
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+
+      // Scenario 1: Authentication failure (e.g. Google App Password was generated for ict.team instead of no-reply)
+      if (
+        username !== fallbackUser &&
+        (errMsg.includes("535") ||
+          errMsg.includes("BadCredentials") ||
+          errMsg.includes("Username and Password not accepted") ||
+          errMsg.includes("Invalid login"))
+      ) {
+        console.warn(`[SMTP Mailer] Auth failed for ${username} (BadCredentials). Retrying with authorized account ${fallbackUser}...`);
+        const fallbackTransport = buildTransportInstance(fallbackUser);
+        const adjustedOptions = { ...mailOptions };
+        if (typeof adjustedOptions.from === "string" && adjustedOptions.from.includes(username)) {
+          adjustedOptions.from = adjustedOptions.from.replace(username, fallbackUser);
+        }
+        const info = await fallbackTransport.sendMail(adjustedOptions);
+        cachedActiveSmtpUser = fallbackUser;
+        console.log(`[SMTP Mailer] Successfully dispatched email via authorized account ${fallbackUser}.`);
+        return info;
+      }
+
+      // Scenario 2: Connection timeout or network drop on STARTTLS port (attempt 465 SMTPS)
+      if (
+        errMsg.includes("timeout") ||
+        errMsg.includes("ECONNREFUSED") ||
+        errMsg.includes("ETIMEDOUT") ||
+        errMsg.includes("Connection timeout")
+      ) {
+        const currentPort = normalizeSmtpPort(process.env.SMTP_PORT);
+        const altPort = currentPort === 465 ? 587 : 465;
+        console.warn(`[SMTP Mailer] Network issue on port ${currentPort} (${errMsg}). Attempting automatic failover to port ${altPort}...`);
+        try {
+          const altTransport = buildTransportInstance(cachedActiveSmtpUser || fallbackUser, altPort);
+          const info = await altTransport.sendMail(mailOptions);
+          console.log(`[SMTP Mailer] Successfully dispatched email via alternate port ${altPort}.`);
+          return info;
+        } catch (retryErr: any) {
+          console.error(`[SMTP Mailer] Failover port ${altPort} also encountered error:`, retryErr.message || retryErr);
+        }
+      }
+
+      throw err;
+    }
   },
-});
+
+  async verify(): Promise<any> {
+    const { transport, username } = getActiveSmtpContext();
+    try {
+      const res = await transport.verify();
+      cachedActiveSmtpUser = username;
+      return res;
+    } catch (err: any) {
+      const fallbackUser = "ict.team@pceastandrews.org";
+      if (username !== fallbackUser) {
+        const fallbackTransport = buildTransportInstance(fallbackUser);
+        const res = await fallbackTransport.verify();
+        cachedActiveSmtpUser = fallbackUser;
+        return res;
+      }
+      throw err;
+    }
+  },
+};
 
 interface Activity {
   action: string;
@@ -193,7 +309,9 @@ function persistActivity(activity: Activity) {
     const filePath = path.join(getBaseDataDir(), "activity_history.json");
     const activities = restoreActivities();
     activities.push(activity);
-    fs.writeFileSync(filePath, JSON.stringify(activities, null, 2), "utf-8");
+    // Retain the latest 1000 activity logs to prevent unbounded file growth and event loop latency
+    const bounded = activities.length > 1000 ? activities.slice(-1000) : activities;
+    fs.writeFileSync(filePath, JSON.stringify(bounded, null, 2), "utf-8");
   } catch (err) {
     console.error("Error writing activity_history.json:", err);
   }
@@ -803,10 +921,14 @@ async function startServer() {
   // L7 Security Hardening: Disable Express fingerprinting
   app.disable("x-powered-by");
 
+  // Parse JSON and urlencoded request bodies first so downstream security sanitizers can inspect req.body
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
   // L7 Security Headers (X-Content-Type-Options, HSTS, Referrer-Policy, COOP, CORP)
   app.use(securityHeadersMiddleware);
 
-  // L7 Request Sanitizer (Blocks Path Traversal, Null Bytes, Prototype Pollution)
+  // L7 Request Sanitizer (Blocks Path Traversal, Null Bytes, Prototype Pollution on URL, Query, and Body)
   app.use(requestSanitizerMiddleware);
 
   // Standard API health check endpoint (Exempt from rate limits)
@@ -831,9 +953,6 @@ async function startServer() {
     },
     level: 6
   }));
-
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // Serve uploaded files using the Express uploads router
   app.use("/api/attachments", uploadsRouter);
@@ -3564,6 +3683,12 @@ Your response MUST adhere strictly to the JSON schema specified.
     const summaryData = getUnapprovedRequisitionsSummaryData();
     if (summaryData.totalCount === 0 && !options?.force) {
       console.log("[Unapproved Digest] Automated summary skipped — zero unapproved requisitions.");
+      // Reset the 14-day cycle timer on automated cron runs so it doesn't poll repeatedly every 15 minutes
+      if (options?.isAutomatedCron) {
+        updateSystemSettingsObject({
+          lastUnapprovedSummaryEmailSentAt: new Date().toISOString()
+        });
+      }
       return { success: true, skipped: true, reason: "Zero unapproved requisitions" };
     }
 
@@ -7420,8 +7545,19 @@ Your response MUST adhere strictly to the JSON schema specified.
     if (!config || config.enabled === false) return false;
     const now = new Date();
     
-    // Check if current hour is 4 AM
-    if (now.getHours() !== 4) return false;
+    // Check if current hour in Africa/Nairobi (EAT, UTC+3) is 4 AM
+    let currentHourEAT = 0;
+    try {
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Africa/Nairobi",
+        hour: "numeric",
+        hour12: false
+      });
+      currentHourEAT = parseInt(formatter.format(now), 10);
+    } catch {
+      currentHourEAT = (now.getUTCHours() + 3) % 24;
+    }
+    if (currentHourEAT !== 4) return false;
 
     const lastSent = config.lastSentTimestamp ? new Date(config.lastSentTimestamp) : null;
     if (!lastSent) return true;
@@ -8071,10 +8207,14 @@ Your response MUST adhere strictly to the JSON schema specified.
         config.lastSentDate !== todayDate
       ) {
         console.log(`[Daily Login Slack Scheduler] End-of-day trigger reached (${currentHourEAT}:${currentMinuteEAT} EAT). Dispatched for ${todayDate}...`);
-        await executeDailyLoginSummaryDispatch(todayDate);
-        config.lastSentDate = todayDate;
-        config.lastSentTimestamp = new Date().toISOString();
-        saveDailyLoginSlackConfig(config);
+        try {
+          await executeDailyLoginSummaryDispatch(todayDate);
+        } finally {
+          // Always record execution date to avoid rapid 15-minute retry storms if webhook encounters network issues
+          config.lastSentDate = todayDate;
+          config.lastSentTimestamp = new Date().toISOString();
+          saveDailyLoginSlackConfig(config);
+        }
         console.log("[Daily Login Slack Scheduler] Completed automated dispatch.");
       }
     } catch (e) {
@@ -8088,9 +8228,12 @@ Your response MUST adhere strictly to the JSON schema specified.
       const config = getHealthSlackConfig();
       if (isHealthAlertDue(config)) {
         console.log("[Health Slack Alert] 5-day 04:00 AM automated alert is due. Triggering dispatch...");
-        await executeHealthSlackAlertDispatch();
-        config.lastSentTimestamp = new Date().toISOString();
-        saveHealthSlackConfig(config);
+        try {
+          await executeHealthSlackAlertDispatch();
+        } finally {
+          config.lastSentTimestamp = new Date().toISOString();
+          saveHealthSlackConfig(config);
+        }
         console.log("[Health Slack Alert] Successfully dispatched and updated config.");
       }
     } catch (e) {

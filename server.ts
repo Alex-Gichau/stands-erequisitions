@@ -15,7 +15,6 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import uploadsRouter from "./uploads.ts";
 import mime from "mime-types";
-import { getCachedJson, invalidateCollectionCache, getValkeyStatus, flushValkeyCache, setValkeyKey } from "./server/valkey.ts";
 import {
   securityHeadersMiddleware,
   apiRateLimiter,
@@ -1759,40 +1758,37 @@ Your response MUST adhere strictly to the JSON schema specified.
 
   // Bulk get (load all 15 datasets at once)
   /**
-   * Fetches all documents from all collections with Valkey in-memory acceleration.
+   * Fetches all documents from all collections.
    */
   app.get("/api/db-all", async (req, res) => {
     try {
-      const result = await getCachedJson("col:db-all", async () => {
-        const dataMap: any = {};
-        for (const col of collectionsList) {
-          if (mongoose.connection.readyState === 1) {
-            const Model = modelMappings[col];
-            if (Model) {
-              const data = await Model.find({}).lean();
-              dataMap[col] = data.map((item: any) => {
-                const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-                const { _id, __v, ...rest } = sanitized;
-                const snakeRest = toSnakeCase(rest);
-                return { id: snakeRest.id || String(_id), ...snakeRest };
-              });
-            } else {
-              dataMap[col] = [];
-            }
-          } else {
-            const data = readJsonCollection(col);
+      const dataMap: any = {};
+      for (const col of collectionsList) {
+        if (mongoose.connection.readyState === 1) {
+          const Model = modelMappings[col];
+          if (Model) {
+            const data = await Model.find({}).lean();
             dataMap[col] = data.map((item: any) => {
               const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
               const { _id, __v, ...rest } = sanitized;
               const snakeRest = toSnakeCase(rest);
               return { id: snakeRest.id || String(_id), ...snakeRest };
             });
+          } else {
+            dataMap[col] = [];
           }
+        } else {
+          const data = readJsonCollection(col);
+          dataMap[col] = data.map((item: any) => {
+            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+            const { _id, __v, ...rest } = sanitized;
+            const snakeRest = toSnakeCase(rest);
+            return { id: snakeRest.id || String(_id), ...snakeRest };
+          });
         }
-        return dataMap;
-      }, 300);
+      }
 
-      const jsonString = JSON.stringify(result);
+      const jsonString = JSON.stringify(dataMap);
       const etag = `"${crypto.createHash("md5").update(jsonString).digest("hex")}"`;
 
       res.setHeader("ETag", etag);
@@ -1813,29 +1809,28 @@ Your response MUST adhere strictly to the JSON schema specified.
   // --- EXPLICIT REQUISITIONS ENDPOINTS ---
   /**
    * @route   GET /api/requisitions
-   * @desc    Retrieve all requisitions with Valkey in-memory acceleration
+   * @desc    Retrieve all requisitions
    */
   app.get("/api/requisitions", async (req, res) => {
     try {
-      const cleanData = await getCachedJson("col:requisitions", async () => {
-        if (mongoose.connection.readyState === 1) {
-          const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
-          return data.map((item: any) => {
-            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-            const { _id, __v, ...rest } = sanitized;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
-        } else {
-          const data = readJsonCollection("requisitions");
-          return data.map((item: any) => {
-            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-            const { _id, __v, ...rest } = sanitized;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
-        }
-      }, 300);
+      let cleanData: any[];
+      if (mongoose.connection.readyState === 1) {
+        const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
+        cleanData = data.map((item: any) => {
+          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+          const { _id, __v, ...rest } = sanitized;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
+        });
+      } else {
+        const data = readJsonCollection("requisitions");
+        cleanData = data.map((item: any) => {
+          const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
+          const { _id, __v, ...rest } = sanitized;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
+        });
+      }
 
       // Server-Side Windowing & Pagination Support
       const hasPaginationQuery = req.query.page !== undefined || req.query.limit !== undefined || req.query.window === "true";
@@ -1917,7 +1912,7 @@ Your response MUST adhere strictly to the JSON schema specified.
 
   /**
    * @route   POST /api/requisitions
-   * @desc    Create or update a requisition in MongoDB / JSON and invalidate Valkey cache
+   * @desc    Create or update a requisition in MongoDB / JSON
    */
   app.post("/api/requisitions", express.json({ limit: "50mb" }), async (req, res) => {
     try {
@@ -1948,7 +1943,6 @@ Your response MUST adhere strictly to the JSON schema specified.
         resultData = payload;
       }
 
-      await invalidateCollectionCache("requisitions");
       res.status(201).json(resultData);
     } catch (err: any) {
       console.error("[POST /api/requisitions Error]:", err);
@@ -1958,32 +1952,31 @@ Your response MUST adhere strictly to the JSON schema specified.
 
   // Get all documents in a collection
   /**
-   * Fetches all documents in a specific collection with Valkey cache.
+   * Fetches all documents in a specific collection.
    */
   app.get("/api/db/:collection", async (req, res) => {
     const { collection } = req.params;
     try {
-      const cleanData = await getCachedJson(`col:${collection}`, async () => {
-        if (mongoose.connection.readyState === 1) {
-          const Model = modelMappings[collection];
-          if (!Model) {
-            throw new Error(`Unknown collection: ${collection}`);
-          }
-          const data = await Model.find({}).lean();
-          return data.map((item: any) => {
-            const { _id, __v, ...rest } = item;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
-        } else {
-          const data = readJsonCollection(collection);
-          return data.map((item: any) => {
-            const { _id, __v, ...rest } = item;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
+      let cleanData: any[];
+      if (mongoose.connection.readyState === 1) {
+        const Model = modelMappings[collection];
+        if (!Model) {
+          throw new Error(`Unknown collection: ${collection}`);
         }
-      }, 300);
+        const data = await Model.find({}).lean();
+        cleanData = data.map((item: any) => {
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
+        });
+      } else {
+        const data = readJsonCollection(collection);
+        cleanData = data.map((item: any) => {
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          return { id: snakeRest.id || String(_id), ...snakeRest };
+        });
+      }
 
       // Pagination support if page or limit query parameters provided
       if (req.query.page !== undefined || req.query.limit !== undefined) {
@@ -2024,26 +2017,27 @@ Your response MUST adhere strictly to the JSON schema specified.
   app.get("/api/db/:collection/:id", async (req, res) => {
     const { collection, id } = req.params;
     try {
-      const itemData = await getCachedJson(`col:${collection}:${id}`, async () => {
-        if (mongoose.connection.readyState === 1) {
-          const Model = modelMappings[collection];
-          if (!Model) {
-            throw new Error(`Unknown collection: ${collection}`);
-          }
-          const item = await Model.findOne({ id }).lean();
-          if (!item) return null;
-          const { _id, __v, ...rest } = item;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
-        } else {
-          const data = readJsonCollection(collection);
-          const item = data.find((d: any) => d.id === id);
-          if (!item) return null;
-          const { _id, __v, ...rest } = item;
-          const snakeRest = toSnakeCase(rest);
-          return { id: snakeRest.id || String(_id), ...snakeRest };
+      let itemData: any = null;
+      if (mongoose.connection.readyState === 1) {
+        const Model = modelMappings[collection];
+        if (!Model) {
+          throw new Error(`Unknown collection: ${collection}`);
         }
-      }, 300);
+        const item = await Model.findOne({ id }).lean();
+        if (item) {
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          itemData = { id: snakeRest.id || String(_id), ...snakeRest };
+        }
+      } else {
+        const data = readJsonCollection(collection);
+        const item = data.find((d: any) => d.id === id);
+        if (item) {
+          const { _id, __v, ...rest } = item;
+          const snakeRest = toSnakeCase(rest);
+          itemData = { id: snakeRest.id || String(_id), ...snakeRest };
+        }
+      }
 
       if (!itemData) {
         if (collection === "notification_states") {
@@ -2094,7 +2088,6 @@ Your response MUST adhere strictly to the JSON schema specified.
         responsePayload = { success: true, id, data: payload };
       }
 
-      await invalidateCollectionCache(collection);
       res.json(responsePayload);
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -2133,7 +2126,6 @@ Your response MUST adhere strictly to the JSON schema specified.
         writeJsonCollection(collection, list);
       }
 
-      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -2171,7 +2163,6 @@ Your response MUST adhere strictly to the JSON schema specified.
         writeJsonCollection(collection, list);
       }
 
-      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
@@ -2194,126 +2185,14 @@ Your response MUST adhere strictly to the JSON schema specified.
         writeJsonCollection(collection, filtered);
       }
 
-      await invalidateCollectionCache(collection);
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message || err });
     }
   });
 
-  // Dedicated Valkey Diagnostic Endpoints
-  app.get("/api/valkey/status", async (req, res) => {
-    const status = await getValkeyStatus();
-    res.json(status);
-  });
-
-  app.post("/api/valkey/flush", async (req, res) => {
-    const success = await flushValkeyCache();
-    res.json({ success, message: success ? "Valkey in-memory cache flushed successfully." : "Failed to flush Valkey cache or Valkey server offline." });
-  });
-
-  // Valkey Cache Warmup Endpoint for Frequent Church Groups and Active Requisitions
-  app.all("/api/valkey/warmup", async (req, res) => {
-    try {
-      const summary = {
-        dbAllCached: false,
-        churchGroupsCount: 0,
-        activeReqsCount: 0
-      };
-
-      // 1. Warm up db-all cache
-      await getCachedJson("col:db-all", async () => {
-        const dataMap: any = {};
-        for (const col of collectionsList) {
-          if (mongoose.connection.readyState === 1) {
-            const Model = modelMappings[col];
-            if (Model) {
-              const data = await Model.find({}).lean();
-              dataMap[col] = data.map((item: any) => {
-                const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-                const { _id, __v, ...rest } = sanitized;
-                const snakeRest = toSnakeCase(rest);
-                return { id: snakeRest.id || String(_id), ...snakeRest };
-              });
-            } else {
-              dataMap[col] = [];
-            }
-          } else {
-            const data = readJsonCollection(col);
-            dataMap[col] = data.map((item: any) => {
-              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
-              const { _id, __v, ...rest } = sanitized;
-              const snakeRest = toSnakeCase(rest);
-              return { id: snakeRest.id || String(_id), ...snakeRest };
-            });
-          }
-        }
-        return dataMap;
-      }, 600);
-      summary.dbAllCached = true;
-
-      // 2. Fetch & warm up church group configurations into Valkey individually
-      const groups = await getCachedJson("col:church_groups", async () => {
-        if (mongoose.connection.readyState === 1) {
-          const Model = modelMappings["church_groups"];
-          return Model ? (await Model.find({}).lean()) : [];
-        } else {
-          return readJsonCollection("church_groups");
-        }
-      }, 600);
-
-      if (Array.isArray(groups)) {
-        for (const g of groups) {
-          const gId = g.id || g.groupId || String(g._id);
-          if (gId) {
-            const snakeGroup = toSnakeCase(g);
-            await setValkeyKey(`col:church_groups:${gId}`, { id: gId, ...snakeGroup }, 600);
-            summary.churchGroupsCount++;
-          }
-        }
-      }
-
-      // 3. Fetch & warm up active requisitions into Valkey individually
-      const reqs = await getCachedJson("col:requisitions", async () => {
-        if (mongoose.connection.readyState === 1) {
-          const data = await mongoose.model('Requisition').find({}).sort({ createdAt: -1 }).lean();
-          return data.map((item: any) => {
-            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-            const { _id, __v, ...rest } = sanitized;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
-        } else {
-          const data = readJsonCollection("requisitions");
-          return data.map((item: any) => {
-            const sanitized = sanitizeRequisitionAttachments(item, getUploadsDir());
-            const { _id, __v, ...rest } = sanitized;
-            const snakeRest = toSnakeCase(rest);
-            return { id: snakeRest.id || String(_id), ...snakeRest };
-          });
-        }
-      }, 600);
-
-      if (Array.isArray(reqs)) {
-        for (const r of reqs) {
-          if (r && r.id && r.status !== "DISBURSED" && r.status !== "REJECTED" && r.status !== "CANCELLED") {
-            await setValkeyKey(`col:requisitions:${r.id}`, r, 600);
-            summary.activeReqsCount++;
-          }
-        }
-      }
-
-      res.json({ success: true, message: "Valkey cache successfully warmed up with church group configurations and active requisition IDs.", summary });
-    } catch (err: any) {
-      console.error("[Valkey Warmup Endpoint Error]:", err);
-      res.status(500).json({ error: err.message || err });
-    }
-  });
-
   // GET health endpoint for periodic status checks in UI
   app.get("/api/system-health", async (req, res) => {
-    const valkeyInfo = await getValkeyStatus();
-
     const report: any = {
       mongodb: {
         status: mongoose.connection.readyState === 1 ? "ok" : "disconnected",
@@ -2321,7 +2200,6 @@ Your response MUST adhere strictly to the JSON schema specified.
         database: mongoose.connection.db ? mongoose.connection.db.databaseName : "None",
         counts: {}
       },
-      valkey: valkeyInfo,
       recommendations: []
     };
 
@@ -2329,12 +2207,6 @@ Your response MUST adhere strictly to the JSON schema specified.
       report.recommendations.push("ℹ️ LOCAL MONGO DISCONNECTED: MongoDB server is offline or unreachable at standard port 27017. Start your local MongoDB server or MongoDB Compass to connect.");
     } else {
       report.recommendations.push("🟢 LOCAL MONGO CONNECTED: Successfully verified live communication with local MongoDB server.");
-    }
-
-    if (valkeyInfo.connected) {
-      report.recommendations.push(`⚡ VALKEY CACHE ACTIVE: Valkey key-value store connected at ${valkeyInfo.endpoint} (Latency: ${valkeyInfo.latencyMs}ms, Keys: ${valkeyInfo.keysCount}, Hit Rate: ${valkeyInfo.hitRate}).`);
-    } else {
-      report.recommendations.push(`ℹ️ VALKEY CACHE STANDBY: Valkey key-value store is not running at ${valkeyInfo.endpoint}. System is operating on disk/DB fallback mode.`);
     }
 
     try {

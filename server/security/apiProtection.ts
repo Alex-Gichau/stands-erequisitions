@@ -207,8 +207,7 @@ export function sensitiveActionLimiter(req: Request, res: Response, next: NextFu
     "/api/send-test-email",
     "/api/reports/ai-summary",
     "/api/notify-slack",
-    "/api/slack/",
-    "/api/valkey/flush"
+    "/api/slack/"
   ];
 
   const isSensitive = sensitivePaths.some(p => req.path.startsWith(p));

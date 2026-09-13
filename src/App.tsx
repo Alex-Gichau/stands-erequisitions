@@ -407,13 +407,10 @@ function AppContent() {
     };
   }, [clearAuthFields]);
 
-  // Standard best-practice pre-fetch: As soon as login page loads, warm up Valkey cache and fetch all dashboard data
+  // Standard best-practice pre-fetch: As soon as login page loads, fetch all dashboard data
   useEffect(() => {
     const prefetchDashboardData = async () => {
       try {
-        // Trigger Valkey cache warmup for frequent church group configs and active requisition IDs
-        fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
-
         const res = await fetch("/api/db-all");
         if (res.ok) {
           const data = await res.json();
@@ -626,7 +623,7 @@ function AppContent() {
 
   const hasRedirectedRef = useRef(false);
 
-  // Redirect to dashboard upon successful login and trigger splash intro + Valkey cache warmup
+  // Redirect to dashboard upon successful login and trigger splash intro
   useEffect(() => {
     if (currentUser) {
       if (!hasRedirectedRef.current) {
@@ -637,8 +634,6 @@ function AppContent() {
         setShowSplash(true);
         hasShownSplashRef.current = true;
       }
-      // Automatically warm up Valkey cache with church group configs and active requisitions upon login
-      fetch("/api/valkey/warmup", { method: "POST" }).catch(() => {});
     } else {
       hasRedirectedRef.current = false;
       hasShownSplashRef.current = false;

@@ -2030,6 +2030,95 @@ Your response MUST adhere strictly to the JSON schema specified.
   });
 
   /**
+   * @route   GET /api/requisitions/:id
+   * @route   GET /api/db/requisitions/:id
+   * @desc    Retrieve a single requisition by ID or reference (case-insensitive & hyphen/underscore agnostic)
+   */
+  const handleGetSingleRequisition = async (req: express.Request, res: express.Response) => {
+    try {
+      const targetId = String(req.params.id || "").trim();
+      if (!targetId) {
+        return res.status(400).json({ error: "Requisition ID is required" });
+      }
+
+      const normalizedTarget = targetId.toLowerCase().replace(/[-_]/g, "");
+
+      const isMatch = (item: any) => {
+        if (!item) return false;
+        const itemId = String(item.id || item._id || "");
+        const docId = String(item.document_id || item.documentId || "");
+        const refNo = String(item.referenceNo || item.reference_no || "");
+
+        if (itemId === targetId || itemId.toLowerCase() === targetId.toLowerCase()) return true;
+        if (docId === targetId || docId.toLowerCase() === targetId.toLowerCase()) return true;
+        if (refNo === targetId || refNo.toLowerCase() === targetId.toLowerCase()) return true;
+
+        if (itemId.toLowerCase().replace(/[-_]/g, "") === normalizedTarget) return true;
+        if (docId.toLowerCase().replace(/[-_]/g, "") === normalizedTarget) return true;
+        return false;
+      };
+
+      let matchedItem: any = null;
+
+      if (mongoose.connection.readyState === 1) {
+        const query = {
+          $or: [
+            { id: targetId },
+            { id: { $regex: new RegExp(`^${targetId}$`, 'i') } },
+            { document_id: targetId },
+            { referenceNo: targetId }
+          ]
+        };
+        matchedItem = await mongoose.model('Requisition').findOne(query).lean();
+      }
+
+      if (!matchedItem) {
+        const list = readJsonCollection("requisitions");
+        matchedItem = list.find(isMatch);
+      }
+
+      if (!matchedItem) {
+        return res.status(404).json({ error: `Requisition '${targetId}' not found.` });
+      }
+
+      const sanitized = sanitizeRequisitionAttachments(matchedItem, getUploadsDir());
+      const { _id, __v, ...rest } = sanitized;
+      const snakeRest = toSnakeCase(rest);
+      const camelRest = toCamelCase(rest);
+
+      // Return unified payload with both camelCase and snake_case properties
+      const cleanResult = {
+        ...snakeRest,
+        ...camelRest,
+        id: rest.id || snakeRest.id || camelRest.id || String(_id),
+        title: rest.title || "",
+        description: rest.description || "",
+        amount: Number(rest.amount) || 0,
+        amountWords: rest.amountWords || rest.amount_words || "",
+        groupName: rest.groupName || rest.group_name || "",
+        groupId: rest.groupId || rest.group_id || "",
+        requesterName: rest.requesterName || rest.requester_name || "Requester",
+        requesterEmail: rest.requesterEmail || rest.requester_email || "",
+        requesterId: rest.requesterId || rest.requester_id || "",
+        status: rest.status || "SUBMITTED",
+        submittedAt: rest.submittedAt || rest.submitted_at || new Date().toISOString(),
+        attachments: rest.attachments || [],
+        comments: rest.comments || [],
+        notificationEmails: rest.notificationEmails || rest.notification_emails || [],
+        installments: rest.installments || []
+      };
+
+      return res.json(cleanResult);
+    } catch (err: any) {
+      console.error("[GET Single Requisition Error]:", err);
+      res.status(500).json({ error: err.message || err });
+    }
+  };
+
+  app.get("/api/requisitions/:id", handleGetSingleRequisition);
+  app.get("/api/db/requisitions/:id", handleGetSingleRequisition);
+
+  /**
    * @route   POST /api/requisitions
    * @desc    Create or update a requisition in MongoDB / JSON
    */
@@ -2809,8 +2898,12 @@ Your response MUST adhere strictly to the JSON schema specified.
     try {
       const reqName = title || "Untitled Requisition";
       const displayId = requisitionId || "N/A";
-      const reqOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : "");
-      const defaultBaseUrl = reqOrigin || "https://stands-erequisitions.org";
+      const reqHeaderOrigin = req.headers.origin ? String(req.headers.origin) : "";
+      const refererOrigin = req.headers.referer ? new URL(String(req.headers.referer)).origin : "";
+      const forwardedProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+      const forwardedHost = (req.headers["x-forwarded-host"] as string) || req.headers.host || "";
+      const hostOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : "";
+      const defaultBaseUrl = reqHeaderOrigin || refererOrigin || hostOrigin || "https://stands-erequisitions.org";
       const reqUrl = requisitionUrl || (requisitionId ? `${defaultBaseUrl}?reqId=${encodeURIComponent(requisitionId)}` : defaultBaseUrl);
       const formattedAmount = amount ? `KES ${Number(amount).toLocaleString()}` : "KES 0.00";
       const ministryName = groupName || "General Ministry";

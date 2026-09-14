@@ -623,30 +623,53 @@ function AppContent() {
 
   const hasRedirectedRef = useRef(false);
 
-  // Redirect to dashboard upon successful login and trigger splash intro
+  // Redirect to dashboard upon successful login and trigger splash intro (unless opening a deep-linked requisition)
   useEffect(() => {
     if (currentUser) {
       if (!hasRedirectedRef.current) {
-        setCurrentView("dashboard");
+        const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const pendingUrlId = urlParams?.get("reqId") || urlParams?.get("requisitionId") || urlParams?.get("id");
+        const pendingStoredId = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pending_deep_link_req_id") : null;
+        const hasPendingReq = Boolean(targetReqId || pendingUrlId || pendingStoredId);
+
+        if (!hasPendingReq) {
+          setCurrentView("dashboard");
+          if (!hasShownSplashRef.current) {
+            setShowSplash(true);
+            hasShownSplashRef.current = true;
+          }
+        } else {
+          // Direct navigation: skip splash screen and keep view focused on requisitions
+          setCurrentView("requisitions");
+          setShowSplash(false);
+          hasShownSplashRef.current = true;
+        }
         hasRedirectedRef.current = true;
-      }
-      if (!hasShownSplashRef.current) {
-        setShowSplash(true);
-        hasShownSplashRef.current = true;
       }
     } else {
       hasRedirectedRef.current = false;
       hasShownSplashRef.current = false;
       setShowSplash(false);
     }
-  }, [currentUser]);
+  }, [currentUser, targetReqId]);
 
-  // 1. Extract direct link requisition ID on mount
+  // 1. Extract direct link requisition ID on mount or from session cache
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const reqIdParam = params.get("reqId") || params.get("requisitionId") || params.get("id");
-    if (reqIdParam) {
-      setTargetReqId(reqIdParam.trim());
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const reqIdParam = params.get("reqId") || params.get("requisitionId") || params.get("id");
+      if (reqIdParam) {
+        const cleanId = reqIdParam.trim();
+        setTargetReqId(cleanId);
+        sessionStorage.setItem("pending_deep_link_req_id", cleanId);
+      } else {
+        const cachedId = sessionStorage.getItem("pending_deep_link_req_id");
+        if (cachedId) {
+          setTargetReqId(cachedId.trim());
+        }
+      }
+    } catch (e) {
+      // Ignore sessionStorage access errors
     }
   }, []);
 
@@ -657,12 +680,25 @@ function AppContent() {
     const checkDirectRequisitionAccess = async () => {
       setCheckingAccess(true);
       try {
+        const normalizedTarget = targetReqId.toLowerCase().replace(/[-_]/g, "");
+
+        const isMatch = (r: any) => {
+          if (!r) return false;
+          const rId = String(r.id || r._id || "");
+          const docId = String(r.document_id || r.documentId || "");
+          const refNo = String(r.referenceNo || r.reference_no || "");
+
+          if (rId === targetReqId || rId.toLowerCase() === targetReqId.toLowerCase()) return true;
+          if (docId === targetReqId || docId.toLowerCase() === targetReqId.toLowerCase()) return true;
+          if (refNo === targetReqId || refNo.toLowerCase() === targetReqId.toLowerCase()) return true;
+
+          if (rId.toLowerCase().replace(/[-_]/g, "") === normalizedTarget) return true;
+          if (docId.toLowerCase().replace(/[-_]/g, "") === normalizedTarget) return true;
+          return false;
+        };
+
         // Step A: Search in-memory requisitions array from RequisitionContext
-        let reqData = requisitions.find(r => 
-          r.id === targetReqId || 
-          r.id.toLowerCase() === targetReqId.toLowerCase() ||
-          r.id.replace(/^req-/, "") === targetReqId.replace(/^req-/, "")
-        );
+        let reqData = requisitions.find(isMatch);
 
         // Step B: Search local storage cache if not found in current state array
         if (!reqData && currentUser?.id) {
@@ -671,11 +707,7 @@ function AppContent() {
             if (cachedStr) {
               const cachedArr = JSON.parse(cachedStr);
               if (Array.isArray(cachedArr)) {
-                reqData = cachedArr.find((r: any) => 
-                  r.id === targetReqId || 
-                  r.id.toLowerCase() === targetReqId.toLowerCase() ||
-                  r.id.replace(/^req-/, "") === targetReqId.replace(/^req-/, "")
-                );
+                reqData = cachedArr.find(isMatch);
               }
             }
           } catch (cacheErr) {
@@ -683,20 +715,44 @@ function AppContent() {
           }
         }
 
-        // Step C: Fallback to backend endpoint if available
+        // Step C: Fallback to backend endpoints if available
         if (!reqData) {
           try {
-            const res = await fetch(`/api/db/requisitions/${targetReqId}`);
+            let res = await fetch(`/api/requisitions/${encodeURIComponent(targetReqId)}`);
+            if (!res.ok) {
+              res = await fetch(`/api/db/requisitions/${encodeURIComponent(targetReqId)}`);
+            }
             if (res.ok) {
               const data = await res.json();
-              if (data && data.id) reqData = data;
+              if (data && (data.id || data._id)) {
+                reqData = {
+                  ...data,
+                  id: data.id || data._id,
+                  title: data.title || "Untitled Requisition",
+                  description: data.description || "",
+                  amount: Number(data.amount) || 0,
+                  amountWords: data.amountWords || data.amount_words || "",
+                  groupName: data.groupName || data.group_name || "Church Ministry",
+                  groupId: data.groupId || data.group_id || "",
+                  requesterName: data.requesterName || data.requester_name || "Requester",
+                  requesterEmail: data.requesterEmail || data.requester_email || "",
+                  requesterId: data.requesterId || data.requester_id || "",
+                  status: data.status || RequisitionStatus.SUBMITTED,
+                  submittedAt: data.submittedAt || data.submitted_at || new Date().toISOString(),
+                  attachments: Array.isArray(data.attachments) ? data.attachments : [],
+                  comments: Array.isArray(data.comments) ? data.comments : [],
+                  notificationEmails: Array.isArray(data.notificationEmails) ? data.notificationEmails : (Array.isArray(data.notification_emails) ? data.notification_emails : []),
+                  installments: Array.isArray(data.installments) ? data.installments : [],
+                  payableTo: data.payableTo || data.payable_to || ""
+                };
+              }
             }
           } catch (apiErr) {
-            // Ignore API fallback errors
+            console.warn("API fallback lookup error:", apiErr);
           }
         }
 
-        // Step D: If requisitions are still loading, wait for context sync to finish
+        // Step D: If requisitions are still loading and not found in API yet, wait for sync to finish
         if (!reqData && (loading || authLoading)) {
           return;
         }
@@ -706,20 +762,79 @@ function AppContent() {
           setDeletedReqId(targetReqId);
           setAccessDeniedReq(null);
           setCheckingAccess(false);
+          setTargetReqId(null);
+          try { sessionStorage.removeItem("pending_deep_link_req_id"); } catch (e) {}
           return;
         }
+
+        // Ensure safe field fallbacks on reqData to avoid rendering crashes
+        reqData = {
+          ...reqData,
+          requesterName: reqData.requesterName || (reqData as any).requester_name || "Requester",
+          groupName: reqData.groupName || (reqData as any).group_name || "Church Ministry",
+          amount: Number(reqData.amount) || 0,
+          submittedAt: reqData.submittedAt || (reqData as any).submitted_at || new Date().toISOString()
+        };
 
         // Perform clearance & access verification based on role & ownership
         let hasAccess = true;
 
         if (currentUser.role === UserRole.CHURCH_GROUP) {
-          const filterGroups = currentUser.groups || (currentUser.group ? [currentUser.group] : []);
-          const matchesGroup = filterGroups.some(g => g === reqData.groupId || g === reqData.groupName);
-          const isOwner = reqData.requesterId === currentUser.id || 
-            (reqData.requesterEmail && currentUser.email && reqData.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
-            (reqData.requesterName && currentUser.name && reqData.requesterName.toLowerCase() === currentUser.name.toLowerCase());
-          
-          if (!matchesGroup && !isOwner) {
+          // Normalize user's groups safely
+          let filterGroups: string[] = [];
+          if (Array.isArray(currentUser.groups)) {
+            filterGroups = [...currentUser.groups];
+          } else if (typeof currentUser.groups === "string" && (currentUser.groups as string).trim()) {
+            try {
+              const parsed = JSON.parse(currentUser.groups);
+              if (Array.isArray(parsed)) filterGroups = parsed;
+              else filterGroups = [currentUser.groups];
+            } catch {
+              filterGroups = [currentUser.groups];
+            }
+          }
+          if (currentUser.group && !filterGroups.includes(currentUser.group)) {
+            filterGroups.push(currentUser.group);
+          }
+
+          const userEmailClean = (currentUser.email || "").toLowerCase().trim();
+          const userNameClean = (currentUser.name || "").toLowerCase().trim();
+
+          const matchesGroup = filterGroups.length > 0 && filterGroups.some(g => {
+            const cleanG = g.toLowerCase().trim();
+            const rGroup = (reqData.groupId || "").toLowerCase().trim();
+            const rName = (reqData.groupName || "").toLowerCase().trim();
+            return cleanG === rGroup || cleanG === rName;
+          });
+
+          const isOwner = Boolean(
+            (currentUser.id && reqData.requesterId === currentUser.id) || 
+            (reqData.requesterEmail && userEmailClean && reqData.requesterEmail.toLowerCase().trim() === userEmailClean) ||
+            (reqData.requesterName && userNameClean && reqData.requesterName.toLowerCase().trim() === userNameClean)
+          );
+
+          const isNotifiedMember = Boolean(
+            userEmailClean && 
+            Array.isArray(reqData.notificationEmails) && 
+            reqData.notificationEmails.some((e: any) => typeof e === "string" && e.toLowerCase().trim() === userEmailClean)
+          );
+
+          const isMentionedInComments = Boolean(
+            userEmailClean &&
+            Array.isArray(reqData.comments) &&
+            reqData.comments.some((c: any) => 
+              (c.text && c.text.toLowerCase().includes(userEmailClean)) ||
+              (c.authorEmail && c.authorEmail.toLowerCase().trim() === userEmailClean)
+            )
+          );
+
+          const isSharedWithUser = Boolean(
+            filterGroups.length > 0 &&
+            Array.isArray(reqData.sharedGroups) &&
+            reqData.sharedGroups.some((sg: string) => filterGroups.some(fg => fg.toLowerCase().trim() === String(sg).toLowerCase().trim()))
+          );
+
+          if (!matchesGroup && !isOwner && !isNotifiedMember && !isMentionedInComments && !isSharedWithUser) {
             hasAccess = false;
           }
         }
@@ -729,6 +844,11 @@ function AppContent() {
           setSelectedRequisition(reqData);
           setAccessDeniedReq(null);
           setCurrentView("requisitions");
+          setShowSplash(false);
+
+          // Clear targetReqId and stored session so modal doesn't reopen unexpectedly
+          setTargetReqId(null);
+          try { sessionStorage.removeItem("pending_deep_link_req_id"); } catch (e) {}
 
           // Clean up reqId parameter from URL without page reload
           const url = new URL(window.location.href);
@@ -742,9 +862,11 @@ function AppContent() {
           // Deny access: trigger compliance restriction prompt with actual requisition details
           setAccessDeniedReq({
             id: reqData.id,
-            title: reqData.title,
+            title: reqData.title || "Restricted Ledger Document",
             groupName: reqData.groupName || "Confidential Group"
           });
+          setTargetReqId(null);
+          try { sessionStorage.removeItem("pending_deep_link_req_id"); } catch (e) {}
         }
       } catch (err) {
         console.error("Direct requisition access lookup failed:", err);
@@ -753,6 +875,8 @@ function AppContent() {
           title: "Query Authorization Error",
           groupName: "Compliance Restricted"
         });
+        setTargetReqId(null);
+        try { sessionStorage.removeItem("pending_deep_link_req_id"); } catch (e) {}
       } finally {
         setCheckingAccess(false);
       }

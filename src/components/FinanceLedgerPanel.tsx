@@ -53,7 +53,8 @@ import {
   FileSignature,
   Activity,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  AlertCircle
 } from "lucide-react";
 import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition, Project } from "../types";
@@ -528,7 +529,30 @@ export const FinanceLedgerPanel: React.FC = () => {
   // Search, Order & Pagination for Ministry Group Budget Reserves
   const [reservesSearchQuery, setReservesSearchQuery] = useState("");
   const [reservesPage, setReservesPage] = useState(1);
+  const [reservesFilterTab, setReservesFilterTab] = useState<"ALL" | "ALLOCATED" | "NO_BUDGET">("ALL");
   const itemsPerPage = 15;
+
+  // Identify church groups that currently have NO allocated budget for the active fiscal year
+  const groupsWithoutBudget = useMemo(() => {
+    return churchGroups.filter(cg => {
+      const groupProjs = projects.filter(p => 
+        (p.groupId === cg.id || p.groupId === cg.name || (p.name && p.name.toLowerCase().includes(cg.name.toLowerCase()))) &&
+        (p.fiscalYear === activeYear || !p.fiscalYear)
+      );
+      const totalAllocated = groupProjs.reduce((sum, p) => sum + (Number(p.allocatedBudget) || 0), 0);
+      return totalAllocated === 0;
+    });
+  }, [churchGroups, projects, activeYear]);
+
+  const filteredGroupsWithoutBudget = useMemo(() => {
+    const q = reservesSearchQuery.toLowerCase().trim();
+    if (!q) return groupsWithoutBudget;
+    return groupsWithoutBudget.filter(cg => 
+      cg.name.toLowerCase().includes(q) || 
+      cg.id.toLowerCase().includes(q) ||
+      (cg.description && cg.description.toLowerCase().includes(q))
+    );
+  }, [groupsWithoutBudget, reservesSearchQuery]);
 
   const isDuplicateGroup = useMemo(() => {
     if (!selectedGroupId) return false;
@@ -678,6 +702,26 @@ export const FinanceLedgerPanel: React.FC = () => {
     } finally {
       setIsAllocating(false);
     }
+  };
+
+  const handleStartAllocateForGroup = (groupNameOrId: string) => {
+    setSelectedGroupId(groupNameOrId);
+    setGroupSearchQuery(groupNameOrId);
+    const codeInfo = getAccountingCode(groupNameOrId);
+    let defCode = codeInfo.code;
+    let finalCode = defCode;
+    let suffix = 1;
+    while (projects.some(p => p.accountNumber === finalCode)) {
+      finalCode = `${defCode}-${suffix}`;
+      suffix++;
+    }
+    setAllocationAccountNumber(finalCode);
+    setTimeout(() => {
+      const el = document.getElementById("allocation-form-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 100);
   };
 
   // Component state
@@ -2346,8 +2390,8 @@ export const FinanceLedgerPanel: React.FC = () => {
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-white p-2.5 rounded-lg border border-slate-200 text-[10px]">
                                     <div>
                                       <span className="font-bold text-slate-400 uppercase block">Requester Details</span>
-                                      <p className="font-semibold text-slate-900">{req.requesterName}</p>
-                                      <p className="text-slate-500 font-mono">{req.requesterEmail || users?.find(u => u.id === req.requesterId)?.email || `${req.requesterName.toLowerCase().replace(/\s+/g, "")}@church.org`}</p>
+                                      <p className="font-semibold text-slate-900">{req.requesterName || (req as any).requester_name || "Official Requester"}</p>
+                                      <p className="text-slate-500 font-mono">{req.requesterEmail || users?.find(u => u.id === req.requesterId)?.email || `${(req.requesterName || (req as any).requester_name || "requester").toLowerCase().replace(/\s+/g, "")}@church.org`}</p>
                                     </div>
                                     <div>
                                       <span className="font-bold text-slate-400 uppercase block">Group / Beneficiary</span>
@@ -2882,7 +2926,7 @@ export const FinanceLedgerPanel: React.FC = () => {
           {isFinanceOrAdmin && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Ministry Budget Controls */}
-              <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 lg:col-span-12">
+              <section id="allocation-form-section" className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 lg:col-span-12">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -2985,8 +3029,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                                         KES {activeAllocation.allocatedBudget.toLocaleString()} Alloc
                                       </span>
                                     ) : (
-                                      <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                        No current limit
+                                      <span className="text-[7.5px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300/80 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                        No Allocated Budget
                                       </span>
                                     )}
                                   </div>
@@ -3141,7 +3186,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search reserves by name or account..."
+                    placeholder="Search reserves or groups..."
                     value={reservesSearchQuery}
                     onChange={(e) => {
                       setReservesSearchQuery(e.target.value);
@@ -3166,124 +3211,257 @@ export const FinanceLedgerPanel: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-5">
-              {paginatedProjects.length > 0 ? (
-                paginatedProjects.map((project) => {
-                  const projectRequisitions = getProjectRequisitions(project, requisitions);
-                  const requisitionsCount = projectRequisitions.length;
-                  
-                  const disbursedAmount = projectRequisitions.filter(r => r.status === RequisitionStatus.DISBURSED).reduce((sum, r) => sum + r.amount, 0);
-                  const pendingReqs = projectRequisitions.filter(r => [RequisitionStatus.SUBMITTED, RequisitionStatus.APPROVED_L1, RequisitionStatus.ESCALATED, RequisitionStatus.APPROVED_L2].includes(r.status));
-                  const pendingAmount = pendingReqs.reduce((sum, r) => sum + r.amount, 0);
+            {/* Alert Banner for groups without allocated budget */}
+            {groupsWithoutBudget.length > 0 && (
+              <div className="p-4 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 shadow-xs">
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className="p-2 rounded-xl bg-amber-100 text-amber-700 shrink-0 mt-0.5 sm:mt-0">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-amber-950">
+                        {groupsWithoutBudget.length} Church {groupsWithoutBudget.length === 1 ? "Group Has" : "Groups Have"} No Allocated Budget
+                      </h4>
+                      <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 font-mono">
+                        FY {activeYear}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800/95 mt-0.5">
+                      These ministries do not currently have dedicated fiscal project reserve lines. Any requisitions submitted will draw against General Operations or require supplementary Treasury allocations.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReservesFilterTab("NO_BUDGET");
+                      setReservesPage(1);
+                    }}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors shadow-xs"
+                  >
+                    View Unbudgeted ({groupsWithoutBudget.length})
+                  </button>
+                </div>
+              </div>
+            )}
 
-                  const totalCommitted = disbursedAmount + pendingAmount;
-                  const remainingAmount = project.allocatedBudget - totalCommitted;
+            {/* Filter Tabs between Active Reserves and Unbudgeted Groups */}
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setReservesFilterTab("ALL")}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer",
+                  reservesFilterTab === "ALL"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                )}
+              >
+                All Active Reserves ({processedProjects.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReservesFilterTab("NO_BUDGET")}
+                className={cn(
+                  "px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                  reservesFilterTab === "NO_BUDGET"
+                    ? "bg-amber-600 text-white shadow-xs"
+                    : "bg-amber-50 text-amber-800 border border-amber-200/80 hover:bg-amber-100"
+                )}
+              >
+                <AlertTriangle size={13} />
+                No Allocated Budget ({groupsWithoutBudget.length})
+              </button>
+            </div>
 
-                  const disbursedRatio = (disbursedAmount / project.allocatedBudget) * 100;
-                  const pendingRatio = (pendingAmount / project.allocatedBudget) * 100;
-                  const totalRatio = (totalCommitted / project.allocatedBudget) * 100;
-
-                  const codeInfo = getAccountingCode(project.groupId);
-
-                  return (
-                    <div key={project.id} className="p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-all bg-slate-50/30">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-                              ACC: {project.accountNumber || codeInfo.code}
+            {/* Content view depending on active tab */}
+            {reservesFilterTab === "NO_BUDGET" ? (
+              <div className="space-y-4">
+                {filteredGroupsWithoutBudget.length > 0 ? (
+                  filteredGroupsWithoutBudget.map((cg) => {
+                    const codeInfo = getAccountingCode(cg.name);
+                    return (
+                      <div
+                        key={cg.id}
+                        className="p-4 rounded-xl border border-amber-200/80 bg-amber-50/30 hover:bg-amber-50/60 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[9px] font-bold text-amber-800 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded">
+                              ACC: {codeInfo.code}
                             </span>
-                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{project.name}</h4>
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">{cg.name}</h4>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                              No Allocated Budget (KES 0.00)
+                            </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Linked Group ID: {project.groupId} • Status: {project.status}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Linked Group ID: <span className="font-mono font-medium">{cg.id}</span>
+                            {cg.description && <span> • {cg.description}</span>}
+                          </p>
+                          <p className="text-[11px] text-amber-800 font-medium">
+                            No project budget line approved for FY {activeYear}. Transactions under this ministry will use General Church Operations reserves.
+                          </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actual Spent</div>
-                            <div className="text-xs font-bold text-emerald-600">
-                              {formatCurrency(disbursedAmount)}
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Committed vs. Allocated</div>
-                            <div className="text-xs font-bold text-slate-800">
-                              {formatCurrency(totalCommitted)} <span className="text-slate-400 font-medium">/ {formatCurrency(project.allocatedBudget)}</span>
-                            </div>
-                          </div>
-
+                        <div className="flex items-center gap-2 shrink-0">
                           {isFinanceOrAdmin && (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setAdjustingProject(project)}
-                                className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-indigo-600 text-slate-700 hover:text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <Plus size={10} />
-                                Modify
-                              </button>
-                              <button
-                                onClick={() => handleDeleteProjectBudget(project)}
-                                className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-650 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                                title="Delete Reserve"
-                              >
-                                <X size={10} className="shrink-0" />
-                                Delete
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleStartAllocateForGroup(cg.name)}
+                              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-xs flex items-center gap-1.5"
+                            >
+                              <Coins size={14} />
+                              Allocate Budget
+                            </button>
                           )}
                         </div>
                       </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest border border-dashed border-slate-200 rounded-xl">
+                    No unbudgeted church groups matching search query
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {paginatedProjects.length > 0 ? (
+                  paginatedProjects.map((project) => {
+                    const projectRequisitions = getProjectRequisitions(project, requisitions);
+                    const requisitionsCount = projectRequisitions.length;
+                    
+                    const disbursedAmount = projectRequisitions.filter(r => r.status === RequisitionStatus.DISBURSED).reduce((sum, r) => sum + r.amount, 0);
+                    const pendingReqs = projectRequisitions.filter(r => [RequisitionStatus.SUBMITTED, RequisitionStatus.APPROVED_L1, RequisitionStatus.ESCALATED, RequisitionStatus.APPROVED_L2].includes(r.status));
+                    const pendingAmount = pendingReqs.reduce((sum, r) => sum + r.amount, 0);
 
-                {/* Progress Bar */}
-                      <div className="space-y-1.5">
-                        <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200 flex">
-                          <div 
-                            className={cn(
-                              "h-full transition-all duration-1000",
-                              totalRatio >= 90 ? "bg-rose-600" : "bg-indigo-600"
-                            )}
-                            style={{ width: `${Math.min(disbursedRatio, 100)}%` }}
-                            title={`Disbursed: ${formatCurrency(disbursedAmount)}`}
-                          />
-                          <div 
-                            className="h-full bg-amber-400 transition-all duration-1000 shadow-[inset_0_0_8px_rgba(0,0,0,0.1)]"
-                            style={{ width: `${Math.min(pendingRatio, 100 - (isNaN(disbursedRatio) ? 0 : disbursedRatio))}%` }}
-                            title={`Pending: ${formatCurrency(pendingAmount)}`}
-                          />
-                        </div>
-                        <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold">
-                          <div className="flex items-center gap-2">
-                            <span>{totalRatio.toFixed(1)}% Bound</span>
-                            {pendingAmount > 0 && (
-                              <span className="bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-200 text-[8px] uppercase ring-1 ring-amber-400/20">
-                                {formatCurrency(pendingAmount)} Pending
+                    const totalCommitted = disbursedAmount + pendingAmount;
+                    const remainingAmount = project.allocatedBudget - totalCommitted;
+
+                    const disbursedRatio = (disbursedAmount / project.allocatedBudget) * 100;
+                    const pendingRatio = (pendingAmount / project.allocatedBudget) * 100;
+                    const totalRatio = (totalCommitted / project.allocatedBudget) * 100;
+
+                    const codeInfo = getAccountingCode(project.groupId);
+
+                    return (
+                      <div key={project.id} className="p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-all bg-slate-50/30">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                                ACC: {project.accountNumber || codeInfo.code}
                               </span>
-                            )}
-                            {requisitionsCount > 0 && (
-                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 text-[8px] uppercase">
-                                {requisitionsCount} Reqs
-                              </span>
-                            )}
-                            <span className="bg-slate-105 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[8px] uppercase font-mono">
-                              REQ LIMIT: {formatCurrency(project.requisitionLimit || project.allocatedBudget)}
-                            </span>
+                              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{project.name}</h4>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Linked Group ID: {project.groupId} • Status: {project.status}</p>
                           </div>
-                          <span>{formatCurrency(remainingAmount)} Remaining Reserve</span>
+
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="text-right">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actual Spent</div>
+                              <div className="text-xs font-bold text-emerald-600">
+                                {formatCurrency(disbursedAmount)}
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Committed vs. Allocated</div>
+                              <div className="text-xs font-bold text-slate-800">
+                                {formatCurrency(totalCommitted)} <span className="text-slate-400 font-medium">/ {formatCurrency(project.allocatedBudget)}</span>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Available Reserve</div>
+                              <div className={cn(
+                                "text-xs font-bold font-mono",
+                                remainingAmount < 0 ? "text-rose-600" : "text-indigo-600"
+                              )}>
+                                {formatCurrency(remainingAmount)}
+                              </div>
+                            </div>
+
+                            {isFinanceOrAdmin && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setAdjustingProject(project)}
+                                  className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-indigo-600 text-slate-700 hover:text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Plus size={10} />
+                                  Modify
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteProjectBudget(project)}
+                                  className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-650 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                  title="Delete Reserve"
+                                >
+                                  <X size={10} className="shrink-0" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Progress bar */}
+                        <div className="space-y-1.5">
+                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                            <div 
+                              className="h-full bg-emerald-500 transition-all duration-500" 
+                              style={{ width: `${Math.min(100, disbursedRatio)}%` }}
+                              title={`Disbursed: ${disbursedRatio.toFixed(1)}%`}
+                            />
+                            <div 
+                              className="h-full bg-amber-400 transition-all duration-500" 
+                              style={{ width: `${Math.min(100 - disbursedRatio, pendingRatio)}%` }}
+                              title={`Pending Commitments: ${pendingRatio.toFixed(1)}%`}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <div className="flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                Disbursed ({disbursedRatio.toFixed(0)}%)
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                Pending ({pendingRatio.toFixed(0)}%)
+                              </span>
+                              {totalRatio > 100 && (
+                                <span className="text-rose-500 font-bold flex items-center gap-0.5">
+                                  <AlertCircle size={10} />
+                                  Over-committed ({totalRatio.toFixed(0)}%)
+                                </span>
+                              )}
+                              <span className="bg-slate-100 border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[8px] uppercase font-mono">
+                                REQ LIMIT: {formatCurrency(project.requisitionLimit || project.allocatedBudget)}
+                              </span>
+                            </div>
+                            <span>{formatCurrency(remainingAmount)} Remaining Reserve</span>
+                          </div>
+                        </div>
+
                       </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest border border-dashed border-slate-200 rounded-xl">
+                    No budget reserves found matching dynamic query
+                  </div>
+                )}
+              </div>
+            )}
 
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest border border-dashed border-slate-200 rounded-xl">
-                  No budget reserves found matching dynamic query
-                </div>
-              )}
-
-              {/* 15-Row Pagination Controls for Ministry Group Budget Reserves */}
-              {processedProjects.length > 0 && (
+            {/* 15-Row Pagination Controls for Ministry Group Budget Reserves */}
+            {processedProjects.length > 0 && reservesFilterTab !== "NO_BUDGET" && (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-4 text-xs font-bold text-slate-600">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider">
@@ -3373,7 +3551,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
 
           {/* Yearly Budgeting & Fiscal Books section */}
           {renderYearlyBudgetingAndFiscalBooks()}

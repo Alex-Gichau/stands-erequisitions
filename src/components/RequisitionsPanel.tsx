@@ -6033,10 +6033,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       const matchedUser = users?.find(
         (u) => u.email && u.email.trim().toLowerCase() === email
       );
+      const reqNameSafe = (req.requesterName || (req as any).requester_name || "Requester").toLowerCase();
       const isRequester =
         (req.requesterEmail && req.requesterEmail.trim().toLowerCase() === email) ||
-        (matchedUser && matchedUser.name === req.requesterName) ||
-        (!matchedUser && email.includes(req.requesterName.toLowerCase()));
+        (matchedUser && matchedUser.name === (req.requesterName || (req as any).requester_name)) ||
+        (!matchedUser && email.includes(reqNameSafe));
 
       if (matchedUser) {
         result.push({
@@ -6567,11 +6568,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   <h4 className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Individual Requestor</h4>
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 text-primary font-bold text-xs md:text-base flex items-center justify-center shrink-0">
-                      {req.requesterName.charAt(0)}
+                      {(req.requesterName || (req as any).requester_name || "R").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={req.requesterName}>{req.requesterName}</p>
-                      <p className="text-[8px] md:text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title={req.groupName}>{req.groupName}</p>
+                      <p className="text-xs md:text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={req.requesterName || (req as any).requester_name || "Requester"}>
+                        {req.requesterName || (req as any).requester_name || "Requester"}
+                      </p>
+                      <p className="text-[8px] md:text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate" title={req.groupName || (req as any).group_name || "Church Ministry"}>
+                        {req.groupName || (req as any).group_name || "Church Ministry"}
+                      </p>
                     </div>
                   </div>
                 </section>

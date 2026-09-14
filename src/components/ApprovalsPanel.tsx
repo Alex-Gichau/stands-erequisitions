@@ -256,9 +256,9 @@ export const ApprovalsPanel: React.FC = () => {
                     )}
                     <div className="flex items-center gap-1.5">
                        <div className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full bg-slate-100 flex items-center justify-center text-[7.5px] md:text-[8.5px] font-bold text-slate-500 border border-white">
-                        {req.requesterName.charAt(0)}
+                        {(req.requesterName || (req as any).requester_name || "R").charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-[8.5px] md:text-[9.5px] font-bold text-slate-500 uppercase tracking-wider truncate max-w-[70px] md:max-w-none">{req.requesterName}</span>
+                      <span className="text-[8.5px] md:text-[9.5px] font-bold text-slate-500 uppercase tracking-wider truncate max-w-[70px] md:max-w-none">{req.requesterName || (req as any).requester_name || "Requester"}</span>
                     </div>
                   </div>
                 </div>

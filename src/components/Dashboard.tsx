@@ -580,6 +580,22 @@ const Dashboard: React.FC<{
     return Object.values(groupTotals).sort((a, b) => b.totalAmount - a.totalAmount);
   }, [activeFiscalYearRequisitions, activeFiscalYearProjects]);
 
+  const groupBudgetMap = useMemo(() => {
+    const map = new Map<string, number>();
+    activeFiscalYearProjects.forEach(p => {
+      const curr = map.get(p.groupId) || 0;
+      map.set(p.groupId, curr + (Number(p.allocatedBudget) || 0));
+    });
+    return map;
+  }, [activeFiscalYearProjects]);
+
+  const unbudgetedGroups = useMemo(() => {
+    return churchGroups.filter(cg => {
+      const budget = groupBudgetMap.get(cg.id) || 0;
+      return budget === 0;
+    });
+  }, [churchGroups, groupBudgetMap]);
+
   const budgetVariances = useMemo(() => {
     // Optimization: Pre-calculate project utilizations and create a lookup map
     const projectUtilizations = new Map<string, { usedAmount: number, remainingAmount: number }>();
@@ -1634,8 +1650,38 @@ const Dashboard: React.FC<{
               </h2>
               <p className="text-[8px] md:text-[10px] text-slate-400 mt-0.5 uppercase font-mono">Consolidated Financials</p>
             </div>
-            <span className="text-[8px] md:text-[10px] font-mono text-slate-400">TOTAL: {requestedPerGroup.length}</span>
+            <div className="flex items-center gap-3">
+              {unbudgetedGroups.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onViewChange?.("finance")}
+                  className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                  title="Click to view and allocate in Finance Ledger"
+                >
+                  <AlertTriangle size={10} className="text-amber-600" />
+                  <span>{unbudgetedGroups.length} Unbudgeted Groups</span>
+                </button>
+              )}
+              <span className="text-[8px] md:text-[10px] font-mono text-slate-400">TOTAL: {requestedPerGroup.length}</span>
+            </div>
           </div>
+
+          {unbudgetedGroups.length > 0 && (
+            <div className="sm:hidden px-4 py-2 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between text-[10px] text-amber-800">
+              <span className="flex items-center gap-1 font-medium">
+                <AlertTriangle size={11} className="text-amber-600 shrink-0" />
+                {unbudgetedGroups.length} groups have no allocated budget
+              </span>
+              <button
+                type="button"
+                onClick={() => onViewChange?.("finance")}
+                className="font-bold underline text-amber-900 cursor-pointer"
+              >
+                Allocate
+              </button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left font-sans">
               <thead>
@@ -1647,7 +1693,9 @@ const Dashboard: React.FC<{
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {requestedPerGroup.map((val, i) => (
+                {requestedPerGroup.map((val, i) => {
+                  const hasBudget = (groupBudgetMap.get(val.groupId) || 0) > 0;
+                  return (
                   <tr 
                     key={`dashboard-group-row-${val.groupId}-${i}`} 
                     onClick={() => setSelectedGroupDetails(val)}
@@ -1655,7 +1703,18 @@ const Dashboard: React.FC<{
                   >
                     <td className="px-3 md:px-6 py-2.5 md:py-4">
                       <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 text-[11px] md:text-sm uppercase group-hover:text-indigo-600 transition-colors truncate max-w-[100px] md:max-w-none">{val.groupName}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-800 text-[11px] md:text-sm uppercase group-hover:text-indigo-600 transition-colors truncate max-w-[100px] md:max-w-none">{val.groupName}</span>
+                          {!hasBudget && (
+                            <span 
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200"
+                              title="No allocated budget line in active fiscal year"
+                            >
+                              <AlertTriangle size={8} className="text-amber-600" />
+                              No Budget
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-center">
@@ -1675,7 +1734,8 @@ const Dashboard: React.FC<{
                       {formatCurrency(val.totalAmount)}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {requestedPerGroup.length > 0 && (
                   <tr className="bg-slate-50 border-t border-slate-200 font-bold">
                     <td className="px-4 md:px-6 py-3 md:py-4 text-[10px] md:text-xs font-black uppercase text-slate-800">

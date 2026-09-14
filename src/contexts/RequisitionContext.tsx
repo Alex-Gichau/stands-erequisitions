@@ -2326,7 +2326,51 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             }).filter(Boolean) as Requisition[];
 
             if (isGroupUser && parsedGroups.length > 0) {
-              data = data.filter(req => req && ((req.groupId && (parsedGroups.includes(req.groupId) || parsedGroups.includes(req.groupName))) || (req.sharedGroups && Array.isArray(req.sharedGroups) && req.sharedGroups.some(sg => parsedGroups.includes(sg)))));
+              const userEmailLower = (currentUser?.email || "").toLowerCase().trim();
+              const userId = currentUser?.id;
+              data = data.filter(req => {
+                if (!req) return false;
+                // 1. Group affiliation (ID or Name)
+                const matchesGroup = Boolean(
+                  (req.groupId && (parsedGroups.includes(req.groupId) || parsedGroups.includes(req.groupName))) ||
+                  (req.groupName && parsedGroups.includes(req.groupName))
+                );
+                if (matchesGroup) return true;
+
+                // 2. Shared groups
+                if (req.sharedGroups && Array.isArray(req.sharedGroups) && req.sharedGroups.some(sg => parsedGroups.includes(sg))) {
+                  return true;
+                }
+
+                // 3. User is Requester
+                if (userId && req.requesterId === userId) return true;
+                if (userEmailLower && req.requesterEmail && req.requesterEmail.toLowerCase().trim() === userEmailLower) return true;
+
+                // 4. User is an update recipient or notified member
+                if (userEmailLower) {
+                  const notifyList = Array.isArray(req.notificationEmails) ? req.notificationEmails : [];
+                  if (notifyList.some(e => typeof e === "string" && e.toLowerCase().trim() === userEmailLower)) {
+                    return true;
+                  }
+                }
+
+                // 5. Target direct requisition ID requested via URL deep link or stored session
+                if (typeof window !== "undefined") {
+                  try {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const activeReqId = urlParams.get("reqId") || urlParams.get("requisitionId") || urlParams.get("id") || sessionStorage.getItem("pending_deep_link_req_id");
+                    if (activeReqId) {
+                      const cleanActive = activeReqId.trim().toLowerCase();
+                      const reqIdLower = (req.id || "").toLowerCase();
+                      if (reqIdLower === cleanActive || reqIdLower.replace(/[-_]/g, "") === cleanActive.replace(/[-_]/g, "")) {
+                        return true;
+                      }
+                    }
+                  } catch (e) {}
+                }
+
+                return false;
+              });
             }
             if (hidePrototype) {
               data = data.filter(req => req && req.id && !req.id.startsWith("req-seed-") && !req.id.startsWith("req-auto-"));

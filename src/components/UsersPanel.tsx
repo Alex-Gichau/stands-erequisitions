@@ -13,6 +13,7 @@ import {
   UserX, 
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle,
   Search, 
   Filter, 
   UserPlus, 
@@ -39,15 +40,20 @@ import {
   ChevronRight,
   Camera,
   Sparkles,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  FileText,
+  ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
+import { ChurchGroupDetailsModal } from "./ChurchGroupDetailsModal";
 
 export const UsersPanel: React.FC = () => {
   const { 
     users, 
     requisitions,
+    projects,
     approveUser, 
     suspendUser, 
     updateUserRole, 
@@ -157,9 +163,32 @@ export const UsersPanel: React.FC = () => {
 
   // Group search & filtering states under identity & affiliations
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
+  const [groupBudgetFilter, setGroupBudgetFilter] = useState<"ALL" | "WITH_BUDGET" | "NO_BUDGET">("ALL");
+
+  const getGroupAllocatedBudget = React.useCallback((group: { id: string; name: string }) => {
+    const groupProjs = projects.filter(p => 
+      p.groupId === group.id || 
+      p.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
+      p.name?.trim().toLowerCase().includes(group.name.trim().toLowerCase())
+    );
+    return groupProjs.reduce((s, p) => s + (Number(p.allocatedBudget) || 0), 0);
+  }, [projects]);
+
+  const groupsWithBudgetCount = React.useMemo(() => {
+    return churchGroups.filter(g => getGroupAllocatedBudget(g) > 0).length;
+  }, [churchGroups, getGroupAllocatedBudget]);
+
+  const groupsWithoutBudgetCount = React.useMemo(() => {
+    return churchGroups.filter(g => getGroupAllocatedBudget(g) === 0).length;
+  }, [churchGroups, getGroupAllocatedBudget]);
 
   const filteredChurchGroups = React.useMemo(() => {
     return churchGroups.filter((group) => {
+      // Apply budget filter
+      const allocBudget = getGroupAllocatedBudget(group);
+      if (groupBudgetFilter === "WITH_BUDGET" && allocBudget <= 0) return false;
+      if (groupBudgetFilter === "NO_BUDGET" && allocBudget > 0) return false;
+
       // Apply text search
       if (groupSearchTerm.trim()) {
         const query = groupSearchTerm.toLowerCase();
@@ -169,7 +198,7 @@ export const UsersPanel: React.FC = () => {
       }
       return true;
     });
-  }, [churchGroups, groupSearchTerm]);
+  }, [churchGroups, groupSearchTerm, groupBudgetFilter, getGroupAllocatedBudget]);
 
   // Group modal states
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -976,22 +1005,106 @@ export const UsersPanel: React.FC = () => {
         <>
           {/* Church Groups Search and Affiliations filter layer */}
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-4 mb-6">
-            <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search groups under identity, affiliations, description, or name..."
-                value={groupSearchTerm}
-                onChange={(e) => setGroupSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 rounded-xl text-sm focus:border-primary/40 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
-              />
-              {groupSearchTerm && (
-                <button 
-                  onClick={() => setGroupSearchTerm("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Search groups under identity, affiliations, description, or name..."
+                  value={groupSearchTerm}
+                  onChange={(e) => setGroupSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-10 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-200 rounded-xl text-sm focus:border-primary/40 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+                />
+                {groupSearchTerm && (
+                  <button 
+                    onClick={() => setGroupSearchTerm("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    CLEAR
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsGroupModalOpen(true)}
+                className="px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer"
+              >
+                <Building2 size={15} />
+                <span>New Group</span>
+              </button>
+            </div>
+
+            {/* Budget Allocation Status Filter Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGroupBudgetFilter("ALL")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                    groupBudgetFilter === "ALL"
+                      ? "bg-slate-900 text-white dark:bg-primary dark:text-white shadow-xs"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  )}
                 >
-                  CLEAR
+                  <span>All Groups</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-700/40 text-slate-200 dark:bg-slate-900/60">
+                    {churchGroups.length}
+                  </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGroupBudgetFilter("WITH_BUDGET")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                    groupBudgetFilter === "WITH_BUDGET"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/40"
+                  )}
+                >
+                  <Wallet size={13} className={groupBudgetFilter === "WITH_BUDGET" ? "text-white" : "text-emerald-500"} />
+                  <span>With Allocated Budget</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    groupBudgetFilter === "WITH_BUDGET" ? "bg-emerald-700 text-white" : "bg-emerald-200/80 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200"
+                  )}>
+                    {groupsWithBudgetCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGroupBudgetFilter("NO_BUDGET")}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                    groupBudgetFilter === "NO_BUDGET"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200/60 dark:border-amber-800/40"
+                  )}
+                >
+                  <AlertCircle size={13} className={groupBudgetFilter === "NO_BUDGET" ? "text-white" : "text-amber-500"} />
+                  <span>No Allocated Budget</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    groupBudgetFilter === "NO_BUDGET" ? "bg-amber-800 text-white" : "bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-200"
+                  )}>
+                    {groupsWithoutBudgetCount}
+                  </span>
+                </button>
+              </div>
+
+              {groupsWithoutBudgetCount > 0 ? (
+                <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/50 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 flex items-center gap-1.5 font-bold">
+                  <AlertCircle size={13} className="text-amber-500 shrink-0" />
+                  <span>{groupsWithoutBudgetCount} group{groupsWithoutBudgetCount !== 1 ? 's have' : ' has'} no allocated budget</span>
+                </div>
+              ) : (
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1.5 font-bold">
+                  <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                  <span>All groups have allocated budget lines</span>
+                </div>
               )}
             </div>
           </div>
@@ -1029,16 +1142,30 @@ export const UsersPanel: React.FC = () => {
                 No matching church groups found
               </h4>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mb-4">
-                No groups matched your search keyword: <strong className="text-slate-700 dark:text-slate-300">"{groupSearchTerm}"</strong>
+                {groupBudgetFilter === "NO_BUDGET" 
+                  ? "None of the church groups match the 'No Allocated Budget' filter or your search criteria."
+                  : groupBudgetFilter === "WITH_BUDGET"
+                  ? "None of the church groups match the 'With Allocated Budget' filter or your search criteria."
+                  : `No groups matched your search keyword: "${groupSearchTerm}"`}
               </p>
-              <button 
-                onClick={() => {
-                  setGroupSearchTerm("");
-                }}
-                className="btn-primary px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md cursor-pointer"
-              >
-                Clear Search
-              </button>
+              <div className="flex items-center gap-2">
+                {groupSearchTerm && (
+                  <button 
+                    onClick={() => setGroupSearchTerm("")}
+                    className="btn-primary px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md cursor-pointer"
+                  >
+                    Clear Keyword
+                  </button>
+                )}
+                {groupBudgetFilter !== "ALL" && (
+                  <button 
+                    onClick={() => setGroupBudgetFilter("ALL")}
+                    className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-200 cursor-pointer"
+                  >
+                    Reset Filter
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -1046,6 +1173,28 @@ export const UsersPanel: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <AnimatePresence mode="popLayout">
                 {filteredChurchGroups.map((group) => {
+                  const memberCount = users.filter(u => 
+                    u.group === group.name || 
+                    u.group === group.id || 
+                    (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id)))
+                  ).length;
+                  const groupReqs = requisitions.filter(r => 
+                    r.groupId === group.id || 
+                    r.groupName?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
+                    r.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase()
+                  );
+                  const groupProjs = projects.filter(p => 
+                    p.groupId === group.id || 
+                    p.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
+                    p.name?.trim().toLowerCase().includes(group.name.trim().toLowerCase())
+                  );
+                  const groupAllocBudget = groupProjs.reduce((s, p) => s + (Number(p.allocatedBudget) || 0), 0);
+                  const hasNoBudget = groupAllocBudget === 0;
+                  const approverCount = users.filter(u => 
+                    (u.role === UserRole.APPROVER_L1 || u.role === UserRole.APPROVER_L2) && 
+                    (u.group === group.name || u.group === group.id || (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id))))
+                  ).length;
+
                   return (
                     <motion.div
                       key={group.id}
@@ -1054,40 +1203,117 @@ export const UsersPanel: React.FC = () => {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.9 }}
                       onClick={() => setSelectedGroupForMembers(group)}
-                      className="bg-white dark:bg-slate-900 p-4.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm group hover:border-primary/50 hover:shadow-md transition-all cursor-pointer hover:scale-[1.01]"
+                      className={cn(
+                        "bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm group hover:shadow-md transition-all cursor-pointer hover:scale-[1.01] flex flex-col justify-between relative",
+                        hasNoBudget 
+                          ? "border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-400 dark:border-l-amber-500 hover:border-amber-400/80" 
+                          : "border-slate-200 dark:border-slate-800 hover:border-primary/50"
+                      )}
                     >
-                      <div className="flex justify-between items-start mb-2.5">
-                        <div className="w-10 h-10 bg-slate-50 dark:bg-slate-950 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
-                          <Building2 size={20} />
+                      <div>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
+                            hasNoBudget 
+                              ? "bg-amber-50/70 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40" 
+                              : "bg-slate-50 dark:bg-slate-950 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary border-slate-100 dark:border-slate-800"
+                          )}>
+                            <Building2 size={20} />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {hasNoBudget ? (
+                              <span 
+                                className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100/90 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 flex items-center gap-1 shadow-2xs"
+                                title="No active project budget line assigned to this group"
+                              >
+                                <AlertCircle size={9} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>NO BUDGET</span>
+                              </span>
+                            ) : (
+                              <span 
+                                className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 flex items-center gap-1 shadow-2xs"
+                                title={`Allocated Budget: KES ${groupAllocBudget.toLocaleString()}`}
+                              >
+                                <Wallet size={9} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>KES {(groupAllocBudget / 1000).toFixed(0)}k</span>
+                              </span>
+                            )}
+                            <span className="text-[8px] font-mono text-slate-300 dark:text-slate-600 px-1.5 py-0.5 rounded bg-slate-50 dark:bg-slate-950" title={group.id}>
+                              #{group.id.toUpperCase().substring(0, 5)}
+                            </span>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteChurchGroup(group.id);
+                              }}
+                              className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full transition-all"
+                              title="Delete Group"
+                            >
+                              <XCircle size={15} />
+                            </button>
+                          </div>
                         </div>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteChurchGroup(group.id);
-                          }}
-                          className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full transition-all"
-                          title="Delete Group"
-                        >
-                          <XCircle size={16} />
-                        </button>
+
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate flex-1" title={group.name}>
+                            {group.name}
+                          </h3>
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 min-h-[2.5rem]" title={group.description || "No description provided."}>
+                          {group.description || "No description provided."}
+                        </p>
+                        
+                        {/* Quick Metrics Chips */}
+                        <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
+                          {hasNoBudget ? (
+                            <div className="bg-amber-50/70 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-200/80 dark:border-amber-800/60">
+                              <div className="text-[8px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                                <AlertCircle size={10} className="text-amber-500 shrink-0" />
+                                <span>Budget Status</span>
+                              </div>
+                              <div className="text-[10px] font-black text-amber-900 dark:text-amber-200 mt-0.5 truncate">
+                                No Allocated Budget
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50 dark:bg-slate-950/80 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                              <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                <Wallet size={10} className="text-emerald-500 shrink-0" />
+                                <span>Allocated Budget</span>
+                              </div>
+                              <div className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                                KES {groupAllocBudget.toLocaleString()}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="bg-slate-50 dark:bg-slate-950/80 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                              <FileText size={10} className="text-indigo-500 shrink-0" />
+                              <span>Requisitions</span>
+                            </div>
+                            <div className="text-[11px] font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                              {groupReqs.length} reqs
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                      <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight mb-1 truncate" title={group.name}>
-                        {group.name}
-                      </h3>
-
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed min-h-[2.5rem] line-clamp-2" title={group.description || "No description provided."}>
-                        {group.description || "No description provided."}
-                      </p>
-                      
-                      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <Users size={12} className="text-slate-400" />
-                          <span className="text-[9px] font-black text-primary dark:text-blue-400 uppercase tracking-widest bg-primary/5 dark:bg-blue-500/5 px-1.5 py-0.5 rounded-md">
-                            {users.filter(u => u.group === group.name).length} MEMBERS
+                      <div className="mt-3 pt-2.5 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between text-[9px]">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-primary dark:text-blue-400 uppercase tracking-wider bg-primary/5 dark:bg-blue-500/5 px-2 py-0.5 rounded-md">
+                            {memberCount} MEMBERS
                           </span>
+                          {approverCount > 0 && (
+                            <span className="font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded">
+                              {approverCount} L1/L2
+                            </span>
+                          )}
                         </div>
-                        <span className="text-[8px] font-mono text-slate-300 dark:text-slate-600" title={group.id}>#{group.id.toUpperCase().substring(0, 5)}</span>
+                        <span className="text-[9px] font-black text-slate-400 group-hover:text-primary flex items-center gap-0.5 transition-colors uppercase tracking-widest">
+                          VIEW <ArrowRight size={10} />
+                        </span>
                       </div>
                     </motion.div>
                   );
@@ -2058,130 +2284,18 @@ export const UsersPanel: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Group Members Viewer Modal */}
+      {/* Comprehensive Church Group Details Modal */}
       <AnimatePresence>
         {selectedGroupForMembers && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center sm:p-4">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-[2rem] w-full max-w-2xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 flex flex-col"
-            >
-              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
-                <div>
-                  <h3 className="text-xs font-black text-slate-950 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Building2 size={16} className="text-primary" />
-                    <span>{selectedGroupForMembers.name}</span>
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-mono tracking-widest mt-1">
-                    {users.filter(u => u.group === selectedGroupForMembers.name).length} REGISTERED MEMBERS
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {users.filter(u => u.group === selectedGroupForMembers.name).length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleExportCSV(selectedGroupForMembers.name)}
-                      className="px-3.5 py-2 bg-primary/10 hover:bg-primary/25 text-primary border border-primary/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
-                      title="Export members of this church group as CSV"
-                    >
-                      <Download size={12} />
-                      <span>EXPORT</span>
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => setSelectedGroupForMembers(null)} 
-                    className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                  >
-                    <X size={20} className="text-slate-500" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-8 max-h-[30rem] overflow-y-auto space-y-4">
-                {selectedGroupForMembers.description && (
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-2">
-                    <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Group Purview</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed">{selectedGroupForMembers.description}</p>
-                  </div>
-                )}
-
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Members List</h4>
-                
-                {users.filter(u => u.group === selectedGroupForMembers.name).length === 0 ? (
-                  <div className="py-12 text-center rounded-2xl border-2 border-dashed border-slate-101 p-6">
-                    <Users size={32} className="mx-auto text-slate-300 mb-3" />
-                    <p className="text-sm font-medium text-slate-500">No members registered under this group.</p>
-                    <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                      Go to the Users Directory tab to associate users with this church group.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
-                    {users.filter(u => u.group === selectedGroupForMembers.name).map((user, uIdx) => (
-                      <div key={`group-member-${user.id || uIdx}-${uIdx}`} className="p-4 flex items-center justify-between gap-4 bg-white hover:bg-slate-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <UserAvatar 
-                            user={user} 
-                            size="lg" 
-                            rounded="xl" 
-                            ring="ring-1 ring-slate-200" 
-                          />
-                          <div>
-                            <div className="text-xs font-black text-slate-900 uppercase tracking-tight">{user.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{user.email}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <span className="text-[9px] font-black px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg">
-                            {user.role}
-                          </span>
-                          
-                          {user.isSuspended ? (
-                            <span className="text-[8px] font-black px-2 py-0.5 bg-rose-50 text-rose-600 rounded-md border border-rose-100">
-                              SUSPENDED
-                            </span>
-                          ) : !user.isApproved ? (
-                            <span className="text-[8px] font-black px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md border border-amber-100">
-                              PENDING
-                            </span>
-                          ) : (
-                            <span className="text-[8px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100">
-                              ACTIVE
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => {
-                              setSelectedGroupForMembers(null);
-                              startEditing(user);
-                              setActiveTab("users"); // Switch tab to users where editing takes place
-                            }}
-                            className="px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 rounded-lg border border-primary/20 transition-all flex items-center gap-1"
-                          >
-                            <Edit size={10} />
-                            <span>MANAGE</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="px-8 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setSelectedGroupForMembers(null)}
-                  className="px-6 py-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 hover:border-slate-300 transition-all"
-                >
-                  CLOSE VIEWPORT
-                </button>
-              </div>
-            </motion.div>
-          </div>
+          <ChurchGroupDetailsModal
+            group={selectedGroupForMembers}
+            onClose={() => setSelectedGroupForMembers(null)}
+            onManageUser={(user) => {
+              setSelectedGroupForMembers(null);
+              startEditing(user);
+              setActiveTab("users");
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

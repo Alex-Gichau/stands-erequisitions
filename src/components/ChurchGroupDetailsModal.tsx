@@ -303,16 +303,16 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex flex-col w-screen h-screen overflow-hidden">
       <motion.div 
-        initial={{ scale: 0.95, opacity: 0, y: 16 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.95, opacity: 0, y: 16 }}
-        transition={{ duration: 0.2 }}
-        className="bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl w-full max-w-5xl max-h-[94vh] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col my-auto"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 6 }}
+        transition={{ duration: 0.18 }}
+        className="bg-slate-50 dark:bg-slate-950 w-full h-full flex flex-col overflow-hidden"
       >
         {/* Modal Header */}
-        <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 sticky top-0 z-20 backdrop-blur-sm">
+        <div className="px-6 lg:px-10 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-20 shadow-2xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary dark:bg-blue-500/10 dark:text-blue-400 flex items-center justify-center shrink-0 border border-primary/20">
@@ -325,7 +325,7 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
                   </h2>
                   <button 
                     onClick={copyGroupId}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono text-slate-500 dark:text-slate-400 transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
                     title="Click to copy Group ID"
                   >
                     <span>#{group.id.toUpperCase().substring(0, 8)}</span>
@@ -348,6 +348,9 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
                       <span>KES {(totalAllocatedBudget / 1000).toFixed(0)}k Budget</span>
                     </span>
                   )}
+                  <span className="hidden md:inline-flex items-center gap-1 text-[9px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                    FULL SCREEN (ESC TO CLOSE)
+                  </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
                   {group.description || "Church ministry and expense group of St. Andrew's PCEA."}
@@ -357,11 +360,11 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
 
             {/* Header Actions */}
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={handleExportMembersCSV}
-                  className="px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
                   title="Export members as CSV"
                 >
                   <Download size={12} className="text-primary dark:text-blue-400" />
@@ -371,7 +374,7 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
                 <button
                   type="button"
                   onClick={handleExportRequisitionsCSV}
-                  className="px-2.5 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
                   title="Export requisitions as CSV"
                 >
                   <Download size={12} className="text-emerald-500" />
@@ -381,10 +384,10 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
 
               <button 
                 onClick={onClose} 
-                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 title="Close modal (Esc)"
               >
-                <X size={20} />
+                <X size={22} />
               </button>
             </div>
           </div>
@@ -568,9 +571,10 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 overflow-y-auto max-h-[60vh] space-y-6">
-          {/* TAB 1: FINANCIALS & BUDGET */}
-          {activeTab === "financials" && (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-10">
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* TAB 1: FINANCIALS & BUDGET */}
+            {activeTab === "financials" && (
             <div className="space-y-6">
               {/* Unbudgeted Notice Banner if no allocated budget */}
               {totalAllocatedBudget === 0 && (
@@ -1269,10 +1273,11 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex flex-wrap items-center justify-between gap-3">
+        <div className="px-6 lg:px-10 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"

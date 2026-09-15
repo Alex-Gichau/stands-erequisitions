@@ -43,7 +43,11 @@ import {
   RefreshCw,
   Wallet,
   FileText,
-  ArrowRight
+  ArrowRight,
+  Table as TableIcon,
+  LayoutGrid,
+  ExternalLink,
+  TrendingUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
@@ -200,11 +204,71 @@ export const UsersPanel: React.FC = () => {
     });
   }, [churchGroups, groupSearchTerm, groupBudgetFilter, getGroupAllocatedBudget]);
 
+  // Pre-calculate per-group aggregates for snappy rendering in table and cards
+  const groupMetricsMap = React.useMemo(() => {
+    const map = new Map<string, {
+      memberCount: number;
+      approverCount: number;
+      reqCount: number;
+      reqTotalAmount: number;
+      disbursedAmount: number;
+      allocBudget: number;
+      projectCount: number;
+      hasNoBudget: boolean;
+    }>();
+
+    churchGroups.forEach((group) => {
+      const memberCount = users.filter(u => 
+        u.group === group.name || 
+        u.group === group.id || 
+        (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id)))
+      ).length;
+
+      const approverCount = users.filter(u => 
+        (u.role === UserRole.APPROVER_L1 || u.role === UserRole.APPROVER_L2) && 
+        (u.group === group.name || u.group === group.id || (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id))))
+      ).length;
+
+      const groupReqs = requisitions.filter(r => 
+        r.groupId === group.id || 
+        r.groupName?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
+        r.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase()
+      );
+      const reqCount = groupReqs.length;
+      const reqTotalAmount = groupReqs.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      const disbursedAmount = groupReqs
+        .filter(r => r.status === "DISBURSED")
+        .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+      const groupProjs = projects.filter(p => 
+        p.groupId === group.id || 
+        p.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
+        p.name?.trim().toLowerCase().includes(group.name.trim().toLowerCase())
+      );
+      const allocBudget = groupProjs.reduce((s, p) => s + (Number(p.allocatedBudget) || 0), 0);
+      const projectCount = groupProjs.length;
+
+      map.set(group.id, {
+        memberCount,
+        approverCount,
+        reqCount,
+        reqTotalAmount,
+        disbursedAmount,
+        allocBudget,
+        projectCount,
+        hasNoBudget: allocBudget === 0
+      });
+    });
+
+    return map;
+  }, [churchGroups, users, requisitions, projects]);
+
   // Group modal states
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
   const [isGroupSubmitting, setIsGroupSubmitting] = useState(false);
+  const [groupViewMode, setGroupViewMode] = useState<"table" | "grid">("table");
 
   // Registration modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1095,17 +1159,51 @@ export const UsersPanel: React.FC = () => {
                 </button>
               </div>
 
-              {groupsWithoutBudgetCount > 0 ? (
-                <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/50 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 flex items-center gap-1.5 font-bold">
-                  <AlertCircle size={13} className="text-amber-500 shrink-0" />
-                  <span>{groupsWithoutBudgetCount} group{groupsWithoutBudgetCount !== 1 ? 's have' : ' has'} no allocated budget</span>
+              <div className="flex flex-wrap items-center gap-2">
+                {groupsWithoutBudgetCount > 0 ? (
+                  <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50/80 dark:bg-amber-950/50 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800/60 flex items-center gap-1.5 font-bold">
+                    <AlertCircle size={13} className="text-amber-500 shrink-0" />
+                    <span>{groupsWithoutBudgetCount} group{groupsWithoutBudgetCount !== 1 ? 's have' : ' has'} no allocated budget</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1.5 font-bold">
+                    <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                    <span>All groups have allocated budget lines</span>
+                  </div>
+                )}
+
+                {/* View Switcher: Table (Default) vs Cards */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                  <button
+                    type="button"
+                    onClick={() => setGroupViewMode("table")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      groupViewMode === "table"
+                        ? "bg-white dark:bg-slate-900 text-primary dark:text-blue-400 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                    )}
+                    title="Table View (Default)"
+                  >
+                    <TableIcon size={13} />
+                    <span>Table</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGroupViewMode("grid")}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                      groupViewMode === "grid"
+                        ? "bg-white dark:bg-slate-900 text-primary dark:text-blue-400 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                    )}
+                    title="Card Grid View"
+                  >
+                    <LayoutGrid size={13} />
+                    <span>Cards</span>
+                  </button>
                 </div>
-              ) : (
-                <div className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1.5 font-bold">
-                  <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
-                  <span>All groups have allocated budget lines</span>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -1170,165 +1268,360 @@ export const UsersPanel: React.FC = () => {
           )}
 
           {filteredChurchGroups.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <AnimatePresence mode="popLayout">
-                {filteredChurchGroups.map((group) => {
-                  const memberCount = users.filter(u => 
-                    u.group === group.name || 
-                    u.group === group.id || 
-                    (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id)))
-                  ).length;
-                  const groupReqs = requisitions.filter(r => 
-                    r.groupId === group.id || 
-                    r.groupName?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
-                    r.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase()
-                  );
-                  const groupProjs = projects.filter(p => 
-                    p.groupId === group.id || 
-                    p.groupId?.trim().toLowerCase() === group.name.trim().toLowerCase() ||
-                    p.name?.trim().toLowerCase().includes(group.name.trim().toLowerCase())
-                  );
-                  const groupAllocBudget = groupProjs.reduce((s, p) => s + (Number(p.allocatedBudget) || 0), 0);
-                  const hasNoBudget = groupAllocBudget === 0;
-                  const approverCount = users.filter(u => 
-                    (u.role === UserRole.APPROVER_L1 || u.role === UserRole.APPROVER_L2) && 
-                    (u.group === group.name || u.group === group.id || (Array.isArray(u.groups) && (u.groups.includes(group.name) || u.groups.includes(group.id))))
-                  ).length;
+            groupViewMode === "table" ? (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left font-sans border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/80 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
+                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                          Ministry Group
+                        </th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                          Budget Allocation
+                        </th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                          Disbursed (KES)
+                        </th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                          Requisitions
+                        </th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                          Personnel
+                        </th>
+                        <th className="px-5 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right whitespace-nowrap">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {filteredChurchGroups.map((group) => {
+                        const metrics = groupMetricsMap.get(group.id) || {
+                          memberCount: 0,
+                          approverCount: 0,
+                          reqCount: 0,
+                          reqTotalAmount: 0,
+                          disbursedAmount: 0,
+                          allocBudget: 0,
+                          projectCount: 0,
+                          hasNoBudget: true
+                        };
+                        const { memberCount, approverCount, reqCount, reqTotalAmount, disbursedAmount, allocBudget, projectCount, hasNoBudget } = metrics;
 
-                  return (
-                    <motion.div
-                      key={group.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      onClick={() => setSelectedGroupForMembers(group)}
-                      className={cn(
-                        "bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm group hover:shadow-md transition-all cursor-pointer hover:scale-[1.01] flex flex-col justify-between relative",
-                        hasNoBudget 
-                          ? "border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-400 dark:border-l-amber-500 hover:border-amber-400/80" 
-                          : "border-slate-200 dark:border-slate-800 hover:border-primary/50"
-                      )}
-                    >
-                      <div>
-                        <div className="flex justify-between items-start mb-3">
-                          <div className={cn(
-                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
-                            hasNoBudget 
-                              ? "bg-amber-50/70 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40" 
-                              : "bg-slate-50 dark:bg-slate-950 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary border-slate-100 dark:border-slate-800"
-                          )}>
-                            <Building2 size={20} />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {hasNoBudget ? (
-                              <span 
-                                className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100/90 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 flex items-center gap-1 shadow-2xs"
-                                title="No active project budget line assigned to this group"
-                              >
-                                <AlertCircle size={9} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                                <span>NO BUDGET</span>
-                              </span>
-                            ) : (
-                              <span 
-                                className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 flex items-center gap-1 shadow-2xs"
-                                title={`Allocated Budget: KES ${groupAllocBudget.toLocaleString()}`}
-                              >
-                                <Wallet size={9} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                <span>KES {(groupAllocBudget / 1000).toFixed(0)}k</span>
-                              </span>
+                        return (
+                          <tr 
+                            key={group.id}
+                            onClick={() => setSelectedGroupForMembers(group)}
+                            className={cn(
+                              "group transition-colors cursor-pointer hover:bg-indigo-50/40 dark:hover:bg-slate-800/60",
+                              hasNoBudget ? "bg-amber-50/20 dark:bg-amber-950/10" : ""
                             )}
-                            <span className="text-[8px] font-mono text-slate-300 dark:text-slate-600 px-1.5 py-0.5 rounded bg-slate-50 dark:bg-slate-950" title={group.id}>
-                              #{group.id.toUpperCase().substring(0, 5)}
-                            </span>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteChurchGroup(group.id);
-                              }}
-                              className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full transition-all"
-                              title="Delete Group"
-                            >
-                              <XCircle size={15} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate flex-1" title={group.name}>
-                            {group.name}
-                          </h3>
-                        </div>
-
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 min-h-[2.5rem]" title={group.description || "No description provided."}>
-                          {group.description || "No description provided."}
-                        </p>
-                        
-                        {/* Quick Metrics Chips */}
-                        <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
-                          {hasNoBudget ? (
-                            <div className="bg-amber-50/70 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-200/80 dark:border-amber-800/60">
-                              <div className="text-[8px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                                <AlertCircle size={10} className="text-amber-500 shrink-0" />
-                                <span>Budget Status</span>
+                          >
+                            {/* Group Details */}
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-3">
+                                <div className={cn(
+                                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105",
+                                  hasNoBudget 
+                                    ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60" 
+                                    : "bg-slate-50 dark:bg-slate-950 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary border-slate-200 dark:border-slate-800"
+                                )}>
+                                  <Building2 size={18} />
+                                </div>
+                                <div className="min-w-0 max-w-xs sm:max-w-sm md:max-w-md">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-slate-900 dark:text-slate-100 text-xs uppercase tracking-tight group-hover:text-primary transition-colors">
+                                      {group.name}
+                                    </span>
+                                    <span className="text-[8px] font-mono text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800" title={group.id}>
+                                      #{group.id.toUpperCase().substring(0, 8)}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5" title={group.description || "No description provided."}>
+                                    {group.description || "Church ministry and expense group."}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-[10px] font-black text-amber-900 dark:text-amber-200 mt-0.5 truncate">
-                                No Allocated Budget
+                            </td>
+
+                            {/* Budget Allocation */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {hasNoBudget ? (
+                                <span 
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-100/90 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 shadow-2xs"
+                                  title="No active project budget line assigned to this group"
+                                >
+                                  <AlertCircle size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>No Budget</span>
+                                </span>
+                              ) : (
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-1 text-xs font-black text-emerald-700 dark:text-emerald-400">
+                                    <Wallet size={12} className="text-emerald-600 shrink-0" />
+                                    <span>KES {allocBudget.toLocaleString()}</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 font-medium">
+                                    {projectCount} project line{projectCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Disbursed Amount */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                                  KES {disbursedAmount.toLocaleString()}
+                                </div>
+                                <span className="text-[10px] text-slate-400">
+                                  {allocBudget > 0 ? `${Math.round((disbursedAmount / allocBudget) * 100)}% utilized` : "Direct ops"}
+                                </span>
                               </div>
+                            </td>
+
+                            {/* Requisitions */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                  {reqCount} requisition{reqCount !== 1 ? 's' : ''}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  KES {reqTotalAmount.toLocaleString()}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Personnel */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  <Users size={11} className="text-slate-400" />
+                                  <span>{memberCount} members</span>
+                                </span>
+                                {approverCount > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+                                    <ShieldCheck size={11} className="text-purple-500" />
+                                    <span>{approverCount} L1/L2</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-5 py-3.5 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedGroupForMembers(group)}
+                                  className="px-3 py-1.5 bg-primary/10 hover:bg-primary hover:text-white text-primary dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-primary dark:hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                  title="Open full-screen group details"
+                                >
+                                  <Eye size={12} />
+                                  <span>View Details</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete the church group "${group.name}"? This action cannot be undone.`)) {
+                                      deleteChurchGroup(group.id);
+                                    }
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition-all cursor-pointer"
+                                  title="Delete Church Group"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50 dark:bg-slate-950/80 border-t border-slate-200 dark:border-slate-800 font-bold text-[11px]">
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-300 uppercase font-black">
+                          Total: {filteredChurchGroups.length} Group{filteredChurchGroups.length !== 1 ? 's' : ''}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-black text-emerald-700 dark:text-emerald-400">
+                          KES {filteredChurchGroups.reduce((sum, g) => sum + (groupMetricsMap.get(g.id)?.allocBudget || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-black text-slate-800 dark:text-slate-200">
+                          KES {filteredChurchGroups.reduce((sum, g) => sum + (groupMetricsMap.get(g.id)?.disbursedAmount || 0), 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-black text-slate-800 dark:text-slate-200">
+                          {filteredChurchGroups.reduce((sum, g) => sum + (groupMetricsMap.get(g.id)?.reqCount || 0), 0)} reqs
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          {filteredChurchGroups.reduce((sum, g) => sum + (groupMetricsMap.get(g.id)?.memberCount || 0), 0)} members
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setIsGroupModalOpen(true)}
+                            className="text-[10px] font-black uppercase tracking-wider text-primary hover:underline cursor-pointer"
+                          >
+                            + Register Group
+                          </button>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <AnimatePresence mode="popLayout">
+                  {filteredChurchGroups.map((group) => {
+                    const metrics = groupMetricsMap.get(group.id) || {
+                      memberCount: 0,
+                      approverCount: 0,
+                      reqCount: 0,
+                      reqTotalAmount: 0,
+                      disbursedAmount: 0,
+                      allocBudget: 0,
+                      projectCount: 0,
+                      hasNoBudget: true
+                    };
+                    const { memberCount, approverCount, reqCount, allocBudget, hasNoBudget } = metrics;
+
+                    return (
+                      <motion.div
+                        key={group.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        onClick={() => setSelectedGroupForMembers(group)}
+                        className={cn(
+                          "bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm group hover:shadow-md transition-all cursor-pointer hover:scale-[1.01] flex flex-col justify-between relative",
+                          hasNoBudget 
+                            ? "border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-400 dark:border-l-amber-500 hover:border-amber-400/80" 
+                            : "border-slate-200 dark:border-slate-800 hover:border-primary/50"
+                        )}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start mb-3">
+                            <div className={cn(
+                              "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
+                              hasNoBudget 
+                                ? "bg-amber-50/70 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40" 
+                                : "bg-slate-50 dark:bg-slate-950 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary border-slate-100 dark:border-slate-800"
+                            )}>
+                              <Building2 size={20} />
                             </div>
-                          ) : (
+                            <div className="flex items-center gap-1">
+                              {hasNoBudget ? (
+                                <span 
+                                  className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-amber-100/90 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80 flex items-center gap-1 shadow-2xs"
+                                  title="No active project budget line assigned to this group"
+                                >
+                                  <AlertCircle size={9} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>NO BUDGET</span>
+                                </span>
+                              ) : (
+                                <span 
+                                  className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-100/90 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/80 flex items-center gap-1 shadow-2xs"
+                                  title={`Allocated Budget: KES ${allocBudget.toLocaleString()}`}
+                                >
+                                  <Wallet size={9} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  <span>KES {(allocBudget / 1000).toFixed(0)}k</span>
+                                </span>
+                              )}
+                              <span className="text-[8px] font-mono text-slate-300 dark:text-slate-600 px-1.5 py-0.5 rounded bg-slate-50 dark:bg-slate-950" title={group.id}>
+                                #{group.id.toUpperCase().substring(0, 5)}
+                              </span>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Are you sure you want to delete the group "${group.name}"?`)) {
+                                    deleteChurchGroup(group.id);
+                                  }
+                                }}
+                                className="p-1 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-full transition-all"
+                                title="Delete Group"
+                              >
+                                <XCircle size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate flex-1" title={group.name}>
+                              {group.name}
+                            </h3>
+                          </div>
+
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2 min-h-[2.5rem]" title={group.description || "No description provided."}>
+                            {group.description || "No description provided."}
+                          </p>
+                          
+                          {/* Quick Metrics Chips */}
+                          <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2">
+                            {hasNoBudget ? (
+                              <div className="bg-amber-50/70 dark:bg-amber-950/40 p-2 rounded-xl border border-amber-200/80 dark:border-amber-800/60">
+                                <div className="text-[8px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                                  <AlertCircle size={10} className="text-amber-500 shrink-0" />
+                                  <span>Budget Status</span>
+                                </div>
+                                <div className="text-[10px] font-black text-amber-900 dark:text-amber-200 mt-0.5 truncate">
+                                  No Allocated Budget
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-slate-50 dark:bg-slate-950/80 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                  <Wallet size={10} className="text-emerald-500 shrink-0" />
+                                  <span>Allocated Budget</span>
+                                </div>
+                                <div className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
+                                  KES {allocBudget.toLocaleString()}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="bg-slate-50 dark:bg-slate-950/80 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
                               <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                                <Wallet size={10} className="text-emerald-500 shrink-0" />
-                                <span>Allocated Budget</span>
+                                <FileText size={10} className="text-indigo-500 shrink-0" />
+                                <span>Requisitions</span>
                               </div>
-                              <div className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
-                                KES {groupAllocBudget.toLocaleString()}
+                              <div className="text-[11px] font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                                {reqCount} reqs
                               </div>
-                            </div>
-                          )}
-
-                          <div className="bg-slate-50 dark:bg-slate-950/80 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
-                            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                              <FileText size={10} className="text-indigo-500 shrink-0" />
-                              <span>Requisitions</span>
-                            </div>
-                            <div className="text-[11px] font-black text-slate-900 dark:text-slate-100 mt-0.5">
-                              {groupReqs.length} reqs
                             </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mt-3 pt-2.5 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between text-[9px]">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-primary dark:text-blue-400 uppercase tracking-wider bg-primary/5 dark:bg-blue-500/5 px-2 py-0.5 rounded-md">
-                            {memberCount} MEMBERS
-                          </span>
-                          {approverCount > 0 && (
-                            <span className="font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded">
-                              {approverCount} L1/L2
+                        <div className="mt-3 pt-2.5 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between text-[9px]">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-primary dark:text-blue-400 uppercase tracking-wider bg-primary/5 dark:bg-blue-500/5 px-2 py-0.5 rounded-md">
+                              {memberCount} MEMBERS
                             </span>
-                          )}
+                            {approverCount > 0 && (
+                              <span className="font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded">
+                                {approverCount} L1/L2
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-black text-slate-400 group-hover:text-primary flex items-center gap-0.5 transition-colors uppercase tracking-widest">
+                            VIEW <ArrowRight size={10} />
+                          </span>
                         </div>
-                        <span className="text-[9px] font-black text-slate-400 group-hover:text-primary flex items-center gap-0.5 transition-colors uppercase tracking-widest">
-                          VIEW <ArrowRight size={10} />
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-              <button 
-                onClick={() => setIsGroupModalOpen(true)}
-                className="border-2 border-dashed border-slate-200 dark:border-slate-800 p-4.5 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-primary/40 hover:text-primary transition-all group min-h-[142px]"
-              >
-                <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Building2 size={20} />
-                </div>
-                <span className="text-[9px] font-black uppercase tracking-[0.15em]">REGISTER NEW GROUP</span>
-              </button>
-            </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+                <button 
+                  onClick={() => setIsGroupModalOpen(true)}
+                  className="border-2 border-dashed border-slate-200 dark:border-slate-800 p-4.5 rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-primary/40 hover:text-primary transition-all group min-h-[142px]"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-950 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Building2 size={20} />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em]">REGISTER NEW GROUP</span>
+                </button>
+              </div>
+            )
           )}
         </>
       ) : (

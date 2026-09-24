@@ -93,7 +93,10 @@ import {
   Wrench,
   MoreHorizontal,
   CheckCircle2,
-  RotateCcw
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Plus
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PerformanceTracker } from "./components/PerformanceTracker";
@@ -2610,6 +2613,7 @@ function AppContent() {
             )}
           </div>
         )}
+
         {/* Header */}
         <header className="min-h-[5rem] py-3 bg-card border-b border-border flex items-center justify-between px-4 md:px-8 shrink-0 select-none transition-all">
           <div className="flex flex-col justify-center">

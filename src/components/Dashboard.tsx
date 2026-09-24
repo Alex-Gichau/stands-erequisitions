@@ -17,7 +17,7 @@ import { BudgetCircularGauges } from "./BudgetCircularGauges";
 import { RecentCommentsAndReactionsFeed } from "./RecentCommentsAndReactionsFeed";
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { NewRequisitionForm } from "./NewRequisitionForm";
-import { StockRatesRssStrip } from "./StockRatesRssStrip";
+import { MinistrySpendingFeed } from "./MinistrySpendingFeed";
 
 // Custom high-detail chart tooltip
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -845,13 +845,13 @@ const Dashboard: React.FC<{
 
   return (
     <div className="space-y-6 animate-in fade-in transition-all duration-700">
-      {/* Top Flowing Stock Rates & Financial RSS Feed Strip */}
-      <StockRatesRssStrip />
+      {/* 2-Week Ministry Spending Trends Feed */}
+      <MinistrySpendingFeed onSelectMinistry={(groupName) => onViewChange?.("requisitions")} />
 
       {/* Role-aware Greeting */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-2">
         <div>
-          <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight">System Dashboard</h1>
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">System Dashboard</h1>
           <p className="text-slate-500 text-[9px] md:text-sm">Welcome, {currentUser?.name} • <span className="font-mono text-[8px] md:text-[10px] uppercase tracking-widest">{currentUser?.role} Mode</span></p>
         </div>
       </div>

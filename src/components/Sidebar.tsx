@@ -1,24 +1,19 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from "react";
 import { 
   LayoutDashboard, 
   FileText, 
-  CheckCircle, 
   Banknote, 
   BarChart3, 
+  UserCircle, 
   Settings, 
-  UserCircle,
+  ShieldAlert, 
+  ShieldCheck, 
   LogOut,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
   Zap,
   Bell,
+  CheckCircle,
   Store,
   MoreHorizontal,
   Activity,
@@ -63,7 +58,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       let active = false;
       modalOverlays.forEach((el) => {
         const className = el.className || "";
-        // Exclude sidebar navigation dropdown overlays
         const isSelfBackdrop = className.includes("z-[-1]") || className.includes("z-30");
         if (!isSelfBackdrop) {
           if (
@@ -200,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               data-sidebar-item={item.label}
               title={isCollapsed ? item.label : undefined}
               className={cn(
-                "w-full flex items-center rounded-2xl transition-all duration-300 group text-[11px] font-black uppercase tracking-widest focus:outline-none relative",
+                "w-full flex items-center rounded-2xl transition-all duration-300 group text-[11px] font-black uppercase tracking-widest focus:outline-none relative cursor-pointer",
                 isCollapsed ? "justify-center p-3" : "gap-4 px-4 py-3.5",
                 isActive 
                   ? "bg-primary text-white shadow-lg shadow-primary/20" 
@@ -265,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {!isCollapsed && (
             <button 
               onClick={handleLogoutClick}
-              className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-550 dark:hover:text-rose-400 transition-colors hover:bg-rose-500/10 rounded-lg cursor-pointer"
+              className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors hover:bg-rose-500/10 rounded-lg cursor-pointer"
               title="Logout"
             >
               <LogOut size={16} />
@@ -277,7 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
            <button 
             onClick={handleLogoutClick}
             title="Terminate Session"
-            className="w-full mt-4 flex justify-center py-2 text-slate-400 dark:text-slate-500 hover:text-rose-550 dark:hover:text-rose-400 transition-colors cursor-pointer"
+            className="w-full mt-4 flex justify-center py-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors cursor-pointer"
           >
             <LogOut size={18} />
           </button>
@@ -309,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }}
                     className={cn(
                       "flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all duration-300 relative",
-                      isActive ? "text-primary scale-110" : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
+                      isActive ? "text-primary scale-110" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                     )}
                   >
                     {isActive && (
@@ -336,7 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 h-full gap-1 transition-all duration-300",
-                  isMobileMenuOpen ? "text-primary scale-110" : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
+                  isMobileMenuOpen ? "text-primary scale-110" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 )}
               >
                 <MoreHorizontal size={20} strokeWidth={isMobileMenuOpen ? 2.5 : 2} />
@@ -358,7 +352,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       initial={{ opacity: 0, y: 100, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 100, scale: 0.95 }}
-                      className="absolute bottom-[4.5rem] right-4 bg-white dark:bg-slate-850 border border-slate-200 dark:border-white/10 rounded-3xl p-4 shadow-2xl w-[280px] grid grid-cols-2 gap-2 z-50 overflow-hidden"
+                      className="absolute bottom-[4.5rem] right-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-3xl p-4 shadow-2xl w-[280px] grid grid-cols-2 gap-2 z-50 overflow-hidden"
                     >
                       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-blue-400 opacity-50" />
                       
@@ -387,7 +381,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         );
                       })}
 
-                      {/* Explicitly add some usually desktop-only items if they are important or just filtered ones */}
                       {filteredItems.filter(i => i.desktopOnly).map((item) => {
                          const Icon = item.icon;
                         const isActive = currentView === item.id;
@@ -436,4 +429,3 @@ export const Sidebar: React.FC<SidebarProps> = ({
   </>
   );
 };
-

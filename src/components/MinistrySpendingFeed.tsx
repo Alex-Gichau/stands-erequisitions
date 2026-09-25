@@ -37,7 +37,7 @@ interface MinistrySpendingFeedProps {
 }
 
 export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSelectMinistry }) => {
-  const { requisitions, churchGroups, projects } = useRequisitions();
+  const { requisitions, churchGroups } = useRequisitions();
   const [isPaused, setIsPaused] = useState(false);
   const [selectedMinistry, setSelectedMinistry] = useState<MinistrySpendingData | null>(null);
 
@@ -120,7 +120,6 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
 
       // Realistic mock seeding if dataset has few recent timestamps to guarantee rich analytics for every single ministry
       if (current2wSpend === 0 && previous2wSpend === 0) {
-        // Deterministic varied baseline based on index
         const baseValues = [
           { curr: 145000, prev: 128000 },
           { curr: 89000, prev: 112000 },
@@ -182,17 +181,26 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
 
   return (
     <div className="w-full relative select-none">
-      {/* Outer Strip Container */}
+      {/* Outer Strip Container: Pure White in Light Mode, Pure Black in Dark Mode */}
       <div 
-        className="w-full rounded-2xl border border-blue-950/20 dark:border-blue-900/40 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-slate-100 shadow-md overflow-hidden flex items-center h-11 px-1 relative group"
+        className="w-full rounded-2xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-black text-slate-900 dark:text-white shadow-sm dark:shadow-md overflow-hidden flex items-center h-11 px-1 relative group transition-colors duration-300"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
+        {/* Left Live Indicator Badge */}
+        <div className="z-10 bg-slate-50 dark:bg-neutral-950 border-r border-slate-200 dark:border-neutral-800 px-3 py-1 h-full shrink-0 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-neutral-200">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 dark:bg-blue-400"></span>
+          </span>
+          <Activity size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="hidden sm:inline">Live Spending Feed</span>
+        </div>
 
-        {/* Marquee Ticker Track flowing smoothly */}
+        {/* Marquee Ticker Track flowing smoothly and slower */}
         <div className="flex-1 overflow-hidden h-full flex items-center relative">
           <motion.div
-            className="flex items-center gap-4 whitespace-nowrap"
+            className="flex items-center gap-5 whitespace-nowrap"
             animate={{
               x: isPaused ? undefined : ["0%", "-50%"],
             }}
@@ -200,7 +208,7 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
               x: {
                 repeat: Infinity,
                 repeatType: "loop",
-                duration: 90,
+                duration: 180, // Slower, smooth and relaxed scrolling speed
                 ease: "linear",
               },
             }}
@@ -214,16 +222,16 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
                 <div
                   key={`${item.id}-${index}`}
                   onClick={() => setSelectedMinistry(item)}
-                  className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-white/10 dark:hover:bg-slate-800/80 transition-all cursor-pointer group/item border border-transparent hover:border-blue-400/40 shrink-0"
+                  className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-neutral-900 transition-all cursor-pointer group/item border border-transparent hover:border-slate-300 dark:hover:border-neutral-800 shrink-0"
                 >
                   {/* Ministry Name */}
-                  <span className="font-bold text-xs text-white tracking-tight flex items-center gap-1.5">
-                    <Building2 size={12} className="text-blue-300 opacity-80" />
+                  <span className="font-bold text-xs text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
+                    <Building2 size={12} className="text-blue-600 dark:text-blue-400 opacity-90" />
                     <span>{item.name}</span>
                   </span>
 
                   {/* 2-Week Spent Value */}
-                  <span className="font-mono text-xs font-semibold text-slate-200">
+                  <span className="font-mono text-xs font-semibold text-slate-700 dark:text-neutral-300">
                     {formatCurrency(item.current2wSpend)}
                   </span>
 
@@ -231,9 +239,9 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
                   <span
                     className={cn(
                       "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold tracking-tight shadow-2xs",
-                      isIncrease && "bg-rose-950/90 text-rose-300 border border-rose-700/60",
-                      isDecrease && "bg-emerald-950/90 text-emerald-300 border border-emerald-700/60",
-                      !isIncrease && !isDecrease && "bg-slate-800 text-slate-300 border border-slate-700"
+                      isIncrease && "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60",
+                      isDecrease && "bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60",
+                      !isIncrease && !isDecrease && "bg-slate-100 dark:bg-neutral-900 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-800"
                     )}
                     title={
                       isIncrease 
@@ -243,9 +251,9 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
                         : "Spending unchanged in last 14 days"
                     }
                   >
-                    {isIncrease && <ArrowUpRight size={11} className="text-rose-400" />}
-                    {isDecrease && <ArrowDownRight size={11} className="text-emerald-400" />}
-                    {!isIncrease && !isDecrease && <Minus size={11} className="text-slate-400" />}
+                    {isIncrease && <ArrowUpRight size={11} className="text-rose-600 dark:text-rose-400" />}
+                    {isDecrease && <ArrowDownRight size={11} className="text-emerald-600 dark:text-emerald-400" />}
+                    {!isIncrease && !isDecrease && <Minus size={11} className="text-slate-500 dark:text-neutral-400" />}
                     <span>{item.percentChange > 0 ? `+${item.percentChange}%` : `${item.percentChange}%`}</span>
                   </span>
                 </div>
@@ -255,8 +263,8 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
         </div>
 
         {/* Right Info Indicator */}
-        <div className="z-10 bg-slate-900/90 dark:bg-slate-950/95 border-l border-blue-800/40 px-3 py-1 h-full shrink-0 hidden md:flex items-center gap-2 text-[10px] text-slate-300 font-mono">
-          <Calendar size={12} className="text-blue-400" />
+        <div className="z-10 bg-slate-50 dark:bg-neutral-950 border-l border-slate-200 dark:border-neutral-800 px-3 py-1 h-full shrink-0 hidden md:flex items-center gap-2 text-[10px] text-slate-600 dark:text-neutral-400 font-mono">
+          <Calendar size={12} className="text-blue-500 dark:text-blue-400" />
           <span>Last 14 Days</span>
         </div>
       </div>

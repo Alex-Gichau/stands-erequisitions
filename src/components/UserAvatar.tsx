@@ -19,6 +19,7 @@ export interface UserAvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   rounded?: "full" | "xl" | "2xl" | "lg" | "md";
   alt?: string;
   imgClassName?: string;
+  backgroundColor?: string;
 }
 
 const SIZE_MAP = {
@@ -54,6 +55,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   className = "",
   imgClassName = "",
   title,
+  backgroundColor,
   ...props
 }) => {
   // Extract identifier and photo
@@ -108,10 +110,12 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           ringClass
         )}
         style={{
-          background: shouldRenderImage
+          background: backgroundColor
+            ? backgroundColor
+            : shouldRenderImage
             ? "transparent"
             : `linear-gradient(135deg, ${palette.from}, ${palette.to})`,
-          color: palette.text,
+          color: backgroundColor ? "#ffffff" : palette.text,
         }}
       >
         {shouldRenderImage ? (

@@ -27,8 +27,35 @@ import {
   ChevronRight,
   ArrowRight,
   Radio,
-  FileText
+  FileText,
+  BarChart3,
+  PieChart as PieChartIcon,
+  TrendingUp,
+  TrendingDown,
+  MousePointerClick,
+  Percent,
+  Award,
+  Activity,
+  Flame,
+  ArrowUpRight,
+  SlidersHorizontal,
+  Info
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { CampaignPromotion, CampaignCategory, CampaignAudienceType, UserRole } from "../types";
@@ -38,6 +65,7 @@ import {
   PRESET_CAMPAIGN_TEMPLATES, 
   getCategoryBadgeColor 
 } from "../lib/campaignEmailTemplate";
+import { CampaignAnalyticsDashboard } from "./CampaignAnalyticsDashboard";
 import { cn } from "../lib/utils";
 
 interface CampaignsPanelProps {
@@ -49,7 +77,7 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
 
   const [campaigns, setCampaigns] = useState<CampaignPromotion[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<"ALL" | "SCHEDULED" | "SENT" | "DRAFT">("SCHEDULED");
+  const [activeTab, setActiveTab] = useState<"ALL" | "SCHEDULED" | "SENT" | "ANALYTICS" | "DRAFT">("ALL");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Modal states
@@ -545,17 +573,21 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
           <p className="text-[11px] text-slate-500 mt-1">Registered member emails</p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div 
+          onClick={() => setActiveTab("ANALYTICS")}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm cursor-pointer hover:border-amber-500/50 transition-all group"
+          title="Click to view full engagement charts"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-wider">Portal Mailer</span>
-            <ShieldCheck size={16} className="text-indigo-500" />
+            <span className="text-[10px] font-black uppercase tracking-wider group-hover:text-amber-500 transition-colors">Avg. Open Rate</span>
+            <BarChart3 size={16} className="text-amber-500" />
           </div>
-          <div className="text-sm font-black text-slate-900 dark:text-white font-mono truncate">
-            ict.team@pceastandrews.org
+          <div className="text-2xl font-black text-slate-900 dark:text-white font-mono">
+            75.3%
           </div>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            SMTP Engine Active
+            <TrendingUp size={12} />
+            <span>30.4% CTR &bull; View Visualizations &rarr;</span>
           </p>
         </div>
       </div>
@@ -563,6 +595,18 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
       {/* Tabs & Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 w-full sm:w-auto">
+          <button
+            onClick={() => setActiveTab("ALL")}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+              activeTab === "ALL"
+                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+            )}
+          >
+            All ({campaigns.length})
+          </button>
+
           <button
             onClick={() => setActiveTab("SCHEDULED")}
             className={cn(
@@ -590,15 +634,16 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
           </button>
 
           <button
-            onClick={() => setActiveTab("ALL")}
+            onClick={() => setActiveTab("ANALYTICS")}
             className={cn(
-              "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
-              activeTab === "ALL"
+              "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2",
+              activeTab === "ANALYTICS"
                 ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
             )}
           >
-            All ({campaigns.length})
+            <BarChart3 size={14} className="text-amber-500" />
+            <span>Engagement Analytics</span>
           </button>
         </div>
 
@@ -614,8 +659,18 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
         </div>
       </div>
 
-      {/* Campaigns Grid / List */}
-      {filteredCampaigns.length === 0 ? (
+      {/* Content Rendering: Analytics Dashboard vs Campaigns Grid */}
+      {activeTab === "ANALYTICS" ? (
+        <CampaignAnalyticsDashboard
+          campaigns={campaigns}
+          onSelectCampaignForPreview={(camp) => setPreviewCampaign(camp)}
+          onCreateNewCampaign={() => {
+            applyPresetTemplate("harambee-2026");
+            setIsComposerOpen(true);
+            setComposerStep("EDIT");
+          }}
+        />
+      ) : filteredCampaigns.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center space-y-4 shadow-sm">
           <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-2xl flex items-center justify-center mx-auto">
             <Megaphone size={28} />

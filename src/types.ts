@@ -580,6 +580,11 @@ export interface CampaignPromotion {
     successful: string[];
     failed: { email: string; error: string }[];
     simulated?: boolean;
+    openedCount?: number;
+    clickedCount?: number;
+    openRate?: number;
+    clickRate?: number;
+    unopenedCount?: number;
   };
 }
 

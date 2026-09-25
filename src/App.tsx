@@ -3359,18 +3359,21 @@ function AppContent() {
             <div id="profile-dropdown-trigger" className="relative h-10 flex items-center" ref={profileRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-3 pl-4 pr-1 py-1 bg-slate-900 dark:bg-slate-900/90 rounded-full transition-all cursor-pointer group border border-slate-800 hover:border-primary/50 shadow-lg"
+                className="flex items-center gap-3 pl-4 pr-1 py-1 bg-slate-100 hover:bg-slate-200/90 dark:bg-slate-900 dark:hover:bg-slate-850 rounded-full transition-all cursor-pointer group border border-slate-200 dark:border-slate-800 hover:border-primary/50 shadow-xs dark:shadow-lg"
               >
                 <div className="flex flex-col items-end hidden sm:flex">
-                  <span className="text-[10px] font-black text-white uppercase tracking-tight">{(currentUser?.name || "User").split(' ')[0]}</span>
-                  <span className="text-[8px] text-primary font-bold uppercase tracking-widest leading-tight">{(currentUser?.role || "USER").split('_')[0]}</span>
+                  <span className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-tight">{(currentUser?.name || "User").split(' ')[0]}</span>
+                  <span className="text-[8px] text-primary dark:text-primary font-bold uppercase tracking-widest leading-tight">{(currentUser?.role || "USER").split('_')[0]}</span>
                 </div>
-                <UserAvatar 
-                  user={currentUser} 
-                  size="sm" 
-                  ring="ring-1 ring-white/20 shadow-xs" 
-                  className="group-hover:scale-110 transition-transform" 
-                />
+                <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-slate-300 dark:ring-white/20">
+                  <UserAvatar 
+                    user={currentUser} 
+                    size="sm" 
+                    backgroundColor="#000000"
+                    ring={false}
+                    className="group-hover:scale-110 transition-transform bg-black text-white" 
+                  />
+                </div>
               </button>
 
               <AnimatePresence>
@@ -3379,11 +3382,11 @@ function AppContent() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden z-[60]"
+                    className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden z-[60]"
                   >
-                    <div className="p-4 border-b border-slate-50">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-800">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">User Information</p>
-                      <p className="text-xs font-bold text-slate-900 truncate">{currentUser.email}</p>
+                      <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.email}</p>
                     </div>
                     <div className="p-2">
                       <button
@@ -3405,7 +3408,7 @@ function AppContent() {
                           setPasswordError("");
                           setPasswordSuccess("");
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                       >
                         <KeyRound size={14} className="text-slate-400" />
                         UPDATE PASSWORD
@@ -3415,17 +3418,17 @@ function AppContent() {
                           setCurrentView("help");
                           setIsProfileOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg transition-colors text-left cursor-pointer"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                       >
                         <HelpCircle size={14} className="text-slate-400" />
                         HOW TO USE
                       </button>
 
-                      <div className="h-[1px] bg-slate-50 my-1" />
+                      <div className="h-[1px] bg-slate-100 dark:bg-slate-800 my-1" />
 
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors text-left cursor-pointer"
                       >
                         <LogOut size={14} />
                         Logout

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useRequisitions, useActiveFiscalYear } from "../contexts/RequisitionContext";
 import { COMMITTED_REQUISITION_STATUSES, calculateProjectUtilization, getProjectRequisitions } from "../utils/budgetUtils";
@@ -160,6 +160,20 @@ const Dashboard: React.FC<{
   const [calCategory, setCalCategory] = useState<"MEETING" | "DEADLINE" | "AUDIT" | "EVENT" | "MAINTENANCE" | "OTHER">("MEETING");
   const [calBadge, setCalBadge] = useState("");
   const [calSaving, setCalSaving] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsCalendarModalOpen(false);
+        setIsSupplementaryModalOpen(false);
+        setSelectedGroupDetails(null);
+        setIsGeneratingReceipt(null);
+        setIsNewRequisitionModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const hasAuditTrail = useMemo(() => {
     return canAccess("auditTrail");
@@ -852,7 +866,7 @@ const Dashboard: React.FC<{
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-2">
         <div>
           <h1 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">System Dashboard</h1>
-          <p className="text-slate-500 text-[9px] md:text-sm">Welcome, {currentUser?.name} • <span className="font-mono text-[8px] md:text-[10px] uppercase tracking-widest">{currentUser?.role} Mode</span></p>
+          <p className="text-slate-500 text-[9px] md:text-sm">Welcome, {currentUser?.name} • <span className="font-mono text-[8px] md:text-[10px] uppercase tracking-widest">{currentUser?.role}</span></p>
         </div>
       </div>
 
@@ -876,12 +890,16 @@ const Dashboard: React.FC<{
         ))}
       </div>
 
+
       {/* Global Fiscal Overview */}
       <GlobalFiscalOverview 
         projects={projects}
         activeYear={fiscalSummary.activeYear}
         status={systemSettings?.fiscalYearStatus}
       />
+
+      {/* Section Divider */}
+      <div className="border-t border-slate-200/80 dark:border-slate-800/80" />
 
       {/* Role-Based Recent Comments & Reactions Feed (Social Tweet-Style Activity Cards) */}
       <RecentCommentsAndReactionsFeed onViewChange={onViewChange} />
@@ -933,9 +951,6 @@ const Dashboard: React.FC<{
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="bg-white/25 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10 backdrop-blur-sm">
-                    {activeMinistryView === "ALL" ? "AGGREGATED PORTFOLIO" : "SINGLE VIEW"}
-                  </span>
                   {totalRequisitionsForBanner > 0 && (
                     <span className="bg-white/20 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10 backdrop-blur-sm">
                       {totalRequisitionsForBanner} Linked Requisitions
@@ -970,8 +985,8 @@ const Dashboard: React.FC<{
                   />
                 </div>
                 <div className="flex justify-between text-[8px] md:text-xs font-mono opacity-80">
-                  <span>{formatCurrency(totalUsedForBanner)} spent / committed</span>
-                  <span>{formatCurrency(totalAllocatedForBanner)} total allocation</span>
+                  <span>{formatCurrency(totalUsedForBanner)} spent</span>
+                  <span>{formatCurrency(totalAllocatedForBanner)} total allocated</span>
                 </div>
               </div>
             </div>
@@ -982,89 +997,25 @@ const Dashboard: React.FC<{
       {/* Budget Circular Gauges for different Church Group categories */}
       <BudgetCircularGauges projects={projects} />
 
+      {/* Section Divider */}
+      <div className="border-t border-slate-200/80 dark:border-slate-800/80" />
+
       {/* Side-by-Side: Quick Action Panel & Calendar Widget */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        {/* Left Side: Quick Action Panel with New Requisition */}
-        <div className="lg:col-span-1 flex flex-col justify-between bg-white rounded-2xl border border-slate-200 shadow-sm p-5 md:p-6 space-y-6 relative overflow-hidden group">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                <Activity size={18} />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Requisitions Calendar</h2>
-                <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">Control & submission center</p>
-              </div>
-            </div>
-            
-            <p className="text-xs text-slate-500 leading-relaxed font-sans">
-              Check requisition submissions and monitor disbursement dates from one calendar. Create events and timelines for various church financial events. 
-            </p>
-
-            {/* Quick Tips or Guidelines */}
-            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3.5 space-y-2.5">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 font-mono block">What you can see :</span>
-              <ul className="space-y-2 text-[10px] text-slate-600 font-sans">
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>When requisitions were submitted and approved</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>When funds were disbursed</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-500 font-bold mt-0.5">✓</span>
-                  <span>Financial Reporting and events added by the Finance Team</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={() => setIsNewRequisitionModalOpen(true)}
-              className="w-full py-4 px-4 bg-gradient-to-r from-primary to-indigo-600 hover:from-primary/95 hover:to-indigo-550 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md hover:shadow-lg hover:shadow-indigo-100 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer group-hover:scale-[1.01]"
-            >
-              <Plus size={16} strokeWidth={3} />
-              <span>New Requisition</span>
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
 
         {/* Right Side: Requisition Submission Deadlines Calendar Widget */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 space-y-4 md:space-y-6">
+        <div className="lg:col-span-2 p-4 md:p-6 space-y-4 md:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-primary/15 rounded-xl text-primary">
                 <CalendarRange size={18} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Requisitions & Disbursements Calendar</h2>
-                <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">TRACKING REQUISITIONS PROGRESS BY DATE</p>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Track Your Requisitions & Disbursements</h2>
+                <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight mt-0.5">PROGRESS BY DATE</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
-              {canEditCalendar && (
-                <button
-                  onClick={() => {
-                    setEditingCalendarEvent(null);
-                    setCalTitle("");
-                    setCalDescription("");
-                    const monthStr = String(selectedDay.month + 1).padStart(2, '0');
-                    const dayStr = String(selectedDay.day).padStart(2, '0');
-                    setCalDate(`${selectedDay.year}-${monthStr}-${dayStr}`);
-                    setCalTime("09:00 AM");
-                    setCalCategory("MEETING");
-                    setCalBadge("Admin Event");
-                    setIsCalendarModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 bg-primary hover:bg-primary/95 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                >
-                  <Plus size={13} strokeWidth={2.5} />
-                  <span>Add Event</span>
-                </button>
-              )}
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/60 p-1 rounded-xl">
                 <button
                   onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1))}
@@ -1315,7 +1266,7 @@ const Dashboard: React.FC<{
                             onClick={() => handleOpenRequisitionPage(e.requisition)}
                             className="mt-1 flex items-center gap-1 text-[8px] text-primary hover:text-primary/80 font-black uppercase tracking-widest cursor-pointer self-start transition-all"
                           >
-                            <Eye size={10} /> Inspect Requisition
+                            <Eye size={10} /> Open Requisition
                           </button>
                         )}
                       </div>
@@ -1350,6 +1301,7 @@ const Dashboard: React.FC<{
         </div>
       </div>
 
+
       {/* Main Grid View */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Weekly Volume Chart */}
@@ -1360,7 +1312,7 @@ const Dashboard: React.FC<{
           <div className="px-4 md:px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-primary" />
-              <h2 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest text-center">Requisitions Velocity</h2>
+              <h2 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest text-center"> Requisitions Submissions</h2>
             </div>
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
               <button
@@ -1404,7 +1356,7 @@ const Dashboard: React.FC<{
           
           {/* Detailed Metric Toggle Layer */}
           <div className="px-4 md:px-6 py-2.5 border-b border-slate-100 bg-slate-50/30 flex flex-wrap gap-2 items-center justify-between">
-            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Overlay Parameters:</span>
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">Filter Graph:</span>
             <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
               <button
                 type="button"
@@ -1571,14 +1523,6 @@ const Dashboard: React.FC<{
                 <h2 className="text-[10px] md:text-xs font-bold text-slate-800 uppercase tracking-widest">Audit Trail</h2>
               </div>
               <div className="flex items-center gap-3">
-                <span className="hidden md:inline text-[8px] md:text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">LIVE</span>
-                <button 
-                  onClick={() => printSystemLogs(systemLogs, "System Audit Ledger", currentUser)}
-                  className="flex items-center gap-1.5 text-[8px] md:text-[10px] text-slate-500 font-black uppercase tracking-widest hover:text-primary transition-all group"
-                >
-                  <Printer size={12} className="group-hover:scale-110 transition-transform" />
-                  Print Logs
-                </button>
                 <button className="text-[8px] md:text-[10px] text-primary font-black uppercase tracking-widest hover:underline transition-all">
                   View All
                 </button>
@@ -1840,7 +1784,6 @@ const Dashboard: React.FC<{
         </div>
       </div>
 
-      {/* Budget Variance Summary Widget Removed */}
 
       {/* Transaction Summary Grid */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1896,9 +1839,6 @@ const Dashboard: React.FC<{
                         </div>
                         <div className="text-[10px] text-slate-400 font-mono">#{req.id.slice(-8).toUpperCase()}</div>
                       </div>
-                      <span className="text-[9px] text-indigo-600 bg-indigo-50 opacity-0 group-hover:opacity-100 px-2 py-0.5 rounded font-black tracking-widest uppercase transition-all">
-                        INSPECT
-                      </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -1938,12 +1878,16 @@ const Dashboard: React.FC<{
       {/* Ministry Group requests detailed list Modal */}
       <AnimatePresence>
         {selectedGroupDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div 
+            onClick={() => setSelectedGroupDetails(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
+          >
             <motion.div 
+              onClick={(e) => e.stopPropagation()}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-5xl h-full md:h-auto md:max-h-[85vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col"
+              className="bg-white rounded-none md:rounded-3xl w-full max-w-5xl h-full md:h-auto md:max-h-[85vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col cursor-default"
             >
               <div className="px-8 py-6 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2068,12 +2012,16 @@ const Dashboard: React.FC<{
         )}
 
         {isSupplementaryModalOpen && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center sm:p-4">
+          <div 
+            onClick={() => setIsSupplementaryModalOpen(false)}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center sm:p-4 cursor-pointer"
+          >
             <motion.div 
+              onClick={(e) => e.stopPropagation()}
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto shadow-2xl overflow-hidden border border-slate-200 flex flex-col"
+              className="bg-white rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto shadow-2xl overflow-hidden border border-slate-200 flex flex-col cursor-default"
             >
               <div className="px-6 py-4.5 border-b border-rose-100 bg-amber-50/50 flex items-center justify-between">
                 <div>
@@ -2237,12 +2185,16 @@ const Dashboard: React.FC<{
         )}
         {/* Admin/Super Admin Calendar Event Modal */}
         {isCalendarModalOpen && canEditCalendar && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            onClick={() => setIsCalendarModalOpen(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in cursor-pointer"
+          >
             <motion.div 
+              onClick={(e) => e.stopPropagation()}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 shadow-2xl overflow-hidden"
+              className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 shadow-2xl overflow-hidden cursor-default"
             >
               <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
                 <div className="flex items-center gap-3">

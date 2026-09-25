@@ -168,10 +168,6 @@ export const ApprovalsPanel: React.FC = () => {
             </button>
           )}
           <div className="px-3 py-1.5 md:px-4 md:py-2 bg-primary/5 border border-primary/10 rounded-xl flex items-center gap-2">
-            <ShieldCheck size={14} className="text-primary md:w-4 md:h-4" />
-            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-primary">
-              {currentUser?.role === UserRole.SUPER_ADMIN ? "SUDO OVERSEER" : currentUser?.role === UserRole.APPROVER_L2 ? "L2 KEYMASTER" : currentUser?.role === UserRole.ADMIN ? "GLOBAL ADMIN" : "L1 VERIFIER"}
-            </span>
           </div>
         </div>
       </div>

@@ -57,7 +57,7 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className={cn(
-        "bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden",
+        "p-4 md:p-6 relative overflow-hidden",
         className
       )}
     >

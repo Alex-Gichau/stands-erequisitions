@@ -263,22 +263,11 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
   return (
     <div 
       id="budget-circular-gauges-container"
-      className="bg-white border border-slate-200 rounded-[2rem] p-6 md:p-8 shadow-sm space-y-6"
+      className="p-4 md:p-6 space-y-6"
     >
       {/* Header Info Block */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="p-1 px-1.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 w-fit border border-indigo-100">
-              <PiggyBank size={12} />
-              Ministry Available Budget
-            </span>
-            {assignedGroupsList.length > 0 && (
-              <span className="bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-emerald-200">
-                {assignedGroupsList.length} Assigned {assignedGroupsList.length === 1 ? "Ministry" : "Ministries"}
-              </span>
-            )}
-          </div>
           <h3 className="text-sm md:text-base font-black text-slate-900 uppercase tracking-tight">
             Ministry Available Budget Safe-To-Spend
           </h3>

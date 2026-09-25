@@ -119,9 +119,19 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         setIsVendorDropdownOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsVendorDropdownOpen(false);
+        onClose();
+      }
+    };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   const filteredVendors = React.useMemo(() => {
     if (!vendors || vendors.length === 0) return [];
@@ -995,8 +1005,14 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       Boolean((targetReq as any).is_deleted))
   ) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5">
+      <div 
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
+      >
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5 cursor-default"
+        >
           <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-900/40">
             <Lock size={30} />
           </div>
@@ -1020,11 +1036,15 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div 
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
+    >
       <motion.div 
+        onClick={(e) => e.stopPropagation()}
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-3xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col"
+        className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-3xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col cursor-default"
       >
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">

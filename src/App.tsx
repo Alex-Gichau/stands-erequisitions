@@ -39,7 +39,6 @@ import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator"
 import { NotificationHub } from "./components/NotificationHub";
 import { WaitingRoom } from "./components/WaitingRoom";
 import { CampaignsPanel } from "./components/CampaignsPanel";
-import { ProfilePrompt } from "./components/ProfilePrompt";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { ProductTour } from "./components/ProductTour";
 import { FeedbackModal } from "./components/FeedbackModal";
@@ -1065,9 +1064,6 @@ function AppContent() {
     };
   }, [currentUser, currentView]);
 
-  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
-  const [hasPromptBeenShown, setHasPromptBeenShown] = useState(false);
-
   useEffect(() => {
     if (currentUser) {
       const hasSeen = localStorage.getItem("stands_has_seen_tour");
@@ -1079,20 +1075,6 @@ function AppContent() {
       }
     }
   }, [currentUser]);
-
-  useEffect(() => {
-    if (currentUser && (currentUser.isApproved || currentUser.role === UserRole.SUPER_ADMIN) && !currentUser.isSuspended) {
-      // Only show if preference is not NEVER and we haven't shown it this session
-      const isNever = currentUser.profilePromptPreference === "NEVER";
-      const sessionShown = sessionStorage.getItem(`profile_prompt_shown_${currentUser.id}`);
-
-      if (!isNever && !sessionShown && !hasPromptBeenShown) {
-        setShowProfilePrompt(true);
-        setHasPromptBeenShown(true);
-        sessionStorage.setItem(`profile_prompt_shown_${currentUser.id}`, "true");
-      }
-    }
-  }, [currentUser, hasPromptBeenShown]);
 
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -1169,9 +1151,13 @@ function AppContent() {
         setIsNotificationsOpen(false);
         setIsProfileOpen(false);
         setIsSearchFocused(false);
+        setAdvancedSearchActive(false);
+        setIsFyDropdownOpen(false);
         setSelectedRequisition(null);
         setIsGeneratingReceiptFromHub(null);
-        setShowProfilePrompt(false);
+        setShowUpdatePasswordModal(false);
+        setShowLogoutModal(false);
+        setShowFeedbackModal(false);
         searchInputRef.current?.blur();
       }
     };
@@ -1184,6 +1170,7 @@ function AppContent() {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchFocused(false);
+        setAdvancedSearchActive(false);
       }
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
@@ -2134,10 +2121,6 @@ function AppContent() {
       darkMode ? "dark bg-background text-foreground" : "bg-slate-50 text-slate-900"
     )}>
       <AnimatePresence>
-        {showProfilePrompt && currentUser && (
-          <ProfilePrompt user={currentUser} onComplete={() => setShowProfilePrompt(false)} />
-        )}
-
         {showUpdatePasswordModal && currentUser && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -2338,12 +2321,6 @@ function AppContent() {
           </motion.div>
         )}
 
-        {showProfilePrompt && currentUser && (
-          <Suspense fallback={null}>
-            <ProfilePrompt user={currentUser} onComplete={() => setShowProfilePrompt(false)} />
-          </Suspense>
-        )}
-
         {showFeedbackModal && currentUser && (
           <Suspense fallback={null}>
             <FeedbackModal currentUser={currentUser} onClose={() => setShowFeedbackModal(false)} />
@@ -2355,13 +2332,15 @@ function AppContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4"
+            onClick={() => setShowLogoutModal(false)}
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4 cursor-pointer"
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 10 }}
-              className="bg-card border border-border rounded-[2.5rem] max-w-sm md:max-w-md w-full p-8 md:p-10 space-y-6 shadow-2xl relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card border border-border rounded-[2.5rem] max-w-sm md:max-w-md w-full p-8 md:p-10 space-y-6 shadow-2xl relative overflow-hidden cursor-default"
             >
               {/* Top decoration strip */}
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 animate-pulse" />
@@ -2933,18 +2912,13 @@ function AppContent() {
                 onClick={() => handleToggleTheme()}
                 id="header-dark-mode-toggle"
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-full transition-all text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 cursor-pointer shadow-xs active:scale-95"
+                aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                className="flex items-center justify-center p-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 {darkMode ? (
-                  <>
-                    <Sun size={12} className="text-amber-500" />
-                    <span className="hidden sm:inline">Light Mode</span>
-                  </>
+                  <Sun size={15} className="text-slate-700 dark:text-slate-200 stroke-[1.75]" />
                 ) : (
-                  <>
-                    <Moon size={12} className="text-indigo-600 dark:text-indigo-400" />
-                    <span className="hidden sm:inline">Dark Mode</span>
-                  </>
+                  <Moon size={15} className="text-slate-700 dark:text-slate-200 stroke-[1.75]" />
                 )}
               </button>
             </div>
@@ -3397,7 +3371,7 @@ function AppContent() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                       >
                         <Settings size={14} className="text-primary" />
-                        SYSTEM SETTINGS
+                        COMPLETE YOUR PROFILE
                       </button>
                       <button
                         onClick={() => {

@@ -388,7 +388,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
   return (
     <div 
       id="recent-comments-reactions-feed-section"
-      className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 space-y-6 my-8 relative overflow-hidden shadow-xs border border-slate-100 dark:border-slate-800"
+      className="p-4 md:p-6 space-y-6 relative overflow-hidden"
     >
       {/* Decorative Accent Glow */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
@@ -396,17 +396,6 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
       {/* Section Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="p-1 px-2 bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-sky-200/80 dark:border-sky-800/80">
-              <Sparkles size={12} className="text-sky-500 animate-pulse" />
-              Requisitions Discussion
-            </span>
-
-            <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border border-indigo-200/80 dark:border-indigo-800/80">
-              {filteredComments.length} {filteredComments.length === 1 ? "Activity" : "Comments"}
-            </span>
-          </div>
-
           <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
             Recent Comments & Reactions
           </h3>

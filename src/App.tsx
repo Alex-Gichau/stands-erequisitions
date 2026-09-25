@@ -38,6 +38,7 @@ import { FileUploadProjectionCenter } from "./components/FileUploadProjectionCen
 import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator";
 import { NotificationHub } from "./components/NotificationHub";
 import { WaitingRoom } from "./components/WaitingRoom";
+import { CampaignsPanel } from "./components/CampaignsPanel";
 import { ProfilePrompt } from "./components/ProfilePrompt";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
 import { ProductTour } from "./components/ProductTour";
@@ -916,6 +917,7 @@ function AppContent() {
         setSyncTargets(['reports', 'requisitions']);
         break;
       case "users":
+      case "campaigns":
         setSyncTargets(['users', 'church_groups']);
         break;
       case "accessControl":
@@ -2105,7 +2107,8 @@ function AppContent() {
         case "vendors": return <VendorsPanel />;
         case "approvals": return <ApprovalsPanel />;
         case "settings": return <SettingsPanel />;
-        case "users": return <UsersPanel />;
+        case "users": return <UsersPanel onNavigateToCampaigns={() => setCurrentView("campaigns")} />;
+        case "campaigns": return <CampaignsPanel onNavigateToUsers={() => setCurrentView("users")} />;
         case "reports": return <ReportsPanel />;
         case "transactions": return <TransactionsPanel />;
         case "finance": return <FinanceLedgerPanel />;
@@ -2618,7 +2621,7 @@ function AppContent() {
         <header className="min-h-[5rem] py-3 bg-card border-b border-border flex items-center justify-between px-4 md:px-8 shrink-0 select-none transition-all">
           <div className="flex flex-col justify-center">
             <h1 className="text-xs md:text-lg font-bold text-foreground leading-tight truncate max-w-[150px] md:max-w-none">
-              {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+              {currentView === "campaigns" ? "Promotional Campaigns" : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
               {currentUser.groups && currentUser.groups.length > 0
                 ? `: ${currentUser.groups.join(", ")}`
                 : currentUser.group

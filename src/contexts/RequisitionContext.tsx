@@ -62,7 +62,7 @@ const firebaseConfig = {
 const firebaseApp = initFirebaseApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 
-const getAuthHeaders = async () => {
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json"
   };
@@ -569,6 +569,7 @@ interface RequisitionContextType {
   systemLogLimit: number;
   setSystemLogLimit: (limit: number) => void;
   sendBulkEmail: (subject: string, content: string, recipients?: string[]) => Promise<{ success: boolean; total: number; successful: string[]; failed: any[]; simulated?: boolean; message?: string }>;
+  getAuthHeaders: () => Promise<Record<string, string>>;
   customCalendarEvents: CustomCalendarEvent[];
   addCustomCalendarEvent: (event: Omit<CustomCalendarEvent, "id" | "createdAt" | "createdBy">) => Promise<void>;
   updateCustomCalendarEvent: (id: string, updates: Partial<CustomCalendarEvent>) => Promise<void>;
@@ -945,6 +946,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (viewId === "finance") {
       return [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2, UserRole.FINANCE, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);
     }
+
+    if (viewId === "campaigns") {
+      return [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);
+    }
     
     if (viewId === "vendors") {
       const viewLevel = systemSettings.vendorListViewLevel || "ALL_USERS";
@@ -970,7 +975,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
       [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
       [UserRole.FINANCE]: ["dashboard", "requisitions", "finance", "reports", "notifications", "settings", "auditTrail", "transactions", "vendors"],
-      [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
+      [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "campaigns", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
     };
     return defaults[currentUser.role]?.includes(viewId) ?? false;
   }, [currentUser, permissionConfigs, systemSettings]);
@@ -4885,6 +4890,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setSyncTargets,
       syncingTargets,
       sendBulkEmail,
+      getAuthHeaders,
       customCalendarEvents,
       addCustomCalendarEvent,
       updateCustomCalendarEvent,

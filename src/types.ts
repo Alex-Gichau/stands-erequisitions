@@ -532,5 +532,57 @@ export interface BackgroundUploadTask {
   startedAt: string;
 }
 
+export type CampaignCategory = 
+  | "FUNDRAISING" 
+  | "SPECIAL_SERVICE" 
+  | "EVENT" 
+  | "YOUTH" 
+  | "STEWARDSHIP" 
+  | "FELLOWSHIP" 
+  | "ANNOUNCEMENT";
+
+export type CampaignStatus = "DRAFT" | "SCHEDULED" | "SENDING" | "SENT" | "CANCELLED" | "FAILED";
+
+export type CampaignAudienceType = "ALL_MEMBERS" | "GROUPS" | "ROLES" | "CUSTOM";
+
+export interface CampaignPromotion {
+  id: string;
+  title: string;
+  category: CampaignCategory;
+  subject: string;
+  preheader?: string;
+  badgeText?: string;
+  headline: string;
+  bodyContent: string;
+  bannerImageUrl?: string;
+  bannerImageAlt?: string;
+  eventDate?: string;
+  eventTime?: string;
+  eventVenue?: string;
+  targetAmount?: number;
+  scriptureVerse?: string;
+  scriptureReference?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  targetAudience: CampaignAudienceType;
+  targetGroups?: string[];
+  targetRoles?: UserRole[];
+  customRecipients?: string[];
+  status: CampaignStatus;
+  scheduledFor?: string | null;
+  sentAt?: string | null;
+  createdBy: string;
+  creatorName: string;
+  createdAt: string;
+  updatedAt: string;
+  stats?: {
+    totalRecipients: number;
+    successful: string[];
+    failed: { email: string; error: string }[];
+    simulated?: boolean;
+  };
+}
+
+
 
 

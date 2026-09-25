@@ -17,7 +17,8 @@ import {
   Store,
   MoreHorizontal,
   Activity,
-  Images
+  Images,
+  Megaphone
 } from "lucide-react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { UserRole } from "../types";
@@ -120,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "finance", label: "Budgets", icon: Banknote },
     { id: "reports", label: "Financial Reports", icon: BarChart3 },
     { id: "users", label: "Users", icon: UserCircle },
+    { id: "campaigns", label: "Campaign Emails", icon: Megaphone },
     { id: "auditTrail", label: "Audit Trail", icon: ShieldAlert, desktopOnly: true },
     { id: "accessControl", label: "Permissions", icon: ShieldCheck, desktopOnly: true },
     { id: "settings", label: "Settings", icon: Settings, desktopOnly: true },

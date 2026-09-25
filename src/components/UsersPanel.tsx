@@ -47,13 +47,18 @@ import {
   Table as TableIcon,
   LayoutGrid,
   ExternalLink,
-  TrendingUp
+  TrendingUp,
+  Megaphone
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
 import { ChurchGroupDetailsModal } from "./ChurchGroupDetailsModal";
 
-export const UsersPanel: React.FC = () => {
+export interface UsersPanelProps {
+  onNavigateToCampaigns?: () => void;
+}
+
+export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns }) => {
   const { 
     users, 
     requisitions,
@@ -1638,6 +1643,17 @@ export const UsersPanel: React.FC = () => {
                   Compose and dispatch system-wide newsletters, announcements, and bulletins. All outgoing traffic is routed through <strong className="font-semibold text-slate-700 dark:text-slate-350">ict.team@pceastandrews.org</strong> under the sender alias <strong className="font-semibold text-slate-700 dark:text-slate-350">"STANDS Finance"</strong>.
                 </p>
               </div>
+
+              {onNavigateToCampaigns && (
+                <button
+                  type="button"
+                  onClick={onNavigateToCampaigns}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl flex items-center gap-2 shadow-md shadow-amber-500/20 transition-all hover:scale-105 cursor-pointer shrink-0"
+                >
+                  <Megaphone size={15} />
+                  <span>Promotional Campaigns Studio &rarr;</span>
+                </button>
+              )}
             </div>
           </div>
 

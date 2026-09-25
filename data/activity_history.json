@@ -56,5 +56,11 @@
       "subject": "STANDS System Email Diagnostic Test",
       "status": "DELIVERED"
     }
+  },
+  {
+    "action": "CAMPAIGN_SCHEDULED",
+    "details": "Campaign 'Easter Praise Festival & Fellowship' scheduled for broadcast on 20/10/2026, 08:00:00.",
+    "performedBy": "admin@system.local",
+    "timestamp": "2026-09-25T01:41:07.794Z"
   }
 ]

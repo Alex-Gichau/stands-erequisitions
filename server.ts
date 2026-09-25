@@ -51,7 +51,8 @@ const fileMappings: { [key: string]: string } = {
   "supplementary_budgets": "supplementary_budgets.json",
   "user_reaction_histories": "user_reaction_histories.json",
   "user_reaction_history": "user_reaction_histories.json",
-  "notification_states": "notification_states.json"
+  "notification_states": "notification_states.json",
+  "campaign_promotions": "campaign_promotions.json"
 };
 
 // Helper function to resolve paths from environment variables relative to process.cwd() or absolute path
@@ -1840,6 +1841,7 @@ Your response MUST adhere strictly to the JSON schema specified.
   app.use("/api/send-summary-email", authMiddleware);
   app.use("/api/send-unapproved-summary-email", authMiddleware);
   app.use("/api/send-bulk-email", authMiddleware);
+  app.use("/api/campaigns", authMiddleware);
   app.use("/api/slack", authMiddleware);
   app.use("/api/attachments/upload", authMiddleware);
 
@@ -1848,7 +1850,7 @@ Your response MUST adhere strictly to the JSON schema specified.
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
     "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
-    "user_reaction_histories", "notification_states"
+    "user_reaction_histories", "notification_states", "campaign_promotions"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -3493,6 +3495,664 @@ Your response MUST adhere strictly to the JSON schema specified.
       res.status(500).json({ error: "Failed to process bulk emails: " + err.message });
     }
   });
+
+  // --- PROMOTIONAL CAMPAIGN EMAIL SYSTEM (SCHEDULED & IMMEDIATE BROADCASTS) ---
+
+  function generateCampaignEmailHtmlServer(campaign: any, recipientEmail: string = "member@pceastandrews.org", recipientName: string = "Church Member"): string {
+    const category = campaign.category || "ANNOUNCEMENT";
+    const badgeLabel = campaign.badgeText || category.replace(/_/g, " ");
+    const headline = campaign.headline || campaign.title || "Special Church Announcement";
+    const subject = campaign.subject || "PCEA St. Andrew's Church Announcement";
+    const preheader = campaign.preheader || "Official campaign broadcast from PCEA St. Andrew's Church";
+    const creatorName = campaign.creatorName || "STANDS Church Administration";
+
+    // Category badge color mapping
+    let badgeBg = "#f1f5f9";
+    let badgeText = "#334155";
+    let badgeBorder = "#e2e8f0";
+    if (category === "FUNDRAISING") { badgeBg = "#fef3c7"; badgeText = "#b45309"; badgeBorder = "#fde68a"; }
+    else if (category === "SPECIAL_SERVICE") { badgeBg = "#ede9fe"; badgeText = "#6d28d9"; badgeBorder = "#ddd6fe"; }
+    else if (category === "EVENT") { badgeBg = "#e0f2fe"; badgeText = "#0369a1"; badgeBorder = "#bae6fd"; }
+    else if (category === "YOUTH") { badgeBg = "#ccfbf1"; badgeText = "#0f766e"; badgeBorder = "#99f6e4"; }
+    else if (category === "STEWARDSHIP") { badgeBg = "#d1fae5"; badgeText = "#047857"; badgeBorder = "#a7f3d0"; }
+    else if (category === "FELLOWSHIP") { badgeBg = "#fce7f3"; badgeText = "#be185d"; badgeBorder = "#fbcfe8"; }
+
+    // Normalize banner URL for remote email clients
+    let bannerSrc = campaign.bannerImageUrl || "";
+    if (bannerSrc && bannerSrc.startsWith("/") && !bannerSrc.startsWith("//")) {
+      bannerSrc = `https://accounts.pceastandrews.org${bannerSrc}`;
+    }
+
+    // Format body text with paragraphs
+    const rawBody = campaign.bodyContent || "";
+    const formattedParagraphs = rawBody
+      .split(/\n\n+/)
+      .map((p: string) => {
+        const trimmed = p.trim();
+        if (!trimmed) return "";
+        return `<p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.65; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${trimmed.replace(/\n/g, '<br />')}</p>`;
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    let bannerHtml = "";
+    if (bannerSrc) {
+      bannerHtml = `
+        <tr>
+          <td style="padding: 0; background-color: #0f172a; text-align: center; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px;">
+            <img 
+              src="${bannerSrc}" 
+              alt="${campaign.bannerImageAlt || headline}" 
+              style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto; border: 0; outline: none; object-fit: cover;" 
+            />
+          </td>
+        </tr>
+      `;
+    }
+
+    let scriptureHtml = "";
+    if (campaign.scriptureVerse) {
+      scriptureHtml = `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #d97706; border-radius: 8px;">
+          <tr>
+            <td style="padding: 16px 20px;">
+              <p style="margin: 0; font-family: Georgia, Cambria, 'Times New Roman', Times, serif; font-style: italic; font-size: 15px; line-height: 1.6; color: #78350f;">
+                &ldquo;${campaign.scriptureVerse}&rdquo;
+              </p>
+              ${campaign.scriptureReference ? `
+                <p style="margin: 8px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.05em;">
+                  — ${campaign.scriptureReference}
+                </p>
+              ` : ""}
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    const hasDetails = Boolean(campaign.eventDate || campaign.eventVenue || campaign.targetAmount);
+    let detailsCardHtml = "";
+    if (hasDetails) {
+      detailsCardHtml = `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          <tr>
+            <td style="padding: 16px 20px; background-color: #1e3a8a; border-bottom: 2px solid #d97706;">
+              <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.15em;">
+                📌 CAMPAIGN &amp; EVENT PARTICULARS
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                ${campaign.eventDate ? `
+                  <tr>
+                    <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📅</td>
+                    <td style="padding-bottom: 12px;">
+                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Date &amp; Schedule</div>
+                      <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventDate} ${campaign.eventTime ? `&bull; ${campaign.eventTime}` : ""}</div>
+                    </td>
+                  </tr>
+                ` : ""}
+                ${campaign.eventVenue ? `
+                  <tr>
+                    <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📍</td>
+                    <td style="padding-bottom: 12px;">
+                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Location / Venue</div>
+                      <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventVenue}</div>
+                    </td>
+                  </tr>
+                ` : ""}
+                ${campaign.targetAmount ? `
+                  <tr>
+                    <td width="30" valign="top" style="font-size: 16px;">🎯</td>
+                    <td>
+                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Target Budget / Goal</div>
+                      <div style="font-size: 16px; font-weight: 800; color: #d97706; font-family: sans-serif;">KES ${Number(campaign.targetAmount).toLocaleString()}</div>
+                    </td>
+                  </tr>
+                ` : ""}
+              </table>
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    let ctaHtml = "";
+    if (campaign.ctaText) {
+      const ctaUrl = campaign.ctaUrl || "https://pceastandrews.org";
+      ctaHtml = `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 30px 0 20px 0;">
+          <tr>
+            <td align="center">
+              <a 
+                href="${ctaUrl}" 
+                target="_blank" 
+                style="display: inline-block; background-color: #1e3a8a; background-image: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); border: 1px solid #1e3a8a;"
+              >
+                ${campaign.ctaText} &rarr;
+              </a>
+            </td>
+          </tr>
+        </table>
+      `;
+    }
+
+    return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+    ${preheader}
+  </div>
+
+  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; padding: 24px 10px;">
+    <tr>
+      <td align="center">
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06); overflow: hidden;">
+          
+          <!-- Top Header Strip: PCEA St. Andrew's Branding -->
+          <tr>
+            <td style="background-color: #0f172a; padding: 16px 24px; border-bottom: 2px solid #fbbf24;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td width="36" valign="middle">
+                    <img src="https://accounts.pceastandrews.org/pcea.svg" alt="PCEA St Andrew's" width="32" height="32" style="display: block; border-radius: 6px;" />
+                  </td>
+                  <td valign="middle" style="padding-left: 12px;">
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 900; color: #ffffff; letter-spacing: 0.1em; text-transform: uppercase;">
+                      PCEA St. Andrew's Church
+                    </div>
+                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #fbbf24; letter-spacing: 0.15em; text-transform: uppercase;">
+                      E-Requisitions Portal &bull; Official Broadcast
+                    </div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <span style="display: inline-block; background-color: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 4px 10px; font-family: monospace; font-size: 10px; font-weight: 700; color: #fbbf24;">
+                      PROMOTION
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          ${bannerHtml}
+
+          <!-- Main Content Area -->
+          <tr>
+            <td style="padding: 32px 32px 24px 32px; background-color: #ffffff;">
+              <div style="margin-bottom: 14px;">
+                <span style="display: inline-block; background-color: ${badgeBg}; color: ${badgeText}; border: 1px solid ${badgeBorder}; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  ${badgeLabel}
+                </span>
+              </div>
+
+              <h1 style="margin: 0 0 18px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; color: #0f172a; line-height: 1.3; letter-spacing: -0.02em;">
+                ${headline}
+              </h1>
+
+              ${scriptureHtml}
+
+              <div style="margin-top: 16px;">
+                ${formattedParagraphs}
+              </div>
+
+              ${detailsCardHtml}
+
+              ${ctaHtml}
+
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;" />
+
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="font-size: 12px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5;">
+                    Dispatched on behalf of: <strong style="color: #0f172a;">${creatorName}</strong><br />
+                    Recipient Address: <code style="font-family: monospace; font-size: 11px; color: #1e3a8a;">${recipientEmail}</code>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Official Church Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 32px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.1em;">
+                Presbyterian Church of East Africa &bull; St. Andrew's Parish
+              </p>
+              <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #64748b; line-height: 1.5;">
+                State House Road / Nyerere Road, P.O. Box 41282 - 00100 Nairobi, Kenya<br />
+                Telephone: +254 20 2723040 / +254 722 208556 &bull; Email: ict.team@pceastandrews.org
+              </p>
+              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #94a3b8;">
+                &copy; ${new Date().getFullYear()} PCEA St. Andrew's Church. All rights reserved. &bull; STANDS eRequisitions System
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin-top: 14px;">
+          <tr>
+            <td align="center" style="font-size: 11px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4;">
+              This notification is an official church communication. If you received this email in error, please notify our ICT secretariat.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  async function resolveCampaignRecipients(campaign: any): Promise<string[]> {
+    let resolved: string[] = [];
+
+    if (campaign.targetAudience === "CUSTOM" && Array.isArray(campaign.customRecipients) && campaign.customRecipients.length > 0) {
+      resolved = campaign.customRecipients.filter((e: string) => e && typeof e === 'string' && e.includes('@'));
+      return Array.from(new Set(resolved.map(e => e.toLowerCase().trim())));
+    }
+
+    let usersList: any[] = [];
+    try {
+      if (mongoose.connection.readyState === 1) {
+        usersList = await (models.User as any).find({}).lean();
+      } else {
+        usersList = readJsonCollection("users");
+      }
+    } catch (e: any) {
+      console.error("Error reading users list for campaign dispatch:", e);
+      usersList = readJsonCollection("users");
+    }
+
+    if (campaign.targetAudience === "GROUPS" && Array.isArray(campaign.targetGroups) && campaign.targetGroups.length > 0) {
+      const selectedGroupsLower = campaign.targetGroups.map((g: string) => g.toLowerCase().trim());
+      usersList = usersList.filter((u: any) => {
+        const primaryGroup = String(u.group || "").toLowerCase().trim();
+        let otherGroups: string[] = [];
+        if (typeof u.groups === "string") {
+          try { otherGroups = JSON.parse(u.groups); } catch (err) { otherGroups = [u.groups]; }
+        } else if (Array.isArray(u.groups)) {
+          otherGroups = u.groups;
+        }
+        const matchesPrimary = primaryGroup && selectedGroupsLower.includes(primaryGroup);
+        const matchesOther = otherGroups.some(g => selectedGroupsLower.includes(String(g).toLowerCase().trim()));
+        return matchesPrimary || matchesOther;
+      });
+    } else if (campaign.targetAudience === "ROLES" && Array.isArray(campaign.targetRoles) && campaign.targetRoles.length > 0) {
+      const selectedRoles = campaign.targetRoles.map((r: string) => String(r).toUpperCase());
+      usersList = usersList.filter((u: any) => selectedRoles.includes(String(u.role || "").toUpperCase()));
+    }
+
+    resolved = usersList
+      .map((u: any) => u.email || u.email_address)
+      .filter((email: any) => email && typeof email === "string" && email.includes('@'))
+      .map((email: string) => email.toLowerCase().trim());
+
+    return Array.from(new Set(resolved));
+  }
+
+  async function dispatchCampaignPromotion(campaign: any, initiatorUser: any): Promise<{ total: number; successful: string[]; failed: any[]; simulated?: boolean }> {
+    const resolvedRecipients = await resolveCampaignRecipients(campaign);
+    const fromEmail = process.env.SMTP_USER || "ict.team@pceastandrews.org";
+    const fromName = "PCEA St. Andrew's Church";
+
+    if (resolvedRecipients.length === 0) {
+      console.warn(`[Campaign Dispatcher] No valid recipients found for campaign: ${campaign.title}`);
+      return { total: 0, successful: [], failed: [{ email: "none", error: "No valid recipient email addresses found." }] };
+    }
+
+    const successful: string[] = [];
+    const failed: { email: string; error: string }[] = [];
+    const isSimulated = !process.env.SMTP_PASS;
+
+    if (isSimulated) {
+      console.warn(`[Campaign Mailer] SMTP_PASS not set. Campaign "${campaign.title}" dispatch simulated for ${resolvedRecipients.length} recipients.`);
+      successful.push(...resolvedRecipients);
+
+      persistActivity({
+        action: "CAMPAIGN_EMAIL_SIMULATED",
+        details: `Simulated Campaign Broadcast '${campaign.title}' (${campaign.category}) to ${resolvedRecipients.length} members (SMTP not configured).`,
+        performedBy: initiatorUser?.name || initiatorUser?.email || "SYSTEM_CAMPAIGN_SCHEDULER",
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      for (const recipient of resolvedRecipients) {
+        try {
+          const emailHtml = generateCampaignEmailHtmlServer(campaign, recipient);
+          await transporter.sendMail({
+            from: `"${fromName}" <${fromEmail}>`,
+            to: recipient,
+            subject: campaign.subject || campaign.title,
+            html: emailHtml
+          });
+          successful.push(recipient);
+        } catch (mailErr: any) {
+          console.error(`[Campaign Mailer] Failed sending to ${recipient}:`, mailErr);
+          failed.push({ email: recipient, error: mailErr?.message || "Unknown mail error" });
+        }
+      }
+
+      persistActivity({
+        action: "CAMPAIGN_EMAIL_DISPATCH",
+        details: `Promotional Campaign '${campaign.title}' dispatched. Successful: ${successful.length}/${resolvedRecipients.length}, Failed: ${failed.length}`,
+        performedBy: initiatorUser?.name || initiatorUser?.email || "SYSTEM_CAMPAIGN_SCHEDULER",
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Update campaign record in storage
+    const allCampaigns = readJsonCollection("campaign_promotions");
+    const idx = allCampaigns.findIndex((c: any) => c.id === campaign.id);
+    const nowIso = new Date().toISOString();
+    const updatedRecord = {
+      ...campaign,
+      status: successful.length > 0 ? "SENT" : (isSimulated ? "SENT" : "FAILED"),
+      sentAt: nowIso,
+      updatedAt: nowIso,
+      stats: {
+        totalRecipients: resolvedRecipients.length,
+        successful,
+        failed,
+        simulated: isSimulated
+      }
+    };
+
+    if (idx >= 0) {
+      allCampaigns[idx] = updatedRecord;
+    } else {
+      allCampaigns.push(updatedRecord);
+    }
+    writeJsonCollection("campaign_promotions", allCampaigns);
+
+    return {
+      total: resolvedRecipients.length,
+      successful,
+      failed,
+      simulated: isSimulated
+    };
+  }
+
+  // GET /api/campaigns - List all promotional campaigns
+  app.get("/api/campaigns", async (req: any, res: any) => {
+    try {
+      const campaigns = readJsonCollection("campaign_promotions");
+      // Sort newest first
+      campaigns.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      res.json({ success: true, campaigns });
+    } catch (err: any) {
+      console.error("Error fetching campaigns:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to fetch campaigns" });
+    }
+  });
+
+  // POST /api/campaigns/preview-html - Generate standalone HTML preview
+  app.post("/api/campaigns/preview-html", async (req: any, res: any) => {
+    try {
+      const campaign = req.body;
+      const html = generateCampaignEmailHtmlServer(campaign, req.user?.email || "member@pceastandrews.org", req.dbUser?.name || "Church Member");
+      res.type("text/html").send(html);
+    } catch (err: any) {
+      res.status(500).send("Error rendering campaign preview: " + err.message);
+    }
+  });
+
+  // POST /api/campaigns - Create a new campaign (immediate or scheduled)
+  app.post("/api/campaigns", async (req: any, res: any) => {
+    try {
+      if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
+        return res.status(403).json({ error: "Access Denied: Only Administrators can create and broadcast email campaigns." });
+      }
+
+      const {
+        title,
+        category,
+        subject,
+        preheader,
+        badgeText,
+        headline,
+        bodyContent,
+        bannerImageUrl,
+        bannerImageAlt,
+        eventDate,
+        eventTime,
+        eventVenue,
+        targetAmount,
+        scriptureVerse,
+        scriptureReference,
+        ctaText,
+        ctaUrl,
+        targetAudience = "ALL_MEMBERS",
+        targetGroups = [],
+        targetRoles = [],
+        customRecipients = [],
+        scheduledFor,
+        isDraft = false
+      } = req.body;
+
+      if (!title || !headline || !bodyContent) {
+        return res.status(400).json({ error: "Campaign title, headline, and body content are required." });
+      }
+
+      const campaignId = `camp_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      const nowIso = new Date().toISOString();
+      const creatorName = req.dbUser?.name || req.user?.email || "Administrator";
+
+      // Check if scheduled for the future
+      let initialStatus = "DRAFT";
+      const isScheduledFuture = scheduledFor && new Date(scheduledFor).getTime() > Date.now();
+
+      if (isDraft) {
+        initialStatus = "DRAFT";
+      } else if (isScheduledFuture) {
+        initialStatus = "SCHEDULED";
+      } else {
+        initialStatus = "SENDING";
+      }
+
+      const newCampaign: any = {
+        id: campaignId,
+        title: title.trim(),
+        category: category || "ANNOUNCEMENT",
+        subject: subject?.trim() || title.trim(),
+        preheader: preheader?.trim() || "",
+        badgeText: badgeText?.trim() || "",
+        headline: headline.trim(),
+        bodyContent: bodyContent.trim(),
+        bannerImageUrl: bannerImageUrl?.trim() || "",
+        bannerImageAlt: bannerImageAlt?.trim() || title.trim(),
+        eventDate: eventDate?.trim() || "",
+        eventTime: eventTime?.trim() || "",
+        eventVenue: eventVenue?.trim() || "",
+        targetAmount: targetAmount ? Number(targetAmount) : undefined,
+        scriptureVerse: scriptureVerse?.trim() || "",
+        scriptureReference: scriptureReference?.trim() || "",
+        ctaText: ctaText?.trim() || "",
+        ctaUrl: ctaUrl?.trim() || "",
+        targetAudience,
+        targetGroups,
+        targetRoles,
+        customRecipients,
+        status: initialStatus,
+        scheduledFor: isScheduledFuture ? new Date(scheduledFor).toISOString() : null,
+        sentAt: null,
+        createdBy: req.user?.uid || "admin",
+        creatorName,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        stats: {
+          totalRecipients: 0,
+          successful: [],
+          failed: []
+        }
+      };
+
+      const campaigns = readJsonCollection("campaign_promotions");
+      campaigns.push(newCampaign);
+      writeJsonCollection("campaign_promotions", campaigns);
+
+      if (initialStatus === "SENDING") {
+        // Immediate dispatch
+        const dispatchResult = await dispatchCampaignPromotion(newCampaign, req.dbUser || req.user);
+        return res.json({
+          success: true,
+          campaign: {
+            ...newCampaign,
+            status: dispatchResult.successful.length > 0 ? "SENT" : (dispatchResult.simulated ? "SENT" : "FAILED"),
+            sentAt: new Date().toISOString(),
+            stats: dispatchResult
+          },
+          dispatchedImmediately: true,
+          result: dispatchResult
+        });
+      }
+
+      persistActivity({
+        action: isScheduledFuture ? "CAMPAIGN_SCHEDULED" : "CAMPAIGN_DRAFT_CREATED",
+        details: isScheduledFuture 
+          ? `Campaign '${newCampaign.title}' scheduled for broadcast on ${new Date(scheduledFor).toLocaleString("en-GB")}.`
+          : `Campaign '${newCampaign.title}' saved as draft.`,
+        performedBy: creatorName,
+        timestamp: nowIso
+      });
+
+      return res.json({
+        success: true,
+        campaign: newCampaign,
+        scheduled: isScheduledFuture
+      });
+    } catch (err: any) {
+      console.error("Error creating campaign:", err);
+      res.status(500).json({ error: "Failed to create campaign: " + err.message });
+    }
+  });
+
+  // POST /api/campaigns/:id/send-now - Force immediate dispatch of any campaign
+  app.post("/api/campaigns/:id/send-now", async (req: any, res: any) => {
+    try {
+      if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
+        return res.status(403).json({ error: "Access Denied: Only Administrators can trigger campaign broadcasts." });
+      }
+
+      const campaigns = readJsonCollection("campaign_promotions");
+      const campaign = campaigns.find((c: any) => c.id === req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      campaign.status = "SENDING";
+      writeJsonCollection("campaign_promotions", campaigns);
+
+      const dispatchResult = await dispatchCampaignPromotion(campaign, req.dbUser || req.user);
+      res.json({
+        success: true,
+        campaign: {
+          ...campaign,
+          status: "SENT",
+          sentAt: new Date().toISOString(),
+          stats: dispatchResult
+        },
+        result: dispatchResult
+      });
+    } catch (err: any) {
+      console.error("Error sending campaign immediately:", err);
+      res.status(500).json({ error: "Failed to broadcast campaign: " + err.message });
+    }
+  });
+
+  // POST /api/campaigns/:id/cancel - Cancel a scheduled campaign
+  app.post("/api/campaigns/:id/cancel", async (req: any, res: any) => {
+    try {
+      if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
+        return res.status(403).json({ error: "Access Denied: Only Administrators can cancel scheduled campaigns." });
+      }
+
+      const campaigns = readJsonCollection("campaign_promotions");
+      const campaign = campaigns.find((c: any) => c.id === req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      campaign.status = "CANCELLED";
+      campaign.updatedAt = new Date().toISOString();
+      writeJsonCollection("campaign_promotions", campaigns);
+
+      persistActivity({
+        action: "CAMPAIGN_CANCELLED",
+        details: `Scheduled Campaign '${campaign.title}' was cancelled by Administrator.`,
+        performedBy: req.dbUser?.name || req.user?.email || "ADMIN",
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({ success: true, campaign });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to cancel campaign: " + err.message });
+    }
+  });
+
+  // DELETE /api/campaigns/:id - Delete a campaign
+  app.delete("/api/campaigns/:id", async (req: any, res: any) => {
+    try {
+      if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
+        return res.status(403).json({ error: "Access Denied: Only Administrators can delete campaigns." });
+      }
+
+      let campaigns = readJsonCollection("campaign_promotions");
+      const found = campaigns.find((c: any) => c.id === req.params.id);
+      campaigns = campaigns.filter((c: any) => c.id !== req.params.id);
+      writeJsonCollection("campaign_promotions", campaigns);
+
+      if (found) {
+        persistActivity({
+          action: "CAMPAIGN_DELETED",
+          details: `Campaign '${found.title}' was deleted from the portal.`,
+          performedBy: req.dbUser?.name || req.user?.email || "ADMIN",
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      res.json({ success: true, message: "Campaign deleted successfully" });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to delete campaign: " + err.message });
+    }
+  });
+
+  // Background Campaign Scheduler Worker
+  // Periodically polls every 20 seconds for scheduled campaigns that have reached their trigger time
+  setInterval(async () => {
+    try {
+      const campaigns = readJsonCollection("campaign_promotions");
+      const now = Date.now();
+      let changed = false;
+
+      for (const campaign of campaigns) {
+        if (campaign.status === "SCHEDULED" && campaign.scheduledFor) {
+          const scheduledTime = new Date(campaign.scheduledFor).getTime();
+          if (!isNaN(scheduledTime) && scheduledTime <= now) {
+            console.log(`[Campaign Scheduler] Dispatching due promotional campaign: "${campaign.title}" (${campaign.id})...`);
+            campaign.status = "SENDING";
+            changed = true;
+            writeJsonCollection("campaign_promotions", campaigns);
+
+            // Execute dispatch
+            await dispatchCampaignPromotion(campaign, {
+              name: campaign.creatorName || "AUTOMATED_SCHEDULER",
+              email: "scheduler@pceastandrews.org"
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error("[Campaign Scheduler Exception]:", err.message);
+    }
+  }, 20000);
 
   // API Route for Sending Summary Emails
   app.post("/api/send-summary-email", async (req, res) => {

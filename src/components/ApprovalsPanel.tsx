@@ -17,7 +17,6 @@ import {
   XCircle,
   X,
   FileText,
-  Flag,
   History,
   Layers,
   Split,
@@ -230,11 +229,6 @@ export const ApprovalsPanel: React.FC = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <h3 className="font-bold text-slate-900 text-[13px] md:text-base tracking-tight group-hover:text-primary transition-colors truncate">{req.title}</h3>
-                        {req.flaggedForAudit && (
-                          <span title="Flagged for Audit" className="inline-flex shrink-0">
-                            <Flag size={11} className="text-rose-500 fill-rose-500" />
-                          </span>
-                        )}
                         <span className="text-[7.5px] md:text-[9px] font-mono font-bold text-slate-400 uppercase tracking-tighter">#{req.id.slice(-6).toUpperCase()}</span>
                       </div>
                       <p className="text-[9px] md:text-[11px] text-slate-500 line-clamp-1 italic font-medium">"{req.description}"</p>

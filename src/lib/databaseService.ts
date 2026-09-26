@@ -238,7 +238,6 @@ export const databaseService = {
       disbursedAmount: req.disbursedAmount !== undefined ? req.disbursedAmount : 0,
       remaining_balance: req.remainingBalance !== undefined ? req.remainingBalance : (req.amount || 0),
       remainingBalance: req.remainingBalance !== undefined ? req.remainingBalance : (req.amount || 0),
-      flagged_for_audit: req.flaggedForAudit || false,
       in_procurement: req.inProcurement || false,
       requires_more_info: req.requiresMoreInfo || false,
       fiscal_year: req.fiscalYear || null,
@@ -254,7 +253,6 @@ export const databaseService = {
       payload.notificationEmails = updates.notificationEmails;
     }
     if (updates.requiresMoreInfo !== undefined) payload.requires_more_info = updates.requiresMoreInfo;
-    if (updates.flaggedForAudit !== undefined) payload.flagged_for_audit = updates.flaggedForAudit;
     if (updates.additionalInfo !== undefined) payload.additional_info = updates.additionalInfo;
     if (updates.enableInstallments !== undefined) {
       payload.enable_installments = updates.enableInstallments;

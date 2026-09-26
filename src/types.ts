@@ -187,7 +187,6 @@ export interface Requisition {
   installments?: RequisitionInstallment[];
   disbursedAmount?: number;
   remainingBalance?: number;
-  flaggedForAudit?: boolean;
   inProcurement?: boolean;
   requiresMoreInfo?: boolean;
   fiscalYear?: number;

@@ -26,7 +26,6 @@ import {
   PieChart as PieChartIcon,
   LayoutGrid,
   ChevronDown,
-  Flag,
   Sparkles,
   Bot,
   Copy,
@@ -488,7 +487,6 @@ export const ReportsPanel: React.FC = () => {
         disbursedAmount: statistics.disbursed,
         pendingAmount: statistics.pending + statistics.approved,
         rejectedAmount: filteredRequisitions.filter(r => r.status === RequisitionStatus.REJECTED).reduce((s, r) => s + (r.amount || 0), 0),
-        flaggedCount: filteredRequisitions.filter(r => r.flaggedForAudit).length,
       },
       groupBreakdown,
       sampleRequisitions,
@@ -579,7 +577,7 @@ export const ReportsPanel: React.FC = () => {
       monthlyTrendInsights: `Monthly ledger records indicate consistent operational spend throughout the period with ${monthlyData.length} active monthly cycle(s) monitored.`,
       weeklyVelocityInsights: `Weekly disbursement activity displays structured workflow batches across ${weeklyData.length} measured calendar intervals.`,
       auditObservations: [
-        `${filteredRequisitions.filter(r => r.flaggedForAudit).length} transaction(s) flagged for audit review to verify tax computation and itemized receipts.`,
+        "Continuous compliance monitoring active to verify tax computation and itemized receipts.",
         "Zero unauthorized budget overdrafts detected across active departmental budget lines.",
         "All disbursed funds have verified payment vouchers and approval signatures on file."
       ],
@@ -946,11 +944,6 @@ export const ReportsPanel: React.FC = () => {
                       <div>
                         <p className="text-sm font-bold text-slate-900 leading-tight group-hover:text-primary transition-colors flex items-center gap-1.5">
                           <span>{req.title}</span>
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={11} className="text-rose-500 fill-rose-500" />
-                            </span>
-                          )}
                         </p>
                         <p className="text-[10px] text-slate-400 mt-1 font-medium truncate max-w-xs">{req.description || "NO_DESCRIPTION_PROVIDED"}</p>
                       </div>

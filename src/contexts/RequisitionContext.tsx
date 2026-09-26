@@ -2319,7 +2319,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 notificationEmails: safeNormalizeNotificationEmails(r),
                 isSharedRequisition: Boolean(r?.is_shared_requisition || r?.isSharedRequisition),
                 sharedGroups: Array.isArray(r?.shared_groups) ? r.shared_groups : (Array.isArray(r?.sharedGroups) ? r.sharedGroups : []),
-                flaggedForAudit: Boolean(r?.flagged_for_audit || r?.flaggedForAudit),
                 inProcurement: Boolean(r?.in_procurement || r?.inProcurement),
                 requiresMoreInfo: Boolean(r?.requires_more_info || r?.requiresMoreInfo),
                 fiscalYear: Number(r?.fiscal_year || r?.fiscalYear) || undefined,
@@ -3588,7 +3587,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // Requisition & Budget Limit Evaluation
     const matchingProj = projects.find(p => p.id === reqData.projectId || p.groupId === reqData.groupId || p.name === reqData.groupName);
-    let isAuditFlagged = reqData.flaggedForAudit !== undefined ? reqData.flaggedForAudit : false;
 
     if (matchingProj) {
       // Explicit single-requisition ceiling check (if specifically configured on the project)
@@ -3610,7 +3608,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         const totalProjected = existingGroupCommitments + reqData.amount;
         if (totalProjected > allocatedBudget) {
-          isAuditFlagged = true;
           const deficit = totalProjected - allocatedBudget;
           const alertId = `budget-warning-${id}`;
           const newAlert: BudgetAlert = {
@@ -3636,7 +3633,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       expiresAt: expiresAt.toISOString(),
       escalationLevel: 0,
       approvalHistory: [],
-      flaggedForAudit: isAuditFlagged,
       fiscalYear: systemSettings.currentFiscalYear || 2026,
       attachments: safeNormalizeAttachments(reqData.attachments),
     };
@@ -4140,8 +4136,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       k === "notificationEmails" || 
       k === "notification_emails" || 
       k === "requiresMoreInfo" || 
-      k === "additionalInfo" || 
-      k === "flaggedForAudit"
+      k === "additionalInfo"
     );
 
     // Fast-path for comments and metadata updates (0ms UI lag, lightweight PATCH)
@@ -4153,7 +4148,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           const cleanedUpdates = {
             ...updates,
             updatedAt: new Date().toISOString(),
-            flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (currentReq.flaggedForAudit || false)
           };
           updatedReq = { ...currentReq, ...cleanedUpdates };
           return prev.map(r => r.id === id ? updatedReq! : r);
@@ -4194,7 +4188,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const cleanedUpdates = {
           ...updates,
           updatedAt: new Date().toISOString(),
-          flaggedForAudit: updates.flaggedForAudit !== undefined ? updates.flaggedForAudit : (targetReq.flaggedForAudit || false)
         };
         if (updates.attachments) {
           cleanedUpdates.attachments = safeNormalizeAttachments(updates.attachments);

@@ -9,7 +9,7 @@ import { useRequisitions, useActiveFiscalYear } from "../contexts/RequisitionCon
 import { COMMITTED_REQUISITION_STATUSES, calculateProjectUtilization, getProjectRequisitions } from "../utils/budgetUtils";
 import { RequisitionStatus, UserRole, Requisition } from "../types";
 import { formatCurrency, cn, getDaysSinceSubmission, formatRequisitionAge, isFinalStage } from "../lib/utils";
-import { AlertTriangle, TrendingUp, Layout, Activity, ClipboardList, CheckCircle, Wallet, Users, X, Eye, Repeat, Clock, ArrowUpRight, Search, Trash2, Printer, FileText, ShieldCheck, CalendarRange, Flag, HelpCircle, Moon, Sun, Plus, Calendar, ChevronLeft, ChevronRight, Bell } from "lucide-react";
+import { AlertTriangle, TrendingUp, Layout, Activity, ClipboardList, CheckCircle, Wallet, Users, X, Eye, Repeat, Clock, ArrowUpRight, Search, Trash2, Printer, FileText, ShieldCheck, CalendarRange, HelpCircle, Moon, Sun, Plus, Calendar, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ReceiptTemplateGenerator } from "./ReceiptTemplateGenerator";
 import { printSystemLogs } from "../utils/exportUtils";
@@ -1821,11 +1821,6 @@ const Dashboard: React.FC<{
                               {formatRequisitionAge(req.submittedAt, req.status, { compact: true })}
                             </span>
                           )}
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={11} className="text-rose-500 fill-rose-500" />
-                            </span>
-                          )}
                           {req.inProcurement && (
                             <span className="text-[8px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight">
                               PROCUREMENT
@@ -1960,11 +1955,6 @@ const Dashboard: React.FC<{
                             <td className="px-6 py-4 border-slate-100">
                               <div className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors flex items-center gap-1.5">
                                 <span>{req.title}</span>
-                                {req.flaggedForAudit && (
-                                  <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                    <Flag size={11} className="text-rose-500 fill-rose-500" />
-                                  </span>
-                                )}
                               </div>
                               <div className="text-[10px] text-slate-400 truncate max-w-sm mt-0.5">{req.description}</div>
                             </td>

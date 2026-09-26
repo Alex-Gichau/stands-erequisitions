@@ -30,7 +30,6 @@ import {
   ChevronDown,
   ChevronUp,
   Database,
-  Flag,
   Lock,
   ShieldCheck,
   Download,
@@ -2175,11 +2174,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[9px] font-mono uppercase text-slate-400 font-bold">#{req.id.substr(0, 8)}</span>
-                            {req.flaggedForAudit && (
-                              <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                <Flag size={10} className="text-rose-500 fill-rose-500" />
-                              </span>
-                            )}
                             {isPartial ? (
                               <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded-full font-bold uppercase">
                                 Partial Payout
@@ -2309,11 +2303,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                             <td className="py-4 px-4">
                               <div className="flex items-center gap-1.5 font-bold text-slate-800">
                                 <span className="line-clamp-1">{req.title}</span>
-                                {req.flaggedForAudit && (
-                                  <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                    <Flag size={11} className="text-rose-500 fill-rose-500" />
-                                  </span>
-                                )}
                               </div>
                               <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
                                 <span className="font-bold text-indigo-600">{req.groupName}</span>

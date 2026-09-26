@@ -32,7 +32,6 @@ import {
   ChevronDown,
   ChevronUp,
   Users,
-  Flag,
   TrendingUp,
   Check,
   User,
@@ -2567,7 +2566,7 @@ export const RequisitionsPanel: React.FC = () => {
   const { selectedRequisition: viewingReq, setSelectedRequisition: setViewingReq } = useRequisitions();
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState<Requisition | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
-  const [filterPreset, setFilterPreset] = useState<"ALL" | "URGENT" | "FLAGGED" | "OVERDUE" | "L1_APPROVED" | "UNREAD">("ALL");
+  const [filterPreset, setFilterPreset] = useState<"ALL" | "URGENT" | "OVERDUE" | "L1_APPROVED" | "UNREAD">("ALL");
   const [dateRangePreset, setDateRangePreset] = useState<"ALL" | "WEEK" | "MONTH" | "CUSTOM">("ALL");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
@@ -2804,7 +2803,6 @@ export const RequisitionsPanel: React.FC = () => {
     const matchesPreset = () => {
       if (filterPreset === "ALL") return true;
       if (filterPreset === "UNREAD") return getReqUnreadInfo(req).hasUnread;
-      if (filterPreset === "FLAGGED") return req.flaggedForAudit === true;
       if (filterPreset === "L1_APPROVED") return req.status === RequisitionStatus.APPROVED_L1;
       if (filterPreset === "OVERDUE") {
         const days = Math.ceil(Math.abs(Date.now() - new Date(req.submittedAt).getTime()) / (1000 * 60 * 60 * 24));
@@ -3279,18 +3277,6 @@ export const RequisitionsPanel: React.FC = () => {
             Urgent
           </button>
           <button
-            onClick={() => setFilterPreset("FLAGGED")}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-2",
-              filterPreset === "FLAGGED" 
-                ? "bg-rose-600 text-white border-rose-600 shadow-sm" 
-                : "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"
-            )}
-          >
-            <Flag size={12} />
-            Flagged
-          </button>
-          <button
             onClick={() => setFilterPreset("OVERDUE")}
             className={cn(
               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-2",
@@ -3605,11 +3591,6 @@ export const RequisitionsPanel: React.FC = () => {
                                   {compactAge}
                                 </span>
                               )}
-                              {req.flaggedForAudit && (
-                                <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                  <Flag size={11} className="text-rose-500 fill-rose-500" />
-                                </span>
-                              )}
                               {req.inProcurement && (
                                 <span className="text-[8px] md:text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
                                   PROCUREMENT
@@ -3869,9 +3850,6 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           {req.id}
                         </span>
-                        {req.flaggedForAudit && (
-                          <Flag size={11} className="text-rose-500 fill-rose-500" />
-                        )}
                         {req.attachments && req.attachments.length > 0 && (
                           <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                             <Paperclip size={10} />
@@ -4146,11 +4124,6 @@ export const RequisitionsPanel: React.FC = () => {
                             <span className="font-bold text-slate-900 text-[11px] md:text-sm truncate">
                               <HighlightText text={req.title} highlight={globalSearchTerm} />
                             </span>
-                            {req.flaggedForAudit && (
-                              <span title="Flagged for Audit" className="inline-flex shrink-0">
-                                <Flag size={11} className="text-rose-500 fill-rose-500" />
-                              </span>
-                            )}
                             {req.attachments && req.attachments.length > 0 && (
                               <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                                 <Paperclip size={10} />
@@ -4350,9 +4323,6 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           {req.id}
                         </span>
-                        {req.flaggedForAudit && (
-                          <Flag size={11} className="text-rose-500 fill-rose-500" />
-                        )}
                         {req.attachments && req.attachments.length > 0 && (
                           <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                             <Paperclip size={10} />
@@ -4581,11 +4551,6 @@ export const RequisitionsPanel: React.FC = () => {
                           <span className="font-bold text-slate-900 text-[11px] md:text-sm truncate">
                             <HighlightText text={req.title} highlight={globalSearchTerm} />
                           </span>
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={11} className="text-rose-500 fill-rose-500" />
-                            </span>
-                          )}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
                           <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
@@ -4725,9 +4690,6 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           {req.id}
                         </span>
-                        {req.flaggedForAudit && (
-                          <Flag size={11} className="text-rose-500 fill-rose-500" />
-                        )}
                       </div>
                       <h4 className="text-sm font-bold text-slate-900 leading-snug">
                         <HighlightText text={req.title} highlight={globalSearchTerm} />
@@ -4896,11 +4858,6 @@ export const RequisitionsPanel: React.FC = () => {
                           <span className="font-bold text-slate-700 line-through text-[11px] md:text-sm truncate">
                             <HighlightText text={req.title} highlight={globalSearchTerm} />
                           </span>
-                          {req.flaggedForAudit && (
-                            <span title="Flagged for Audit" className="inline-flex shrink-0">
-                              <Flag size={11} className="text-slate-400 fill-slate-400" />
-                            </span>
-                          )}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
                           <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
@@ -5051,9 +5008,6 @@ export const RequisitionsPanel: React.FC = () => {
                         <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
                           {req.id}
                         </span>
-                        {req.flaggedForAudit && (
-                          <Flag size={11} className="text-slate-400 fill-slate-400" />
-                        )}
                       </div>
                       <h4 className="text-sm font-bold text-slate-700 line-through leading-snug">
                         <HighlightText text={req.title} highlight={globalSearchTerm} />
@@ -6312,16 +6266,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   };
 
-  const handleToggleAuditFlag = async () => {
-    try {
-      await updateRequisition(req.id, {
-        flaggedForAudit: !req.flaggedForAudit
-      });
-    } catch (error) {
-      console.error("Failed to toggle audit flag:", error);
-    }
-  };
-
   const canAct = () => {
     if (!currentUser) return false;
     if (isDeleted) return false;
@@ -6396,12 +6340,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               <h3 className="text-[12px] md:text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-[0.05em] sm:tracking-[0.1em] truncate min-w-0 flex-1">
                 <HighlightText text={req.title} highlight={globalSearchTerm || ""} />
               </h3>
-              {req.flaggedForAudit && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] shrink-0">
-                  <Flag size={10} className="fill-current" />
-                  Audit Flagged
-                </span>
-              )}
             </div>
             <p className="text-[8px] md:text-[10px] font-mono text-slate-400 uppercase tracking-widest truncate">{req.id}</p>
           </div>
@@ -8171,20 +8109,6 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   <Share2 size={15} className="text-slate-400 shrink-0" />
                   <span>Share Link</span>
                 </button>
-
-                {/* Audit Flag Toggle (Admins only) */}
-                {currentUser?.role === UserRole.ADMIN && (
-                  <button 
-                    onClick={() => {
-                      setIsMoreOpen(false);
-                      handleToggleAuditFlag();
-                    }}
-                    className="flex items-center gap-2.5 px-3.5 py-2 w-full text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer whitespace-nowrap"
-                  >
-                    <Flag size={15} className={cn("text-slate-400 shrink-0", req.flaggedForAudit && "text-rose-500 fill-rose-500")} />
-                    <span>{req.flaggedForAudit ? "Remove Audit Flag" : "Flag for Audit"}</span>
-                  </button>
-                )}
 
                 {/* Edit details */}
                 {onEdit && isRequisitionEditableByUser(req, currentUser, canPerform) && (

@@ -32,7 +32,6 @@ export interface IRequisition extends Document {
   attachments: any[];
   receipts: any[];
   comments?: any[];
-  flaggedForAudit: boolean;
   inProcurement: boolean;
   requiresMoreInfo: boolean;
   fiscalYear?: number;
@@ -69,7 +68,6 @@ const RequisitionSchema = new Schema<IRequisition>({
   attachments: { type: [Schema.Types.Mixed], default: [] } as any,
   receipts: { type: [Schema.Types.Mixed], default: [] } as any,
   comments: { type: [Schema.Types.Mixed], default: [] } as any,
-  flaggedForAudit: { type: Boolean, default: false },
   inProcurement: { type: Boolean, default: false },
   requiresMoreInfo: { type: Boolean, default: false },
   fiscalYear: { type: Number },

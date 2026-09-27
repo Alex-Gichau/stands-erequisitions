@@ -638,10 +638,6 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
             </p>
           </div>
 
-          <div className="px-3.5 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 rounded-xl text-xs font-bold flex items-center gap-2">
-            <Sparkles size={14} className="text-amber-500" />
-            <span>Optimal Window: Early Morning (06:00 - 09:00 EAT)</span>
-          </div>
         </div>
 
         <div className="h-64 w-full">

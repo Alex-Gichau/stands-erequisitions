@@ -509,10 +509,6 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
       {/* Header & Main Call-to-action */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 md:p-8 shadow-sm">
         <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full text-xs font-black uppercase tracking-wider">
-            <Megaphone size={13} />
-            <span>PCEA St. Andrew's Email Broadcasts</span>
-          </div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
             Campaign Promotional Emails
           </h1>

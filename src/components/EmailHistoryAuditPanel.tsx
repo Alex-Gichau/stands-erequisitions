@@ -53,9 +53,6 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
   const [serverEmailLogs, setServerEmailLogs] = useState<EmailAuditLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [dateRangeFilter, setDateRangeFilter] = useState<'ALL' | 'TODAY' | '7DAYS' | '30DAYS'>('ALL');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedLog, setSelectedLog] = useState<EmailAuditLog | null>(null);
   const [showTestEmailModal, setShowTestEmailModal] = useState<boolean>(false);
@@ -579,10 +576,8 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
 
   // Filtered Logs
   const filteredLogs = useMemo(() => {
-    const now = new Date().getTime();
-
     return allMergedLogs.filter(log => {
-      // 1. Search filter
+      // Search filter
       if (searchTerm.trim()) {
         const query = searchTerm.toLowerCase();
         const matchesQuery = 
@@ -597,33 +592,9 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
         if (!matchesQuery) return false;
       }
 
-      // 2. Category filter
-      if (categoryFilter !== 'ALL') {
-        if (log.category !== categoryFilter) return false;
-      }
-
-      // 3. Status filter
-      if (statusFilter !== 'ALL') {
-        if (log.status !== statusFilter) return false;
-      }
-
-      // 4. Date filter
-      if (dateRangeFilter !== 'ALL') {
-        const logTime = new Date(log.timestamp).getTime();
-        if (isNaN(logTime)) return true;
-
-        if (dateRangeFilter === 'TODAY') {
-          if (now - logTime > 24 * 60 * 60 * 1000) return false;
-        } else if (dateRangeFilter === '7DAYS') {
-          if (now - logTime > 7 * 24 * 60 * 60 * 1000) return false;
-        } else if (dateRangeFilter === '30DAYS') {
-          if (now - logTime > 30 * 24 * 60 * 60 * 1000) return false;
-        }
-      }
-
       return true;
     });
-  }, [allMergedLogs, searchTerm, categoryFilter, statusFilter, dateRangeFilter]);
+  }, [allMergedLogs, searchTerm]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
@@ -1197,74 +1168,6 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             </button>
           </div>
         </div>
-
-        {/* Filter Pills */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          {/* Category Filter */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1">
-              <Filter size={12} /> Category:
-            </span>
-            {[
-              { key: 'ALL', label: 'All' },
-              { key: 'REQUISITION_WORKFLOW', label: 'Requisitions' },
-              { key: 'BACKUP_SNAPSHOT', label: 'Backups' },
-              { key: 'PASSWORD_RESET', label: 'Security & Auth' },
-              { key: 'BULK_ANNOUNCEMENT', label: 'Announcements' },
-              { key: 'SYSTEM_ALERT', label: 'Alerts' }
-            ].map(cat => (
-              <button
-                key={cat.key}
-                onClick={() => {
-                  setCategoryFilter(cat.key);
-                  setCurrentPage(1);
-                }}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer",
-                  categoryFilter === cat.key
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                )}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Status & Date Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Status Selector */}
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-700 focus:outline-none"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="DELIVERED">Delivered Only</option>
-              <option value="SIMULATED">Simulated / Safe</option>
-              <option value="SKIPPED">Skipped</option>
-              <option value="FAILED">Failed</option>
-            </select>
-
-            {/* Date Window */}
-            <select
-              value={dateRangeFilter}
-              onChange={(e) => {
-                setDateRangeFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-700 focus:outline-none"
-            >
-              <option value="ALL">All Time</option>
-              <option value="TODAY">Last 24 Hours</option>
-              <option value="7DAYS">Last 7 Days</option>
-              <option value="30DAYS">Last 30 Days</option>
-            </select>
-          </div>
-        </div>
       </div>
 
       {/* 3. Email Logs Table */}
@@ -1288,19 +1191,16 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
             </div>
             <h4 className="text-sm font-bold text-slate-800">No email audit logs matched your query</h4>
             <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Try adjusting your search keywords, clear active category filters, or click "Send Test Email" to generate an initial diagnostic verification log.
+              Try adjusting your search keywords or click "Send Test Email" to generate an initial diagnostic verification log.
             </p>
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setCategoryFilter('ALL');
-                setStatusFilter('ALL');
-                setDateRangeFilter('ALL');
-              }}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-            >
-              Reset Filters
-            </button>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Clear Search
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

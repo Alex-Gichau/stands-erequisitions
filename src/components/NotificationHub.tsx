@@ -13,6 +13,7 @@ import {
   Smile, 
   ThumbsUp, 
   CheckCircle2, 
+  CheckCheck,
   ShieldCheck, 
   FilePlus, 
   Users, 
@@ -330,7 +331,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
         if (!c || !c.text) return;
         const commentId = c.id || `comment-${r.id}-${cIdx}`;
         const authorName = c.authorName || (c.authorEmail ? c.authorEmail.split("@")[0] : "Team Member");
-        const authorEmail = c.authorEmail || "accounts@pceastandrews.org";
+        const authorEmail = c.authorEmail || "no-reply@pceastandrews.org";
         const commentDate = c.createdAt || c.timestamp || r.updatedAt || now;
 
         items.push({
@@ -347,7 +348,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           title: `Discussion comment on "${r.title || "Requisition"}"`,
           message: `${authorName} commented on requisition "${r.title}":\n\n"${c.text}"`,
           snippet: `"${c.text.length > 90 ? c.text.slice(0, 90) + '...' : c.text}"`,
-          actionLabel: "View Discussion & Reply",
+          actionLabel: "Open Discussion & Reply",
           timestamp: commentDate,
           tags: ["#COMMENT", `#${r.groupName || "Ministry"}`, `KES ${r.amount?.toLocaleString() || 0}`],
           requisition: r,
@@ -362,7 +363,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
             if (!rep || !rep.text) return;
             const replyId = rep.id || `reply-${commentId}-${repIdx}`;
             const repAuthor = rep.authorName || (rep.authorEmail ? rep.authorEmail.split("@")[0] : "Contributor");
-            const repEmail = rep.authorEmail || "accounts@pceastandrews.org";
+            const repEmail = rep.authorEmail || "no-reply@pceastandrews.org";
             const replyDate = rep.createdAt || rep.timestamp || commentDate;
 
             items.push({
@@ -446,7 +447,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
         r.approvalHistory.forEach((note, noteIdx) => {
           if (!note) return;
           const approver = note.approverName || "Treasury Approver";
-          const approverEmail = (note as any).approverEmail || "treasury@pceastandrews.org";
+          const approverEmail = (note as any).approverEmail || "no-reply@pceastandrews.org";
           const appDate = note.timestamp || (note as any).approvedAt || r.approvedAtL2 || r.approvedAtL1 || r.updatedAt || now;
           const levelName = (note as any).level || (note.role ? note.role.replace("_", " ") : r.status.replace("_", " "));
 
@@ -481,7 +482,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           type: "APPROVAL",
           category: "APPROVALS",
           senderName: "Church Treasury & Governance",
-          senderEmail: "treasury@pceastandrews.org",
+          senderEmail: "no-reply@pceastandrews.org",
           senderRole: "Approver",
           avatarGradient: "bg-gradient-to-tr from-emerald-400 via-teal-500 to-cyan-500",
           icon: <ShieldCheck size={14} className="text-teal-500" />,
@@ -510,13 +511,13 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           type: "APPROVAL",
           category: "APPROVALS",
           senderName: u.name || "New Registration",
-          senderEmail: u.email || "accounts@pceastandrews.org",
+          senderEmail: u.email || "no-reply@pceastandrews.org",
           senderRole: u.role || "Member",
           avatarGradient: "bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500",
           icon: <UserCheck size={14} className="text-orange-500" />,
           badgeColor: "bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60",
           badgeLabel: "Authorization Required",
-          title: `Member Pending Approval: ${u.name || u.email}`,
+          title: `${u.name || u.email} is waiting for Account Approval`,
           message: `${u.name || "User"} (${u.email}) requested account authorization with assigned role "${u.role}". Approval is required to grant portal access.`,
           snippet: `Requested Role: ${u.role}. Click to authorize account.`,
           actionLabel: "Authorize Account",
@@ -546,7 +547,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
         type: "SUBMISSION",
         category: "SUBMISSIONS",
         senderName: r.requesterName || r.groupName || "Ministry Group",
-        senderEmail: r.requesterEmail || "requisitions@pceastandrews.org",
+        senderEmail: r.requesterEmail || "no-reply@pceastandrews.org",
         senderRole: "Requester",
         avatarGradient: "bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500",
         icon: <FilePlus size={14} className="text-indigo-500" />,
@@ -963,15 +964,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 <h1 className="text-lg md:text-xl font-black tracking-tight text-slate-900 dark:text-slate-100 leading-none">
                   Notification Hub
                 </h1>
-                {unreadTotal > 0 ? (
-                  <span className="text-[10px] font-black font-mono bg-indigo-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
-                    {unreadTotal} UNREAD
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-black font-mono bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-1">
-                    <CheckCircle2 size={10} /> ALL CAUGHT UP
-                  </span>
-                )}
               </div>
               <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 hidden xs:block">
                 Streamlined feed for comments, reactions, approvals, submissions, group & security alerts
@@ -1017,32 +1009,15 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
               </button>
             )}
 
-            {/* Unread Only Toggle */}
-            <button
-              onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none",
-                showUnreadOnly
-                  ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                  : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200/80 dark:border-slate-700 hover:bg-slate-200/70"
-              )}
-              title="Toggle unread notifications filter"
-            >
-              <Filter size={13} />
-              <span>Unread Only</span>
-              {showUnreadOnly && (
-                <span className="w-1.5 h-1.5 rounded-full bg-white inline-block" />
-              )}
-            </button>
-
+            {/* Mark All As Read (Outline Icon) */}
             {unreadTotal > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800 rounded-xl text-xs font-bold hover:bg-indigo-100 transition-all cursor-pointer"
-                title="Mark all notifications as read"
+                className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 border border-slate-200/80 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-800 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
+                title={`Mark all as read (${unreadTotal})`}
+                aria-label={`Mark all as read (${unreadTotal})`}
               >
-                <CheckCircle2 size={14} />
-                <span>Mark All Read ({unreadTotal})</span>
+                <CheckCheck size={16} />
               </button>
             )}
 
@@ -1061,222 +1036,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
               <RefreshCw size={16} />
             </button>
           </div>
-        </div>
-
-        {/* Category Navigation Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-          {/* ALL / Primary */}
-          <button
-            onClick={() => setActiveTab("ALL")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "ALL" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <span>All</span>
-            {categoryCounts.ALL.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryCounts.ALL.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.ALL.total}
-              </span>
-            )}
-          </button>
-
-          {/* COMMENTS */}
-          <button
-            onClick={() => setActiveTab("COMMENTS")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "COMMENTS" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <MessageSquare size={13} className="text-sky-500" />
-            <span>Comments</span>
-            {categoryCounts.COMMENTS.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-sky-500 text-white">
-                {categoryCounts.COMMENTS.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.COMMENTS.total}
-              </span>
-            )}
-          </button>
-
-          {/* REACTIONS */}
-          <button
-            onClick={() => setActiveTab("REACTIONS")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "REACTIONS" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <Smile size={13} className="text-amber-500" />
-            <span>Reactions</span>
-            {categoryCounts.REACTIONS.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-amber-500 text-white">
-                {categoryCounts.REACTIONS.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.REACTIONS.total}
-              </span>
-            )}
-          </button>
-
-          {/* APPROVALS */}
-          <button
-            onClick={() => setActiveTab("APPROVALS")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "APPROVALS" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <CheckCircle2 size={13} className="text-emerald-500" />
-            <span>Approvals</span>
-            {categoryCounts.APPROVALS.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-emerald-500 text-white">
-                {categoryCounts.APPROVALS.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.APPROVALS.total}
-              </span>
-            )}
-          </button>
-
-          {/* SUBMISSIONS */}
-          <button
-            onClick={() => setActiveTab("SUBMISSIONS")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "SUBMISSIONS" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <FilePlus size={13} className="text-indigo-500" />
-            <span>Submissions</span>
-            {categoryCounts.SUBMISSIONS.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-indigo-500 text-white">
-                {categoryCounts.SUBMISSIONS.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.SUBMISSIONS.total}
-              </span>
-            )}
-          </button>
-
-          {/* GROUPS */}
-          <button
-            onClick={() => setActiveTab("GROUPS")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "GROUPS" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <Building2 size={13} className="text-violet-500" />
-            <span>Group Updates</span>
-            {categoryCounts.GROUPS.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-violet-500 text-white">
-                {categoryCounts.GROUPS.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.GROUPS.total}
-              </span>
-            )}
-          </button>
-
-          {/* SECURITY & LOGINS */}
-          <button
-            onClick={() => setActiveTab("SECURITY")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "SECURITY" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <KeyRound size={13} className="text-rose-500" />
-            <span>Account & Logins</span>
-            {categoryCounts.SECURITY.unread > 0 ? (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-rose-500 text-white">
-                {categoryCounts.SECURITY.unread}
-              </span>
-            ) : (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                {categoryCounts.SECURITY.total}
-              </span>
-            )}
-          </button>
-
-          <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />
-
-          {/* STARRED */}
-          <button
-            onClick={() => setActiveTab("STARRED")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "STARRED" 
-                ? "bg-amber-500 text-white shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <Star size={13} className={cn(activeTab === "STARRED" ? "fill-white text-white" : "fill-amber-500 text-amber-500")} />
-            <span>Starred</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
-              {starredNoticeIds.length}
-            </span>
-          </button>
-
-          {/* ARCHIVED */}
-          <button
-            onClick={() => setActiveTab("ARCHIVED")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "ARCHIVED" 
-                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <Archive size={13} />
-            <span>Archived</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
-              {archivedNoticeIds.length}
-            </span>
-          </button>
-
-          {/* TRASH */}
-          <button
-            onClick={() => setActiveTab("TRASH")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer select-none",
-              activeTab === "TRASH" 
-                ? "bg-rose-600 text-white shadow-sm" 
-                : "bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200/70"
-            )}
-          >
-            <Trash2 size={13} />
-            <span>Trash</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-black/10 text-inherit">
-              {deletedNoticeIds.length}
-            </span>
-          </button>
         </div>
       </div>
 
@@ -1317,7 +1076,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 <CheckCircle2 size={18} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-black tracking-tight leading-tight">All Caught Up!</p>
+                <p className="text-xs font-black tracking-tight leading-tight">You're all caught up!🥳🥳🥳</p>
                 <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium truncate mt-0.5">
                   All activity logs and comments have been reviewed.
                 </p>
@@ -1432,13 +1191,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                                 </div>
 
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className={cn(
-                                    "text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider flex items-center gap-1",
-                                    item.badgeColor
-                                  )}>
-                                    {item.icon}
-                                    <span>{item.badgeLabel}</span>
-                                  </span>
                                   <span className="text-[10px] font-mono font-medium text-slate-400 dark:text-slate-500">
                                     {formatTimeString(item.timestamp)}
                                   </span>
@@ -1679,15 +1431,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                             <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-slate-100">
                               {selectedItem.senderName}
                             </h3>
-                            {selectedItem.badgeLabel && selectedItem.type !== "NEW_LOGIN" && selectedItem.badgeLabel.toLowerCase() !== "new login" && (
-                              <span className={cn(
-                                "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1",
-                                selectedItem.badgeColor
-                              )}>
-                                {selectedItem.icon}
-                                <span>{selectedItem.badgeLabel}</span>
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
                             {selectedItem.senderEmail} {selectedItem.senderRole ? `• ${selectedItem.senderRole}` : ''}

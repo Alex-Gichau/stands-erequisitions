@@ -857,6 +857,15 @@ const Dashboard: React.FC<{
     );
   }
 
+  const getTimeGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  const userFirstName = currentUser?.name ? currentUser.name.split(' ')[0] : "User";
+
   return (
     <div className="space-y-6 animate-in fade-in transition-all duration-700">
       {/* 2-Week Ministry Spending Trends Feed */}
@@ -865,8 +874,12 @@ const Dashboard: React.FC<{
       {/* Role-aware Greeting */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-2">
         <div>
-          <h1 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">System Dashboard</h1>
-          <p className="text-slate-500 text-[9px] md:text-sm">Welcome, {currentUser?.name} • <span className="font-mono text-[8px] md:text-[10px] uppercase tracking-widest">{currentUser?.role}</span></p>
+          <h1 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            {getTimeGreeting()} {userFirstName}
+          </h1>
+          <p className="text-slate-500 text-[9px] md:text-sm">
+            System Dashboard • <span className="font-mono text-[8px] md:text-[10px] uppercase tracking-widest">{currentUser?.role}</span>
+          </p>
         </div>
       </div>
 
@@ -1312,7 +1325,7 @@ const Dashboard: React.FC<{
           <div className="px-4 md:px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex justify-between items-center flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <TrendingUp size={16} className="text-primary" />
-              <h2 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest text-center"> Requisitions Submissions</h2>
+              <h2 className="text-[10px] font-bold text-slate-800 uppercase tracking-widest text-center">Submission & Approval Data</h2>
             </div>
             <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
               <button

@@ -2566,7 +2566,7 @@ export const RequisitionsPanel: React.FC = () => {
   const { selectedRequisition: viewingReq, setSelectedRequisition: setViewingReq } = useRequisitions();
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState<Requisition | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
-  const [filterPreset, setFilterPreset] = useState<"ALL" | "URGENT" | "OVERDUE" | "L1_APPROVED" | "UNREAD">("ALL");
+  const [filterPreset, setFilterPreset] = useState<"ALL" | "L1_PENDING" | "L2_PENDING" | "PENDING_DISBURSEMENT" | "DISBURSED">("ALL");
   const [dateRangePreset, setDateRangePreset] = useState<"ALL" | "WEEK" | "MONTH" | "CUSTOM">("ALL");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
@@ -2802,15 +2802,10 @@ export const RequisitionsPanel: React.FC = () => {
 
     const matchesPreset = () => {
       if (filterPreset === "ALL") return true;
-      if (filterPreset === "UNREAD") return getReqUnreadInfo(req).hasUnread;
-      if (filterPreset === "L1_APPROVED") return req.status === RequisitionStatus.APPROVED_L1;
-      if (filterPreset === "OVERDUE") {
-        const days = Math.ceil(Math.abs(Date.now() - new Date(req.submittedAt).getTime()) / (1000 * 60 * 60 * 24));
-        return days > 3 && (req.status === RequisitionStatus.SUBMITTED || req.status === RequisitionStatus.APPROVED_L1);
-      }
-      if (filterPreset === "URGENT") {
-        return req.escalationLevel > 0 || req.amount > 20000;
-      }
+      if (filterPreset === "L1_PENDING") return req.status === RequisitionStatus.SUBMITTED;
+      if (filterPreset === "L2_PENDING") return req.status === RequisitionStatus.APPROVED_L1;
+      if (filterPreset === "PENDING_DISBURSEMENT") return req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.PARTIALLY_DISBURSED;
+      if (filterPreset === "DISBURSED") return req.status === RequisitionStatus.DISBURSED;
       return true;
     };
 
@@ -3253,88 +3248,69 @@ export const RequisitionsPanel: React.FC = () => {
       {/* Filter Bar */}
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mr-0.5 flex items-center gap-1 select-none">
+            <Filter size={11} className="text-slate-400" />
+            Filter:
+          </span>
           <button
             onClick={() => setFilterPreset("ALL")}
             className={cn(
               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer",
               filterPreset === "ALL" 
                 ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
-                : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300"
             )}
           >
             Show All
           </button>
           <button
-            onClick={() => setFilterPreset("URGENT")}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-2",
-              filterPreset === "URGENT" 
-                ? "bg-amber-500 text-white border-amber-500 shadow-sm" 
-                : "bg-white text-amber-600 border-amber-200 hover:bg-amber-50"
-            )}
-          >
-            <AlertTriangle size={12} />
-            Urgent
-          </button>
-          <button
-            onClick={() => setFilterPreset("OVERDUE")}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-2",
-              filterPreset === "OVERDUE" 
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" 
-                : "bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-            )}
-          >
-            <History size={12} />
-            Approvals Overdue
-          </button>
-          <button
-            onClick={() => setFilterPreset("L1_APPROVED")}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-2",
-              filterPreset === "L1_APPROVED" 
-                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" 
-                : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-            )}
-          >
-            <CheckCircle size={12} />
-            L1 Approved
-          </button>
-          <button
-            onClick={() => setFilterPreset("UNREAD")}
+            onClick={() => setFilterPreset("L1_PENDING")}
             className={cn(
               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-1.5",
-              filterPreset === "UNREAD" 
-                ? "bg-rose-600 text-white border-rose-600 shadow-sm" 
-                : totalUnreadCount > 0
-                  ? "bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 animate-pulse"
-                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              filterPreset === "L1_PENDING" 
+                ? "bg-amber-500 text-white border-amber-500 shadow-sm" 
+                : "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/40"
             )}
           >
-            <MessageSquare size={12} className={totalUnreadCount > 0 ? "fill-rose-500 text-rose-500" : ""} />
-            <span>Unread Threads</span>
-            {totalUnreadCount > 0 && (
-              <span className={cn(
-                "px-1.5 py-0.2 rounded-full text-[8.5px] font-mono font-black",
-                filterPreset === "UNREAD" ? "bg-white text-rose-700" : "bg-rose-600 text-white"
-              )}>
-                {totalUnreadCount}
-              </span>
-            )}
+            <Clock size={12} />
+            <span>L1 Approval Pending</span>
           </button>
-          {requisitionsWithUnreadCount > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                markAllAsRead();
-              }}
-              title="Mark all discussion threads as read"
-              className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-dashed border-slate-300 dark:border-slate-700 hover:border-rose-300 transition-all flex items-center gap-1 cursor-pointer ml-auto sm:ml-0"
-            >
-              <Check size={11} className="text-rose-500" />
-              <span>Mark all read</span>
-            </button>
-          )}
+          <button
+            onClick={() => setFilterPreset("L2_PENDING")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-1.5",
+              filterPreset === "L2_PENDING" 
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" 
+                : "bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+            )}
+          >
+            <ShieldCheck size={12} />
+            <span>L2 Approval Pending</span>
+          </button>
+          <button
+            onClick={() => setFilterPreset("PENDING_DISBURSEMENT")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-1.5",
+              filterPreset === "PENDING_DISBURSEMENT" 
+                ? "bg-teal-600 text-white border-teal-600 shadow-sm" 
+                : "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800/80 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+            )}
+          >
+            <Banknote size={12} />
+            <span>Pending Disbursement</span>
+          </button>
+          <button
+            onClick={() => setFilterPreset("DISBURSED")}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer flex items-center gap-1.5",
+              filterPreset === "DISBURSED" 
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" 
+                : "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+            )}
+          >
+            <CheckCircle2 size={12} />
+            <span>Disbursed</span>
+          </button>
         </div>
 
         <div className="bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-3 md:gap-4">

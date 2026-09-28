@@ -68,20 +68,16 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
         <div className="space-y-3 max-w-xl">
           <div className="flex items-center gap-2">
-            <span className="p-1 px-2 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-indigo-100">
-              <CalendarRange size={14} />
-              Church Financial Year {activeYear}
-            </span>
             <span className={cn(
               "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest leading-none border",
               status === "ARCHIVED" ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-200"
             )}>
-              {status}
+              FINANCIAL YEAR IS {status}
             </span>
           </div>
           
           <h2 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight leading-tight">
-            STANDS MINISTRIES<br />
+            STANDS MINISTRIES {activeYear}<br />
             <span className="text-primary">FINANCIAL OVERVIEW</span>
           </h2>
           
@@ -94,14 +90,14 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl">
               <Wallet size={16} className="text-slate-400" />
               <div>
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Headroom</p>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Amount Unspent</p>
                 <p className="text-xs font-bold text-slate-700">{formatCurrency(fiscalStats.totalRemaining)}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl">
               <TrendingUp size={16} className="text-slate-400" />
               <div>
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Active Links</p>
+                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Submitted</p>
                 <p className="text-xs font-bold text-slate-700">{fiscalStats.requisitionsCount} Requisitions</p>
               </div>
             </div>

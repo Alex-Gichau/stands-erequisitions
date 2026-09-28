@@ -2597,37 +2597,32 @@ function AppContent() {
         )}
 
         {/* Header */}
-        <header className="min-h-[5rem] py-3 bg-card border-b border-border flex items-center justify-between px-4 md:px-8 shrink-0 select-none transition-all">
+        <header className="min-h-[5rem] py-3 bg-transparent border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 md:px-8 shrink-0 select-none transition-all">
           <div className="flex flex-col justify-center">
-            <h1 className="text-xs md:text-lg font-bold text-foreground leading-tight truncate max-w-[150px] md:max-w-none">
-              {currentView === "campaigns" ? "Promotional Campaigns" : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-              {currentUser.groups && currentUser.groups.length > 0
-                ? `: ${currentUser.groups.join(", ")}`
-                : currentUser.group
-                  ? `: ${currentUser.group}`
-                  : ""}
+            <h1 className="text-sm md:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate max-w-[220px] md:max-w-none">
+              Your {currentView === "campaigns" ? "Promotional Campaigns" : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
             </h1>
-            <p className="text-[10px] text-muted hidden sm:flex items-center gap-2">
+            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:flex items-center gap-2 mt-0.5">
               {isSyncingData ? (
                 <>
-                  <RefreshCw className="animate-spin text-indigo-500" size={10} />
-                  <span className="text-indigo-600 font-medium tracking-wide">Syncing Data 🔍</span>
+                  <RefreshCw className="animate-spin text-indigo-500" size={11} />
+                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide">Syncing Data 🔍</span>
                 </>
               ) : (
-                <>System synchronized • {new Date().toLocaleTimeString()}</>
+                <>System synchronized ⏰ {new Date().toLocaleTimeString()}</>
               )}
             </p>
           </div>
 
-          <div id="global-search-container" className="flex-1 max-w-md mx-8 hidden md:block" ref={searchRef}>
+          <div id="global-search-container" className="flex-1 max-w-md mx-6 lg:mx-8 hidden md:block" ref={searchRef}>
             <div className="relative pb-0.5">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" size={16} />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" size={15} />
                 <input
                   ref={searchInputRef}
                   type="text"
                   placeholder="Search requisitions by title or group..."
-                  className="w-full pl-10 pr-16 py-2 bg-background border border-border rounded-lg text-xs focus:ring-2 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-muted/50 text-foreground"
+                  className="w-full pl-10 pr-16 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 focus:border-primary dark:focus:border-primary outline-none transition-all shadow-xs hover:border-slate-300 dark:hover:border-slate-700"
                   value={globalSearchTerm}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -2652,7 +2647,7 @@ function AppContent() {
                 {globalSearchTerm && (
                   <button
                     onClick={() => setGlobalSearchTerm("")}
-                    className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 cursor-pointer transition-colors"
                   >
                     <X size={14} />
                   </button>
@@ -2664,9 +2659,9 @@ function AppContent() {
                     setAdvancedSearchActive(!advancedSearchActive);
                     setCurrentView("requisitions");
                   }}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition-all cursor-pointer ${advancedSearchActive
+                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all cursor-pointer ${advancedSearchActive
                       ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400"
-                      : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                      : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   title="Advanced search criteria"
                 >
@@ -2683,7 +2678,7 @@ function AppContent() {
                     className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 p-4 space-y-4 text-slate-800 dark:text-slate-100"
                   >
                     <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">Advanced Search Criteria</span>
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">Advanced Search</span>
                       <button
                         type="button"
                         onClick={() => {
@@ -2906,19 +2901,19 @@ function AppContent() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            <div className="flex items-center border-r border-slate-200 dark:border-slate-800/80 pr-4 mr-2">
+            <div className="flex items-center border-r border-slate-200 dark:border-slate-800 pr-3 mr-1">
               <button
                 type="button"
                 onClick={() => handleToggleTheme()}
                 id="header-dark-mode-toggle"
                 title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
                 aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                className="flex items-center justify-center p-2 rounded-full border border-slate-200 dark:border-slate-800 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                className="flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 {darkMode ? (
-                  <Sun size={15} className="text-slate-700 dark:text-slate-200 stroke-[1.75]" />
+                  <Sun size={15} className="text-amber-400 stroke-[1.75]" />
                 ) : (
-                  <Moon size={15} className="text-slate-700 dark:text-slate-200 stroke-[1.75]" />
+                  <Moon size={15} className="text-slate-700 stroke-[1.75]" />
                 )}
               </button>
             </div>
@@ -2930,13 +2925,13 @@ function AppContent() {
                 disabled={!(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN)}
                 onClick={() => setIsFyDropdownOpen(!isFyDropdownOpen)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-tight transition-all",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-tight transition-all shadow-xs",
                   (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN)
-                    ? "bg-primary/5 text-primary border-primary/25 hover:bg-primary/10 cursor-pointer"
-                    : "bg-slate-50 dark:bg-slate-900 border-border text-slate-500"
+                    ? "bg-white dark:bg-slate-900 text-primary dark:text-blue-400 border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
                 )}
               >
-                <Calendar size={12} className={(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) ? "text-primary" : "text-slate-400"} />
+                <Calendar size={12} className={(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) ? "text-primary dark:text-blue-400" : "text-slate-400"} />
                 <span>FY {systemSettings.currentFiscalYear}</span>
                 {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) && <ChevronDown size={10} className="opacity-70" />}
               </button>
@@ -3333,19 +3328,18 @@ function AppContent() {
             <div id="profile-dropdown-trigger" className="relative h-10 flex items-center" ref={profileRef}>
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center gap-3 pl-4 pr-1 py-1 bg-slate-100 hover:bg-slate-200/90 dark:bg-slate-900 dark:hover:bg-slate-850 rounded-full transition-all cursor-pointer group border border-slate-200 dark:border-slate-800 hover:border-primary/50 shadow-xs dark:shadow-lg"
+                className="flex items-center gap-3 pl-3.5 pr-1 py-1 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800 rounded-full transition-all cursor-pointer group border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
               >
                 <div className="flex flex-col items-end hidden sm:flex">
                   <span className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-tight">{(currentUser?.name || "User").split(' ')[0]}</span>
                   <span className="text-[8px] text-primary dark:text-primary font-bold uppercase tracking-widest leading-tight">{(currentUser?.role || "USER").split('_')[0]}</span>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-black flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-slate-300 dark:ring-white/20">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center overflow-hidden shrink-0 ring-1 ring-slate-300 dark:ring-white/20">
                   <UserAvatar 
                     user={currentUser} 
                     size="sm" 
-                    backgroundColor="#000000"
                     ring={false}
-                    className="group-hover:scale-110 transition-transform bg-black text-white" 
+                    className="group-hover:scale-110 transition-transform" 
                   />
                 </div>
               </button>

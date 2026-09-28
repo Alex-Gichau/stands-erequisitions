@@ -246,8 +246,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               rounded="xl" 
               showStatus={true} 
               isOnline={true}
-              backgroundColor="#000000"
-              className="bg-black"
+              ring="ring-1 ring-slate-200 dark:ring-slate-700 shadow-xs"
             />
           </div>
 

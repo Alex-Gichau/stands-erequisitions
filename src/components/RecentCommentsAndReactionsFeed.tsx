@@ -390,9 +390,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
       id="recent-comments-reactions-feed-section"
       className="p-4 md:p-6 space-y-6 relative overflow-hidden"
     >
-      {/* Decorative Accent Glow */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
-
+      
       {/* Section Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
         <div className="space-y-1.5">

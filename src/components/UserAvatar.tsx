@@ -96,6 +96,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
     <div
       className={cn(
         "relative inline-flex items-center justify-center shrink-0 select-none overflow-visible",
+        roundedClass,
         className
       )}
       style={customStyle}

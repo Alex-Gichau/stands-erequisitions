@@ -187,13 +187,6 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Left Live Indicator Badge */}
-        <div className="z-10 bg-slate-50 dark:bg-neutral-950 border-r border-slate-200 dark:border-neutral-800 px-3 py-1 h-full shrink-0 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-slate-800 dark:text-neutral-200">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 dark:bg-blue-400"></span>
-          </span>
-        </div>
 
         {/* Marquee Ticker Track flowing smoothly and slower */}
         <div className="flex-1 overflow-hidden h-full flex items-center relative">

@@ -1965,7 +1965,7 @@ export const FinanceLedgerPanel: React.FC = () => {
               activeTab === "ledgers" ? "border-indigo-600 text-indigo-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
             )}
           >
-            General Ledger Logs
+            Ministry Budgets
           </button>
         )}
         <button
@@ -1975,7 +1975,7 @@ export const FinanceLedgerPanel: React.FC = () => {
             activeTab === "budgets" ? "border-indigo-600 text-indigo-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
           )}
         >
-          {isFinanceOrAdmin ? "Ministry Budget Controls" : "Ministry Budget Allocations"}
+          {isFinanceOrAdmin ? "Budget Controls" : "Budget Allocations"}
         </button>
       </div>
 

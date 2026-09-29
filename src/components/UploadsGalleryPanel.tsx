@@ -701,15 +701,6 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                 Uploads & Documents Gallery
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-xs font-bold border border-indigo-200 dark:border-indigo-800">
-                {scopedUploadsList.length} Uploads
-              </span>
-              {isAdminOrFinance && (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1">
-                  <ShieldCheck size={13} />
-                  <span>Finance & Admin Master Access</span>
-                </span>
-              )}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
               Central parish repository for receipts, tax invoices, quotations, and requisition attachments.

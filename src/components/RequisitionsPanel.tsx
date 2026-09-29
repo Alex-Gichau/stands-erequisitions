@@ -1933,12 +1933,6 @@ const DocumentPreviewModal = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black px-2 py-0.5 rounded-full font-mono uppercase border border-emerald-200 dark:border-emerald-800/40 flex items-center gap-1">
-                  <Eye size={10} /> SIDE PREVIEW
-                </span>
-                <span className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase border border-indigo-200 dark:border-indigo-800/40">
-                  {reqId ? `#${reqId}` : "REQUISITION ATTACHMENT"}
-                </span>
                 <span className="text-[9px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold px-2 py-0.5 rounded-full font-mono uppercase">
                   FILE {activeDocIndex + 1} OF {attachments.length}
                 </span>
@@ -6210,7 +6204,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         id: "legacy-l1",
         timestamp: req.approvedAtL1,
         title: "L1 Approval Granted",
-        subtitle: "First level approval completed",
+        subtitle: "Level 1 approval completed",
         type: "L1_APPROVED",
         actorName: "Ministry L1 Approver"
       });
@@ -6221,7 +6215,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         id: "legacy-l2",
         timestamp: req.approvedAtL2,
         title: "L2 Approval Granted",
-        subtitle: "Second level approval cleared",
+        subtitle: "Level 2  approval cleared",
         type: "L2_APPROVED",
         actorName: "Ministry L2 Approver"
       });
@@ -6231,7 +6225,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       timeline.push({
         id: "legacy-disbursal",
         timestamp: req.disbursedAt,
-        title: "Requisition Funds Disbursed",
+        title: "Funds Disbursed",
         subtitle: "Financial transaction settled and paid",
         type: "DISBURSED",
         actorName: "STANDS Finance Office"

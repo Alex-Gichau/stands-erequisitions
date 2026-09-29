@@ -30,7 +30,8 @@ import {
   FiscalYear,
   CustomCalendarEvent,
   BackgroundUploadTask,
-  RequisitionInstallment
+  RequisitionInstallment,
+  DeviceSession
 } from "../types";
 import { getProjectRequisitions, COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
 import { databaseService } from "../lib/databaseService";
@@ -108,9 +109,32 @@ export function normalizeUserProfile(u: any): UserProfile {
   } else {
     parsedGroups = u.group ? [u.group] : [];
   }
+
+  // Strip out legacy 'INDEPENDENT' affiliation so unassigned users are marked unallocated
+  parsedGroups = parsedGroups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
+  const rawGroup = u.group && typeof u.group === "string" ? u.group.trim() : "";
+  const normalizedGroup = rawGroup.toUpperCase() !== "INDEPENDENT" ? rawGroup : (parsedGroups[0] || "");
+
+  let parsedDevices: DeviceSession[] = [];
+  const rawDevices = u.activeDevices !== undefined ? u.activeDevices : u.active_devices;
+  if (Array.isArray(rawDevices)) {
+    parsedDevices = rawDevices;
+  } else if (typeof rawDevices === "string" && rawDevices.trim() !== "") {
+    try {
+      const parsed = JSON.parse(rawDevices);
+      if (Array.isArray(parsed)) {
+        parsedDevices = parsed;
+      }
+    } catch (e) {}
+  }
+
+  const { approverCode: _ac, approver_code: _acc, ...cleanU } = u;
+
   return {
-    ...u,
-    groups: parsedGroups
+    ...cleanU,
+    group: normalizedGroup || undefined,
+    groups: parsedGroups,
+    activeDevices: parsedDevices
   };
 }
 
@@ -1167,7 +1191,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const isSuperAdmin = dbUser.role === UserRole.SUPER_ADMIN || dbUser.role === "SUPER_ADMIN";
             setCurrentUser(normalizeUserProfile({
               ...dbUser,
-              approverCode: dbUser.approverCode || dbUser.approver_code,
               isActive: isSuperAdmin ? true : (dbUser.isActive !== undefined ? dbUser.isActive : (dbUser.is_active !== undefined ? dbUser.is_active : true)),
               isApproved: isSuperAdmin ? true : (dbUser.isApproved !== undefined ? dbUser.isApproved : (dbUser.is_approved !== undefined ? dbUser.is_approved : true)),
               isSuspended: dbUser.isSuspended !== undefined ? dbUser.isSuspended : (dbUser.is_suspended !== undefined ? dbUser.is_suspended : false),
@@ -1234,7 +1257,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         dbProfile.isSuspended !== currentUser.isSuspended ||
         dbProfile.isActive !== currentUser.isActive ||
         dbProfile.group !== currentUser.group ||
-        JSON.stringify(dbProfile.groups || []) !== JSON.stringify(currentUser.groups || []);
+        JSON.stringify(dbProfile.groups || []) !== JSON.stringify(currentUser.groups || []) ||
+        JSON.stringify(dbProfile.activeDevices || []) !== JSON.stringify(currentUser.activeDevices || []);
 
       if (hasChanged) {
         console.log("[Auth Sync] Aligning currentUser state with latest database profile:", dbProfile);
@@ -1242,6 +1266,61 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
   }, [users, currentUser?.id, currentUser?.email]);
+
+  // Active Device Session Management: Register & keep-alive the current device session
+  useEffect(() => {
+    if (!currentUser || !currentUser.id || typeof window === "undefined") return;
+
+    let deviceId = localStorage.getItem("device_session_id");
+    if (!deviceId) {
+      deviceId = "dev_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now().toString(36);
+      localStorage.setItem("device_session_id", deviceId);
+    }
+
+    const currentDevices = Array.isArray(currentUser.activeDevices) ? [...currentUser.activeDevices] : [];
+    const existingIdx = currentDevices.findIndex(d => d.id === deviceId);
+    const now = new Date().toISOString();
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "Desktop Client";
+
+    let shouldUpdate = false;
+    let nextDevices: DeviceSession[];
+
+    if (existingIdx !== -1) {
+      const lastActiveTime = new Date(currentDevices[existingIdx].lastActive || 0).getTime();
+      // Keep alive if more than 3 minutes since last activity or if userAgent was missing
+      if (Date.now() - lastActiveTime > 3 * 60 * 1000 || !currentDevices[existingIdx].userAgent) {
+        currentDevices[existingIdx] = {
+          ...currentDevices[existingIdx],
+          lastActive: now,
+          userAgent: userAgent || currentDevices[existingIdx].userAgent
+        };
+        nextDevices = currentDevices;
+        shouldUpdate = true;
+      } else {
+        nextDevices = currentDevices;
+      }
+    } else {
+      // New device session on this browser
+      nextDevices = [
+        ...currentDevices,
+        {
+          id: deviceId,
+          userAgent,
+          loginTime: now,
+          lastActive: now
+        }
+      ];
+      shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+      setCurrentUser(prev => prev && prev.id === currentUser.id ? { ...prev, activeDevices: nextDevices } : prev);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, activeDevices: nextDevices } : u));
+      databaseService.updateUser(currentUser.id, { activeDevices: nextDevices }).catch(err => {
+        console.warn("[Device Session] Failed to update active devices in database:", err);
+      });
+    }
+  }, [currentUser?.id]);
 
   const addSystemLog = useCallback(async (action: string, details: string, metadata?: any) => {
     try {
@@ -2564,7 +2643,6 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 role: u?.role || "",
                 group: u?.group || "",
                 groups: u?.groups || [],
-                approverCode: u?.approver_code || u?.approverCode || "",
                 isActive: Boolean(u?.is_active !== undefined ? u?.is_active : u?.isActive),
                 isApproved: Boolean(u?.is_approved !== undefined ? u?.is_approved : u?.isApproved),
                 isSuspended: Boolean(u?.is_suspended !== undefined ? u?.is_suspended : u?.isSuspended),
@@ -3059,19 +3137,27 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const userRole = currentUser?.role || "USER";
     const userGroup = currentUser?.group || "General Ministry";
     const currentUserId = currentUser?.id || auth.currentUser?.uid;
+    const localSessionId = typeof window !== "undefined" ? localStorage.getItem("device_session_id") : null;
+
+    // Filter out the current device session so it is unlisted upon logout
+    let remainingDevices: DeviceSession[] = [];
+    if (currentUser?.activeDevices && Array.isArray(currentUser.activeDevices)) {
+      remainingDevices = currentUser.activeDevices.filter(d => d.id !== localSessionId);
+    }
 
     // 1. Immediately reset state and local cache for instant UI response
     setCurrentUser(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("override_authorized_user_email");
       localStorage.removeItem("stands_cache_user");
+      localStorage.removeItem("device_session_id");
       sessionStorage.removeItem("slack_session_");
     }
 
     // 2. Fire signOut immediately
     const signOutPromise = signOut(auth).catch(err => console.warn("SignOut warning:", err));
 
-    // 3. Dispatch background logging & notifications without blocking UI execution
+    // 3. Dispatch background logging & unlist device from user profile on server
     (async () => {
       if (currentUserId) {
         try {
@@ -3079,10 +3165,15 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           fetch(`/api/db/users/${currentUserId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", ...headers },
-            body: JSON.stringify({ is_online: false, last_seen: new Date().toISOString() })
+            body: JSON.stringify({ 
+              is_online: false, 
+              last_seen: new Date().toISOString(),
+              active_devices: remainingDevices,
+              activeDevices: remainingDevices
+            })
           }).catch(() => {});
         } catch (err) {
-          console.warn("Failed to mark user offline on logout:", err);
+          console.warn("Failed to mark user offline / unlist device on logout:", err);
         }
       }
 
@@ -3276,7 +3367,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     name: string,
     role: UserRole,
     group?: string,
-    approverCode?: string,
+    _approverCode?: string,
     groups?: string[]
   ) => {
     if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
@@ -3308,9 +3399,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isSuspended: false,
       };
 
-      if (group) newProfile.group = group;
-      if (groups) newProfile.groups = groups;
-      if (approverCode) newProfile.approverCode = approverCode;
+      if (group && group.toUpperCase() !== "INDEPENDENT") newProfile.group = group;
+      if (groups) newProfile.groups = groups.filter(g => g && g.toUpperCase() !== "INDEPENDENT");
 
       // Store in users collection
       await databaseService.saveUserProfile(newProfile as any);
@@ -3484,7 +3574,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     const origin = typeof window !== "undefined" && window.location?.origin 
       ? window.location.origin 
-      : "https://stands-erequisitions.org";
+      : "https://accounts.pceastandrews.org";
     const requisitionUrl = `${origin}?reqId=${encodeURIComponent(req.id)}`;
 
     const effectiveApprover = approverName || resolveSenderName(currentUser, users) || currentUser?.name || "Reviewing Official";

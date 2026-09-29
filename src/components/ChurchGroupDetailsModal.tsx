@@ -1157,7 +1157,7 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
                               {isDirectlyAssigned ? "Direct Group L1" : "Church-Wide L1"}
                             </span>
                             <div className="text-[9px] text-slate-400 mt-1">
-                              {approver.approverCode ? "PIN Configured" : "Code Pending"}
+                              {approver.isActive ? "Active Verification" : "Inactive"}
                             </div>
                           </div>
                         </div>
@@ -1217,7 +1217,7 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
                               {isDirectlyAssigned ? "Direct Group L2" : "Treasury L2"}
                             </span>
                             <div className="text-[9px] text-slate-400 mt-1">
-                              {approver.approverCode ? "PIN Configured" : "Code Pending"}
+                              {approver.isActive ? "Active Verification" : "Inactive"}
                             </div>
                           </div>
                         </div>

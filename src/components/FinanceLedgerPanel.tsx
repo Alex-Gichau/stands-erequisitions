@@ -4012,9 +4012,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                           // Verification Method Info
                           let methodLabel = "System Protocol";
                           let MethodIcon = Activity;
-                          if (event.method === "CODE") {
-                            methodLabel = "Security PIN Code Verified";
-                            MethodIcon = KeyRound;
+                          if (event.method === "CODE" || event.method === "DIRECT") {
+                            methodLabel = "Digital Authorization Verified";
+                            MethodIcon = ShieldCheck;
                           } else if (event.method === "FINGERPRINT") {
                             methodLabel = "Biometric Authenticated";
                             MethodIcon = Fingerprint;
@@ -4095,7 +4095,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                                       </span>
                                       {event.approvalCode && (
                                         <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 rounded">
-                                          PIN: ••••{event.approvalCode.slice(-2)}
+                                          AUTH: ••••{event.approvalCode.slice(-2)}
                                         </span>
                                       )}
                                     </div>

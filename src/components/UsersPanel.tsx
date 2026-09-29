@@ -158,9 +158,13 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
         counts[g.name] = 0;
       }
     });
+    counts["UNALLOCATED"] = 0;
     
     users.forEach((u) => {
-      const uGroups = u.groups && u.groups.length > 0 ? u.groups : (u.group ? [u.group] : ["INDEPENDENT"]);
+      const rawGroups = (u.groups && u.groups.length > 0)
+        ? u.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
+        : (u.group && u.group.trim().toUpperCase() !== "INDEPENDENT" ? [u.group] : []);
+      const uGroups = rawGroups.length > 0 ? rawGroups : ["UNALLOCATED"];
       uGroups.forEach((gName) => {
         if (gName) {
           counts[gName] = (counts[gName] || 0) + 1;
@@ -283,7 +287,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
   const [role, setRole] = useState<UserRole>(UserRole.CHURCH_GROUP);
   const [group, setGroup] = useState("");
   const [groups, setGroups] = useState<string[]>([]);
-  const [approverCode, setApproverCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -312,7 +315,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  const [editApproverCode, setEditApproverCode] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState<string | null>(null);
@@ -405,9 +407,9 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     setEditingUser(user);
     setEditName(user.name);
     setEditRole(user.role);
-    setEditGroup(user.group || "");
-    setEditGroups(user.groups || (user.group ? [user.group] : []));
-    setEditApproverCode(user.approverCode || "");
+    const initialGroups = (user.groups || (user.group ? [user.group] : [])).filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
+    setEditGroup((user.group && user.group.trim().toUpperCase() !== "INDEPENDENT") ? user.group : "");
+    setEditGroups(initialGroups);
     setEditError(null);
     setEditSuccess(null);
   };
@@ -423,7 +425,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     if (regType === "GMAIL") {
       setIsSubmitting(true);
       try {
-        const inviteUrl = window.location.origin + "?invite=true&email=" + encodeURIComponent(email.trim()) + "&role=" + role + "&group=" + encodeURIComponent(group || "") + "&code=" + approverCode;
+        const inviteUrl = window.location.origin + "?invite=true&email=" + encodeURIComponent(email.trim()) + "&role=" + role + "&group=" + encodeURIComponent(group || "");
         setGeneratedInvite({
           url: inviteUrl,
           email: email.trim(),
@@ -442,20 +444,20 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
 
     setIsSubmitting(true);
     try {
-      const finalGroups = groups.filter(Boolean);
-      const primaryGroup = finalGroups[0] || group.trim() || "";
+      const finalGroups = groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
+      const primaryGroup = finalGroups[0] || (group.trim().toUpperCase() !== "INDEPENDENT" ? group.trim() : "");
       await adminRegisterUser(
         email.trim(),
         password,
         name.trim(),
         role,
         primaryGroup || undefined,
-        (role === UserRole.APPROVER_L1 || role === UserRole.APPROVER_L2) ? approverCode.trim() : undefined,
+        undefined,
         finalGroups
       );
 
       setSuccess(`Account registered successfully for ${name}!`);
-      setName(""); setEmail(""); setPassword(""); setRole(UserRole.CHURCH_GROUP); setGroup(""); setGroups([]); setApproverCode("");
+      setName(""); setEmail(""); setPassword(""); setRole(UserRole.CHURCH_GROUP); setGroup(""); setGroups([]);
       
       setTimeout(() => {
         setIsModalOpen(false);
@@ -474,21 +476,16 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     setEditError(null);
     setEditSuccess(null);
 
-    const finalGroups = editGroups.filter(Boolean);
-    if (finalGroups.length === 0) {
-      setEditError("Ministry Group Affiliations: You must select at least one ministry group for permission scoping.");
-      return;
-    }
+    const finalGroups = editGroups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
 
     setIsSaving(true);
     try {
-      const primaryGroup = finalGroups[0] || editGroup.trim() || "";
-      const profileUpdates = {
+      const primaryGroup = finalGroups[0] || (editGroup.trim().toUpperCase() !== "INDEPENDENT" ? editGroup.trim() : "");
+      const profileUpdates: Partial<UserProfile> = {
         name: editName.trim(),
         role: editRole,
         group: primaryGroup || undefined,
-        groups: finalGroups,
-        approverCode: (editRole === UserRole.APPROVER_L1 || editRole === UserRole.APPROVER_L2) ? editApproverCode.trim() : undefined
+        groups: finalGroups
       };
 
       // Optimistic update for local modal state
@@ -535,7 +532,10 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
         
         let matchesGroup = true;
         if (filterGroup !== "ALL") {
-          const uGroups = u.groups && u.groups.length > 0 ? u.groups : (u.group ? [u.group] : ["INDEPENDENT"]);
+          const rawGroups = (u.groups && u.groups.length > 0)
+            ? u.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
+            : (u.group && u.group.trim().toUpperCase() !== "INDEPENDENT" ? [u.group] : []);
+          const uGroups = rawGroups.length > 0 ? rawGroups : ["UNALLOCATED"];
           matchesGroup = uGroups.includes(filterGroup);
         }
 
@@ -724,19 +724,19 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                 </div>
                 <div className="flex items-center gap-2">
                   {Object.entries(groupCounts).map(([gName, count]) => {
-                    const isIndependent = gName === "INDEPENDENT";
+                    const isUnallocated = gName === "UNALLOCATED" || gName === "INDEPENDENT";
                     return (
                       <div 
                         key={gName}
                         className={cn(
                           "px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all hover:scale-[1.02] shrink-0",
-                          isIndependent 
-                            ? "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800/40 dark:text-slate-400 dark:border-slate-700/40"
+                          isUnallocated 
+                            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30"
                             : "bg-teal-50 text-teal-700 border-teal-100 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900/30"
                         )}
                       >
-                        <span className="uppercase tracking-wide text-[9px] whitespace-nowrap max-w-[120px] truncate" title={gName}>
-                          {gName}
+                        <span className="uppercase tracking-wide text-[9px] whitespace-nowrap max-w-[120px] truncate" title={isUnallocated ? "Unallocated Users" : gName}>
+                          {isUnallocated ? "UNALLOCATED" : gName}
                         </span>
                         <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-white/60 dark:bg-black/20 font-mono">
                           {count}
@@ -802,7 +802,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               className="bg-transparent text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 outline-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-slate-900"
             >
               <option value="ALL">ALL CHURCH GROUPS</option>
-              <option value="INDEPENDENT">INDEPENDENT</option>
+              <option value="UNALLOCATED">UNALLOCATED (NO GROUP)</option>
               {churchGroups.map((group) => (
                 <option key={group.id || group.name} value={group.name}>{group.name.toUpperCase()}</option>
               ))}
@@ -818,8 +818,8 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                 <th className="px-4 md:px-8 py-4"> Username</th>
-                <th className="px-4 md:px-8 py-4 hidden sm:table-cell">Security Level</th>
-                <th className="px-4 md:px-8 py-4 hidden md:table-cell">Affiliation / Key</th>
+                <th className="px-4 md:px-8 py-4 hidden sm:table-cell">Role</th>
+                <th className="px-4 md:px-8 py-4 hidden md:table-cell">Ministry</th>
                 <th className="px-4 md:px-8 py-4">Status</th>
                 <th className="px-4 md:px-8 py-4 text-right">Actions</th>
               </tr>
@@ -892,15 +892,23 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                     </td>
                     <td className="px-4 md:px-8 py-3 md:py-5 hidden md:table-cell">
                       {(() => {
-                        const groupsCount = user.groups && user.groups.length > 0 ? user.groups.length : (user.group && user.group !== "INDEPENDENT" ? 1 : 0);
+                        const rawGroups = (user.groups && user.groups.length > 0)
+                          ? user.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
+                          : (user.group && user.group.trim().toUpperCase() !== "INDEPENDENT" ? [user.group] : []);
+                        const groupsCount = rawGroups.length;
+                        const isUnallocated = groupsCount === 0;
+
                         return (
                           <div className="flex flex-col gap-1.5 justify-center">
                             <div className="flex flex-col gap-1 text-slate-600">
                               <div className="flex items-center gap-1.5 justify-between">
                                 <div className="flex items-center gap-1.5">
-                                  <Building2 size={12} className="text-slate-300" />
-                                  <span className="text-[10px] font-bold uppercase tracking-tight italic">
-                                    {(user.groups && user.groups.length > 0) ? user.groups[0] : (user.group || "INDEPENDENT")}
+                                  <Building2 size={12} className={isUnallocated ? "text-amber-500" : "text-slate-300"} />
+                                  <span className={cn(
+                                    "text-[10px] font-bold uppercase tracking-tight",
+                                    isUnallocated ? "text-amber-700 dark:text-amber-400 font-extrabold" : "italic text-slate-700 dark:text-slate-300"
+                                  )}>
+                                    {isUnallocated ? "UNALLOCATED" : rawGroups[0]}
                                   </span>
                                 </div>
                                 <span 
@@ -908,17 +916,17 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                                     "text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 border",
                                     groupsCount > 0 
                                       ? "bg-blue-50 text-blue-600 border-blue-200/50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/30" 
-                                      : "bg-slate-50 text-slate-400 border-slate-200/30 dark:bg-slate-900/30 dark:text-slate-550 dark:border-slate-800/20"
+                                      : "bg-amber-50 text-amber-700 border-amber-200/60 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/30"
                                   )}
-                                  title={`${groupsCount} Active Ministry Group(s) assigned`}
+                                  title={isUnallocated ? "User has no assigned group (Unallocated)" : `${groupsCount} Active Ministry Group(s) assigned`}
                                 >
-                                  <span className={cn("w-1 h-1 rounded-full", groupsCount > 0 ? "bg-blue-500 animate-pulse" : "bg-slate-300")} />
-                                  {groupsCount} {groupsCount === 1 ? "Group" : "Groups"}
+                                  <span className={cn("w-1 h-1 rounded-full", groupsCount > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500")} />
+                                  {isUnallocated ? "Unallocated" : `${groupsCount} ${groupsCount === 1 ? "Group" : "Groups"}`}
                                 </span>
                               </div>
-                              {user.groups && user.groups.length > 1 && (
+                              {rawGroups.length > 1 && (
                                 <div className="flex flex-wrap gap-1 mt-1 pl-4">
-                                  {user.groups.slice(1).map((g, idx) => (
+                                  {rawGroups.slice(1).map((g, idx) => (
                                     <span key={`group-tag-${g}-${idx}`} className="text-[8px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                                       {g}
                                     </span>
@@ -929,14 +937,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                           </div>
                         );
                       })()}
-                      {(user.role === UserRole.APPROVER_L1 || user.role === UserRole.APPROVER_L2) && (
-                        <div className="flex items-center gap-1.5 text-primary mt-1.5 pl-0.5">
-                          <Fingerprint size={12} className="text-primary/40" />
-                          <span className="text-[10px] font-mono font-bold tracking-widest bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
-                            {user.approverCode || "TRANSACTION_PENDING"}
-                          </span>
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 md:px-8 py-3 md:py-5">
                       <div className="flex items-center gap-2">
@@ -2065,7 +2065,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   <h3 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-[0.2em]">
                     {isModalOpen ? "New Member Credentials" : "Update Member Transaction"}
                   </h3>
-                  <p className="text-[8px] md:text-[10px] text-slate-400 font-mono tracking-widest mt-1">SYS_ACCESS_CONTROL_V4</p>
                 </div>
                 <button 
                   onClick={() => { setIsModalOpen(false); setEditingUser(null); setError(null); setSuccess(null); setGeneratedInvite(null); }}
@@ -2192,7 +2191,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                     />
                   </div>
                   <div className="space-y-1.5 text-xs text-slate-400">
-                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Identity Transaction (Email)</label>
+                    <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
                     <input 
                       type="email"
                       required
@@ -2235,7 +2234,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
 
                 <div className="bg-slate-50 rounded-2xl p-6 space-y-6 border border-slate-100">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Protocol Level (Role)</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">User Access Role</label>
                       <select
                         value={isModalOpen ? role : editRole}
                         onChange={(e) => isModalOpen ? setRole(e.target.value as UserRole) : setEditRole(e.target.value as UserRole)}
@@ -2252,17 +2251,8 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                      <div className="space-y-2 animate-in slide-in-from-top-2 duration-300 relative" ref={dropdownRef}>
                        <div className="flex justify-between items-center ml-1">
                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                           Ministry Group Affiliations (Select One or More)
+                           Ministry Allocation (Select One or More)
                          </label>
-                         {lastGroupsSync && (
-                           <span 
-                             className="text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-help"
-                             title={`Fresh from Supabase. Last synchronized: ${lastGroupsSync.toLocaleString()}`}
-                           >
-                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-                             Synced {lastGroupsSync.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                           </span>
-                         )}
                        </div>
                        <div 
                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-h-[46px] flex flex-wrap gap-2 items-center cursor-text transition-colors focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-600/10"
@@ -2375,25 +2365,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                        </AnimatePresence>
                      </div>
 
-                    {((isModalOpen ? role : editRole) === UserRole.APPROVER_L1 || (isModalOpen ? role : editRole) === UserRole.APPROVER_L2) && (
-                      <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                          Security PIN Signature ({ (isModalOpen ? role : editRole) === UserRole.APPROVER_L1 ? "6" : "7" } DIGITS)
-                        </label>
-                        <div className="relative">
-                          <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                          <input 
-                            type="text"
-                            maxLength={(isModalOpen ? role : editRole) === UserRole.APPROVER_L1 ? 6 : 7}
-                            required
-                            value={isModalOpen ? approverCode : editApproverCode}
-                            onChange={(e) => isModalOpen ? setApproverCode(e.target.value.replace(/\D/g, "")) : setEditApproverCode(e.target.value.replace(/\D/g, ""))}
-                            className="input-field pl-11 bg-white font-mono font-bold tracking-[0.4em]"
-                            placeholder="XXXXXX"
-                          />
-                        </div>
-                      </div>
-                    )}
                 </div>
 
                 {!isModalOpen && editingUser && (

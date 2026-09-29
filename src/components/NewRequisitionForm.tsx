@@ -1896,7 +1896,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                 required 
                 rows={4}
                 className="input-field resize-none py-3"
-                placeholder="Provide a comprehensive breakdown of the requirements..."
+                placeholder="For the following purpose..."
               />
             </div>
           </div>
@@ -2324,7 +2324,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
               <Info size={12} />
             </div>
             <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
-              Important: You are submitting a legal financial request to the Diocese ledger. Ensure all supporting documents are accurate. Approval processing typically takes 24-72 hours.
+              Important: You are submitting your requisition to the STANDS Finance. Ensure all supporting documents are accurate.
             </p>
           </div>
         </form>

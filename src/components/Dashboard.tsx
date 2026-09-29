@@ -981,7 +981,7 @@ const Dashboard: React.FC<{
               </div>
               <div className="flex-1 w-full md:max-w-lg space-y-4">
                 <div className="flex justify-between items-end mb-1">
-                  <span className="text-[10px] md:text-sm font-bold opacity-80 uppercase tracking-wider">Utilization</span>
+                  <span className="text-[10px] md:text-sm font-bold opacity-80 uppercase tracking-wider">Amount Spent(%)</span>
                   <span className="text-lg md:text-2xl font-bold">
                     {totalAllocatedForBanner > 0 ? ((totalUsedForBanner / totalAllocatedForBanner) * 100).toFixed(1) : "0.0"}%
                   </span>

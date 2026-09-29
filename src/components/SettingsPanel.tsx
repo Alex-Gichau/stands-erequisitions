@@ -11,6 +11,8 @@ import {
   Database, 
   Mail, 
   Smartphone,
+  Monitor,
+  Laptop,
   Fingerprint,
   Save,
   History,
@@ -122,6 +124,39 @@ export const SettingsPanel: React.FC = () => {
   }, [currentUser?.activeDevices]);
 
   const devices = Array.isArray(localActiveDevices) ? localActiveDevices : [];
+
+  const parseDeviceInfo = (userAgent?: string) => {
+    if (!userAgent) return { name: "Web Browser", platform: "Desktop", isMobile: false };
+    let browser = "Web Browser";
+    let platform = "Desktop";
+    let isMobile = false;
+
+    if (/iPhone/i.test(userAgent)) {
+      platform = "iPhone";
+      isMobile = true;
+    } else if (/iPad/i.test(userAgent)) {
+      platform = "iPad";
+      isMobile = true;
+    } else if (/Android/i.test(userAgent)) {
+      platform = "Android Device";
+      isMobile = true;
+    } else if (/Macintosh|Mac OS/i.test(userAgent)) {
+      platform = "Mac";
+    } else if (/Windows NT/i.test(userAgent)) {
+      platform = "Windows PC";
+    } else if (/Linux/i.test(userAgent)) {
+      platform = "Linux PC";
+    }
+
+    if (/Edg\//i.test(userAgent)) browser = "Microsoft Edge";
+    else if (/Chrome\//i.test(userAgent)) browser = "Google Chrome";
+    else if (/Firefox\//i.test(userAgent)) browser = "Mozilla Firefox";
+    else if (/Safari\//i.test(userAgent) && !/Chrome/i.test(userAgent)) browser = "Apple Safari";
+    else if (/Opera|OPR\//i.test(userAgent)) browser = "Opera";
+    else if (/SamsungBrowser/i.test(userAgent)) browser = "Samsung Internet";
+
+    return { name: `${browser} • ${platform}`, platform, isMobile };
+  };
 
   // Desktop Notification States
   const [desktopPermission, setDesktopPermission] = React.useState<DesktopNotificationPermission>(() => getDesktopNotificationPermission());
@@ -788,14 +823,27 @@ export const SettingsPanel: React.FC = () => {
     }
   };
 
+  const isAdminOrSuperAdmin = 
+    currentUser?.role === UserRole.ADMIN || 
+    currentUser?.role === UserRole.SUPER_ADMIN || 
+    currentUser?.email?.toLowerCase() === "gichaumburu@gmail.com";
+
+  React.useEffect(() => {
+    if (!isAdminOrSuperAdmin && ["notifications", "backups", "health", "database"].includes(activeTab)) {
+      setActiveTab("profile");
+    }
+  }, [isAdminOrSuperAdmin, activeTab]);
+
   const navItems = [
     { id: "profile", label: "Profile & Account", icon: User, description: "Personal details and display name" },
     { id: "security", label: "Security & Auth", icon: Lock, description: "Password, biometrics & connected devices" },
     { id: "expiry", label: "Limits & Thresholds", icon: SlidersHorizontal, description: "Operational approval thresholds & spending limits" },
-    { id: "notifications", label: "Notifications & Slack", icon: Bell, description: "Email alerts & Slack webhook dispatches" },
-    { id: "backups", label: "Automated Backups", icon: Cloud, description: "Scheduled JSON email snapshots & snapshots" },
-    { id: "health", label: "System Health & Logs", icon: Gauge, description: "Telemetry speed & real-time audit trails" },
-    { id: "database", label: "Database & Compass", icon: Database, description: "MongoDB cluster, guides & dumps" }
+    ...(isAdminOrSuperAdmin ? [
+      { id: "notifications", label: "Notifications & Slack", icon: Bell, description: "Email alerts & Slack webhook dispatches" },
+      { id: "backups", label: "Automated Backups", icon: Cloud, description: "Scheduled JSON email snapshots & snapshots" },
+      { id: "health", label: "System Health & Logs", icon: Gauge, description: "Telemetry speed & real-time audit trails" },
+      { id: "database", label: "Database & Compass", icon: Database, description: "MongoDB cluster, guides & dumps" }
+    ] : [])
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -805,135 +853,72 @@ export const SettingsPanel: React.FC = () => {
   );
 
   return (
-    <div className="bg-[#f0f4f9] dark:bg-slate-950 p-3 sm:p-6 lg:p-8 rounded-[2.5rem] min-h-[820px] transition-colors">
-      {/* Main Container Shell matching STANDS eRequisition Card Design */}
-      <div className="max-w-7xl mx-auto bg-white dark:bg-slate-900 rounded-[2rem] border border-blue-100/80 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col md:flex-row min-h-[750px]">
-        
-        {/* LEFT SUB-SIDEBAR (STANDS eRequisition Left Panel Style) */}
-        <div className="w-full md:w-64 lg:w-72 bg-[#eef4fb] dark:bg-slate-950/80 p-5 lg:p-6 flex flex-col justify-between shrink-0 border-b md:border-b-0 md:border-r border-blue-100/60 dark:border-slate-800">
-          <div className="space-y-6">
-            
-            {/* STANDS eRequisition Header Brand */}
-            <div className="flex items-center gap-3 px-2 pt-1">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 font-black">
-                <Settings2 size={20} />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight leading-none">
-                  STANDS eRequisition
-                </h2>
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                  Settings Portal
-                </span>
-              </div>
+    <div className="w-full space-y-6 animate-in fade-in transition-all duration-300">
+      {/* Top Header & Tab Navigation */}
+      <div className="space-y-4">
+        {/* Title Bar & Search */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 font-black">
+              <Settings2 size={20} />
             </div>
-
-            {/* Sub-Navigation List */}
-            <nav className="space-y-1.5 pt-2">
-              {filteredNavItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id as any)}
-                    className={cn(
-                      "w-full text-left px-4 py-3 rounded-2xl flex items-center justify-between transition-all group cursor-pointer text-sm font-semibold",
-                      isActive
-                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs border-r-4 border-[#0f172a] dark:border-blue-500 font-bold"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/40"
-                    )}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Icon 
-                        size={18} 
-                        className={cn(
-                          "shrink-0 transition-colors",
-                          isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"
-                        )} 
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
+            <div>
+              <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                Settings & Governance
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                {isAdminOrSuperAdmin
+                  ? "Configure account preferences, authentication, financial limits, notifications, backups, and system diagnostics."
+                  : "Configure personal account preferences, authentication credentials, and connected device sessions."}
+              </p>
+            </div>
           </div>
 
-          {/* User Profile Card at Bottom of Sub-Sidebar */}
-          <div className="pt-6 border-t border-blue-100/80 dark:border-slate-800/80 mt-6 space-y-3">
-            <div className="flex items-center gap-3 p-2 bg-white/70 dark:bg-slate-800/60 rounded-2xl border border-blue-100/50 dark:border-slate-700/50">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-sm shrink-0 shadow-sm">
-                {currentUser?.name?.charAt(0) || "U"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                  {currentUser?.name || "User"}
-                </p>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                  @{currentUser?.role?.toLowerCase().replace("_", "") || "member"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between px-2 pt-1 text-slate-500">
-              <button 
-                onClick={() => logout()}
-                className="text-xs font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1.5 cursor-pointer"
-              >
-                <Power size={14} />
-                <span>Sign out</span>
-              </button>
-              
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => currentUser && updateUserProfile(currentUser.id, { theme: currentUser.theme === 'dark' ? 'light' : 'dark' })}
-                  className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/80 dark:hover:bg-slate-800 transition-all"
-                  title="Toggle Light / Dark Mode"
-                >
-                  {currentUser?.theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-                </button>
-              </div>
-            </div>
+          {/* Quick Search */}
+          <div className="relative w-full sm:w-72">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter settings..."
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all shadow-xs"
+            />
           </div>
         </div>
 
-        {/* RIGHT MAIN CONTENT AREA */}
-        <div className="flex-1 bg-white dark:bg-slate-900 p-6 md:p-10 flex flex-col justify-between overflow-y-auto">
-          
-          <div>
-            {/* Top Bar with Back Arrow and Search Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-8 border-b border-slate-100 dark:border-slate-800">
+        {/* Tab Navigation Menu */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-slate-200 dark:border-slate-800">
+          {filteredNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
               <button
-                type="button"
-                onClick={() => {
-                  const tabs: ("profile" | "security" | "expiry" | "notifications" | "backups" | "health" | "database")[] = [
-                    "profile", "security", "expiry", "notifications", "backups", "health", "database"
-                  ];
-                  const currentIndex = tabs.indexOf(activeTab);
-                  if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
-                }}
-                className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-                title="Go to previous section"
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={cn(
+                  "px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-bold transition-all whitespace-nowrap cursor-pointer",
+                  isActive
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+                    : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
+                )}
               >
-                <ArrowLeft size={18} />
-              </button>
-
-              {/* STANDS eRequisition Search Pill Bar */}
-              <div className="relative w-full sm:w-72">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search your next Xperience"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                <Icon
+                  size={15}
+                  className={cn(
+                    "shrink-0",
+                    isActive ? "text-indigo-400 dark:text-indigo-600" : "text-slate-400"
+                  )}
                 />
-              </div>
-            </div>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-            {/* TAB CONTENT AREA */}
-            <div className="py-8 space-y-8">
+      {/* TAB CONTENT AREA */}
+      <div className="w-full space-y-8">
 
               {/* TAB 1: PROFILE & ACCOUNT */}
               {activeTab === "profile" && (
@@ -1251,7 +1236,7 @@ export const SettingsPanel: React.FC = () => {
                       Security & Authentication
                     </h1>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      Manage password signatures, hardware biometric enrollment, and active connected devices.
+                      Manage account credentials, hardware biometric enrollment, and active connected devices.
                     </p>
                   </div>
 
@@ -1360,39 +1345,140 @@ export const SettingsPanel: React.FC = () => {
 
                   {/* Connected Devices List */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Smartphone size={16} className="text-blue-600" />
-                      <span>Active Sessions ({devices.length})</span>
-                    </h3>
-
-                    {devices.map((device) => {
-                      const localSessionId = typeof window !== "undefined" ? localStorage.getItem("device_session_id") : null;
-                      const isCurrent = device.id === localSessionId;
-                      return (
-                        <div key={device.id} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 flex items-center justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                              {device.userAgent ? device.userAgent.slice(0, 60) : "Session Device"}
-                            </p>
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              Logged in: {device.loginTime ? new Date(device.loginTime).toLocaleDateString() : 'N/A'} {isCurrent ? '• (This Device)' : ''}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              if (confirm("Revoke session for this device?")) {
-                                const updated = devices.filter(d => d.id !== device.id);
-                                setLocalActiveDevices(updated);
-                                if (currentUser) updateUserProfile(currentUser.id, { activeDevices: updated });
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Smartphone size={16} className="text-indigo-600" />
+                          <span>Active Logged-In Sessions ({devices.length})</span>
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Devices and browsers currently authenticated into your account.
+                        </p>
+                      </div>
+                      {devices.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const localSessionId = typeof window !== "undefined" ? localStorage.getItem("device_session_id") : null;
+                            if (confirm("Disconnect all other sessions except this current device?")) {
+                              const remaining = devices.filter(d => d.id === localSessionId);
+                              setLocalActiveDevices(remaining);
+                              if (currentUser) {
+                                await updateUserProfile(currentUser.id, { activeDevices: remaining });
+                                triggerToast({
+                                  type: "SYSTEM_INFO",
+                                  severity: "LOW",
+                                  message: "All other device sessions have been revoked.",
+                                  timestamp: new Date().toISOString()
+                                });
                               }
-                            }}
-                            className="px-4 py-2 rounded-xl border border-rose-200 text-rose-600 text-xs font-bold hover:bg-rose-50 transition-all cursor-pointer"
-                          >
-                            Revoke
-                          </button>
-                        </div>
-                      );
-                    })}
+                            }
+                          }}
+                          className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer self-start sm:self-auto"
+                        >
+                          Revoke All Other Devices
+                        </button>
+                      )}
+                    </div>
+
+                    {devices.length === 0 ? (
+                      <div className="p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-1 bg-slate-50/50 dark:bg-slate-900/50">
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          No active sessions registered.
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Devices are listed when you log in and unlisted when you log out.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {devices.map((device) => {
+                          const localSessionId = typeof window !== "undefined" ? localStorage.getItem("device_session_id") : null;
+                          const isCurrent = device.id === localSessionId;
+                          const info = parseDeviceInfo(device.userAgent);
+
+                          return (
+                            <div 
+                              key={device.id} 
+                              className={cn(
+                                "p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                                isCurrent 
+                                  ? "bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/50" 
+                                  : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-800"
+                              )}
+                            >
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className={cn(
+                                  "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5",
+                                  isCurrent 
+                                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300" 
+                                    : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                                )}>
+                                  {info.isMobile ? (
+                                    <Smartphone size={18} />
+                                  ) : info.platform.includes("Mac") || info.platform.includes("Windows") ? (
+                                    <Laptop size={18} />
+                                  ) : (
+                                    <Monitor size={18} />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                      {info.name}
+                                    </p>
+                                    {isCurrent && (
+                                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                        This Device (Current)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-slate-400 mt-1 flex flex-wrap items-center gap-x-2">
+                                    <span>Logged in: {device.loginTime ? new Date(device.loginTime).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Active"}</span>
+                                    {device.lastActive && device.lastActive !== device.loginTime && (
+                                      <span>• Last active: {new Date(device.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (isCurrent) {
+                                    if (confirm("Revoke session for this device? You will be signed out immediately.")) {
+                                      await logout();
+                                    }
+                                  } else {
+                                    if (confirm(`Revoke session for ${info.name}? This device will be unlisted and disconnected.`)) {
+                                      const updated = devices.filter(d => d.id !== device.id);
+                                      setLocalActiveDevices(updated);
+                                      if (currentUser) {
+                                        await updateUserProfile(currentUser.id, { activeDevices: updated });
+                                        triggerToast({
+                                          type: "SYSTEM_INFO",
+                                          severity: "LOW",
+                                          message: "Remote device session revoked.",
+                                          timestamp: new Date().toISOString()
+                                        });
+                                      }
+                                    }
+                                  }
+                                }}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 self-start sm:self-auto",
+                                  isCurrent
+                                    ? "border-amber-200 dark:border-amber-900/40 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                    : "border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                )}
+                              >
+                                {isCurrent ? "Sign Out Device" : "Revoke"}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1452,7 +1538,7 @@ export const SettingsPanel: React.FC = () => {
               )}
 
               {/* TAB 4: NOTIFICATIONS & SLACK */}
-              {activeTab === "notifications" && (
+              {isAdminOrSuperAdmin && activeTab === "notifications" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -1981,7 +2067,7 @@ export const SettingsPanel: React.FC = () => {
               )}
 
               {/* TAB 5: BACKUPS & AUTO BACKUP */}
-              {activeTab === "backups" && (
+              {isAdminOrSuperAdmin && activeTab === "backups" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -2000,7 +2086,7 @@ export const SettingsPanel: React.FC = () => {
               )}
 
               {/* TAB 6: SYSTEM HEALTH & DIAGNOSTICS */}
-              {activeTab === "health" && (
+              {isAdminOrSuperAdmin && activeTab === "health" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -2070,7 +2156,7 @@ export const SettingsPanel: React.FC = () => {
               )}
 
               {/* TAB 7: DATABASE & COMPASS */}
-              {activeTab === "database" && (
+              {isAdminOrSuperAdmin && activeTab === "database" && (
                 <div className="space-y-8 animate-in fade-in duration-300">
                   <div className="space-y-1">
                     <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
@@ -2148,19 +2234,13 @@ sudo systemctl enable mongod`}
                 </div>
               )}
 
-            </div>
-          </div>
-
-          {/* STANDS eRequisition Footer Note */}
-          <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span>STANDS eRequisition System & Profile Core</span>
-            <span>St. Andrew's PCEA eRequisitions</span>
-          </div>
-
-        </div>
-
       </div>
 
+      {/* Footer Note */}
+      <div className="pt-8 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+        <span>STANDS eRequisition System & Governance</span>
+        <span>St. Andrew's PCEA eRequisitions</span>
+      </div>
     </div>
   );
 };

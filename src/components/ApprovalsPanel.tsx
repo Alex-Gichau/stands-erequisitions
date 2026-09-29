@@ -31,9 +31,8 @@ export const ApprovalsPanel: React.FC = () => {
   const { requisitions, updateRequisitionStatus, currentUser, globalSearchTerm, canPerform, systemSettings } = useRequisitions();
   const [selectedReq, setSelectedReq] = useState<Requisition | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [approvalStep, setApprovalStep] = useState<"DETAILS" | "CODE" | "SUCCESS">("DETAILS");
+  const [approvalStep, setApprovalStep] = useState<"DETAILS" | "SUCCESS">("DETAILS");
   const [isBulkMode, setIsBulkMode] = useState(false);
-  const [authCode, setAuthCode] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
   const [loading, setLoading] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
@@ -99,9 +98,9 @@ export const ApprovalsPanel: React.FC = () => {
             nextStatus, 
             "APPROVE", 
             "Bulk authorization signature applied.", 
-            "CODE", 
+            "DIRECT", 
             undefined, 
-            authCode
+            undefined
           );
         });
         await Promise.all(promises);
@@ -116,9 +115,9 @@ export const ApprovalsPanel: React.FC = () => {
           nextStatus, 
           "APPROVE", 
           decisionNote, 
-          "CODE", 
+          "DIRECT", 
           undefined, 
-          authCode
+          undefined
         );
       }
       setApprovalStep("SUCCESS");
@@ -138,7 +137,7 @@ export const ApprovalsPanel: React.FC = () => {
         RequisitionStatus.REJECTED, 
         "REJECT", 
         decisionNote, 
-        "CODE", 
+        "DIRECT", 
         decisionNote
       );
       setSelectedReq(null);
@@ -198,7 +197,6 @@ export const ApprovalsPanel: React.FC = () => {
                 setSelectedReq(req);
                 setIsBulkMode(false);
                 setApprovalStep("DETAILS");
-                setAuthCode("");
                 setDecisionNote("");
               }}
               className={cn(
@@ -456,66 +454,6 @@ export const ApprovalsPanel: React.FC = () => {
                       </button>
                     </div>
                   )}
-                </div>
-              )}
-
-              {approvalStep === "CODE" && (
-                <div className="p-8 md:p-12 text-center space-y-6 md:space-y-8 relative flex-1 flex flex-col justify-center">
-                   <button 
-                    onClick={() => {
-                      if (isBulkMode) setIsBulkMode(false);
-                      else setSelectedReq(null);
-                    }} 
-                    className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full transition-all border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500"
-                  >
-                    <X size={20} />
-                  </button>
-
-                  <div className="mx-auto w-16 h-16 md:w-20 md:h-20 bg-primary/10 rounded-2xl md:rounded-3xl flex items-center justify-center text-primary relative">
-                    <Fingerprint size={30} className="md:w-10 md:h-10 animate-pulse" />
-                    <motion.div 
-                      className="absolute inset-0 rounded-2xl md:rounded-3xl border-2 border-primary"
-                      animate={{ scale: [1, 1.1, 1], opacity: [0, 0.5, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tight">
-                      {isBulkMode ? "Bulk Authorization" : "Security Protocol"}
-                    </h3>
-                    <p className="text-[9px] md:text-xs text-slate-400 mt-2 uppercase font-black tracking-widest">
-                      {isBulkMode ? `Signing ${selectedIds.size} transactions` : `Input unique ${currentUser?.role === UserRole.APPROVER_L2 ? "7" : "6"}-digit signature key`}
-                    </p>
-                  </div>
-                  
-                  <div className="relative max-w-[240px] md:max-w-[280px] mx-auto">
-                    <input 
-                      type="password"
-                      maxLength={7}
-                      value={authCode}
-                      onChange={(e) => setAuthCode(e.target.value.replace(/\D/g, ''))}
-                      autoFocus
-                      placeholder="•••••••"
-                      className="w-full text-center text-2xl md:text-4xl tracking-[0.4em] md:tracking-[0.6em] font-black border-none bg-slate-50 py-4 md:py-6 rounded-xl md:rounded-2xl focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-slate-200"
-                    />
-                  </div>
-                  
-                  <div className="flex flex-col gap-2.5 md:gap-3">
-                    <button 
-                      disabled={loading || authCode.length < (currentUser?.role === UserRole.APPROVER_L2 ? 7 : 6)}
-                      onClick={handleApprove}
-                      className="w-full py-3 md:py-4 bg-primary text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black uppercase hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                      Verify Signature
-                    </button>
-                    <button 
-                      onClick={() => setApprovalStep("DETAILS")}
-                      className="w-full py-2.5 bg-white text-slate-400 rounded-xl text-[9px] md:text-[10px] font-black uppercase hover:text-slate-600 transition-all"
-                    >
-                      Return to details
-                    </button>
-                  </div>
                 </div>
               )}
 

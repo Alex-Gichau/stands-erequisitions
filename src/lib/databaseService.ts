@@ -103,6 +103,8 @@ export const databaseService = {
       is_online: user.isOnline || false,
       last_seen: user.lastSeen ? new Date(user.lastSeen).toISOString() : null,
       idle_timeout_duration: user.idleTimeoutDuration || 15,
+      active_devices: user.activeDevices || [],
+      activeDevices: user.activeDevices || [],
       updated_at: new Date().toISOString()
     });
   },
@@ -519,6 +521,8 @@ export const databaseService = {
       isApproved: user.isApproved !== undefined ? user.isApproved : true,
       is_suspended: user.isSuspended !== undefined ? user.isSuspended : false,
       isSuspended: user.isSuspended !== undefined ? user.isSuspended : false,
+      active_devices: user.activeDevices || [],
+      activeDevices: user.activeDevices || [],
       updated_at: new Date().toISOString()
     });
   },
@@ -536,6 +540,10 @@ export const databaseService = {
     if (updates.isApproved !== undefined) mapped.is_approved = updates.isApproved;
     if (updates.isSuspended !== undefined) mapped.is_suspended = updates.isSuspended;
     if (updates.forceLogout !== undefined) mapped.force_logout = updates.forceLogout;
+    if (updates.activeDevices !== undefined) {
+      mapped.active_devices = updates.activeDevices;
+      mapped.activeDevices = updates.activeDevices;
+    }
     mapped.updated_at = new Date().toISOString();
     await apiCall(`/api/db/users/${encodeURIComponent(id)}`, "PATCH", mapped);
   },

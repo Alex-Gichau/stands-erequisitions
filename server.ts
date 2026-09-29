@@ -2905,7 +2905,7 @@ Your response MUST adhere strictly to the JSON schema specified.
       const forwardedProto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
       const forwardedHost = (req.headers["x-forwarded-host"] as string) || req.headers.host || "";
       const hostOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : "";
-      const defaultBaseUrl = reqHeaderOrigin || refererOrigin || hostOrigin || "https://stands-erequisitions.org";
+      const defaultBaseUrl = reqHeaderOrigin || refererOrigin || hostOrigin || "https://accounts.pceastandrews.org";
       const reqUrl = requisitionUrl || (requisitionId ? `${defaultBaseUrl}?reqId=${encodeURIComponent(requisitionId)}` : defaultBaseUrl);
       const formattedAmount = amount ? `KES ${Number(amount).toLocaleString()}` : "KES 0.00";
       const ministryName = groupName || "General Ministry";
@@ -4461,7 +4461,7 @@ Your response MUST adhere strictly to the JSON schema specified.
       return { success: false, error: "No valid recipient email addresses found." };
     }
 
-    const subject = `⏳ [Bi-Weekly Digest] ${summaryData.totalCount} Unapproved Requisition(s) Pending Action`;
+    const subject = `⏳ UPDATE | ${summaryData.totalCount} Unapproved Requisition(s)`;
     const portalUrl = options?.reqOrigin || "https://accounts.pceastandrews.org";
 
     const rowsHtml = summaryData.items.length > 0
@@ -4506,7 +4506,7 @@ Your response MUST adhere strictly to the JSON schema specified.
                 STANDS eRequisitions
               </h1>
               <div style="display: inline-block; margin-top: 14px; background-color: rgba(251, 191, 36, 0.15); color: #fbbf24; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.3);">
-                ⏳ BI-WEEKLY UNAPPROVED SUMMARY (14-DAY CYCLE)
+                ⏳ 14-DAYS REQUISITIONS SUMMARY
               </div>
             </td>
           </tr>
@@ -4515,10 +4515,10 @@ Your response MUST adhere strictly to the JSON schema specified.
           <tr>
             <td style="padding: 32px 28px 20px;">
               <p style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 6px;">
-                Attention Approvers &amp; Church Leadership,
+                UPDATE | Un-approved Requisitions (Last 14 Days)
               </p>
               <p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 24px;">
-                This is the automated bi-weekly digest of expense requisitions currently awaiting review, Level 1 audit verification, or Level 2 Treasury clearance. Please review pending items to maintain financial workflow momentum.
+                This is an automated bi-weekly requisitions update currently awaiting review. 
               </p>
 
               <!-- Metrics Grid -->
@@ -4526,21 +4526,21 @@ Your response MUST adhere strictly to the JSON schema specified.
                 <tr>
                   <td width="50%" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; text-align: center;">
                     <div style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 4px;">${summaryData.totalCount}</div>
-                    <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Unapproved</div>
+                    <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Unapproved</div>
                   </td>
                   <td width="50%" valign="top" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 16px; text-align: center;">
                     <div style="font-size: 24px; font-weight: 800; color: #a16207; line-height: 1; margin-bottom: 4px;">KES ${summaryData.totalAmount.toLocaleString()}</div>
-                    <div style="font-size: 10px; font-weight: 800; color: #854d0e; text-transform: uppercase; letter-spacing: 1px;">Total Pending Value</div>
+                    <div style="font-size: 10px; font-weight: 800; color: #854d0e; text-transform: uppercase; letter-spacing: 1px;">Pending Amount</div>
                   </td>
                 </tr>
                 <tr>
                   <td width="50%" valign="top" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 16px; text-align: center;">
                     <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; line-height: 1; margin-bottom: 2px;">${summaryData.level1Count}</div>
-                    <div style="font-size: 9px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 1 Audit</div>
+                    <div style="font-size: 9px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 1 Approver</div>
                   </td>
                   <td width="50%" valign="top" style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 12px 16px; text-align: center;">
                     <div style="font-size: 20px; font-weight: 800; color: #7e22ce; line-height: 1; margin-bottom: 2px;">${summaryData.level2Count}</div>
-                    <div style="font-size: 9px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 2 Treasury</div>
+                    <div style="font-size: 9px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 2 Approver</div>
                   </td>
                 </tr>
               </table>
@@ -4548,15 +4548,15 @@ Your response MUST adhere strictly to the JSON schema specified.
               <!-- Itemized Table -->
               <div style="margin-top: 24px; margin-bottom: 24px; overflow-x: auto;">
                 <div style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 8px; border-bottom: 2px solid #0f172a; margin-bottom: 8px;">
-                  📋 Unapproved Requisitions Queue (${summaryData.items.length > 15 ? `Showing 15 of ${summaryData.totalCount}` : summaryData.totalCount})
+                  📋 Unapproved Requisitions (${summaryData.items.length > 15 ? `Showing 15 of ${summaryData.totalCount}` : summaryData.totalCount})
                 </div>
                 <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
                   <thead>
                     <tr style="background-color: #f1f5f9; text-align: left;">
-                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Title &amp; Group</th>
+                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Requisition</th>
                       <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Requester</th>
                       <th align="right" style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Amount</th>
-                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Required Stage</th>
+                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Pending</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -4568,7 +4568,7 @@ Your response MUST adhere strictly to the JSON schema specified.
               <!-- Call to Action Button -->
               <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
                 <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 13px; font-weight: 800; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
-                  Access Portal &amp; Review Approvals →
+                  Review Requisitions →
                 </a>
               </div>
             </td>
@@ -4578,13 +4578,13 @@ Your response MUST adhere strictly to the JSON schema specified.
           <tr>
             <td style="background-color: #f8fafc; padding: 24px 28px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin: 0 0 10px;">
-                ⚙️ <strong>Notification Control</strong>: This automated digest is sent on a 14-day schedule. Super Admins can turn off or adjust this notification for all users anytime in the <strong>Settings &gt; Notifications &amp; Slack</strong> control panel.
+                <strong>This automated digest is sent every 14-day schedule.</strong>: 
               </p>
               <div style="display: inline-block; background-color: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px;">
-                DISPATCH SENDER: ict.team@pceastandrews.org
+                To Respond Contact : finance@pceastandrews.org
               </div>
               <p style="font-size: 10px; color: #94a3b8; margin-top: 14px; margin-bottom: 0;">
-                PCEA St. Andrew's Church © ${new Date().getFullYear()} eRequisitions Financial Management System
+                PCEA St. Andrew's Church © ${new Date().getFullYear()} STANDS eRequisitions
               </p>
             </td>
           </tr>
@@ -4598,7 +4598,7 @@ Your response MUST adhere strictly to the JSON schema specified.
     if (process.env.SMTP_PASS) {
       try {
         await transporter.sendMail({
-          from: `"STANDS eRequisitions" <ict.team@pceastandrews.org>`,
+          from: `"STANDS eRequisitions" <no-reply@pceastandrews.org>`,
           to: recipients.join(", "),
           subject,
           html: bodyHtml

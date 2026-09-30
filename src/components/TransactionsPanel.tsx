@@ -176,16 +176,6 @@ export const TransactionsPanel: React.FC = () => {
               Official ledger of all verified, settled, and disbursed treasury funds. Transactions are automatically created and updated in real-time as disbursements occur.
             </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={() => setShowClearConfirm(true)}
-              className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-            >
-              <Trash2 size={15} />
-              <span>Clear Web Transactions</span>
-            </button>
-          </div>
         </div>
       </div>
 

@@ -1254,9 +1254,6 @@ export const VendorsPanel: React.FC = () => {
               <BarChart3 size={150} />
             </div>
             <div className="space-y-2 relative z-10 font-sans">
-              <span className="text-[9px] font-black bg-primary/20 text-primary border border-primary/30 px-3 py-1 rounded-full uppercase tracking-wider">
-                Corporate Governance & Audit
-              </span>
               <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Supplier Spend Analytics</h2>
               <p className="text-slate-400 text-xs max-w-xl font-medium leading-relaxed">
                 Aggressive diagnostic oversight engine. Tracks historical billing anomalies, identifies off-contract leakages, and simulates category consolidation opportunities to expand profit margins.

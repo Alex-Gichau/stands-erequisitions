@@ -655,7 +655,6 @@ export const ReportsPanel: React.FC = () => {
               <LayoutGrid size={16} className="text-primary" />
               Configure Audit Parameters
             </h3>
-            <p className="text-[10px] text-slate-400 font-mono mt-1">SYS_REPORT_ENGINE_ACTIVE</p>
           </div>
           
           <div className="flex items-center gap-3">

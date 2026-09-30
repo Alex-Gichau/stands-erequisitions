@@ -2964,23 +2964,23 @@ Your response MUST adhere strictly to the JSON schema specified.
             subject = `${requester} has submitted "${reqName}" requisition`;
             headerTitle = "Requisition Submitted";
             mainMessage = isRequester
-              ? `Your requisition "<strong>${reqName}</strong>" has been submitted successfully and entered the approval pipeline.`
-              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> for <strong>${ministryName}</strong> has entered the approval pipeline.`;
+              ? `Your requisition "<strong>${reqName}</strong>" has been submitted successfully for approval.`
+              : `Your requisition "<strong>${reqName}</strong>" (${formattedAmount}) has been submitted by <strong>${requesterName || "your group"}</strong> for <strong>${ministryName}</strong> has entered the approval.`;
             decisionBoxHtml = `
               <div style="margin-top: 16px; padding: 14px 16px; background-color: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 6px;">
-                <p style="margin: 0; font-size: 13px; color: #0369a1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Current Workflow Stage:</p>
-                <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">Awaiting Level 1 Compliance & Verification by <strong>${ministryName}</strong> leadership and compliance team.</p>
+                <p style="margin: 0; font-size: 13px; color: #0369a1; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Requisition Status:</p>
+                <p style="margin: 4px 0 0 0; font-size: 13px; color: #0c4a6e;">Awaiting Level 1 Approver from <strong>${ministryName}</strong>.</p>
               </div>
             `;
             nextStepsText = isRequester
-              ? `Your requisition will now be reviewed by the designated ministry leaders and compliance officers. You will receive an automated notification as soon as a decision is recorded.`
+              ? `Your requisition will now be reviewed by Level 1 and Level 2 Approvers. You will receive an automated notification as soon as it is approved.`
               : `Please log in to review and verify this requisition if you are a designated compliance officer or approver for ${ministryName}.`;
             break;
 
           case "APPROVED_L1":
             subject = actor 
-              ? `${actor} has approved "${reqName}" requisition (Level 1)`
-              : `Level 1 approval granted for "${reqName}" requisition`;
+              ? `${actor} has approved "${reqName}" requisition [Level 1 Approved]`
+              : `Level 1 approver has approved "${reqName}" requisition`;
             headerTitle = "Level 1 Approval Granted";
             mainMessage = isRequester
               ? `Your requisition "<strong>${reqName}</strong>" has passed Level 1 Compliance & Verification review.`
@@ -2998,13 +2998,13 @@ Your response MUST adhere strictly to the JSON schema specified.
                     <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Reason / Notes:</td>
-                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Compliance standards verified and budget clearance confirmed."}</td>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Comments :</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Requester and L1 Approver have approved the requisition."}</td>
                   </tr>
                 </table>
               </div>
             `;
-            nextStepsText = `The requisition has escalated to Level 2 (Final Executive/Finance Authorization) for final sign-off.`;
+            nextStepsText = `The requisition has been shared to Level 2 for final sign-off.`;
             break;
 
           case "APPROVED_L2":
@@ -3014,38 +3014,38 @@ Your response MUST adhere strictly to the JSON schema specified.
               : `"${reqName}" requisition has been approved`;
             headerTitle = "Final Authorization Granted";
             mainMessage = isRequester
-              ? `Excellent news! Your requisition "<strong>${reqName}</strong>" has received final Level 2 executive authorization.`
-              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has received final Level 2 executive authorization.`;
+              ? `Excellent news ${actor}! The requisition "<strong>${reqName}</strong>" has received final approval.`
+              : `Requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has received final submission.`;
             decisionBoxHtml = `
               <div style="margin-top: 16px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #059669; border-radius: 6px;">
-                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Executive Approval Details</p>
+                <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Who has Approved :</p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #064e3b;">
                   <tr>
                     <td style="padding: 4px 0; font-weight: 700; width: 35%;">Final Approver:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #047857;">${actualApprover}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #047857;">${ministryName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Approval Reason / Notes:</td>
-                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Approved for payment and budget allocation."}</td>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Comments:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #064e3b;">${decisionNote ? `"${decisionNote}"` : "Everyone have approved the requisition."}</td>
                   </tr>
                 </table>
               </div>
             `;
-            nextStepsText = `The Finance Treasury team has been notified to prepare the funds for settlement and disbursement.`;
+            nextStepsText = `The requisition has been shared to Level 2 for final sign-off.`;
             break;
 
           case "PARTIALLY_DISBURSED":
             subject = actor 
               ? `${actor} has disbursed an installment for "${reqName}" requisition`
-              : `Installment disbursed for "${reqName}" requisition`;
+              : `Requisition disbursed for "${reqName}" requisition`;
             headerTitle = "Installment Disbursed";
             mainMessage = isRequester
-              ? `An installment payment for your requisition "<strong>${reqName}</strong>" has been disbursed and released!`
-              : `An installment payment for requisition "<strong>${reqName}</strong>" (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been disbursed.`;
+              ? `Good News ${actor}, payment for your requisition "<strong>${reqName}</strong>" has been disbursed! Visit the Accounts Office!`
+              : `"<strong>${reqName}</strong>" payment of (${formattedAmount}) submitted by <strong>${requesterName || "Requester"}</strong> has been disbursed.`;
             decisionBoxHtml = `
               <div style="margin-top: 16px; padding: 16px; background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 6px;">
                 <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">Installment Disbursement Details</p>
@@ -3055,12 +3055,12 @@ Your response MUST adhere strictly to the JSON schema specified.
                     <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${actualApprover}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${ministryName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Disbursement Notes:</td>
-                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Installment funds released to specified vendor or payee account."}</td>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Comments:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Requisition funds have been released."}</td>
                   </tr>
                 </table>
               </div>
@@ -3085,12 +3085,12 @@ Your response MUST adhere strictly to the JSON schema specified.
                     <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${actualApprover}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #92400e;">${ministryName}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Disbursement Notes:</td>
-                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Funds released to specified vendor or payee account."}</td>
+                    <td style="padding: 4px 0; font-weight: 700; vertical-align: top;">Notes:</td>
+                    <td style="padding: 4px 0; font-style: italic; color: #78350f;">${decisionNote ? `"${decisionNote}"` : "Funds released to specified vendor."}</td>
                   </tr>
                 </table>
               </div>
@@ -3115,7 +3115,7 @@ Your response MUST adhere strictly to the JSON schema specified.
                     <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
                   </tr>
                   <tr>
@@ -3125,7 +3125,7 @@ Your response MUST adhere strictly to the JSON schema specified.
                 </table>
               </div>
             `;
-            nextStepsText = `Please log in to the STANDS eRequisitions portal to review feedback, make required changes, and resubmit if appropriate.`;
+            nextStepsText = `Please log in to the STANDS eRequisitions to review feedback, make required changes, and resubmit if appropriate.`;
             break;
 
           case "DELETED":
@@ -3145,7 +3145,7 @@ Your response MUST adhere strictly to the JSON schema specified.
                     <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${actualApprover}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 4px 0; font-weight: 700;">Ministry / Group:</td>
+                    <td style="padding: 4px 0; font-weight: 700;">Ministry:</td>
                     <td style="padding: 4px 0; font-weight: 600; color: #991b1b;">${ministryName}</td>
                   </tr>
                   <tr>

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { 
   Coins,
   BookOpen,
@@ -53,7 +53,11 @@ import {
   Activity,
   XCircle,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Paperclip,
+  FileSpreadsheet,
+  FileImage
 } from "lucide-react";
 import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionContext";
 import { RequisitionStatus, UserRole, Requisition, Project } from "../types";
@@ -132,6 +136,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     projects, 
     currentUser, 
     updateRequisitionStatus,
+    updateRequisition,
     addSystemLog,
     triggerToast,
     users,
@@ -828,9 +833,31 @@ export const FinanceLedgerPanel: React.FC = () => {
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>("ALL");
   const [isVoucherTimelineCollapsed, setIsVoucherTimelineCollapsed] = useState(false);
 
-  // Keep selectedInstallmentId in sync when disbursingReq changes
+  // Payment proof & receipts attachments state
+  const [payoutFiles, setPayoutFiles] = useState<File[]>([]);
+  const [isDraggingPayoutFiles, setIsDraggingPayoutFiles] = useState(false);
+  const payoutFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePayoutFilesAdded = (files: File[]) => {
+    const validFiles = files.filter(f => {
+      if (f.size > 15 * 1024 * 1024) {
+        alert(`File "${f.name}" exceeds the 15MB size limit.`);
+        return false;
+      }
+      return true;
+    });
+    setPayoutFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removePayoutFile = (index: number) => {
+    setPayoutFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Keep selectedInstallmentId in sync and reset payout files when disbursingReq changes
   React.useEffect(() => {
     if (disbursingReq) {
+      setPayoutFiles([]);
+      setIsDraggingPayoutFiles(false);
       if (disbursingReq.enableInstallments && Array.isArray(disbursingReq.installments) && disbursingReq.installments.length > 0) {
         const firstPending = disbursingReq.installments.find(i => i.status === "PENDING");
         if (firstPending) {
@@ -841,6 +868,9 @@ export const FinanceLedgerPanel: React.FC = () => {
       } else {
         setSelectedInstallmentId("ALL");
       }
+    } else {
+      setPayoutFiles([]);
+      setIsDraggingPayoutFiles(false);
     }
   }, [disbursingReq]);
 
@@ -1078,6 +1108,46 @@ export const FinanceLedgerPanel: React.FC = () => {
     });
 
     try {
+      // 1.5 Process and upload any attached payment proof documents / receipts
+      let uploadedReceiptUrls: string[] = [];
+      if (payoutFiles.length > 0) {
+        for (const file of payoutFiles) {
+          try {
+            const base64Data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+
+            let finalUrl = base64Data;
+            try {
+              const res = await fetch("/api/attachments/upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  fileName: file.name,
+                  dataUrl: base64Data,
+                  data: base64Data
+                })
+              });
+              if (res.ok) {
+                const resData = await res.json();
+                if (resData.url) {
+                  finalUrl = resData.url;
+                }
+              }
+            } catch (apiErr) {
+              console.warn("Fallback to base64 Data URI for payout attachment:", apiErr);
+            }
+
+            uploadedReceiptUrls.push(`${file.name}::${finalUrl}`);
+          } catch (fileErr) {
+            console.error("Error reading payout file:", file.name, fileErr);
+          }
+        }
+      }
+
       if (isInstallmentMode && targetInstallment) {
         await disburseInstallment(
           disbursingReq.id,
@@ -1108,6 +1178,16 @@ export const FinanceLedgerPanel: React.FC = () => {
         );
       }
 
+      // Attach new receipts/documents to the requisition
+      if (uploadedReceiptUrls.length > 0) {
+        const currentReceipts = Array.isArray(disbursingReq.receipts) ? disbursingReq.receipts : [];
+        const currentAttachments = Array.isArray(disbursingReq.attachments) ? disbursingReq.attachments : [];
+        await updateRequisition(disbursingReq.id, {
+          receipts: [...currentReceipts, ...uploadedReceiptUrls],
+          attachments: [...currentAttachments, ...uploadedReceiptUrls]
+        });
+      }
+
       // 3. Trigger Success Toast
       triggerToast({
         type: "LARGE_REQUEST",
@@ -1116,6 +1196,8 @@ export const FinanceLedgerPanel: React.FC = () => {
         timestamp: new Date().toISOString()
       });
 
+      setPayoutFiles([]);
+      setIsDraggingPayoutFiles(false);
       setReferenceNum("");
       setPayoutNotes("");
       setSelectedInstallmentId("ALL");
@@ -4354,6 +4436,148 @@ export const FinanceLedgerPanel: React.FC = () => {
                         onChange={(e) => setPayoutNotes(e.target.value)}
                         className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-2xs"
                       />
+                    </div>
+
+                    {/* Drag and Drop File Attachment Field for Payment Documents & Receipts */}
+                    <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
+                          <Paperclip size={13} className="text-indigo-600" />
+                          Payment Proof &amp; Receipt Attachments
+                        </label>
+                        <span className="text-[9px] text-slate-400 font-medium">PDF, Images, Excel, Word (Max 15MB)</span>
+                      </div>
+
+                      {/* Drag & Drop Dropzone */}
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingPayoutFiles(true);
+                        }}
+                        onDragEnter={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingPayoutFiles(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingPayoutFiles(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDraggingPayoutFiles(false);
+                          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                            handlePayoutFilesAdded(Array.from(e.dataTransfer.files));
+                          }
+                        }}
+                        onClick={() => payoutFileInputRef.current?.click()}
+                        className={cn(
+                          "border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group text-center bg-white",
+                          isDraggingPayoutFiles
+                            ? "border-indigo-500 bg-indigo-50/70 scale-[1.01]"
+                            : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/20 shadow-2xs"
+                        )}
+                      >
+                        <input
+                          ref={payoutFileInputRef}
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handlePayoutFilesAdded(Array.from(e.target.files));
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload size={16} className={cn("text-indigo-600", isDraggingPayoutFiles && "animate-bounce")} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-700">
+                            {isDraggingPayoutFiles ? "Drop payment documents here!" : "Click to attach or drag & drop files"}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Attach bank transfer slips, cheque copies, EFT vouchers, M-Pesa receipts, or cash sale slips
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Attached files preview list */}
+                      {payoutFiles.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 size={12} className="text-indigo-600" />
+                              Attached Files ({payoutFiles.length})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setPayoutFiles([])}
+                              className="text-[9px] text-rose-500 hover:underline cursor-pointer font-bold"
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                            {payoutFiles.map((file, idx) => {
+                              const isImage = file.type.startsWith("image/");
+                              const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                              const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls") || file.name.toLowerCase().endsWith(".csv");
+                              return (
+                                <div
+                                  key={`${file.name}-${idx}`}
+                                  className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-xs shadow-2xs group hover:border-slate-300 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 rounded bg-slate-100 flex items-center justify-center shrink-0">
+                                      {isImage ? (
+                                        <FileImage size={14} className="text-emerald-600" />
+                                      ) : isPdf ? (
+                                        <FileText size={14} className="text-rose-500" />
+                                      ) : isExcel ? (
+                                        <FileSpreadsheet size={14} className="text-teal-600" />
+                                      ) : (
+                                        <Paperclip size={14} className="text-indigo-600" />
+                                      )}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="font-semibold text-slate-800 text-[11px] truncate max-w-[240px] sm:max-w-[340px]">
+                                        {file.name}
+                                      </p>
+                                      <p className="text-[9px] text-slate-400 font-mono">
+                                        {(file.size / 1024).toFixed(1)} KB
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removePayoutFile(idx)}
+                                    className="p-1 text-slate-400 hover:text-rose-500 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    title="Remove file"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Display Existing Receipts if any */}
+                      {disbursingReq.receipts && disbursingReq.receipts.length > 0 && (
+                        <div className="p-2.5 bg-emerald-50/60 rounded-lg border border-emerald-100 text-[11px] text-emerald-800 flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 size={13} className="text-emerald-600" />
+                            {disbursingReq.receipts.length} existing payment document(s) already attached
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

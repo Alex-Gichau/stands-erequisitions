@@ -77,7 +77,10 @@ import {
   Layers,
   Split,
   Banknote,
-  CheckCircle2
+  CheckCircle2,
+  Receipt,
+  Upload,
+  FileImage
 } from "lucide-react";
 import { applyTextFormatting, renderFormattedCommentText } from "../lib/commentFormatUtils";
 import { motion, AnimatePresence } from "motion/react";
@@ -5389,6 +5392,124 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
     if (fromReq.length > 0) return fromReq;
     return safeNormalizeAttachments(initialReq.attachments);
   }, [req.attachments, initialReq.attachments]);
+
+  const normalizedReceipts = React.useMemo(() => {
+    return safeNormalizeAttachments(req.receipts);
+  }, [req.receipts]);
+
+  const isPaid = req.status === RequisitionStatus.DISBURSED || 
+    req.status === RequisitionStatus.PARTIALLY_DISBURSED || 
+    Boolean(req.disbursedAt) || 
+    (typeof req.disbursedAmount === "number" && req.disbursedAmount > 0);
+
+  const [previewReceiptIndex, setPreviewReceiptIndex] = useState<number | null>(null);
+  const [stagedReceiptFiles, setStagedReceiptFiles] = useState<File[]>([]);
+  const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
+  const receiptFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReceiptFilesAdded = (files: File[]) => {
+    const valid = files.filter(f => {
+      if (f.size > 15 * 1024 * 1024) {
+        alert(`File "${f.name}" exceeds the 15MB size limit.`);
+        return false;
+      }
+      return true;
+    });
+    setStagedReceiptFiles(prev => [...prev, ...valid]);
+  };
+
+  const removeStagedReceiptFile = (index: number) => {
+    setStagedReceiptFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadStagedReceipts = async () => {
+    if (stagedReceiptFiles.length === 0) return;
+    if (!isPaid) {
+      triggerToast?.({
+        type: "SECURITY_UPDATE",
+        severity: "MEDIUM",
+        message: "Receipts can only be attached after payment disbursement has been processed.",
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    setIsUploadingReceipt(true);
+    try {
+      const uploadedReceiptUrls: string[] = [];
+
+      for (const file of stagedReceiptFiles) {
+        try {
+          let base64data: string;
+          if (file.type.startsWith("image/")) {
+            base64data = await compressImageFile(file, {
+              maxWidth: 1600,
+              maxHeight: 1600,
+              quality: 0.85,
+              mimeType: "image/webp",
+            });
+            const mime = file.type || "image/jpeg";
+            if (!base64data.startsWith("data:")) {
+              base64data = `data:${mime};base64,${base64data}`;
+            }
+          } else {
+            base64data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+          }
+
+          let finalUrl = base64data;
+          try {
+            const res = await fetch("/api/attachments/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fileName: file.name,
+                dataUrl: base64data,
+                data: base64data
+              })
+            });
+            if (res.ok) {
+              const resData = await res.json();
+              if (resData.url) {
+                finalUrl = resData.url;
+              }
+            }
+          } catch (apiErr) {
+            console.warn("Fallback to base64 Data URI for receipt upload:", apiErr);
+          }
+
+          uploadedReceiptUrls.push(`${file.name}::${finalUrl}`);
+        } catch (fileErr) {
+          console.error("Error reading receipt file:", file.name, fileErr);
+        }
+      }
+
+      if (uploadedReceiptUrls.length > 0) {
+        await uploadReceipts(req.id, uploadedReceiptUrls);
+        setStagedReceiptFiles([]);
+        triggerToast?.({
+          type: "SYSTEM_INFO",
+          severity: "LOW",
+          message: `Successfully attached ${uploadedReceiptUrls.length} receipt document(s) to Requisition!`,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to upload receipts:", err);
+      triggerToast?.({
+        type: "SECURITY_UPDATE",
+        severity: "HIGH",
+        message: err?.message || "Failed to attach receipts.",
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setIsUploadingReceipt(false);
+    }
+  };
   const [decisionNote, setDecisionNote] = useState("");
   const [approvalCode, setApprovalCode] = useState("");
   const [showDecisionForm, setShowDecisionForm] = useState<"APPROVE" | "REJECT" | "ESCALATE" | null>(null);
@@ -6085,11 +6206,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
   };
 
   const handleCaptureReceipt = async (file: File) => {
-    if (req.status !== RequisitionStatus.DISBURSED) {
+    if (!isPaid) {
       triggerToast({
         type: "SECURITY_UPDATE",
         severity: "MEDIUM",
-        message: "Receipts can only be attached after all approvals are confirmed and disbursement is done.",
+        message: "Receipts can only be attached after payment disbursement has been processed.",
         timestamp: new Date().toISOString()
       });
       return;
@@ -6110,7 +6231,33 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
         base64data = base64data.replace(/^data:[^;]*;base64,/, `data:${mime};base64,`);
       }
 
-      await uploadReceipts(req.id, [base64data]);
+      const fileName = file.name || `camera_receipt_${Date.now()}.webp`;
+      let finalUrl = base64data;
+      try {
+        const res = await fetch("/api/attachments/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName,
+            dataUrl: base64data,
+            data: base64data
+          })
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.url) finalUrl = resData.url;
+        }
+      } catch (uploadErr) {
+        console.warn("Fallback to base64 Data URI for captured receipt:", uploadErr);
+      }
+
+      await uploadReceipts(req.id, [`${fileName}::${finalUrl}`]);
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: "Camera receipt photo captured and attached successfully!",
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error("Error saving captured receipt physical photo:", error);
     } finally {
@@ -6860,6 +7007,255 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   <div className="w-full py-8 flex flex-col items-center justify-center text-slate-300 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl gap-1">
                     <FileText size={24} className="text-slate-300 dark:text-slate-700" />
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No Attachments Provided</p>
+                  </div>
+                )}
+              </section>
+
+              {/* Payment Receipts & Proof of Payment Section */}
+              <section className="space-y-3 md:space-y-4 pt-5 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="text-emerald-600 dark:text-emerald-400" size={16} />
+                    <h4 className="text-[9px] md:text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
+                      Payment Receipts &amp; Proof of Expenditure
+                    </h4>
+                    <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full text-[9px] font-bold">
+                      {normalizedReceipts.length}
+                    </span>
+                  </div>
+
+                  {isPaid ? (
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-2xs">
+                        <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
+                        {req.status === RequisitionStatus.PARTIALLY_DISBURSED ? "Partially Disbursed" : "Disbursement Complete"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsCameraOpen(true)}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200 dark:border-slate-700"
+                        title="Scan receipt with camera"
+                      >
+                        <Camera size={13} />
+                        <span>Camera</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg text-[9px] font-bold uppercase tracking-wider">
+                      Awaiting Payment Disbursement
+                    </span>
+                  )}
+                </div>
+
+                {isPaid ? (
+                  <div className="space-y-3">
+                    {/* Existing Receipts Visual Grid */}
+                    {normalizedReceipts.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                        {normalizedReceipts.map((rcpt: any, i: number) => {
+                          let name = typeof rcpt === 'string' ? rcpt : (rcpt?.name || `Receipt_${i + 1}`);
+                          let url = typeof rcpt === 'string' ? rcpt : (rcpt?.url || '');
+                          if (typeof rcpt === 'string' && rcpt.includes("::")) {
+                            const parts = rcpt.split("::");
+                            name = parts[0];
+                            url = parts[1];
+                          }
+                          url = normalizeAttachmentUrl(url);
+
+                          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(name) || /\.(jpg|jpeg|png|gif|webp)$/i.test(url) || (typeof url === 'string' && (url.startsWith('data:image/') || url.startsWith('blob:')));
+                          const fileExt = name.split('.').pop()?.toUpperCase() || "DOC";
+                          const isDocx = fileExt === "DOCX" || /\.(docx)$/i.test(name) || /\.(docx)$/i.test(url);
+                          const isXlsx = fileExt === "XLSX" || fileExt === "XLS" || fileExt === "CSV" || /\.(xlsx|xls|csv)$/i.test(name) || /\.(xlsx|xls|csv)$/i.test(url);
+                          const isPdf = !isImage && !isDocx && !isXlsx && (fileExt === "PDF" || /\.(pdf)$/i.test(name) || /\.(pdf)$/i.test(url) || (typeof url === 'string' && url.startsWith('data:application/pdf')));
+
+                          return (
+                            <div
+                              key={`rcpt-card-${i}`}
+                              onClick={() => setPreviewReceiptIndex(i)}
+                              className="aspect-[4/3] sm:aspect-square w-full bg-white dark:bg-slate-800/90 border border-emerald-200/70 dark:border-emerald-900/50 rounded-2xl hover:border-emerald-500 hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between overflow-hidden relative shadow-sm"
+                              title={name}
+                            >
+                              {isImage ? (
+                                <CachedImage src={url} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : isPdf ? (
+                                <PdfThumbnailPreview url={url} title={name} />
+                              ) : isXlsx ? (
+                                <div className="flex flex-col items-center justify-center p-3 text-center w-full h-full bg-gradient-to-b from-emerald-50/80 to-emerald-100/30 dark:from-emerald-950/30 dark:to-slate-900">
+                                  <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-1 shadow-sm group-hover:scale-110 transition-transform">
+                                    <FileSpreadsheet size={20} />
+                                  </div>
+                                  <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                                    {fileExt === "CSV" ? "CSV SHEET" : "EXCEL SHEET"}
+                                  </span>
+                                </div>
+                              ) : isDocx ? (
+                                <div className="flex flex-col items-center justify-center p-3 text-center w-full h-full bg-gradient-to-b from-blue-50/80 to-blue-100/30 dark:from-blue-950/30 dark:to-slate-900">
+                                  <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-1 shadow-sm group-hover:scale-110 transition-transform">
+                                    <FileText size={20} />
+                                  </div>
+                                  <span className="text-[9px] font-mono font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">WORD DOC</span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center p-3 text-center w-full h-full bg-gradient-to-b from-slate-50 to-slate-100/50 dark:from-slate-800 dark:to-slate-900">
+                                  <div className="w-10 h-10 rounded-2xl bg-slate-200/80 dark:bg-slate-700 text-slate-500 dark:text-slate-300 flex items-center justify-center mb-1 shadow-sm group-hover:scale-110 transition-transform">
+                                    <FileText size={20} />
+                                  </div>
+                                  <span className="text-[9px] font-mono font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{fileExt}</span>
+                                </div>
+                              )}
+
+                              <div className="absolute top-2 left-2 z-10">
+                                <span className="px-2 py-0.5 bg-emerald-950/85 backdrop-blur-md text-emerald-300 text-[8px] font-black uppercase tracking-wider rounded-lg border border-emerald-500/30 shadow-sm flex items-center gap-1">
+                                  <Receipt size={9} />
+                                  {isImage ? "RECEIPT" : fileExt}
+                                </span>
+                              </div>
+
+                              <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 backdrop-blur-[2px]">
+                                <span className="p-2.5 bg-white text-slate-900 rounded-xl shadow-lg hover:bg-slate-100 transition-transform active:scale-95 flex items-center gap-1.5 text-[10px] font-bold">
+                                  <Eye size={14} />
+                                  <span>Preview Receipt</span>
+                                </span>
+                              </div>
+
+                              <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent">
+                                <div className="text-[9px] font-bold text-white truncate drop-shadow-sm">{name}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Drag and Drop Upload Zone for Receipts */}
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingReceipt(true); }}
+                      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingReceipt(true); }}
+                      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingReceipt(false); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsDraggingReceipt(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                          handleReceiptFilesAdded(Array.from(e.dataTransfer.files));
+                        }
+                      }}
+                      onClick={() => receiptFileInputRef.current?.click()}
+                      className={cn(
+                        "border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group text-center bg-white dark:bg-slate-900/50",
+                        isDraggingReceipt
+                          ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 scale-[1.01]"
+                          : "border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-500/50 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20"
+                      )}
+                    >
+                      <input
+                        ref={receiptFileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            handleReceiptFilesAdded(Array.from(e.target.files));
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-800/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shadow-2xs">
+                        <Upload size={18} className={cn(isDraggingReceipt && "animate-bounce")} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {isDraggingReceipt ? "Drop receipt documents here!" : "Click to attach or drag & drop payment receipts"}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Attach official receipts, bank deposit slips, EFT acknowledgments, cash sale receipts, or M-Pesa confirmations
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Staged Receipts for Upload */}
+                    {stagedReceiptFiles.length > 0 && (
+                      <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/60 rounded-2xl space-y-2.5">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900 dark:text-emerald-300">
+                          <span className="flex items-center gap-1.5">
+                            <Receipt size={13} className="text-emerald-600 dark:text-emerald-400" />
+                            Staged for Attachment ({stagedReceiptFiles.length})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setStagedReceiptFiles([])}
+                            className="text-[10px] text-rose-500 hover:underline cursor-pointer font-bold"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                          {stagedReceiptFiles.map((file, idx) => (
+                            <div
+                              key={`staged-rcpt-${idx}`}
+                              className="flex items-center justify-between p-2 bg-white dark:bg-slate-850 rounded-xl border border-slate-200/80 dark:border-slate-750 text-xs shadow-2xs"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[240px] sm:max-w-[340px]">
+                                  {file.name}
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-mono">
+                                  ({(file.size / 1024).toFixed(1)} KB)
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeStagedReceiptFile(idx)}
+                                className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                                title="Remove file"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="button"
+                            disabled={isUploadingReceipt}
+                            onClick={handleUploadStagedReceipts}
+                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer disabled:opacity-50"
+                          >
+                            {isUploadingReceipt ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                <span>Uploading Receipts...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 size={14} />
+                                <span>Save &amp; Attach {stagedReceiptFiles.length} Receipt(s)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                        <Receipt size={16} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Payment Proof &amp; Receipt Upload</p>
+                        <p className="text-[10px] text-slate-400">This field activates once funds have been disbursed by Finance.</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold self-start sm:self-auto shrink-0 flex items-center gap-1.5">
+                      <Clock size={12} />
+                      Pending Disbursement
+                    </span>
                   </div>
                 )}
               </section>
@@ -8278,6 +8674,14 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               attachments={normalizedAttachments}
               initialIndex={previewIndex}
               onClose={() => setPreviewIndex(null)} 
+              requisition={req}
+            />
+          )}
+          {previewReceiptIndex !== null && normalizedReceipts.length > 0 && (
+            <DocumentPreviewModal 
+              attachments={normalizedReceipts}
+              initialIndex={previewReceiptIndex}
+              onClose={() => setPreviewReceiptIndex(null)} 
               requisition={req}
             />
           )}

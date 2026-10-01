@@ -976,7 +976,8 @@ async function startServer() {
 
   // Local File Upload Endpoint (VPS Local Storage Support)
   app.post("/api/attachments/upload", async (req, res) => {
-    const { fileName, dataUrl } = req.body;
+    const fileName = req.body.fileName;
+    const dataUrl = req.body.dataUrl || req.body.data;
     if (!fileName || !dataUrl) {
       return res.status(400).json({ error: "Missing fileName or dataUrl payload." });
     }

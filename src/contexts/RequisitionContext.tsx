@@ -4440,7 +4440,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const uploadReceipts = useCallback(async (id: string, newReceipts: string[]) => {
     try {
       const existingReq = requisitions.find(r => r.id === id);
-      if (existingReq && existingReq.status !== RequisitionStatus.DISBURSED) {
+      const isPaid = existingReq && (
+        existingReq.status === RequisitionStatus.DISBURSED || 
+        existingReq.status === RequisitionStatus.PARTIALLY_DISBURSED || 
+        Boolean(existingReq.disbursedAt) ||
+        (existingReq.disbursedAmount && existingReq.disbursedAmount > 0)
+      );
+
+      if (existingReq && !isPaid) {
         triggerToast({
           type: "SECURITY_UPDATE",
           severity: "MEDIUM",
@@ -4461,10 +4468,12 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         onComplete: async (uploadedReceipts) => {
           const currentReceipts = existingReq?.receipts || [];
           const updatedReceipts = [...currentReceipts, ...uploadedReceipts];
+          const currentAttachments = existingReq?.attachments || [];
+          const updatedAttachments = [...currentAttachments, ...uploadedReceipts];
           const updatedAt = new Date().toISOString();
 
-          await databaseService.updateRequisition(id, { receipts: updatedReceipts, updatedAt });
-          setRequisitions(prev => prev.map(r => r.id === id ? { ...r, receipts: updatedReceipts, updatedAt } : r));
+          await databaseService.updateRequisition(id, { receipts: updatedReceipts, attachments: updatedAttachments, updatedAt });
+          setRequisitions(prev => prev.map(r => r.id === id ? { ...r, receipts: updatedReceipts, attachments: updatedAttachments, updatedAt } : r));
           await addSystemLog("RECEIPTS_UPLOADED", `Uploaded ${newReceipts.length} receipts to Requisition ID: ${id}`, { requisitionId: id, currentReceiptCount: updatedReceipts.length });
         }
       });

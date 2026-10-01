@@ -53,6 +53,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { UserAvatar } from "./UserAvatar";
 import { ChurchGroupDetailsModal } from "./ChurchGroupDetailsModal";
+import { enforceUserGroupAllocation, CANONICAL_CHURCH_GROUPS } from "../lib/churchGroupUtils";
 
 export interface UsersPanelProps {
   onNavigateToCampaigns?: () => void;
@@ -77,6 +78,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     addChurchGroup,
     deleteChurchGroup,
     addSystemLog,
+    triggerToast,
     loading,
     sendBulkEmail,
     canAccess,
@@ -161,15 +163,17 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     counts["UNALLOCATED"] = 0;
     
     users.forEach((u) => {
-      const rawGroups = (u.groups && u.groups.length > 0)
-        ? u.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
-        : (u.group && u.group.trim().toUpperCase() !== "INDEPENDENT" ? [u.group] : []);
-      const uGroups = rawGroups.length > 0 ? rawGroups : ["UNALLOCATED"];
-      uGroups.forEach((gName) => {
-        if (gName) {
-          counts[gName] = (counts[gName] || 0) + 1;
-        }
-      });
+      const { group: uPrimary, groups: uGroups } = enforceUserGroupAllocation(u);
+      const isUnallocated = !uPrimary || uGroups.length === 0;
+      if (isUnallocated) {
+        counts["UNALLOCATED"] = (counts["UNALLOCATED"] || 0) + 1;
+      } else {
+        uGroups.forEach((gName) => {
+          if (gName) {
+            counts[gName] = (counts[gName] || 0) + 1;
+          }
+        });
+      }
     });
     return counts;
   }, [users, churchGroups]);
@@ -407,11 +411,56 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     setEditingUser(user);
     setEditName(user.name);
     setEditRole(user.role);
-    const initialGroups = (user.groups || (user.group ? [user.group] : [])).filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
-    setEditGroup((user.group && user.group.trim().toUpperCase() !== "INDEPENDENT") ? user.group : "");
-    setEditGroups(initialGroups);
+    const { group: primaryGroup, groups: cleanGroups } = enforceUserGroupAllocation(user);
+    setEditGroup(primaryGroup);
+    setEditGroups(cleanGroups);
     setEditError(null);
     setEditSuccess(null);
+  };
+
+  const [isReconcilingGroups, setIsReconcilingGroups] = useState(false);
+
+  const handleEnforceAllGroupAllocations = async () => {
+    setIsReconcilingGroups(true);
+    let updatedCount = 0;
+    try {
+      for (const u of users) {
+        const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(u);
+        const needsUpdate = !u.group || 
+                            u.group === "INDEPENDENT" || 
+                            u.group === "UNALLOCATED" || 
+                            u.group !== cleanGroup || 
+                            !u.groups || 
+                            u.groups.length === 0 ||
+                            JSON.stringify(u.groups) !== JSON.stringify(cleanGroups);
+        
+        if (needsUpdate) {
+          await updateUserProfile(u.id, {
+            group: cleanGroup,
+            groups: cleanGroups
+          });
+          updatedCount++;
+        }
+      }
+      triggerToast({
+        type: "SYSTEM_INFO",
+        severity: "LOW",
+        message: updatedCount > 0 
+          ? `Verified and assigned ${updatedCount} member(s) to canonical church groups!`
+          : "All registered members are verified and allocated to active church groups.",
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("Failed to enforce group allocations:", err);
+      triggerToast({
+        type: "SECURITY_UPDATE",
+        severity: "HIGH",
+        message: "Failed to enforce church group allocations.",
+        timestamp: new Date().toISOString()
+      });
+    } finally {
+      setIsReconcilingGroups(false);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -422,10 +471,20 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     if (!name.trim()) return setError("Name is required");
     if (!email.trim() || !email.includes("@")) return setError("Valid email required");
 
+    const finalGroups = groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT" && g.trim().toUpperCase() !== "UNALLOCATED");
+    const primaryGroup = finalGroups[0] || (group && group.trim().toUpperCase() !== "INDEPENDENT" && group.trim().toUpperCase() !== "UNALLOCATED" ? group.trim() : (churchGroups[0]?.name || "Youth Ministry"));
+
+    if (!primaryGroup || (finalGroups.length === 0 && !group)) {
+      setIsSubmitting(false);
+      return setError("Church group allocation is required. Every member must belong to at least one church group.");
+    }
+
+    const assignedGroups = finalGroups.length > 0 ? finalGroups : [primaryGroup];
+
     if (regType === "GMAIL") {
       setIsSubmitting(true);
       try {
-        const inviteUrl = window.location.origin + "?invite=true&email=" + encodeURIComponent(email.trim()) + "&role=" + role + "&group=" + encodeURIComponent(group || "");
+        const inviteUrl = window.location.origin + "?invite=true&email=" + encodeURIComponent(email.trim()) + "&role=" + role + "&group=" + encodeURIComponent(primaryGroup);
         setGeneratedInvite({
           url: inviteUrl,
           email: email.trim(),
@@ -444,19 +503,17 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
 
     setIsSubmitting(true);
     try {
-      const finalGroups = groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
-      const primaryGroup = finalGroups[0] || (group.trim().toUpperCase() !== "INDEPENDENT" ? group.trim() : "");
       await adminRegisterUser(
         email.trim(),
         password,
         name.trim(),
         role,
-        primaryGroup || undefined,
+        primaryGroup,
         undefined,
-        finalGroups
+        assignedGroups
       );
 
-      setSuccess(`Account registered successfully for ${name}!`);
+      setSuccess(`Account registered successfully for ${name} under ${primaryGroup}!`);
       setName(""); setEmail(""); setPassword(""); setRole(UserRole.CHURCH_GROUP); setGroup(""); setGroups([]);
       
       setTimeout(() => {
@@ -476,15 +533,20 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     setEditError(null);
     setEditSuccess(null);
 
-    const finalGroups = editGroups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
+    const finalGroups = editGroups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT" && g.trim().toUpperCase() !== "UNALLOCATED");
+    const primaryGroup = finalGroups[0] || (editGroup && editGroup.trim().toUpperCase() !== "INDEPENDENT" && editGroup.trim().toUpperCase() !== "UNALLOCATED" ? editGroup.trim() : "");
+
+    if (!primaryGroup || finalGroups.length === 0) {
+      setIsSaving(false);
+      return setEditError("Church group allocation is mandatory. Every member must belong to at least one church group.");
+    }
 
     setIsSaving(true);
     try {
-      const primaryGroup = finalGroups[0] || (editGroup.trim().toUpperCase() !== "INDEPENDENT" ? editGroup.trim() : "");
       const profileUpdates: Partial<UserProfile> = {
         name: editName.trim(),
         role: editRole,
-        group: primaryGroup || undefined,
+        group: primaryGroup,
         groups: finalGroups
       };
 
@@ -532,10 +594,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
         
         let matchesGroup = true;
         if (filterGroup !== "ALL") {
-          const rawGroups = (u.groups && u.groups.length > 0)
-            ? u.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
-            : (u.group && u.group.trim().toUpperCase() !== "INDEPENDENT" ? [u.group] : []);
-          const uGroups = rawGroups.length > 0 ? rawGroups : ["UNALLOCATED"];
+          const { groups: uGroups } = enforceUserGroupAllocation(u);
           matchesGroup = uGroups.includes(filterGroup);
         }
 
@@ -593,7 +652,26 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
             </button>
           )}
           <button 
-            onClick={() => setIsModalOpen(true)}
+            type="button"
+            disabled={isReconcilingGroups}
+            onClick={handleEnforceAllGroupAllocations}
+            className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 hover:bg-teal-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+            title="Audit and enforce that every member is allocated to a valid church group"
+          >
+            <Building2 size={18} className={cn("text-teal-600 dark:text-teal-400", isReconcilingGroups && "animate-spin")} />
+            <span className="text-[10px] md:text-xs uppercase tracking-widest font-black">
+              {isReconcilingGroups ? "ENFORCING..." : "ENFORCE ALLOCATIONS"}
+            </span>
+          </button>
+          <button 
+            onClick={() => {
+              setIsModalOpen(true);
+              if (groups.length === 0) {
+                const defaultG = churchGroups[0]?.name || "Youth Ministry";
+                setGroups([defaultG]);
+                setGroup(defaultG);
+              }
+            }}
             className="w-full md:w-auto btn-primary flex items-center justify-center gap-2 px-6 py-3 md:py-2.5 rounded-xl shadow-lg shadow-primary/20"
           >
             <UserPlus size={18} />
@@ -723,7 +801,15 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   <span>Groups:</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {Object.entries(groupCounts).map(([gName, count]) => {
+                  {groupCounts["UNALLOCATED"] === 0 && (
+                    <div className="px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 shrink-0">
+                      <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
+                      <span className="uppercase tracking-wide text-[9px] font-black">100% ALLOCATED</span>
+                    </div>
+                  )}
+                  {Object.entries(groupCounts)
+                    .filter(([gName, count]) => gName !== "UNALLOCATED" || count > 0)
+                    .map(([gName, count]) => {
                     const isUnallocated = gName === "UNALLOCATED" || gName === "INDEPENDENT";
                     return (
                       <div 
@@ -802,7 +888,9 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               className="bg-transparent text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 outline-none cursor-pointer [&>option]:bg-white [&>option]:dark:bg-slate-900"
             >
               <option value="ALL">ALL CHURCH GROUPS</option>
-              <option value="UNALLOCATED">UNALLOCATED (NO GROUP)</option>
+              {groupCounts["UNALLOCATED"] > 0 && (
+                <option value="UNALLOCATED">UNALLOCATED (NO GROUP)</option>
+              )}
               {churchGroups.map((group) => (
                 <option key={group.id || group.name} value={group.name}>{group.name.toUpperCase()}</option>
               ))}
@@ -892,37 +980,49 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                     </td>
                     <td className="px-4 md:px-8 py-3 md:py-5 hidden md:table-cell">
                       {(() => {
-                        const rawGroups = (user.groups && user.groups.length > 0)
-                          ? user.groups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT")
-                          : (user.group && user.group.trim().toUpperCase() !== "INDEPENDENT" ? [user.group] : []);
+                        const { group: primaryGroup, groups: rawGroups } = enforceUserGroupAllocation(user);
                         const groupsCount = rawGroups.length;
-                        const isUnallocated = groupsCount === 0;
+                        const isUnallocated = !primaryGroup || rawGroups.length === 0;
 
                         return (
                           <div className="flex flex-col gap-1.5 justify-center">
                             <div className="flex flex-col gap-1 text-slate-600">
                               <div className="flex items-center gap-1.5 justify-between">
                                 <div className="flex items-center gap-1.5">
-                                  <Building2 size={12} className={isUnallocated ? "text-amber-500" : "text-slate-300"} />
+                                  <Building2 size={12} className={isUnallocated ? "text-amber-500" : "text-slate-400"} />
                                   <span className={cn(
                                     "text-[10px] font-bold uppercase tracking-tight",
-                                    isUnallocated ? "text-amber-700 dark:text-amber-400 font-extrabold" : "italic text-slate-700 dark:text-slate-300"
+                                    isUnallocated ? "text-amber-700 dark:text-amber-400 font-extrabold" : "text-slate-800 dark:text-slate-200"
                                   )}>
-                                    {isUnallocated ? "UNALLOCATED" : rawGroups[0]}
+                                    {isUnallocated ? "UNALLOCATED" : primaryGroup}
                                   </span>
                                 </div>
-                                <span 
-                                  className={cn(
-                                    "text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 border",
-                                    groupsCount > 0 
-                                      ? "bg-blue-50 text-blue-600 border-blue-200/50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/30" 
-                                      : "bg-amber-50 text-amber-700 border-amber-200/60 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800/30"
-                                  )}
-                                  title={isUnallocated ? "User has no assigned group (Unallocated)" : `${groupsCount} Active Ministry Group(s) assigned`}
-                                >
-                                  <span className={cn("w-1 h-1 rounded-full", groupsCount > 0 ? "bg-blue-500 animate-pulse" : "bg-amber-500")} />
-                                  {isUnallocated ? "Unallocated" : `${groupsCount} ${groupsCount === 1 ? "Group" : "Groups"}`}
-                                </span>
+                                {isUnallocated ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditing(user);
+                                    }}
+                                    className="text-[9px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0 border bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-700 cursor-pointer transition-colors shadow-2xs"
+                                    title="Click to assign a church group"
+                                  >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                                    <span>Assign Group</span>
+                                  </button>
+                                ) : (
+                                  <span 
+                                    className="text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 border bg-blue-50 text-blue-600 border-blue-200/50 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800/30 cursor-pointer hover:bg-blue-100"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditing(user);
+                                    }}
+                                    title={`${groupsCount} Active Ministry Group(s) assigned. Click to edit.`}
+                                  >
+                                    <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                                    {`${groupsCount} ${groupsCount === 1 ? "Group" : "Groups"}`}
+                                  </span>
+                                )}
                               </div>
                               {rawGroups.length > 1 && (
                                 <div className="flex flex-wrap gap-1 mt-1 pl-4">
@@ -1865,12 +1965,12 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                     {emailSending ? (
                       <>
                         <Loader2 className="animate-spin" size={16} />
-                        Dispatched Broadcast Campaign...
+                        Sent Emails...
                       </>
                     ) : (
                       <>
                         <Send size={16} />
-                        Dispatch Email Campaign
+                        Send Emails
                       </>
                     )}
                   </button>

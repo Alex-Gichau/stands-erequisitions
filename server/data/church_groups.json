@@ -13,8 +13,8 @@
   },
   {
     "id": "cg_mens_fellowship",
-    "name": "Men's Fellowship",
-    "description": "Men ministry, community service, and facility maintenance",
+    "name": "Men's Fellowship (PCMF)",
+    "description": "Men ministry, PCMF fellowship, community service, and facility maintenance",
     "created_at": "2026-01-01T00:00:00.000Z"
   },
   {
@@ -57,6 +57,54 @@
     "id": "cg_sanctuary_renovation",
     "name": "Sanctuary Renovation",
     "description": "Building expansion, interior decoration, and altar upgrades",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_ict_ministry",
+    "name": "ICT Ministry",
+    "description": "Live streaming, audio-visual technology, media, and digital systems",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_deacons",
+    "name": "Deacons Board",
+    "description": "Diaconate service, sanctuary welfare, and communion preparation",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_security",
+    "name": "Security Committee",
+    "description": "Sanctuary security, parking coordination, and protocol safety",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_administration",
+    "name": "Administration",
+    "description": "Church secretariat, human resources, registry, and operations",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_pastoral",
+    "name": "Pastoral Ministry",
+    "description": "Clergy pastoral care, counseling, prayers, and parish leadership",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_brigade",
+    "name": "Boys & Girls Brigade",
+    "description": "Youth mentoring, Christian discipline, drill, and leadership",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_finance",
+    "name": "Finance Department",
+    "description": "Financial accounting, internal audit, and treasury control",
+    "created_at": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "cg_districts",
+    "name": "District Fellowships",
+    "description": "Neighborhood prayer cells, home fellowships, and zonal districts",
     "created_at": "2026-01-01T00:00:00.000Z"
   }
 ]

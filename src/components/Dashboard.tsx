@@ -963,13 +963,6 @@ const Dashboard: React.FC<{
             <div className="absolute right-0 top-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl" />
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8">
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  {totalRequisitionsForBanner > 0 && (
-                    <span className="bg-white/20 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-white/10 backdrop-blur-sm">
-                      {totalRequisitionsForBanner} Linked Requisitions
-                    </span>
-                  )}
-                </div>
                 <h3 className="text-xl md:text-3xl font-bold uppercase tracking-tight">
                   {activeMinistryView === "ALL" ? "All Assigned Ministries" : activeMinistryView}
                 </h3>

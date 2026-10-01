@@ -1324,8 +1324,8 @@ function AppContent() {
           className="text-center"
         >
           <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-xl font-black uppercase tracking-widest">Ending Session...</h2>
-          <p className="text-slate-400 text-xs mt-2">Clearing secure transaction buffers.</p>
+          <h2 className="text-xl font-black uppercase tracking-widest">Logging Out...</h2>
+          <p className="text-slate-400 text-xs mt-2">You are now about to logout.</p>
         </motion.div>
       </div>
     );
@@ -1376,17 +1376,17 @@ function AppContent() {
               <div className="p-4 bg-rose-950/40 border border-rose-800/40 rounded-2xl text-left space-y-1.5 mb-2 animate-in slide-in-from-top duration-300">
                 <div className="flex items-center gap-2 text-rose-400 font-bold text-[10px] uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse shrink-0" />
-                  <span className="text-rose-400 font-extrabold">Emergency Sudo Bypass Active</span>
+                  <span className="text-rose-400 font-extrabold">Emergency Bypass Active</span>
                 </div>
                 <p className="text-[10px] text-slate-300 leading-normal font-semibold">
-                  The system is currently <strong>Offline</strong>. Standard user access yields the maintenance screen. Authorize with your registered Sudo Super Admin credentials to restore service.
+                  The system is currently <strong>Offline</strong>. Your Admin is working to restore.
                 </p>
                 <button
                   type="button"
                   onClick={() => setAdminBypass(false)}
                   className="text-[9px] font-black text-rose-400 hover:text-rose-350 uppercase tracking-widest mt-1 underline transition-all cursor-pointer"
                 >
-                  ← Return to Offline Screen
+                  ← Back
                 </button>
               </div>
             )}

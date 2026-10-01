@@ -84,9 +84,15 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
   // 1. Group Members & Affiliated Users
   const isUserInGroup = (user: UserProfile) => {
     if (!user) return false;
-    if (user.group === group.name || user.group === group.id) return true;
+    const target = group.name.trim().toLowerCase();
+    const targetId = (group.id || "").trim().toLowerCase();
+    const uGroup = (user.group || "").trim().toLowerCase();
+    if (uGroup === target || (targetId && uGroup === targetId)) return true;
     if (Array.isArray(user.groups)) {
-      return user.groups.includes(group.name) || user.groups.includes(group.id);
+      return user.groups.some(g => {
+        const gl = (g || "").trim().toLowerCase();
+        return gl === target || (targetId && gl === targetId);
+      });
     }
     return false;
   };

@@ -77,7 +77,7 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
           </div>
           
           <h2 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight leading-tight">
-            STANDS MINISTRIES {activeYear}<br />
+            ST ANDREW'S {activeYear}<br />
             <span className="text-primary">FINANCIAL OVERVIEW</span>
           </h2>
           

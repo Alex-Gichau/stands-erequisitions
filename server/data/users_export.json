@@ -10,8 +10,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"FRENCH CONGREGATION\"]",
-    "group": "FRENCH CONGREGATION",
+    "groups": [
+      "French Congregation"
+    ],
+    "group": "French Congregation",
     "name": "JEAN DE DIUE",
     "activeDevices": "[{\"id\":\"zw5s9kj7\",\"lastActive\":\"2026-06-27T09:55:36.454Z\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-24T09:19:38.492Z\"}]",
     "lastSeen": "2026-06-27T09:55:37.286Z",
@@ -32,7 +34,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Sanctuary Renovation"
+    ],
     "group": "Sanctuary Renovation",
     "name": "Jane Doe",
     "activeDevices": "",
@@ -54,8 +58,10 @@
     "isApproved": true,
     "role": "FINANCE",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Health & Welfare Board"
+    ],
+    "group": "Health & Welfare Board",
     "name": "Deacon John Mwangi",
     "activeDevices": "",
     "lastSeen": "",
@@ -76,7 +82,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Music Ministry"
+    ],
     "group": "Music Ministry",
     "name": "Erick Maina Kariuki",
     "activeDevices": "",
@@ -98,8 +106,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "Youth Camp 2026",
+    "groups": [
+      "Youth Ministry"
+    ],
+    "group": "Youth Ministry",
     "name": "George Gichauri",
     "activeDevices": "",
     "lastSeen": "",
@@ -120,8 +130,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "ICT MINISTRY",
+    "groups": [
+      "ICT Ministry"
+    ],
+    "group": "ICT Ministry",
     "name": "ICT Team",
     "activeDevices": "[]",
     "lastSeen": "2026-06-18T04:28:37.153Z",
@@ -142,7 +154,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Music Ministry"
+    ],
     "group": "Music Ministry",
     "name": "Praise Riungu",
     "activeDevices": "[{\"id\":\"dlk82hdi\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-23T11:42:51.242Z\",\"lastActive\":\"2026-06-23T11:42:51.242Z\"}]",
@@ -164,8 +178,11 @@
     "isApproved": true,
     "role": "APPROVER_L2",
     "approverCode": "",
-    "groups": "[\"FRENCH CONGREGATION\",\"Finance Department\"]",
-    "group": "FRENCH CONGREGATION",
+    "groups": [
+      "French Congregation",
+      "Finance Department"
+    ],
+    "group": "French Congregation",
     "name": "Nivosoa Rakotoarivelo",
     "activeDevices": "[{\"id\":\"awvdrab6\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-24T08:20:57.979Z\",\"lastActive\":\"2026-06-24T08:20:57.979Z\"}]",
     "lastSeen": "2026-06-24T08:25:27.477Z",
@@ -186,8 +203,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "SECURITY COMMIITEE",
+    "groups": [
+      "Security Committee"
+    ],
+    "group": "Security Committee",
     "name": "Francis Ayaya",
     "activeDevices": "[{\"id\":\"z5uvjkz7\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-28T06:39:59.725Z\",\"lastActive\":\"2026-06-28T06:39:59.725Z\"}]",
     "lastSeen": "2026-06-30T11:14:47.228Z",
@@ -208,7 +227,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Music Ministry"
+    ],
     "group": "Music Ministry",
     "name": "Jacqueline T.",
     "activeDevices": "",
@@ -230,8 +251,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"Church School\"]",
-    "group": "Church School",
+    "groups": [
+      "Sunday School & Children"
+    ],
+    "group": "Sunday School & Children",
     "name": "Catherine Gitau",
     "activeDevices": "[{\"id\":\"d2tzyuw0\",\"lastActive\":\"2026-06-24T12:03:38.525Z\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-24T05:45:51.713Z\"}]",
     "lastSeen": "2026-06-24T12:03:40.417Z",
@@ -252,8 +275,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "Sunday School Resources",
+    "groups": [
+      "Sunday School & Children"
+    ],
+    "group": "Sunday School & Children",
     "name": "Mary Atieno",
     "activeDevices": "",
     "lastSeen": "",
@@ -274,8 +299,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "DEACONS",
+    "groups": [
+      "Deacons Board"
+    ],
+    "group": "Deacons Board",
     "name": "Kevin Wainaina Mungai",
     "activeDevices": "",
     "lastSeen": "2026-06-17T08:20:48.662Z",
@@ -296,8 +323,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "Outreach Program",
+    "groups": [
+      "Evangelism & Missions"
+    ],
+    "group": "Evangelism & Missions",
     "name": "David Kimani",
     "activeDevices": "",
     "lastSeen": "",
@@ -318,8 +347,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "ADMINSTRATION",
+    "groups": [
+      "Administration"
+    ],
+    "group": "Administration",
     "name": "Pcea St Andrews",
     "activeDevices": "[{\"loginTime\":\"2026-06-23T11:52:28.087Z\",\"lastActive\":\"2026-07-02T08:18:59.360Z\",\"id\":\"wgnpx7z3\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36\"}]",
     "lastSeen": "2026-07-02T08:21:59.843Z",
@@ -340,8 +371,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "ICT MINISTRY",
+    "groups": [
+      "ICT Ministry"
+    ],
+    "group": "ICT Ministry",
     "name": "Maxie Nigel",
     "activeDevices": "[{\"lastActive\":\"2026-06-26T18:10:53.750Z\",\"id\":\"9sb1f2as\",\"loginTime\":\"2026-06-26T09:56:55.803Z\",\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15\"}]",
     "lastSeen": "2026-06-26T18:15:27.506Z",
@@ -362,8 +395,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "ADMINSTRATION",
+    "groups": [
+      "Administration"
+    ],
+    "group": "Administration",
     "name": "Kimani Thaiya",
     "activeDevices": "[{\"id\":\"9l3riw7x\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36\",\"loginTime\":\"2026-06-24T04:01:07.356Z\",\"lastActive\":\"2026-06-24T04:01:07.356Z\"}]",
     "lastSeen": "2026-06-24T04:01:08.206Z",
@@ -384,7 +419,9 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"Pastoral Ministry\"]",
+    "groups": [
+      "Pastoral Ministry"
+    ],
     "group": "Pastoral Ministry",
     "name": "Julius Mwamba",
     "activeDevices": "[{\"loginTime\":\"2026-06-24T09:52:25.131Z\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0\",\"id\":\"1t3l2b3l\",\"lastActive\":\"2026-06-24T10:23:27.274Z\"}]",
@@ -406,8 +443,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "MISSIONS COMMITEE",
+    "groups": [
+      "Evangelism & Missions"
+    ],
+    "group": "Evangelism & Missions",
     "name": "Victor Kimathi Murithi",
     "activeDevices": "",
     "lastSeen": "2026-06-23T08:52:31.235Z",
@@ -428,7 +467,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Youth Ministry"
+    ],
     "group": "Youth Ministry",
     "name": "Ethan Chege Kinyua",
     "activeDevices": "",
@@ -450,8 +491,10 @@
     "isApproved": false,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Youth Ministry"
+    ],
+    "group": "Youth Ministry",
     "name": "peterm muthuri",
     "activeDevices": "[{\"id\":\"yxzbudmh\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-25T06:58:03.634Z\",\"lastActive\":\"2026-06-25T06:58:03.634Z\"}]",
     "lastSeen": "2026-06-25T06:58:03.791Z",
@@ -472,7 +515,9 @@
     "isApproved": true,
     "role": "FINANCE",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Finance Department"
+    ],
     "group": "Finance Department",
     "name": "Samuel Mwangi",
     "activeDevices": "",
@@ -494,8 +539,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "PCMF",
+    "groups": [
+      "Men's Fellowship (PCMF)"
+    ],
+    "group": "Men's Fellowship (PCMF)",
     "name": "Jeremy K",
     "activeDevices": "",
     "lastSeen": "2026-07-07T20:35:57.584Z",
@@ -516,8 +563,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"District 21/23\"]",
-    "group": "District 21/23",
+    "groups": [
+      "ICT Ministry"
+    ],
+    "group": "ICT Ministry",
     "name": "Phillip Mwangi Gathuya",
     "activeDevices": "[{\"id\":\"8alor7z6\",\"userAgent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36\",\"loginTime\":\"2026-06-23T19:28:17.761Z\",\"lastActive\":\"2026-06-23T19:28:17.761Z\"}]",
     "lastSeen": "2026-06-23T19:26:45.735Z",
@@ -538,8 +587,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "DEACONS",
+    "groups": [
+      "Deacons Board"
+    ],
+    "group": "Deacons Board",
     "name": "Angela Ndereyerio",
     "activeDevices": "",
     "lastSeen": "2026-06-18T18:33:39.828Z",
@@ -554,8 +605,10 @@
     "name": "aloyse kioko",
     "email": "aloysekioko@gmail.com",
     "role": "CHURCH_GROUP",
-    "group": null,
-    "groups": [],
+    "group": "Youth Ministry",
+    "groups": [
+      "Youth Ministry"
+    ],
     "approver_code": null,
     "is_active": true,
     "is_approved": false,
@@ -583,8 +636,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "BRIGADE",
+    "groups": [
+      "Boys & Girls Brigade"
+    ],
+    "group": "Boys & Girls Brigade",
     "name": "Ann Kamira",
     "activeDevices": "",
     "lastSeen": "2026-06-23T22:25:39.412Z",
@@ -605,7 +660,9 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Music Ministry"
+    ],
     "group": "Music Ministry",
     "name": "Eric Gicheru",
     "activeDevices": "",
@@ -627,7 +684,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Youth Ministry"
+    ],
     "group": "Youth Ministry",
     "name": "waridi dada",
     "activeDevices": "",
@@ -649,8 +708,10 @@
     "isApproved": true,
     "role": "FINANCE",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Health & Welfare Board"
+    ],
+    "group": "Health & Welfare Board",
     "name": "Peter Omondi",
     "activeDevices": "",
     "lastSeen": "",
@@ -671,8 +732,10 @@
     "isApproved": true,
     "role": "APPROVER_L2",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Men's Fellowship (PCMF)"
+    ],
+    "group": "Men's Fellowship (PCMF)",
     "name": "Elder Mercy Wanjiku",
     "activeDevices": "",
     "lastSeen": "",
@@ -693,8 +756,10 @@
     "isApproved": true,
     "role": "ADMIN",
     "approverCode": "",
-    "groups": "",
-    "group": "ICT MINISTRY",
+    "groups": [
+      "ICT Ministry"
+    ],
+    "group": "ICT Ministry",
     "name": "Trevor Maina",
     "activeDevices": "",
     "lastSeen": "2026-06-04T16:17:59.354Z",
@@ -715,8 +780,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "Musical Instruments",
+    "groups": [
+      "Music Ministry"
+    ],
+    "group": "Music Ministry",
     "name": "Sarah Kemunto",
     "activeDevices": "",
     "lastSeen": "",
@@ -737,8 +804,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "ADMINSTRATION",
+    "groups": [
+      "Administration"
+    ],
+    "group": "Administration",
     "name": "Pcea St Andrews",
     "activeDevices": "[{\"id\":\"2yed3zvk\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36\",\"lastActive\":\"2026-07-02T12:06:16.473Z\",\"loginTime\":\"2026-06-24T10:17:45.446Z\"}]",
     "lastSeen": "2026-07-02T12:06:15.983Z",
@@ -759,8 +828,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "SECURITY COMMIITEE",
+    "groups": [
+      "Security Committee"
+    ],
+    "group": "Security Committee",
     "name": "Simon maina mumburi",
     "activeDevices": "",
     "lastSeen": "2026-06-18T18:46:38.934Z",
@@ -781,8 +852,10 @@
     "isApproved": true,
     "role": "ADMIN",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Sanctuary Renovation"
+    ],
+    "group": "Sanctuary Renovation",
     "name": "Kevin Talam",
     "activeDevices": "[{\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36\",\"loginTime\":\"2026-06-23T11:30:03.811Z\",\"lastActive\":\"2026-06-27T04:57:39.681Z\",\"id\":\"anewkel6\"},{\"id\":\"55z9logv\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36\",\"lastActive\":\"2026-06-25T18:04:27.192Z\",\"loginTime\":\"2026-06-23T15:52:50.391Z\"}]",
     "lastSeen": "2026-07-09T14:03:16.667Z",
@@ -803,7 +876,9 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Youth Ministry"
+    ],
     "group": "Youth Ministry",
     "name": "Wanjiku Mwangi",
     "activeDevices": "",
@@ -825,7 +900,9 @@
     "isApproved": true,
     "role": "SUPER_ADMIN",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "ICT Ministry"
+    ],
     "group": "ICT Ministry",
     "name": "Alex Gichau",
     "activeDevices": [
@@ -851,19 +928,25 @@
         "id": "dev_aur7h6u_mum50w14",
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
         "login_time": "2026-09-29T03:49:35.656Z",
-        "last_active": "2026-09-29T03:57:39.473Z",
-        "lastActive": "2026-09-29T04:03:24.303Z",
+        "last_active": "2026-09-29T04:03:24.303Z"
+      },
+      {
+        "id": "dev_l6xlolw_munzb87x",
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "login_time": "2026-10-01T06:53:22.034Z",
+        "last_active": "2026-10-01T07:08:06.792Z",
+        "lastActive": "2026-10-01T07:17:16.012Z",
         "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
       }
     ],
-    "lastSeen": "2026-09-29T04:10:24.992Z",
+    "lastSeen": "2026-10-01T08:48:57.626Z",
     "profilePromptPreference": "NEVER",
     "phone": "",
     "department": "",
     "tempPassword": "SaoYyy7Ckx9!",
     "theme": "dark",
     "is_online": true,
-    "last_seen": "2026-09-29T04:10:24.992Z",
+    "last_seen": "2026-10-01T08:48:57.626Z",
     "active_devices": [
       {
         "login_time": "2026-06-18T16:35:37.354Z",
@@ -887,12 +970,18 @@
         "id": "dev_aur7h6u_mum50w14",
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
         "login_time": "2026-09-29T03:49:35.656Z",
-        "last_active": "2026-09-29T03:57:39.473Z",
-        "lastActive": "2026-09-29T04:03:24.303Z",
+        "last_active": "2026-09-29T04:03:24.303Z"
+      },
+      {
+        "id": "dev_l6xlolw_munzb87x",
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "login_time": "2026-10-01T06:53:22.034Z",
+        "last_active": "2026-10-01T07:08:06.792Z",
+        "lastActive": "2026-10-01T07:17:16.012Z",
         "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
       }
     ],
-    "updated_at": "2026-09-29T04:03:24.303Z"
+    "updated_at": "2026-10-01T07:17:16.012Z"
   },
   {
     "document_id": "lkaDpjBVA0gDf7OCSiweA2pHGCI3",
@@ -905,8 +994,10 @@
     "isApproved": true,
     "role": "CHURCH_GROUP",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Music Ministry"
+    ],
+    "group": "Music Ministry",
     "name": "Andrew Nyumu",
     "activeDevices": "[{\"id\":\"1rckvi7k\",\"lastActive\":\"2026-06-23T20:50:59.404Z\",\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"loginTime\":\"2026-06-23T20:44:53.000Z\"},{\"id\":\"4xq4s4t1\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0\",\"lastActive\":\"2026-06-24T12:49:29.838Z\",\"loginTime\":\"2026-06-24T12:35:25.075Z\"}]",
     "lastSeen": "2026-06-24T12:52:29.879Z",
@@ -927,8 +1018,11 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"PCMF\",\"District 21/23\"]",
-    "group": "PCMF",
+    "groups": [
+      "Men's Fellowship (PCMF)",
+      "ICT Ministry"
+    ],
+    "group": "Men's Fellowship (PCMF)",
     "name": "Paul Mwangi",
     "activeDevices": "[{\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\",\"lastActive\":\"2026-06-25T12:17:36.985Z\",\"id\":\"7zbe9si9\",\"loginTime\":\"2026-06-23T14:01:46.407Z\"}]",
     "lastSeen": "2026-06-25T12:17:36.417Z",
@@ -949,7 +1043,9 @@
     "isApproved": true,
     "role": "FINANCE",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Finance Department"
+    ],
     "group": "Finance Department",
     "name": "Joel Mwaniki",
     "activeDevices": "[{\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36\",\"id\":\"qjtxpdtx\",\"lastActive\":\"2026-06-23T14:08:49.392Z\",\"loginTime\":\"2026-06-23T11:38:13.667Z\"},{\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36\",\"id\":\"hodphwe0\",\"loginTime\":\"2026-06-23T14:30:48.300Z\",\"lastActive\":\"2026-06-23T16:05:04.046Z\"},{\"lastActive\":\"2026-07-02T11:59:23.249Z\",\"loginTime\":\"2026-06-28T07:43:57.236Z\",\"id\":\"aw7fvxl5\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0\"}]",
@@ -998,8 +1094,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "[\"District 21/23\"]",
-    "group": "District 21/23",
+    "groups": [
+      "ICT Ministry"
+    ],
+    "group": "ICT Ministry",
     "name": "Maurice Kamotho Macharia",
     "activeDevices": "[{\"userAgent\":\"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Mobile Safari/537.36\",\"lastActive\":\"2026-07-03T07:49:27.180Z\",\"id\":\"b8dgf8y0\",\"loginTime\":\"2026-06-25T05:28:50.309Z\"}]",
     "lastSeen": "2026-07-03T07:49:28.186Z",
@@ -1020,8 +1118,10 @@
     "isApproved": true,
     "role": "APPROVER_L2",
     "approverCode": "",
-    "groups": "",
-    "group": "PCEA KILELESHWA CHURCH",
+    "groups": [
+      "Evangelism & Missions"
+    ],
+    "group": "Evangelism & Missions",
     "name": "Joyce Ndeche",
     "activeDevices": "",
     "lastSeen": "2026-06-17T10:04:59.560Z",
@@ -1042,7 +1142,9 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
+    "groups": [
+      "Youth Ministry"
+    ],
     "group": "Youth Ministry",
     "name": "Youth Treasurer",
     "activeDevices": "[{\"id\":\"fpiltvz3\",\"lastActive\":\"2026-06-27T05:06:13.609Z\",\"loginTime\":\"2026-06-23T13:54:41.140Z\",\"userAgent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36\"}]",
@@ -1064,8 +1166,10 @@
     "isApproved": true,
     "role": "APPROVER_L1",
     "approverCode": "",
-    "groups": "",
-    "group": "",
+    "groups": [
+      "Evangelism & Missions"
+    ],
+    "group": "Evangelism & Missions",
     "name": "Rev. Dr. Patrick Mutua",
     "activeDevices": "",
     "lastSeen": "",

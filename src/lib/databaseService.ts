@@ -17,6 +17,7 @@ import {
 } from "../types";
 import { getAuth } from "firebase/auth";
 import { invalidatePortalQueries } from "../hooks/usePortalQueries";
+import { enforceUserGroupAllocation } from "./churchGroupUtils";
 
 // Helper for making API calls
 async function apiCall(endpoint: string, method: string = "GET", body?: any): Promise<any> {
@@ -85,13 +86,14 @@ export const databaseService = {
   // --- USER OPERATIONS ---
   async saveUserProfile(user: UserProfile): Promise<void> {
     console.log(`[DatabaseService] Saving user profile to MongoDB: ${user.email}`);
+    const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(user);
     await apiCall(`/api/db/users/${encodeURIComponent(user.id)}`, "POST", {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      group: user.group || null,
-      groups: user.groups || [],
+      group: cleanGroup,
+      groups: cleanGroups,
       approver_code: user.approverCode || null,
       is_active: user.isActive,
       is_approved: user.isApproved,
@@ -533,8 +535,11 @@ export const databaseService = {
     if (updates.name !== undefined) mapped.name = updates.name;
     if (updates.email !== undefined) mapped.email = updates.email;
     if (updates.role !== undefined) mapped.role = updates.role;
-    if (updates.group !== undefined) mapped.group = updates.group;
-    if (updates.groups !== undefined) mapped.groups = updates.groups;
+    if (updates.group !== undefined || updates.groups !== undefined) {
+      const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(updates);
+      mapped.group = cleanGroup;
+      mapped.groups = cleanGroups;
+    }
     if (updates.approverCode !== undefined) mapped.approver_code = updates.approverCode;
     if (updates.isActive !== undefined) mapped.is_active = updates.isActive;
     if (updates.isApproved !== undefined) mapped.is_approved = updates.isApproved;

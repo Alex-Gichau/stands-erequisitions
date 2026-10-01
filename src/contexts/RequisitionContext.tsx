@@ -38,6 +38,7 @@ import { databaseService } from "../lib/databaseService";
 import { AuthContext, AuthContextType } from "./AuthContext";
 import { NotificationContext, NotificationContextType } from "./NotificationContext";
 import { FiscalYearContext, FiscalYearContextType } from "./FiscalYearContext";
+import { enforceUserGroupAllocation } from "../lib/churchGroupUtils";
 import { uploadAttachmentsToLocalServer, unwrapAttachmentTarget, sendSlackNotification, resolveSenderName } from "../lib/utils";
 import { sendDesktopNotification } from "../lib/desktopNotifications";
 import { triggerAutosendBackupEmail, AUTOSEND_DEFAULT_EMAIL, getLocalAutosendConfig } from "../services/autosendBackupService";
@@ -86,34 +87,9 @@ export function normalizeUserProfile(u: any): UserProfile {
     u.isActive = true;
     u.isSuspended = false;
   }
-  let parsedGroups: string[] = [];
-  if (u.groups) {
-    if (Array.isArray(u.groups)) {
-      parsedGroups = u.groups;
-    } else if (typeof u.groups === "string" && u.groups.trim() !== "") {
-      try {
-        const parsed = JSON.parse(u.groups);
-        if (Array.isArray(parsed)) {
-          parsedGroups = parsed;
-        } else {
-          parsedGroups = [u.groups];
-        }
-      } catch (e) {
-        parsedGroups = [u.groups];
-      }
-    } else if (typeof u.groups === "string") {
-      parsedGroups = [];
-    } else {
-      parsedGroups = [];
-    }
-  } else {
-    parsedGroups = u.group ? [u.group] : [];
-  }
 
-  // Strip out legacy 'INDEPENDENT' affiliation so unassigned users are marked unallocated
-  parsedGroups = parsedGroups.filter(g => g && g.trim().toUpperCase() !== "INDEPENDENT");
-  const rawGroup = u.group && typeof u.group === "string" ? u.group.trim() : "";
-  const normalizedGroup = rawGroup.toUpperCase() !== "INDEPENDENT" ? rawGroup : (parsedGroups[0] || "");
+  // Enforce mandatory canonical church group allocation
+  const { group: normalizedGroup, groups: parsedGroups } = enforceUserGroupAllocation(u);
 
   let parsedDevices: DeviceSession[] = [];
   const rawDevices = u.activeDevices !== undefined ? u.activeDevices : u.active_devices;
@@ -132,7 +108,7 @@ export function normalizeUserProfile(u: any): UserProfile {
 
   return {
     ...cleanU,
-    group: normalizedGroup || undefined,
+    group: normalizedGroup,
     groups: parsedGroups,
     activeDevices: parsedDevices
   };
@@ -1203,35 +1179,37 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           } else {
             const isSuperAdminEmail = userEmail === "gichaumburu@gmail.com";
             const googlePhoto = firebaseUser.photoURL || (userEmail && userEmail.endsWith("@gmail.com") ? `https://unavatar.io/google/${userEmail}` : "");
-            const defaultUser = {
+            const rawDefaultUser = {
               id: firebaseUser.uid,
               name: firebaseUser.displayName || userEmail || "Alex Gichau",
               email: userEmail || "",
               photoURL: googlePhoto,
-              role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : "CHURCH_GROUP") as UserRole,
+              role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : UserRole.CHURCH_GROUP),
               isActive: true,
               isApproved: true,
               isSuspended: false
             };
-            setCurrentUser(defaultUser as any);
-            await databaseService.saveUserProfile(defaultUser as any);
+            const defaultUser = normalizeUserProfile(rawDefaultUser);
+            setCurrentUser(defaultUser);
+            await databaseService.saveUserProfile(defaultUser);
           }
         } catch (err) {
           console.warn("Could not fetch user profile from backend database, setting default:", err);
           const isSuperAdminEmail = userEmail === "gichaumburu@gmail.com";
           const googlePhoto = firebaseUser.photoURL || (userEmail && userEmail.endsWith("@gmail.com") ? `https://unavatar.io/google/${userEmail}` : "");
-          const fallbackUser = {
+          const rawFallbackUser = {
             id: firebaseUser.uid,
             name: firebaseUser.displayName || userEmail || "Alex Gichau",
             email: userEmail || "",
             photoURL: googlePhoto,
-            role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : "CHURCH_GROUP") as UserRole,
+            role: (isSuperAdminEmail ? UserRole.SUPER_ADMIN : UserRole.CHURCH_GROUP),
             isActive: true,
             isApproved: true,
             isSuspended: false
           };
-          setCurrentUser(fallbackUser as any);
-          await databaseService.saveUserProfile(fallbackUser as any);
+          const fallbackUser = normalizeUserProfile(rawFallbackUser);
+          setCurrentUser(fallbackUser);
+          await databaseService.saveUserProfile(fallbackUser);
         }
         setAuthLoading(false);
       } else {
@@ -2636,7 +2614,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           if (dbData?.users && Array.isArray(dbData.users)) {
             const data = dbData.users.map((u: any) => {
               if (!u) return null;
-              return normalizeUserProfile({
+              const normalized = normalizeUserProfile({
                 id: u?.id || "",
                 name: u?.name || "",
                 email: u?.email || "",
@@ -2654,6 +2632,13 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 lastSeen: u?.last_seen || u?.lastSeen || "",
                 idleTimeoutDuration: Number(u?.idle_timeout_duration) || Number(u?.idleTimeoutDuration) || 15
               } as UserProfile);
+
+              // Auto-heal any legacy unassigned, unallocated, or uncanonicalized user in background
+              if (!u.group || u.group === "INDEPENDENT" || u.group === "UNALLOCATED" || u.group !== normalized.group) {
+                databaseService.saveUserProfile(normalized).catch(() => {});
+              }
+
+              return normalized;
             }).filter(Boolean) as UserProfile[];
             setUsers(data);
           }
@@ -3095,11 +3080,14 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             })
           });
         } else {
+          const defaultChurchGroup = "Youth Ministry";
           const newProfile = {
             id: uid,
             name: name,
             email: email,
             role: "CHURCH_GROUP" as UserRole,
+            group: defaultChurchGroup,
+            groups: [defaultChurchGroup],
             is_active: true,
             is_approved: true,
             is_suspended: false,
@@ -3288,20 +3276,21 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const updateUserProfile = useCallback(async (id: string, updates: Partial<UserProfile>) => {
     try {
       const existingUser = users.find(u => u.id === id);
-      const updatedUser = existingUser ? { ...existingUser, ...updates } : ({ id, ...updates } as UserProfile);
+      const rawUpdated = existingUser ? { ...existingUser, ...updates } : ({ id, ...updates } as UserProfile);
+      const updatedUser = normalizeUserProfile(rawUpdated);
 
       // 1. Optimistic update: Update React state immediately (0ms UI lag)
       setUsers(prev => {
         const exists = prev.some(u => u.id === id);
         const next = exists 
-          ? prev.map(u => u.id === id ? { ...u, ...updates } : u)
+          ? prev.map(u => u.id === id ? { ...u, ...updatedUser } : u)
           : [...prev, updatedUser];
         try { localStorage.setItem("stands_cache_users", JSON.stringify(next)); } catch (e) {}
         return next;
       });
 
       if (currentUser?.id === id) {
-        setCurrentUser(prev => prev ? { ...prev, ...updates } : prev);
+        setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : prev);
       }
 
       // 2. Non-blocking asynchronous backend save (no full screen loading overlay)
@@ -3399,8 +3388,15 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isSuspended: false,
       };
 
-      if (group && group.toUpperCase() !== "INDEPENDENT") newProfile.group = group;
-      if (groups) newProfile.groups = groups.filter(g => g && g.toUpperCase() !== "INDEPENDENT");
+      const finalGs = (groups && groups.length > 0)
+        ? groups.filter(g => g && g.toUpperCase() !== "INDEPENDENT" && g.toUpperCase() !== "UNALLOCATED")
+        : (group && group.toUpperCase() !== "INDEPENDENT" && group.toUpperCase() !== "UNALLOCATED" ? [group] : ["Youth Ministry"]);
+      const finalG = (group && group.toUpperCase() !== "INDEPENDENT" && group.toUpperCase() !== "UNALLOCATED")
+        ? group
+        : (finalGs[0] || "Youth Ministry");
+
+      newProfile.group = finalG;
+      newProfile.groups = finalGs.length > 0 ? finalGs : [finalG];
 
       // Store in users collection
       await databaseService.saveUserProfile(newProfile as any);

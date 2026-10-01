@@ -3294,7 +3294,7 @@ export const RequisitionsPanel: React.FC = () => {
             )}
           >
             <Banknote size={12} />
-            <span>Pending Disbursement</span>
+            <span>Waiting for Finance</span>
           </button>
           <button
             onClick={() => setFilterPreset("DISBURSED")}
@@ -7017,7 +7017,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   <div className="flex items-center gap-2">
                     <Receipt className="text-emerald-600 dark:text-emerald-400" size={16} />
                     <h4 className="text-[9px] md:text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                      Payment Receipts &amp; Proof of Expenditure
+                      Attach Payment Receipts
                     </h4>
                     <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded-full text-[9px] font-bold">
                       {normalizedReceipts.length}
@@ -7248,8 +7248,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                         <Receipt size={16} />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Payment Proof &amp; Receipt Upload</p>
-                        <p className="text-[10px] text-slate-400">This field activates once funds have been disbursed by Finance.</p>
+                        <p className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">Payment Reciepts Upload</p>
+                        <p className="text-[10px] text-slate-400">This reciepts uploads placeholder activates once Finance have been disbursed.</p>
                       </div>
                     </div>
                     <span className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold self-start sm:self-auto shrink-0 flex items-center gap-1.5">

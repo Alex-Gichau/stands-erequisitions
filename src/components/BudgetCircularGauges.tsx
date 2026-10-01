@@ -269,10 +269,10 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <h3 className="text-sm md:text-base font-black text-slate-900 uppercase tracking-tight">
-            Ministry Available Budget Safe-To-Spend
+            Ministry Unspent Budget
           </h3>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-            Realtime available calculation showing uncommitted cash balances for active church group categories
+            Realtime available cash balances for active church group categories.
           </p>
         </div>
 
@@ -282,21 +282,15 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
             <ArrowDownRight size={20} className="animate-bounce" />
           </div>
           <div>
-            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">AGGREGATE FREE HEADROOM</div>
+            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL UNSPENT BUDGET</div>
             <div className="text-base font-black text-slate-900 font-sans tracking-tight leading-none mb-1">
               Ksh {summary.totalRemaining.toLocaleString()}
-            </div>
-            <div className="text-[9px] font-bold text-indigo-600 leading-none">
-              Over {summary.overallRemainingPct.toFixed(1)}% safe balance unspent
             </div>
           </div>
           <div className="ml-auto text-right pl-4 border-l border-slate-200">
             <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL ACTUAL SPENT</div>
             <div className="text-base font-black text-emerald-600 font-sans tracking-tight leading-none mb-1">
               Ksh {summary.totalSpent.toLocaleString()}
-            </div>
-            <div className="text-[9px] font-bold text-slate-400 leading-none">
-              Physical cash outflow recorded
             </div>
           </div>
         </div>

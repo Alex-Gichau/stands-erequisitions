@@ -1883,21 +1883,10 @@ export const FinanceLedgerPanel: React.FC = () => {
       {/* 1. Brand Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Finance Ledger</h1>
-          <p className="text-slate-500 text-sm">Double-entry ledger ledger checking, budget allocations, and disbursement controls.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#4f46e5]/95 bg-[#4f46e5]/10 px-3 py-1 rounded-full border border-indigo-500/10">
-            Accounting Console
-          </span>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Accounting & Budgets</h1>
+          <p className="text-slate-500 text-sm">Checking, budget allocations, and disbursement controls.</p>
         </div>
       </div>
-
-      <GlobalFiscalOverview 
-        projects={projects}
-        activeYear={systemSettings?.currentFiscalYear}
-        status={systemSettings?.fiscalYearStatus}
-      />
 
       {/* Time Horizon Transaction Volume Card Row */}
       <div id="ledger-time-horizon-container" className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
@@ -1908,16 +1897,13 @@ export const FinanceLedgerPanel: React.FC = () => {
             </div>
             <div>
               <h3 id="time-horizon-header-title" className="text-xs font-black text-slate-800 uppercase tracking-widest">
-                Committed Ledger Volumes
+                Requisitions Vouchers Approved & Disbursed
               </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                Consolidated totals from approved & disbursed vouchers
+                Totals for approved & disbursed vouchers
               </p>
             </div>
           </div>
-          <span className="text-[9px] font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md font-bold self-start sm:self-center">
-            REAL-TIME CALENDAR CALCULATION
-          </span>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1992,24 +1978,17 @@ export const FinanceLedgerPanel: React.FC = () => {
             <Building2 size={80} />
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
-            Total Allocated Ministry Group Budget
+            Total Allocated Church Budget
           </p>
           <h2 className="text-xl font-bold leading-none mb-2">{formatCurrency(metrics.totalActiveBudget)}</h2>
-          <div className="flex items-center gap-1.5 text-[9px] font-semibold text-emerald-400">
-            <Building2 size={10} />
-            <span>Sum of All Ministry Allocations (FY {activeYear})</span>
-          </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-125 transition-all text-amber-500">
             <Clock size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Committed Liabilities</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Approved, Awaiting Payout</p>
           <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalCommittedPending)}</h2>
-          <div className="flex items-center gap-1.5 text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full inline-flex">
-            <span>{metrics.pendingDisbursalCount} Approved, Awaiting Payout</span>
-          </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
@@ -2018,21 +1997,14 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Fund Disbursed</p>
           <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalDisbursed)}</h2>
-          <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full inline-flex">
-            <ArrowDownLeft size={10} />
-            <span>Actual Outflows Recorded</span>
-          </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-125 transition-all text-[#4f46e5]">
             <TrendingUp size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Budget Safety Margin</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Unspent Budget</p>
           <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalRemainingBudget)}</h2>
-          <div className="flex items-center gap-1.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full inline-flex">
-            <span>Unspent Budget Pool</span>
-          </div>
         </div>
 
       </div>
@@ -3374,7 +3346,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                             {cg.description && <span> • {cg.description}</span>}
                           </p>
                           <p className="text-[11px] text-amber-800 font-medium">
-                            No project budget line approved for FY {activeYear}. Transactions under this ministry will use General Church Operations reserves.
+                            No project budget allocated for FY {activeYear}. Transactions under this ministry will use General Church Operations reserves.
                           </p>
                         </div>
 

@@ -1664,6 +1664,88 @@ Your response MUST adhere strictly to the JSON schema specified.
     }
   });
 
+  // Centralized Helper to enforce mandatory church group allocation across all server operations
+  function enforceServerUserGroup(body: any): any {
+    if (!body || typeof body !== "object") return body;
+    let g = (body.group && typeof body.group === "string" ? body.group.trim() : "");
+    let rawGs = Array.isArray(body.groups) 
+      ? body.groups 
+      : (typeof body.groups === "string" && body.groups.trim() !== "" 
+          ? (() => { try { const p = JSON.parse(body.groups); return Array.isArray(p) ? p : [body.groups]; } catch { return body.groups.split(","); } })()
+          : []);
+
+    const canonicalize = (name: any): string => {
+      if (!name || typeof name !== "string") return "";
+      const lower = name.trim().toLowerCase();
+      if (lower === "independent" || lower === "unallocated" || lower === "none" || lower === "no group") return "";
+      if (lower.includes("ict") || lower.includes("information tech") || lower.includes("media team")) return "ICT Ministry";
+      if (lower.includes("security")) return "Security Committee";
+      if (lower.includes("pcmf") || lower.includes("men's") || lower.includes("mens") || lower.includes("men fellowship")) return "Men's Fellowship (PCMF)";
+      if (lower.includes("deacon")) return "Deacons Board";
+      if (lower.includes("brigade")) return "Boys & Girls Brigade";
+      if (lower.includes("admin")) return "Administration";
+      if (lower.includes("pastor") || lower.includes("rev") || lower.includes("clergy") || lower.includes("ministerial")) return "Pastoral Ministry";
+      if (lower.includes("finance") || lower.includes("treasur") || lower.includes("accounts") || lower.includes("audit")) return "Finance Department";
+      if (lower.includes("church school") || lower.includes("sunday school") || lower.includes("children") || lower.includes("kids")) return "Sunday School & Children";
+      if (lower.includes("outreach") || lower.includes("mission") || lower.includes("evangelism") || lower.includes("kileleshwa")) return "Evangelism & Missions";
+      if (lower.includes("instrument") || lower.includes("choir") || lower.includes("singers") || lower.includes("music")) return "Music Ministry";
+      if (lower.includes("youth") || lower.includes("teens")) return "Youth Ministry";
+      if (lower.includes("district") || lower.includes("zone")) return "District Fellowships";
+      if (lower.includes("welfare") || lower.includes("health")) return "Health & Welfare Board";
+      if (lower.includes("guild") || lower.includes("women")) return "Women's Guild";
+      if (lower.includes("praise") || lower.includes("worship")) return "Praise & Worship Team";
+      if (lower.includes("sanctuary") || lower.includes("renovation")) return "Sanctuary Renovation";
+      if (lower.includes("french")) return "French Congregation";
+      return name.trim();
+    };
+
+    let cleanG = canonicalize(g);
+    let cleanGs = rawGs.map(canonicalize).filter(Boolean);
+
+    if (!cleanG || cleanGs.length === 0) {
+      const normEmail = (body.email || "").toLowerCase();
+      const role = (body.role || "").toUpperCase();
+      let defaultG = "Youth Ministry";
+      if (normEmail.includes("ict") || normEmail.includes("tech") || normEmail.includes("web") || normEmail.includes("media") || normEmail.includes("system")) {
+        defaultG = "ICT Ministry";
+      } else if (normEmail.includes("music") || normEmail.includes("choir") || normEmail.includes("sing") || normEmail.includes("worship")) {
+        defaultG = "Music Ministry";
+      } else if (normEmail.includes("treasurer") || normEmail.includes("finance") || normEmail.includes("account") || role === "FINANCE") {
+        defaultG = "Finance Department";
+      } else if (normEmail.includes("youth") || normEmail.includes("teen")) {
+        defaultG = "Youth Ministry";
+      } else if (normEmail.includes("guild") || normEmail.includes("women")) {
+        defaultG = "Women's Guild";
+      } else if (normEmail.includes("men") || normEmail.includes("pcmf")) {
+        defaultG = "Men's Fellowship (PCMF)";
+      } else if (normEmail.includes("school") || normEmail.includes("children") || normEmail.includes("kids")) {
+        defaultG = "Sunday School & Children";
+      } else if (normEmail.includes("security") || normEmail.includes("guard")) {
+        defaultG = "Security Committee";
+      } else if (normEmail.includes("deacon")) {
+        defaultG = "Deacons Board";
+      } else if (normEmail.includes("brigade")) {
+        defaultG = "Boys & Girls Brigade";
+      } else if (normEmail.includes("minister") || normEmail.includes("pastor") || normEmail.includes("rev") || role === "APPROVER_L1") {
+        defaultG = "Pastoral Ministry";
+      } else if (normEmail.includes("clerk") || normEmail.includes("session") || role === "APPROVER_L2") {
+        defaultG = "Administration";
+      } else if (role === "ADMIN" || role === "SUPER_ADMIN") {
+        defaultG = "Administration";
+      }
+      cleanG = cleanG || defaultG;
+      cleanGs = cleanGs.length > 0 ? cleanGs : [cleanG];
+    }
+
+    if (!cleanGs.includes(cleanG)) {
+      cleanGs.unshift(cleanG);
+    }
+
+    body.group = cleanG;
+    body.groups = cleanGs;
+    return body;
+  }
+
   app.post("/api/auth/link-profile", express.json(), async (req, res) => {
     const { uid, email, profileId } = req.body;
     if (!uid || !email) return res.status(400).json({ error: "Missing uid or email parameter" });
@@ -1682,11 +1764,12 @@ Your response MUST adhere strictly to the JSON schema specified.
           console.warn("[Link Profile] Cleanup warning:", cleanErr.message);
         }
 
-        const setFields: any = { id: uid, isApproved: true, isActive: true };
+        const setFields: any = { id: uid, isApproved: true, isActive: true, email: normalizedEmail };
         if (normalizedEmail === "gichaumburu@gmail.com") {
           setFields.role = "SUPER_ADMIN";
           setFields.isSuspended = false;
         }
+        enforceServerUserGroup(setFields);
 
         try {
           const updateRes = await (models.User as any).updateOne(
@@ -1697,7 +1780,7 @@ Your response MUST adhere strictly to the JSON schema specified.
           if (updateRes.matchedCount === 0) {
             await (models.User as any).updateOne(
               { id: uid },
-              { $set: { email: normalizedEmail, ...setFields } },
+              { $set: setFields },
               { upsert: true }
             );
           }
@@ -1706,11 +1789,11 @@ Your response MUST adhere strictly to the JSON schema specified.
             console.warn("[Link Profile] E11000 collision handled during profile linking:", dupErr.message);
             await (models.User as any).updateOne(
               { id: uid },
-              { $set: { email: normalizedEmail, ...setFields } }
+              { $set: setFields }
             ).catch(async () => {
               await (models.User as any).updateOne(
                 { email: normalizedEmail },
-                { $set: { id: uid, ...setFields } }
+                { $set: setFields }
               );
             });
           } else {
@@ -1747,14 +1830,15 @@ Your response MUST adhere strictly to the JSON schema specified.
           users[idx].id = uid;
           users[idx].isApproved = true;
           users[idx].isActive = true;
+          enforceServerUserGroup(users[idx]);
         } else {
-          users.push({
+          users.push(enforceServerUserGroup({
             id: uid,
             email: normalizedEmail,
-            role: "USER",
+            role: "CHURCH_GROUP",
             isApproved: true,
             isActive: true
-          });
+          }));
         }
         writeJsonCollection("users", users);
 
@@ -1891,7 +1975,10 @@ Your response MUST adhere strictly to the JSON schema specified.
           if (Model) {
             const data = await Model.find({}).lean();
             dataMap[col] = data.map((item: any) => {
-              const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+              let sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+              if (col === "users") {
+                sanitized = enforceServerUserGroup(sanitized);
+              }
               const { _id, __v, ...rest } = sanitized;
               const snakeRest = toSnakeCase(rest);
               return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -1902,7 +1989,10 @@ Your response MUST adhere strictly to the JSON schema specified.
         } else {
           const data = readJsonCollection(col);
           dataMap[col] = data.map((item: any) => {
-            const sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+            let sanitized = col === "requisitions" ? sanitizeRequisitionAttachments(item, getUploadsDir()) : item;
+            if (col === "users") {
+              sanitized = enforceServerUserGroup(sanitized);
+            }
             const { _id, __v, ...rest } = sanitized;
             const snakeRest = toSnakeCase(rest);
             return { id: snakeRest.id || String(_id), ...snakeRest };
@@ -2189,6 +2279,11 @@ Your response MUST adhere strictly to the JSON schema specified.
         });
       }
 
+      // Enforce church group allocation for users
+      if (collection === "users" && Array.isArray(cleanData)) {
+        cleanData = cleanData.map((u: any) => enforceServerUserGroup(u));
+      }
+
       // Pagination support if page or limit query parameters provided
       if (req.query.page !== undefined || req.query.limit !== undefined) {
         let list = Array.isArray(cleanData) ? cleanData : [];
@@ -2269,7 +2364,13 @@ Your response MUST adhere strictly to the JSON schema specified.
   // Upsert document to collection (id provided in body or auto-generated)
   app.post("/api/db/:collection", express.json({ limit: "50mb" }), async (req, res) => {
     const { collection } = req.params;
-    const body = coerceBooleans(req.body);
+    let body = coerceBooleans(req.body);
+    if (collection === "requisitions") {
+      body = sanitizeRequisitionAttachments(body, getUploadsDir());
+    }
+    if (collection === "users") {
+      body = enforceServerUserGroup(body);
+    }
     const id = body.id || body.document_id || `${collection}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     try {
       let responsePayload: any;
@@ -2312,6 +2413,9 @@ Your response MUST adhere strictly to the JSON schema specified.
     if (collection === "requisitions") {
       body = sanitizeRequisitionAttachments(body, getUploadsDir());
     }
+    if (collection === "users") {
+      body = enforceServerUserGroup(body);
+    }
     try {
       if (mongoose.connection.readyState === 1) {
         const Model = modelMappings[collection];
@@ -2349,6 +2453,9 @@ Your response MUST adhere strictly to the JSON schema specified.
     let body = coerceBooleans(req.body);
     if (collection === "requisitions") {
       body = sanitizeRequisitionAttachments(body, getUploadsDir());
+    }
+    if (collection === "users") {
+      body = enforceServerUserGroup(body);
     }
     try {
       if (mongoose.connection.readyState === 1) {

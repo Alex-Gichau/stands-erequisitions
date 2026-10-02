@@ -202,8 +202,6 @@ export const PdfThumbnailPreview: React.FC<PdfThumbnailPreviewProps> = ({
   showOverlayBadge = true,
 }) => {
   const [renderedCanvas, setRenderedCanvas] = useState(false);
-  const [cachedImgUri, setCachedImgUri] = useState<string | null>(null);
-  const [rendering, setRendering] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
@@ -238,6 +236,16 @@ export const PdfThumbnailPreview: React.FC<PdfThumbnailPreviewProps> = ({
     const absUrl = getAbsoluteAttachmentUrl(rawUrl) || rawUrl;
     return absUrl || "";
   }, [url, objectUrl]);
+
+  // Synchronously initialize cached image uri & rendering state to avoid flash of loading
+  const [cachedImgUri, setCachedImgUri] = useState<string | null>(() => {
+    if (!targetPdfUrl) return null;
+    return pdfThumbnailDataUriCache.get(targetPdfUrl) || null;
+  });
+  const [rendering, setRendering] = useState<boolean>(() => {
+    if (!targetPdfUrl) return false;
+    return !pdfThumbnailDataUriCache.has(targetPdfUrl);
+  });
 
   // Fallback iframe URL with page=1 parameters
   const iframeSource = useMemo(() => {

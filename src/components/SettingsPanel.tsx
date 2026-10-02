@@ -1009,7 +1009,7 @@ export const SettingsPanel: React.FC = () => {
                           type="button"
                           onClick={handleSaveAllSettings}
                           disabled={isSavingSettings}
-                          className="w-full bg-[#0f172a] hover:bg-[#1e293b] text-white rounded-2xl px-6 py-3 font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                          className="w-full bg-[#18181b] hover:bg-[#27272a] text-white rounded-2xl px-6 py-3 font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                         >
                           {isSavingSettings ? (
                             <>
@@ -1307,7 +1307,7 @@ export const SettingsPanel: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isUpdatingPassword}
-                      className="bg-[#0f172a] hover:bg-[#1e293b] text-white rounded-2xl px-8 py-3.5 font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                      className="bg-[#18181b] hover:bg-[#27272a] text-white rounded-2xl px-8 py-3.5 font-bold text-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                     >
                       {isUpdatingPassword ? "Updating Password..." : "Update Password"}
                     </button>
@@ -1999,7 +1999,7 @@ export const SettingsPanel: React.FC = () => {
                             timestamp: new Date().toISOString()
                           });
                         }}
-                        className="bg-[#0f172a] hover:bg-[#1e293b] text-white rounded-2xl px-6 py-3 font-bold text-xs transition-all cursor-pointer"
+                        className="bg-[#18181b] hover:bg-[#27272a] text-white rounded-2xl px-6 py-3 font-bold text-xs transition-all cursor-pointer"
                       >
                         Save Email
                       </button>

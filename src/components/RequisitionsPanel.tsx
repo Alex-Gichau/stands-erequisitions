@@ -2264,13 +2264,15 @@ const DocumentPreviewModal = ({
 };
 
 const HighlightText = ({ text, highlight }: { text: string; highlight: string }) => {
-  if (!highlight.trim()) return <>{text}</>;
-  const parts = text.split(new RegExp(`(${highlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+  if (!text) return null;
+  if (!highlight || !highlight.trim()) return <>{text}</>;
+  const cleanHighlight = highlight.trim();
+  const parts = String(text).split(new RegExp(`(${cleanHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
   return (
     <>
       {parts.map((part, i) => 
-        part.toLowerCase() === highlight.toLowerCase() 
-          ? <mark key={i} className="bg-amber-200 text-amber-900 rounded-px px-px font-bold underline decoration-amber-500/30 decoration-2">{part}</mark> 
+        part.toLowerCase() === cleanHighlight.toLowerCase() 
+          ? <mark key={i} className="bg-amber-200 dark:bg-amber-500/30 text-amber-900 dark:text-amber-200 rounded-px px-px font-bold underline decoration-amber-500/30 decoration-2">{part}</mark> 
           : part
       )}
     </>
@@ -3324,9 +3326,6 @@ export const RequisitionsPanel: React.FC = () => {
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 setShowTrending(false);
-                setTimeout(() => {
-                  setGlobalSearchTerm("");
-                }, 1000);
               }
             }}
           />
@@ -3352,7 +3351,7 @@ export const RequisitionsPanel: React.FC = () => {
               >
                 <div className="p-3 border-bottom border-slate-50 flex items-center gap-2">
                   <TrendingUp size={12} className="text-emerald-500" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trending Searches</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Most Searched</span>
                 </div>
                 <div className="flex flex-col p-1">
                   {trendingSearches.map((item, idx) => (
@@ -3452,7 +3451,7 @@ export const RequisitionsPanel: React.FC = () => {
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="hidden md:table w-full text-left">
+          <table className="hidden lg:table w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="px-4 md:px-6 py-3 md:py-4 w-10">
@@ -3493,273 +3492,254 @@ export const RequisitionsPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {activeItems.flatMap((req, i) => {
-                  const updateAge = now - new Date(req.updatedAt).getTime();
-                  const isRecentlyApprovedOrDisbursed = (req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED) && updateAge < 8000;
-                  const formattedAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status);
-                  const compactAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status, { compact: true });
+              {activeItems.flatMap((req) => {
+                const updateAge = now - new Date(req.updatedAt).getTime();
+                const isRecentlyApprovedOrDisbursed = (req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED) && updateAge < 8000;
+                const formattedAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status);
+                const compactAge = formatRequisitionAge(req.submittedAt || req.createdAt, req.status, { compact: true });
 
-                  const hasInstallments = Boolean(req.installments && req.installments.length > 0);
-                  const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
-                  const totalInstallments = hasInstallments ? req.installments!.length : 0;
-                  const isScheduleExpanded = expandedScheduleIds.has(req.id);
-                  const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
-                  const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
-                  const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+                const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+                const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+                const totalInstallments = hasInstallments ? req.installments!.length : 0;
+                const isScheduleExpanded = expandedScheduleIds.has(req.id);
+                const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+                const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+                const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
 
-                  const mainRow = (
-                    <motion.tr 
-                      key={req.id}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ 
-                          opacity: 1, 
-                          y: 0,
-                          backgroundColor: isRecentlyApprovedOrDisbursed ? "rgba(16, 185, 129, 0.08)" : undefined
-                        }}
-                        exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                        transition={{ 
-                          opacity: { duration: 0.2 },
-                          layout: { type: "spring", stiffness: 300, damping: 30 },
-                          y: { type: "spring", stiffness: 300, damping: 30 }
-                        }}
-                        onClick={() => setViewingReq(req)}
-                        className={cn(
-                          "transition-colors group cursor-pointer border-l-2",
-                          selectedIds.has(req.id) ? "bg-primary/5 border-l-primary" : 
-                          isRecentlyApprovedOrDisbursed 
-                            ? "border-l-emerald-500 shadow-[inset_4px_0_0_0_#10b981]" 
-                            : "hover:bg-slate-50/80 border-l-transparent"
+                const mainRow = (
+                  <tr 
+                    key={req.id}
+                    onClick={() => setViewingReq(req)}
+                    className={cn(
+                      "transition-colors group cursor-pointer border-l-2",
+                      selectedIds.has(req.id) ? "bg-primary/5 border-l-primary" : 
+                      isRecentlyApprovedOrDisbursed 
+                        ? "border-l-emerald-500 shadow-[inset_4px_0_0_0_#10b981] bg-emerald-50/20" 
+                        : "hover:bg-slate-50/80 border-l-transparent"
+                    )}
+                  >
+                    <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
+                        checked={selectedIds.has(req.id)}
+                        onChange={() => toggleSelect(req.id)}
+                      />
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4">
+                      <div className="flex flex-col min-w-0 max-w-full md:max-w-none space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                          {getReqUnreadInfo(req).hasUnread && (
+                            <span 
+                              title={`${getReqUnreadInfo(req).unreadCount} unread comment${getReqUnreadInfo(req).unreadCount === 1 ? "" : "s"}${getReqUnreadInfo(req).unreadAuthors.length > 0 ? ` from ${getReqUnreadInfo(req).unreadAuthors.join(", ")}` : ""}`}
+                              className="inline-flex items-center gap-1 text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
+                            >
+                              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
+                              </span>
+                              <MessageSquare size={10} className="fill-rose-500 text-rose-600" />
+                              {getReqUnreadInfo(req).unreadCount} NEW
+                            </span>
+                          )}
+                          <span className="font-bold text-slate-900 text-xs md:text-sm break-words leading-snug">
+                            <HighlightText text={req.title} highlight={globalSearchTerm} />
+                          </span>
+                          {compactAge && (
+                            <span className="text-[8px] md:text-[9px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                              {compactAge}
+                            </span>
+                          )}
+                          {req.inProcurement && (
+                            <span className="text-[8px] md:text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                              PROCUREMENT
+                            </span>
+                          )}
+                          {req.requiresMoreInfo && (
+                            <span className="text-[8px] md:text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
+                              INFO REQ
+                            </span>
+                          )}
+                          {req.recurrence && req.recurrence !== "NONE" && (
+                            <Repeat size={10} className="text-primary animate-pulse shrink-0" />
+                          )}
+                          {req.attachments && req.attachments.length > 0 && (
+                            <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                              <Paperclip size={10} />
+                              {req.attachments.length}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[8px] md:text-[10px]">
+                          <span className="font-mono text-slate-400 uppercase tracking-wider shrink-0">{req.id}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50/80 border border-indigo-200/50 text-indigo-700 rounded-md font-extrabold uppercase tracking-wider leading-none shrink-0">
+                            💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                          </span>
+                          <span className="inline-block lg:hidden text-slate-500 font-semibold truncate max-w-[140px]">
+                            • {req.requesterName}
+                          </span>
+                        </div>
+
+                        {/* Phased Installment Progress Badge & Toggle */}
+                        {hasInstallments && (
+                          <div className="mt-1 flex flex-wrap items-center gap-2 pt-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-50/90 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 rounded-md text-[9px]">
+                              <Layers size={11} className="text-purple-600 dark:text-purple-400 shrink-0" />
+                              <span className="font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono text-[8.5px]">
+                                {paidInstallments}/{totalInstallments} Disbursed
+                              </span>
+                              <div className="w-14 sm:w-16 h-1.5 bg-purple-200/80 dark:bg-purple-900/60 rounded-full overflow-hidden shrink-0">
+                                <div 
+                                  className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
+                                  style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
+                                />
+                              </div>
+                              <span className="text-[8px] font-mono font-bold text-purple-700 dark:text-purple-300">
+                                {installmentProgressPct}%
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => toggleScheduleExpand(req.id, e)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-white hover:bg-purple-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-md text-[8.5px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
+                            >
+                              <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
+                              <span>{isScheduleExpanded ? "Hide Schedule" : "View Schedule"}</span>
+                            </button>
+                          </div>
                         )}
-                      >
-                        <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
-                          <input 
-                            type="checkbox" 
-                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
-                            checked={selectedIds.has(req.id)}
-                            onChange={() => toggleSelect(req.id)}
-                          />
-                        </td>
-                        <td className="px-3 md:px-6 py-2.5 md:py-4">
-                          <div className="flex flex-col min-w-0 max-w-full md:max-w-none space-y-1">
-                            <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                              {getReqUnreadInfo(req).hasUnread && (
-                                <span 
-                                  title={`${getReqUnreadInfo(req).unreadCount} unread comment${getReqUnreadInfo(req).unreadCount === 1 ? "" : "s"}${getReqUnreadInfo(req).unreadAuthors.length > 0 ? ` from ${getReqUnreadInfo(req).unreadAuthors.join(", ")}` : ""}`}
-                                  className="inline-flex items-center gap-1 text-[8px] md:text-[9px] font-black text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-2xs animate-pulse"
-                                >
-                                  <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-600"></span>
-                                  </span>
-                                  <MessageSquare size={10} className="fill-rose-500 text-rose-600" />
-                                  {getReqUnreadInfo(req).unreadCount} NEW
-                                </span>
-                              )}
-                              <span className="font-bold text-slate-900 text-xs md:text-sm break-words leading-snug">
-                                <HighlightText text={req.title} highlight={globalSearchTerm} />
-                              </span>
-                              {compactAge && (
-                                <span className="text-[8px] md:text-[9px] font-mono font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                  {compactAge}
-                                </span>
-                              )}
-                              {req.inProcurement && (
-                                <span className="text-[8px] md:text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                  PROCUREMENT
-                                </span>
-                              )}
-                              {req.requiresMoreInfo && (
-                                <span className="text-[8px] md:text-[9px] font-bold text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded uppercase tracking-tight shrink-0">
-                                  INFO REQ
-                                </span>
-                              )}
-                              {req.recurrence && req.recurrence !== "NONE" && (
-                                <Repeat size={10} className="text-primary animate-pulse shrink-0" />
-                              )}
-                              {req.attachments && req.attachments.length > 0 && (
-                                <span title="Attachments" className="flex items-center gap-1 text-[8px] md:text-[9px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                                  <Paperclip size={10} />
-                                  {req.attachments.length}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[8px] md:text-[10px]">
-                              <span className="font-mono text-slate-400 uppercase tracking-wider shrink-0">{req.id}</span>
-                              <span className="inline-flex items-center px-1.5 py-0.5 bg-indigo-50/80 border border-indigo-200/50 text-indigo-700 rounded-md font-extrabold uppercase tracking-wider leading-none shrink-0">
-                                💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                              </span>
-                              <span className="inline-block lg:hidden text-slate-500 font-semibold truncate max-w-[140px]">
-                                • {req.requesterName}
-                              </span>
-                            </div>
-
-                            {/* Phased Installment Progress Badge & Toggle */}
-                            {hasInstallments && (
-                              <div className="mt-1 flex flex-wrap items-center gap-2 pt-0.5">
-                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-purple-50/90 dark:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/60 rounded-md text-[9px]">
-                                  <Layers size={11} className="text-purple-600 dark:text-purple-400 shrink-0" />
-                                  <span className="font-black uppercase tracking-wider text-purple-900 dark:text-purple-200 font-mono text-[8.5px]">
-                                    {paidInstallments}/{totalInstallments} Disbursed
-                                  </span>
-                                  <div className="w-14 sm:w-16 h-1.5 bg-purple-200/80 dark:bg-purple-900/60 rounded-full overflow-hidden shrink-0">
-                                    <div 
-                                      className="h-full bg-purple-600 dark:bg-purple-400 transition-all duration-500 rounded-full" 
-                                      style={{ width: `${Math.min(100, Math.max(0, installmentProgressPct))}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-[8px] font-mono font-bold text-purple-700 dark:text-purple-300">
-                                    {installmentProgressPct}%
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => toggleScheduleExpand(req.id, e)}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-white hover:bg-purple-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-md text-[8.5px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
-                                >
-                                  <Split size={9} className={cn("transition-transform duration-200", isScheduleExpanded && "rotate-180")} />
-                                  <span>{isScheduleExpanded ? "Hide Schedule" : "View Schedule"}</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
-                          <div className="flex flex-col">
-                            <span className="text-slate-900 font-bold text-[11px] md:text-xs">
-                              {req.requesterName}
-                            </span>
-                            <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
-                              {req.groupName}
-                            </span>
-                            <RequisitionOwnershipDiscussionRow req={req} users={users} />
-                          </div>
-                        </td>
-                        <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
-                          {req.payableTo && req.payableTo.trim() ? (
-                            <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
-                              <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-[11px] md:text-xs truncate">
-                                <Store size={13} className="text-indigo-500 shrink-0" />
-                                <span className="truncate" title={req.payableTo}>
-                                  <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
-                                </span>
-                              </div>
-                              {(() => {
-                                const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
-                                if (v?.offerings) {
-                                  return (
-                                    <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
-                                      {v.offerings}
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                          ) : (
-                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
-                          )}
-                        </td>
-                        <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
-                          <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
-                        </td>
-                        <td className="px-3 md:px-6 py-2.5 md:py-4">
-                          <div className="flex justify-center">
-                            <span className={cn(
-                              "px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0",
-                              getStatusColor(req.status)
-                            )}>
-                              {req.status}
+                      </div>
+                    </td>
+                    <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
+                      <div className="flex flex-col">
+                        <span className="text-slate-900 font-bold text-[11px] md:text-xs">
+                          {req.requesterName}
+                        </span>
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest text-[8px]">
+                          {req.groupName}
+                        </span>
+                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                      </div>
+                    </td>
+                    <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                      {req.payableTo && req.payableTo.trim() ? (
+                        <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                          <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-bold text-[11px] md:text-xs truncate">
+                            <Store size={13} className="text-indigo-500 shrink-0" />
+                            <span className="truncate" title={req.payableTo}>
+                              <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
                             </span>
                           </div>
-                        </td>
-                        <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
-                          {formattedAge ? (
-                            <div className="flex items-center gap-1.5">
-                              <Clock size={11} className="text-slate-400" />
-                              <span className="text-[10px] md:text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                                {formattedAge}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 font-mono">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setViewingReq(req);
-                              }}
-                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
-                              title="View Details"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyShareLinkForReq(req);
-                              }}
-                              className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
-                              title="Copy Shareable Link"
-                            >
-                              <Share2 size={16} />
-                            </button>
-                            {/* Edit button for Church Group users, requesters, and admins */}
-                            {isRequisitionEditableByUser(req, currentUser, canPerform) && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingReq(req);
-                                }}
-                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all cursor-pointer"
-                                title="Edit Requisition"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                            )}
-                            {/* Delete button: only admins */}
-                            {canPerform('canDeleteRequisition') && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRequisitionToDelete(req);
-                                }}
-                                className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 transition-all"
-                                title="Delete Permanently"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    );
-
-                    if (hasInstallments && isScheduleExpanded) {
-                      const expandedRow = (
-                        <motion.tr 
-                          key={`${req.id}-schedule-expanded`} 
-                          layout
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
+                          {(() => {
+                            const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                            if (v?.offerings) {
+                              return (
+                                <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                  {v.offerings}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
+                      <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                    </td>
+                    <td className="px-3 md:px-6 py-2.5 md:py-4">
+                      <div className="flex justify-center">
+                        <span className={cn(
+                          "px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] md:tracking-[0.15em] shrink-0",
+                          getStatusColor(req.status)
+                        )}>
+                          {req.status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
+                      {formattedAge ? (
+                        <div className="flex items-center gap-1.5">
+                          <Clock size={11} className="text-slate-400" />
+                          <span className="text-[10px] md:text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                            {formattedAge}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingReq(req);
+                          }}
+                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
+                          title="View Details"
                         >
-                          <td colSpan={8} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
-                            <RequisitionInstallmentScheduleBreakdown req={req} />
-                          </td>
-                        </motion.tr>
-                      );
-                      return [mainRow, expandedRow];
-                    }
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyShareLinkForReq(req);
+                          }}
+                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                          title="Copy Shareable Link"
+                        >
+                          <Share2 size={16} />
+                        </button>
+                        {/* Edit button for Church Group users, requesters, and admins */}
+                        {isRequisitionEditableByUser(req, currentUser, canPerform) && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingReq(req);
+                            }}
+                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-amber-500 transition-all cursor-pointer"
+                            title="Edit Requisition"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        )}
+                        {/* Delete button: only admins */}
+                        {canPerform('canDeleteRequisition') && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRequisitionToDelete(req);
+                            }}
+                            className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 transition-all"
+                            title="Delete Permanently"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
 
-                    return [mainRow];
-                  })}
-              </AnimatePresence>
+                if (hasInstallments && isScheduleExpanded) {
+                  const expandedRow = (
+                    <tr 
+                      key={`${req.id}-schedule-expanded`} 
+                      className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
+                    >
+                      <td colSpan={8} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
+                        <RequisitionInstallmentScheduleBreakdown req={req} />
+                      </td>
+                    </tr>
+                  );
+                  return [mainRow, expandedRow];
+                }
+
+                return [mainRow];
+              })}
             </tbody>
             {activeList.length > 0 && (
               <tfoot>
@@ -3780,8 +3760,8 @@ export const RequisitionsPanel: React.FC = () => {
             )}
           </table>
 
-          {/* Mobile Cards View */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Medium & Small Screen Row Cards View */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {activeItems.map((req) => {
               const updateAge = now - new Date(req.updatedAt).getTime();
               const isRecentlyApprovedOrDisbursed = (req.status === RequisitionStatus.APPROVED_L2 || req.status === RequisitionStatus.DISBURSED) && updateAge < 8000;
@@ -4014,7 +3994,7 @@ export const RequisitionsPanel: React.FC = () => {
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="hidden md:table w-full text-left">
+          <table className="hidden lg:table w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="px-4 md:px-6 py-3 md:py-4 w-10">
@@ -4055,34 +4035,24 @@ export const RequisitionsPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {disbursedItems.flatMap((req, i) => {
-                  const hasInstallments = Boolean(req.installments && req.installments.length > 0);
-                  const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
-                  const totalInstallments = hasInstallments ? req.installments!.length : 0;
-                  const isScheduleExpanded = expandedScheduleIds.has(req.id);
-                  const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
-                  const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
-                  const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
+              {disbursedItems.flatMap((req, i) => {
+                const hasInstallments = Boolean(req.installments && req.installments.length > 0);
+                const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
+                const totalInstallments = hasInstallments ? req.installments!.length : 0;
+                const isScheduleExpanded = expandedScheduleIds.has(req.id);
+                const paidAmount = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) : 0;
+                const totalPlannedAmount = hasInstallments ? (req.installments!.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0) || req.amount) : req.amount;
+                const installmentProgressPct = hasInstallments ? Math.round((paidAmount / (totalPlannedAmount || 1)) * 100) : 0;
 
-                  const mainRow = (
-                    <motion.tr 
-                      key={req.id} 
-                      layout
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                      transition={{ 
-                        opacity: { duration: 0.2 },
-                        layout: { type: "spring", stiffness: 300, damping: 30 },
-                        y: { type: "spring", stiffness: 300, damping: 30 }
-                      }}
-                      onClick={() => setViewingReq(req)}
-                      className={cn(
-                        "transition-colors group cursor-pointer border-l-2",
-                        selectedIds.has(req.id) ? "bg-blue-50/50 border-l-blue-600" : "hover:bg-slate-50/80 border-l-transparent"
-                      )}
-                    >
+                const mainRow = (
+                  <tr 
+                    key={req.id} 
+                    onClick={() => setViewingReq(req)}
+                    className={cn(
+                      "transition-colors group cursor-pointer border-l-2",
+                      selectedIds.has(req.id) ? "bg-blue-50/50 border-l-blue-600" : "hover:bg-slate-50/80 border-l-transparent"
+                    )}
+                  >
                       <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
                         <input 
                           type="checkbox" 
@@ -4216,31 +4186,25 @@ export const RequisitionsPanel: React.FC = () => {
                           </button>
                         </div>
                       </td>
-                    </motion.tr>
+                    </tr>
                   );
 
                   if (hasInstallments && isScheduleExpanded) {
                     const expandedRow = (
-                      <motion.tr 
+                      <tr 
                         key={`${req.id}-disbursed-schedule-expanded`} 
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
                         className="bg-purple-50/30 dark:bg-purple-950/20 border-b border-purple-100 dark:border-purple-900/40"
                       >
                         <td colSpan={8} className="p-3 md:p-4 pl-8 md:pl-12" onClick={(e) => e.stopPropagation()}>
                           <RequisitionInstallmentScheduleBreakdown req={req} />
                         </td>
-                      </motion.tr>
+                      </tr>
                     );
                     return [mainRow, expandedRow];
                   }
 
                   return [mainRow];
                 })}
-              </AnimatePresence>
             </tbody>
             {disbursedList.length > 0 && (
               <tfoot>
@@ -4261,8 +4225,8 @@ export const RequisitionsPanel: React.FC = () => {
             )}
           </table>
 
-          {/* Mobile Cards View */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Medium & Small Screen Row Cards View */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {disbursedItems.map((req) => {
               const hasInstallments = Boolean(req.installments && req.installments.length > 0);
               const paidInstallments = hasInstallments ? req.installments!.filter(inst => inst.status === "DISBURSED").length : 0;
@@ -4450,7 +4414,7 @@ export const RequisitionsPanel: React.FC = () => {
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="hidden md:table w-full text-left">
+          <table className="hidden lg:table w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="px-4 md:px-6 py-3 md:py-4 w-10">
@@ -4491,25 +4455,15 @@ export const RequisitionsPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {rejectedItems.map((req) => (
-                  <motion.tr 
-                    key={req.id} 
-                    layout
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                    transition={{ 
-                      opacity: { duration: 0.2 },
-                      layout: { type: "spring", stiffness: 300, damping: 30 },
-                      y: { type: "spring", stiffness: 300, damping: 30 }
-                    }}
-                    onClick={() => setViewingReq(req)}
-                    className={cn(
-                      "transition-colors group cursor-pointer border-l-2",
-                      selectedIds.has(req.id) ? "bg-rose-50/50 border-l-rose-600" : "hover:bg-slate-50/80 border-l-transparent"
-                    )}
-                  >
+              {rejectedItems.map((req) => (
+                <tr 
+                  key={req.id} 
+                  onClick={() => setViewingReq(req)}
+                  className={cn(
+                    "transition-colors group cursor-pointer border-l-2",
+                    selectedIds.has(req.id) ? "bg-rose-50/50 border-l-rose-600" : "hover:bg-slate-50/80 border-l-transparent"
+                  )}
+                >
                     <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
                       <input 
                         type="checkbox" 
@@ -4613,9 +4567,8 @@ export const RequisitionsPanel: React.FC = () => {
                         </button>
                       </div>
                     </td>
-                  </motion.tr>
+                  </tr>
                 ))}
-              </AnimatePresence>
             </tbody>
             {rejectedList.length > 0 && (
               <tfoot>
@@ -4636,8 +4589,8 @@ export const RequisitionsPanel: React.FC = () => {
             )}
           </table>
 
-          {/* Mobile Cards View for Rejected */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Medium & Small Screen Row Cards View for Rejected */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {rejectedItems.map((req) => {
               return (
                 <div 
@@ -4757,7 +4710,7 @@ export const RequisitionsPanel: React.FC = () => {
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="hidden md:table w-full text-left">
+          <table className="hidden lg:table w-full text-left">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200 text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="px-4 md:px-6 py-3 md:py-4 w-10">
@@ -4798,142 +4751,131 @@ export const RequisitionsPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {deletedItems.map((req) => (
-                  <motion.tr 
-                    key={req.id} 
-                    layout
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -15 }}
-                    transition={{ 
-                      opacity: { duration: 0.2 },
-                      layout: { type: "spring", stiffness: 300, damping: 30 },
-                      y: { type: "spring", stiffness: 300, damping: 30 }
-                    }}
-                    onClick={() => setViewingReq(req)}
-                    className={cn(
-                      "transition-colors group cursor-pointer border-l-2 opacity-85 hover:opacity-100",
-                      selectedIds.has(req.id) ? "bg-slate-100/70 border-l-slate-500" : "hover:bg-slate-50/80 border-l-transparent"
-                    )}
-                  >
-                    <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
-                      <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/20 accent-slate-600 cursor-pointer"
-                        checked={selectedIds.has(req.id)}
-                        onChange={() => toggleSelect(req.id)}
-                      />
-                    </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4">
-                      <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-none">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-700 line-through text-[11px] md:text-sm truncate">
-                            <HighlightText text={req.title} highlight={globalSearchTerm} />
-                          </span>
-                        </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
-                          <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
-                          <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md text-[7.5px] md:text-[9px] font-extrabold uppercase tracking-wider leading-none w-fit">
-                            💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
-                          </span>
-                        </div>
-                        {req.rejectionReason && (
-                          <p className="text-[10px] text-slate-500 mt-1 italic truncate max-w-xs">
-                            Reason: {req.rejectionReason}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
-                      <div className="flex flex-col">
-                        <span className="text-slate-700 font-bold text-[11px] md:text-xs">
-                          {req.requesterName}
+              {deletedItems.map((req) => (
+                <tr 
+                  key={req.id} 
+                  onClick={() => setViewingReq(req)}
+                  className={cn(
+                    "transition-colors group cursor-pointer border-l-2 opacity-85 hover:opacity-100",
+                    selectedIds.has(req.id) ? "bg-slate-100/70 border-l-slate-500" : "hover:bg-slate-50/80 border-l-transparent"
+                  )}
+                >
+                  <td className="px-4 md:px-6 py-2.5 md:py-4" onClick={(e) => e.stopPropagation()}>
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-slate-300 text-slate-600 focus:ring-slate-500/20 accent-slate-600 cursor-pointer"
+                      checked={selectedIds.has(req.id)}
+                      onChange={() => toggleSelect(req.id)}
+                    />
+                  </td>
+                  <td className="px-3 md:px-6 py-2.5 md:py-4">
+                    <div className="flex flex-col min-w-0 max-w-[120px] md:max-w-none">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-700 line-through text-[11px] md:text-sm truncate">
+                          <HighlightText text={req.title} highlight={globalSearchTerm} />
                         </span>
-                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                          {req.groupName}
-                        </span>
-                        <RequisitionOwnershipDiscussionRow req={req} users={users} />
                       </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
-                      {req.payableTo && req.payableTo.trim() ? (
-                        <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
-                          <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold text-[11px] md:text-xs truncate">
-                            <Store size={13} className="text-slate-400 shrink-0" />
-                            <span className="truncate line-through" title={req.payableTo}>
-                              <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
-                            </span>
-                          </div>
-                          {(() => {
-                            const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
-                            if (v?.offerings) {
-                              return (
-                                <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
-                                  {v.offerings}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      ) : (
-                        <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
+                        <span className="text-[7.5px] md:text-[10px] font-mono text-slate-400 uppercase tracking-wider truncate shrink-0">{req.id}</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-md text-[7.5px] md:text-[9px] font-extrabold uppercase tracking-wider leading-none w-fit">
+                          💒 <HighlightText text={req.groupName} highlight={globalSearchTerm} />
+                        </span>
+                      </div>
+                      {req.rejectionReason && (
+                        <p className="text-[10px] text-slate-500 mt-1 italic truncate max-w-xs">
+                          Reason: {req.rejectionReason}
+                        </p>
                       )}
-                    </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
-                      <span className="font-mono font-bold text-slate-500 line-through text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
-                    </td>
-                    <td className="px-3 md:px-6 py-2.5 md:py-4">
-                      <div className="flex justify-center">
-                        <span className="px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border border-slate-200 bg-slate-100 text-slate-600 text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] shrink-0 flex items-center gap-1">
-                          <Trash2 size={10} />
-                          DELETED
-                        </span>
-                      </div>
-                    </td>
-                    <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
-                      <span className="text-[9px] md:text-[10px] font-mono font-bold text-slate-500">
-                        {formatDate(req.updatedAt)}
+                    </div>
+                  </td>
+                  <td className="hidden lg:table-cell px-4 md:px-6 py-3 md:py-4">
+                    <div className="flex flex-col">
+                      <span className="text-slate-700 font-bold text-[11px] md:text-xs">
+                        {req.requesterName}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewingReq(req);
-                          }}
-                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
-                          title="View Details"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCopyShareLinkForReq(req);
-                          }}
-                          className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
-                          title="Copy Shareable Link"
-                        >
-                          <Share2 size={16} />
-                        </button>
-                        {restoreRequisition && (
-                          <button 
-                            onClick={(e) => handleRestoreReq(req, e)}
-                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 text-emerald-700 transition-all flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider cursor-pointer shadow-xs"
-                            title="Restore Requisition"
-                          >
-                            <RotateCcw size={13} />
-                            <span>Restore</span>
-                          </button>
-                        )}
+                      <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
+                        {req.groupName}
+                      </span>
+                      <RequisitionOwnershipDiscussionRow req={req} users={users} />
+                    </div>
+                  </td>
+                  <td className="hidden md:table-cell px-3 md:px-6 py-2.5 md:py-4">
+                    {req.payableTo && req.payableTo.trim() ? (
+                      <div className="flex flex-col min-w-0 max-w-[130px] lg:max-w-[170px]">
+                        <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-bold text-[11px] md:text-xs truncate">
+                          <Store size={13} className="text-slate-400 shrink-0" />
+                          <span className="truncate line-through" title={req.payableTo}>
+                            <HighlightText text={req.payableTo} highlight={globalSearchTerm} />
+                          </span>
+                        </div>
+                        {(() => {
+                          const v = vendorsMap.get(req.payableTo.trim().toLowerCase());
+                          if (v?.offerings) {
+                            return (
+                              <span className="text-[9px] text-slate-400 font-medium truncate pl-4">
+                                {v.offerings}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
+                    ) : (
+                      <span className="text-slate-300 dark:text-slate-600 text-xs font-mono">-</span>
+                    )}
+                  </td>
+                  <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
+                    <span className="font-mono font-bold text-slate-500 line-through text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                  </td>
+                  <td className="px-3 md:px-6 py-2.5 md:py-4">
+                    <div className="flex justify-center">
+                      <span className="px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-full border border-slate-200 bg-slate-100 text-slate-600 text-[7.5px] md:text-[9px] font-black uppercase tracking-[0.1em] shrink-0 flex items-center gap-1">
+                        <Trash2 size={10} />
+                        DELETED
+                      </span>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell px-4 md:px-6 py-3 md:py-4">
+                    <span className="text-[9px] md:text-[10px] font-mono font-bold text-slate-500">
+                      {formatDate(req.updatedAt)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingReq(req);
+                        }}
+                        className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-primary transition-all"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyShareLinkForReq(req);
+                        }}
+                        className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                        title="Copy Shareable Link"
+                      >
+                        <Share2 size={16} />
+                      </button>
+                      {restoreRequisition && (
+                        <button 
+                          onClick={(e) => handleRestoreReq(req, e)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 text-emerald-700 transition-all flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider cursor-pointer shadow-xs"
+                          title="Restore Requisition"
+                        >
+                          <RotateCcw size={13} />
+                          <span>Restore</span>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
             {deletedList.length > 0 && (
               <tfoot>
@@ -4954,8 +4896,8 @@ export const RequisitionsPanel: React.FC = () => {
             )}
           </table>
 
-          {/* Mobile Cards View for Deleted */}
-          <div className="block md:hidden divide-y divide-slate-100">
+          {/* Medium & Small Screen Row Cards View for Deleted */}
+          <div className="block lg:hidden divide-y divide-slate-100">
             {deletedItems.map((req) => {
               return (
                 <div 
@@ -8176,7 +8118,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2">
                   <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest shrink-0">
-                    History & Audit Timeline
+                    Requisition History
                   </h4>
                   <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                     <span className="text-[8px] font-mono font-bold bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase tracking-wider">

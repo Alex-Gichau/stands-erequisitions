@@ -598,7 +598,7 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
                     `${value} interactions (${item.payload.avgOpenRate}% avg open)`,
                     name
                   ]}
-                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#fff", fontSize: "11px" }}
+                  contentStyle={{ backgroundColor: "#18181b", borderColor: "#3f3f46", borderRadius: "12px", color: "#fff", fontSize: "11px" }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -659,7 +659,7 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
               />
               <Tooltip 
                 formatter={(val: any, name: any) => [`${val}%`, name === "openRate" ? "Open Rate" : "Click Rate"]}
-                contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", color: "#fff", fontSize: "11px" }}
+                contentStyle={{ backgroundColor: "#18181b", borderColor: "#3f3f46", borderRadius: "12px", color: "#fff", fontSize: "11px" }}
               />
               <Bar dataKey="openRate" name="Open Rate (%)" fill="#d97706" radius={[6, 6, 0, 0]} />
               <Bar dataKey="clickRate" name="Click Rate (%)" fill="#3b82f6" radius={[6, 6, 0, 0]} />

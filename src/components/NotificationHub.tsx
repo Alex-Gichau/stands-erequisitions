@@ -949,96 +949,8 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-[600px] w-full bg-slate-50/70 dark:bg-slate-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden text-slate-900 dark:text-slate-100 select-text">
+    <div className="flex flex-col h-[calc(100vh-100px)] min-h-[600px] w-full rounded-2xl overflow-hidden text-slate-900 dark:text-slate-100 select-text">
       
-      {/* Top Header & Category Tabs Navigation Bar */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-4 md:px-6 py-3.5 shrink-0 flex flex-col gap-3.5">
-        {/* Main Title & Utility Toolbar */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 flex items-center justify-center font-black text-sm shadow-sm shrink-0">
-              <Bell size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg md:text-xl font-black tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  Notification Hub
-                </h1>
-              </div>
-              <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1 hidden xs:block">
-                Streamlined feed for comments, reactions, approvals, submissions, group & security alerts
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Desktop Notification Toggle / Permission Prompt Button */}
-            {isDesktopNotificationSupported() && (
-              <button
-                onClick={() => {
-                  if (desktopPermission !== "granted") {
-                    handleRequestDesktopPermission();
-                  } else {
-                    handleToggleDesktopNotifications(!desktopEnabled);
-                  }
-                }}
-                disabled={isRequestingPermission}
-                className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border select-none",
-                  desktopPermission === "granted" && desktopEnabled
-                    ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100"
-                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100"
-                )}
-                title={
-                  desktopPermission === "granted"
-                    ? desktopEnabled
-                      ? "Desktop notifications are active. Click to pause."
-                      : "Desktop notifications are paused. Click to resume."
-                    : "Enable native desktop notifications for instant alerts"
-                }
-              >
-                <Bell size={13} className={desktopPermission === "granted" && desktopEnabled ? "text-emerald-600" : "text-amber-600"} />
-                <span className="hidden sm:inline">
-                  {desktopPermission === "granted"
-                    ? desktopEnabled ? "Desktop Alerts: ON" : "Desktop Alerts: OFF"
-                    : "Enable Desktop Alerts"}
-                </span>
-                <span className="sm:hidden">
-                  {desktopPermission === "granted" ? (desktopEnabled ? "Desktop ON" : "Desktop OFF") : "Alerts"}
-                </span>
-              </button>
-            )}
-
-            {/* Mark All As Read (Outline Icon) */}
-            {unreadTotal > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                className="p-2 rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 border border-slate-200/80 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-800 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
-                title={`Mark all as read (${unreadTotal})`}
-                aria-label={`Mark all as read (${unreadTotal})`}
-              >
-                <CheckCheck size={16} />
-              </button>
-            )}
-
-            <button 
-              onClick={() => {
-                triggerToast({
-                  type: "SYSTEM_INFO",
-                  severity: "LOW",
-                  message: "Notification Hub synchronized",
-                  timestamp: new Date().toISOString()
-                });
-              }}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-              title="Refresh Notifications"
-            >
-              <RefreshCw size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Split Layout: Left Notification Stream & Right Reading Pane */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden relative">
         
@@ -1211,7 +1123,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                               </p>
 
                               {/* Footer Actions */}
-                              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 mt-0.5">
+                              <div className="flex items-center justify-between pt-1 mt-0.5">
                                 <div className="flex items-center gap-1">
                                   {item.requisition && (
                                     <span className="text-[9px] font-mono font-bold text-slate-400 dark:text-slate-500 truncate max-w-[150px]">

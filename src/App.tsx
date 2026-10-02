@@ -1291,17 +1291,17 @@ function AppContent() {
 
   if (window.opener && window.opener !== window) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white p-6 text-center">
         <Loader2 className="animate-spin text-primary mb-4" size={48} />
         <h1 className="text-xl font-bold mb-2">Completing Authentication...</h1>
-        <p className="text-slate-400 text-sm">Please wait while we log you in. This window should close automatically.</p>
+        <p className="text-zinc-400 text-sm">Please wait while we log you in. This window should close automatically.</p>
       </div>
     );
   }
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1309,7 +1309,7 @@ function AppContent() {
         >
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-xl font-black uppercase tracking-widest text-primary/80">STANDS FINANCE</h2>
-          <p className="text-slate-400 text-[10px] mt-2 font-mono tracking-tighter uppercase">Logging in.</p>
+          <p className="text-zinc-400 text-[10px] mt-2 font-mono tracking-tighter uppercase">Logging in.</p>
         </motion.div>
       </div>
     );
@@ -1317,7 +1317,7 @@ function AppContent() {
 
   if (isLoggingOut) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1325,7 +1325,7 @@ function AppContent() {
         >
           <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-xl font-black uppercase tracking-widest">Logging Out...</h2>
-          <p className="text-slate-400 text-xs mt-2">You are now about to logout.</p>
+          <p className="text-zinc-400 text-xs mt-2">You are now about to logout.</p>
         </motion.div>
       </div>
     );
@@ -1333,16 +1333,16 @@ function AppContent() {
 
   if (!currentUser) {
     return (
-      <div className="h-[100vh] w-[100vw] bg-slate-950 flex items-center justify-center sm:p-6 relative overflow-hidden">
+      <div className="h-[100vh] w-[100vw] bg-[#121214] flex items-center justify-center sm:p-6 relative overflow-hidden">
         {/* Ambient background effects */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#1e293b_0%,transparent_50%)] opacity-30" />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#27272a_0%,transparent_50%)] opacity-30" />
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
 
         {/* CSS grid background pattern tilted 30 degrees with radial mask */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none [mask-image:radial-gradient(ellipse_90%_90%_at_50%_50%,#000_50%,transparent_100%)]">
           <div 
-            className="absolute w-[200%] h-[200%] -top-[50%] -left-[50%] bg-[linear-gradient(to_right,rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.22)_1px,transparent_1px)] bg-[size:4rem_4rem]"
+            className="absolute w-[200%] h-[200%] -top-[50%] -left-[50%] bg-[linear-gradient(to_right,rgba(113,113,122,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(113,113,122,0.18)_1px,transparent_1px)] bg-[size:4rem_4rem]"
             style={{ transform: "rotate(30deg)" }}
           />
         </div>
@@ -1355,10 +1355,10 @@ function AppContent() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-2.5 bg-slate-900/95 text-white border border-sky-500/50 shadow-2xl rounded-full backdrop-blur-md text-xs font-semibold ring-1 ring-sky-500/20 pointer-events-none"
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-2.5 bg-[#18181b]/95 text-white border border-sky-500/50 shadow-2xl rounded-full backdrop-blur-md text-xs font-semibold ring-1 ring-sky-500/20 pointer-events-none"
             >
               <Loader2 className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
-              <span className="text-slate-100 font-medium">{dbSavingMessage || "Updating database..."}</span>
+              <span className="text-zinc-100 font-medium">{dbSavingMessage || "Updating database..."}</span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
                 Syncing
               </span>
@@ -1369,7 +1369,7 @@ function AppContent() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full sm:max-w-md min-h-screen sm:min-h-0 bg-slate-900 border-x-0 sm:border border-slate-800 rounded-none sm:rounded-[2.5rem] shadow-2xl p-6 sm:p-12 space-y-6 sm:space-y-8 relative z-10 flex flex-col justify-center no-scrollbar"
+          className="w-full sm:max-w-md min-h-screen sm:min-h-0 bg-[#18181b] border-x-0 sm:border border-[#27272a] rounded-none sm:rounded-[2.5rem] shadow-2xl p-6 sm:p-12 space-y-6 sm:space-y-8 relative z-10 flex flex-col justify-center no-scrollbar"
         >
           <div className="text-center space-y-4">
             {systemSettings.isSystemOffline && (
@@ -1378,7 +1378,7 @@ function AppContent() {
                   <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse shrink-0" />
                   <span className="text-rose-400 font-extrabold">Emergency Bypass Active</span>
                 </div>
-                <p className="text-[10px] text-slate-300 leading-normal font-semibold">
+                <p className="text-[10px] text-zinc-300 leading-normal font-semibold">
                   The system is currently <strong>Offline</strong>. Your Admin is working to restore.
                 </p>
                 <button
@@ -1397,14 +1397,14 @@ function AppContent() {
                   <Mail size={13} className="text-sky-400" />
                   <span className="text-sky-450 font-black">Invitation Active</span>
                 </div>
-                <p className="text-[10px] text-slate-300 leading-relaxed font-semibold">
+                <p className="text-[10px] text-zinc-300 leading-relaxed font-semibold">
                   Logging in via Google as <strong className="text-white font-extrabold">{pendingInvite.email}</strong> will claim your pre-approved privilege as <strong className="text-white font-extrabold">{pendingInvite.role?.replace("_", " ")}</strong> representing <strong className="text-white font-extrabold">{pendingInvite.group || "St Andrews Admin"}</strong>.
                 </p>
               </div>
             )}
 
             <div className="relative inline-block">
-              <div className="w-16 h-16 bg-slate-800/80 rounded-2xl flex items-center justify-center border border-slate-700/50 backdrop-blur-sm p-2 shadow-xl">
+              <div className="w-16 h-16 bg-[#27272a]/80 rounded-2xl flex items-center justify-center border border-[#3f3f46]/50 backdrop-blur-sm p-2 shadow-xl">
                 <img src="/pcea.svg" alt="PCEA Logo" className="w-full h-full object-contain" />
               </div>
               
@@ -1412,7 +1412,7 @@ function AppContent() {
             
             <div className="space-y-1">
               <h1 className="text-2xl font-black text-white uppercase tracking-tighter">STANDS FINANCE</h1>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.25em]">E-Requisition</p>
+              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-[0.25em]">E-Requisition</p>
             </div>
           </div>
 
@@ -1420,7 +1420,7 @@ function AppContent() {
             <button 
               onClick={handleGoogleLogin}
               disabled={isSubmitting}
-              className="w-full py-4 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all transform active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl border border-white"
+              className="w-full py-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all transform active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl border border-white"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1432,15 +1432,15 @@ function AppContent() {
             </button>
 
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-full border-t border-slate-800" />
-              <span className="relative px-4 bg-slate-900 text-slate-500 text-[9px] font-bold uppercase tracking-widest">Or Login Via Email</span>
+              <div className="absolute w-full border-t border-[#27272a]" />
+              <span className="relative px-4 bg-[#18181b] text-zinc-400 text-[9px] font-bold uppercase tracking-widest">Or Login Via Email</span>
             </div>
 
             <form ref={loginFormRef} autoComplete="off" className="space-y-4" onSubmit={handleEmailAuth}>
               <div className="space-y-4">
                 {authMode === "EMAIL_SIGNUP" && (
                   <div className="relative">
-                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                     <input 
                       type="text"
                       name="name"
@@ -1448,13 +1448,13 @@ function AppContent() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-slate-700"
+                      className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600"
                       placeholder="Full Name"
                     />
                   </div>
                 )}
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                   <input 
                     type="email"
                     name="email"
@@ -1462,7 +1462,7 @@ function AppContent() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-slate-700"
+                    className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600"
                     placeholder="name@church.org"
                   />
                 </div>
@@ -1475,13 +1475,13 @@ function AppContent() {
                     maxLength={15}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-5 pr-12 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-slate-700 font-mono"
+                    className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-5 pr-12 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600 font-mono"
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-350 hover:scale-105 active:scale-95 transition-all focus:outline-none flex items-center justify-center p-1"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 hover:scale-105 active:scale-95 transition-all focus:outline-none flex items-center justify-center p-1"
                     title={showPassword ? "Hide Password" : "Show Password"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1490,10 +1490,10 @@ function AppContent() {
               </div>
 
               {isSubmitting && (
-                  <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
+                  <div className="absolute inset-0 bg-[#18181b]/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
                     <div className="flex flex-col items-center gap-2">
                        <Loader2 className="animate-spin text-primary" size={32} />
-                       <span className="text-xs font-bold text-slate-700 uppercase tracking-widest">Authenticating...</span>
+                       <span className="text-xs font-bold text-zinc-200 uppercase tracking-widest">Authenticating...</span>
                     </div>
                   </div>
               )}
@@ -1517,14 +1517,14 @@ function AppContent() {
             </form>
           </div>
 
-          <div className="pt-6 border-t border-slate-800 flex justify-center gap-6">
+          <div className="pt-6 border-t border-[#27272a] flex justify-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Active</span>
+              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Active</span>
             </div>
             <div className="flex items-center gap-2">
-              <Lock size={10} className="text-slate-600" />
-              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Secure</span>
+              <Lock size={10} className="text-zinc-500" />
+              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Secure</span>
             </div>
           </div>
         </motion.div>
@@ -1650,7 +1650,7 @@ function AppContent() {
     return (
       <div className={cn(
         "flex h-screen overflow-hidden transition-colors duration-300",
-        darkMode ? "dark bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
+        darkMode ? "dark bg-[#121214] text-slate-100" : "bg-slate-50 text-slate-900"
       )}>
         {/* Sidebar Skeleton (hidden on small screens like real sidebar) */}
         <div className={cn(

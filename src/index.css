@@ -57,11 +57,11 @@
 @theme dark {
   --color-primary: #3b82f6;          /* Bright Blue */
   --color-secondary: #fbbf24;        /* Bright Amber */
-  --color-background: #020617;       /* Slate 950 */
-  --color-foreground: #f8fafc;
-  --color-card: #0f172a;             /* Slate 900 */
-  --color-border: #1e293b;           /* Slate 800 */
-  --color-muted: #94a3b8;
+  --color-background: #121214;       /* Dark Gray Background */
+  --color-foreground: #f4f4f5;       /* Light Gray Foreground */
+  --color-card: #18181b;             /* Dark Gray Card */
+  --color-border: #27272a;           /* Dark Gray Border */
+  --color-muted: #a1a1aa;            /* Muted Gray */
 }
 
 @layer base {
@@ -72,51 +72,69 @@
   .dark {
     --color-primary: #3b82f6;          /* Bright Blue */
     --color-secondary: #fbbf24;        /* Bright Amber */
-    --color-background: #020617;       /* Slate 950 */
-    --color-foreground: #f8fafc;
-    --color-card: #0f172a;             /* Slate 900 */
-    --color-border: #1e293b;           /* Slate 800 */
-    --color-muted: #94a3b8;
+    --color-background: #121214;       /* Dark Gray Background */
+    --color-foreground: #f4f4f5;       /* Light Gray Foreground */
+    --color-card: #18181b;             /* Dark Gray Card */
+    --color-border: #27272a;           /* Dark Gray Border */
+    --color-muted: #a1a1aa;            /* Muted Gray */
   }
 
-  /* Global dark mode overrides for utility classes to improve contrast */
+  /* Global dark mode overrides for utility classes to enforce sleek Dark Gray */
   .dark .bg-white {
-    background-color: #0f172a !important; 
+    background-color: #18181b !important; 
+  }
+  .dark .bg-slate-950,
+  .dark .bg-slate-900 {
+    background-color: #121214 !important;
+  }
+  .dark .bg-slate-850 {
+    background-color: #1c1c20 !important;
+  }
+  .dark .bg-slate-800 {
+    background-color: #24242a !important;
+  }
+  .dark .border-slate-800,
+  .dark .border-slate-850,
+  .dark .border-slate-750,
+  .dark .border-slate-700 {
+    border-color: #27272a !important;
   }
   .dark .border-slate-100,
   .dark .border-slate-200,
   .dark .border-slate-150 {
-    border-color: #1e293b !important;
+    border-color: #27272a !important;
   }
   .dark .bg-slate-50,
   .dark .bg-slate-50\/40,
   .dark .bg-slate-50\/50,
   .dark .bg-slate-100 {
-    background-color: #0b0f19 !important;
+    background-color: #151518 !important;
   }
   .dark .hover\:bg-slate-50:hover,
   .dark .hover\:bg-slate-50\/50:hover,
   .dark .hover\:bg-slate-100:hover,
-  .dark .hover\:bg-slate-50\/30:hover {
-    background-color: #1e293b !important;
+  .dark .hover\:bg-slate-50\/30:hover,
+  .dark .hover\:bg-slate-800:hover,
+  .dark .hover\:bg-slate-850:hover {
+    background-color: #27272a !important;
   }
   .dark .text-slate-950,
   .dark .text-slate-900,
   .dark .text-slate-850,
   .dark .text-black {
-    color: #f8fafc !important;
+    color: #f4f4f5 !important;
   }
   .dark .text-slate-800 {
-    color: #f1f5f9 !important;
+    color: #e4e4e7 !important;
   }
   .dark .text-slate-700 {
-    color: #cbd5e1 !important;
+    color: #d4d4d8 !important;
   }
   .dark .text-slate-600 {
-    color: #94a3b8 !important;
+    color: #a1a1aa !important;
   }
   .dark .text-slate-500 {
-    color: #94a3b8 !important;
+    color: #a1a1aa !important;
   }
   .dark .text-indigo-950,
   .dark .text-indigo-900,
@@ -192,11 +210,11 @@
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.5); /* slate-700 transparent */
+  background: rgba(82, 82, 91, 0.5); /* dark gray zinc-600 */
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.8); /* slate-600 */
+  background: rgba(113, 113, 122, 0.8); /* dark gray zinc-500 */
 }
 
 /* Dedicated Subtle Scrollbar Class */
@@ -219,11 +237,11 @@
 }
 
 .dark .subtle-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(51, 65, 85, 0.3);
+  background: rgba(82, 82, 91, 0.3);
 }
 
 .dark .subtle-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.6);
+  background: rgba(113, 113, 122, 0.6);
 }
 
 .subtle-scrollbar {
@@ -232,7 +250,7 @@
 }
 
 .dark .subtle-scrollbar {
-  scrollbar-color: rgba(51, 65, 85, 0.3) transparent;
+  scrollbar-color: rgba(82, 82, 91, 0.3) transparent;
 }
 
 /* Subtle Active Mobile Tab Floater */

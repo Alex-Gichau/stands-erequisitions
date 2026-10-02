@@ -964,7 +964,7 @@ const Dashboard: React.FC<{
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-8">
               <div className="space-y-2">
                 <h3 className="text-xl md:text-3xl font-bold uppercase tracking-tight">
-                  {activeMinistryView === "ALL" ? "All Assigned Ministries" : activeMinistryView}
+                  {activeMinistryView === "ALL" ? "All Ministries Budget" : activeMinistryView}
                 </h3>
                 <p className="opacity-80 text-xs md:text-sm max-w-md">
                   {activeMinistryView === "ALL" 

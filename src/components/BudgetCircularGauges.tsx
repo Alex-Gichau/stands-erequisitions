@@ -309,7 +309,7 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
                 : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
             )}
           >
-            My Assigned Ministries ({assignedProjects.length})
+            My Ministries Budget ({assignedProjects.length})
           </button>
           <button
             onClick={() => setFilterMode("ALL")}
@@ -320,7 +320,7 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
                 : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
             )}
           >
-            All Organization Ministries ({activeYearProjects.length})
+            All St Andrew's Ministries ({activeYearProjects.length})
           </button>
         </div>
       )}

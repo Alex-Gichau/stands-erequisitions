@@ -1296,7 +1296,7 @@ export const ReportsPanel: React.FC = () => {
                             <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(val) => `KES ${(val / 1000).toFixed(0)}k`} />
                             <Tooltip
                               formatter={(value: any) => [`KES ${Number(value).toLocaleString()}`, ""]}
-                              contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
+                              contentStyle={{ backgroundColor: "#18181b", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
                             />
                             <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
                             <Bar dataKey="requestedAmount" name="Gross Requested" fill="#94a3b8" radius={[4, 4, 0, 0]} />
@@ -1336,7 +1336,7 @@ export const ReportsPanel: React.FC = () => {
                             <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(val) => `KES ${(val / 1000).toFixed(0)}k`} />
                             <Tooltip
                               formatter={(value: any) => [`KES ${Number(value).toLocaleString()}`, ""]}
-                              contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
+                              contentStyle={{ backgroundColor: "#18181b", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
                             />
                             <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
                             <Area type="monotone" dataKey="disbursedAmount" name="Disbursed Outflow" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#disbursedGrad)" />
@@ -1365,7 +1365,7 @@ export const ReportsPanel: React.FC = () => {
                             <YAxis dataKey="groupName" type="category" tick={{ fontSize: 10, fill: "#334155" }} width={120} />
                             <Tooltip
                               formatter={(value: any) => [`KES ${Number(value).toLocaleString()}`, "Disbursed"]}
-                              contentStyle={{ backgroundColor: "#0f172a", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
+                              contentStyle={{ backgroundColor: "#18181b", borderRadius: "12px", color: "#ffffff", fontSize: "11px", border: "none" }}
                             />
                             <Bar dataKey="disbursedAmount" name="Disbursed (KES)" fill="#4f46e5" radius={[0, 6, 6, 0]}>
                               {spendersRanking.slice(0, 7).map((entry, index) => (

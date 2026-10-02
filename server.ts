@@ -199,7 +199,11 @@ function buildTransportInstance(username: string, overridePort?: number) {
 }
 
 function getActiveSmtpContext(): { transport: nodemailer.Transporter; username: string } {
-  const primaryUser = process.env.SMTP_USER || "ict.team@pceastandrews.org";
+  const rawUser = (process.env.SMTP_USER || "").trim();
+  const fallbackUser = "ict.team@pceastandrews.org";
+  // If SMTP_USER is empty or set to no-reply (which lacks direct Google Workspace SMTP credentials),
+  // route directly to the authorized administrative account 'ict.team@pceastandrews.org'.
+  const primaryUser = (!rawUser || rawUser.toLowerCase() === "no-reply@pceastandrews.org") ? fallbackUser : rawUser;
   const user = cachedActiveSmtpUser || primaryUser;
   return {
     transport: buildTransportInstance(user),
@@ -209,18 +213,27 @@ function getActiveSmtpContext(): { transport: nodemailer.Transporter; username: 
 
 const transporter = {
   async sendMail(mailOptions: nodemailer.SendMailOptions): Promise<any> {
-    const primaryUser = process.env.SMTP_USER || "ict.team@pceastandrews.org";
+    const rawUser = (process.env.SMTP_USER || "").trim();
     const fallbackUser = "ict.team@pceastandrews.org";
     const { transport, username } = getActiveSmtpContext();
 
+    // Ensure options use the authorized authenticated address in the from field and set replyTo
+    const preparedOptions: nodemailer.SendMailOptions = { ...mailOptions };
+    if (typeof preparedOptions.from === "string" && preparedOptions.from.includes("no-reply@pceastandrews.org")) {
+      preparedOptions.from = preparedOptions.from.replace("no-reply@pceastandrews.org", username || fallbackUser);
+      if (!preparedOptions.replyTo) {
+        preparedOptions.replyTo = "no-reply@pceastandrews.org";
+      }
+    }
+
     try {
-      const info = await transport.sendMail(mailOptions);
+      const info = await transport.sendMail(preparedOptions);
       cachedActiveSmtpUser = username;
       return info;
     } catch (err: any) {
       const errMsg = err?.message || String(err);
 
-      // Scenario 1: Authentication failure (e.g. Google App Password was generated for ict.team instead of no-reply)
+      // Scenario 1: Authentication failure (e.g. Google App Password was generated for ict.team instead of custom user)
       if (
         username !== fallbackUser &&
         (errMsg.includes("535") ||
@@ -230,9 +243,12 @@ const transporter = {
       ) {
         console.warn(`[SMTP Mailer] Auth failed for ${username} (BadCredentials). Retrying with authorized account ${fallbackUser}...`);
         const fallbackTransport = buildTransportInstance(fallbackUser);
-        const adjustedOptions = { ...mailOptions };
+        const adjustedOptions = { ...preparedOptions };
         if (typeof adjustedOptions.from === "string" && adjustedOptions.from.includes(username)) {
           adjustedOptions.from = adjustedOptions.from.replace(username, fallbackUser);
+        }
+        if (!adjustedOptions.replyTo) {
+          adjustedOptions.replyTo = "no-reply@pceastandrews.org";
         }
         const info = await fallbackTransport.sendMail(adjustedOptions);
         cachedActiveSmtpUser = fallbackUser;
@@ -252,7 +268,7 @@ const transporter = {
         console.warn(`[SMTP Mailer] Network issue on port ${currentPort} (${errMsg}). Attempting automatic failover to port ${altPort}...`);
         try {
           const altTransport = buildTransportInstance(cachedActiveSmtpUser || fallbackUser, altPort);
-          const info = await altTransport.sendMail(mailOptions);
+          const info = await altTransport.sendMail(preparedOptions);
           console.log(`[SMTP Mailer] Successfully dispatched email via alternate port ${altPort}.`);
           return info;
         } catch (retryErr: any) {
@@ -4706,7 +4722,8 @@ Your response MUST adhere strictly to the JSON schema specified.
     if (process.env.SMTP_PASS) {
       try {
         await transporter.sendMail({
-          from: `"STANDS eRequisitions" <no-reply@pceastandrews.org>`,
+          from: `"STANDS eRequisitions" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
+          replyTo: "no-reply@pceastandrews.org",
           to: recipients.join(", "),
           subject,
           html: bodyHtml

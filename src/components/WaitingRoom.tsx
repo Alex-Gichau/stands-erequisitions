@@ -18,7 +18,7 @@ export const WaitingRoom: React.FC<WaitingRoomProps> = ({ user, onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
         {/* Ambient background effects */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_10%,#1e293b_0%,transparent_50%)] opacity-30" />
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_10%,#27272a_0%,transparent_50%)] opacity-30" />
         <div className="absolute top-0 right-0 p-20 opacity-5 pointer-events-none">
           {user.isSuspended ? (
             <UserX size={300} className="text-rose-500" />

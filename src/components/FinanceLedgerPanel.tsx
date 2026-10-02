@@ -4016,7 +4016,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <History size={16} className="text-indigo-600" />
                         <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          History & Audit Timeline
+                          Requisition History
                         </h5>
                       </div>
                       <div className="flex items-center gap-1.5">

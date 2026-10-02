@@ -122,7 +122,7 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
 
           <div className="space-y-2">
             <div className="flex justify-between items-end">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">YTD Spending Progress</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Spending in the Last One Year</span>
               <span className={cn(
                 "text-sm font-black font-mono",
                 fiscalStats.utilizationRate >= 95 ? "text-rose-600" : fiscalStats.utilizationRate >= 85 ? "text-amber-600" : "text-emerald-600"
@@ -153,10 +153,6 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-between text-[8px] font-black text-slate-400 uppercase tracking-widest pt-1">
-              <span>Fiscal Floor $0.00</span>
-              <span>Ceiling reached at 100% Limit</span>
-            </div>
           </div>
 
           {fiscalStats.utilizationRate >= 90 && (

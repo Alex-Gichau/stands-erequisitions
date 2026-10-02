@@ -798,7 +798,7 @@ export const AuditLogsTerminalModal: React.FC<AuditLogsTerminalModalProps> = ({
                     key={log.id || `virtual-log-${actualIndex}`}
                     onClick={() => log.metadata && toggleExpand(log.id || `idx-${actualIndex}`)}
                     className={cn(
-                      "group font-mono transition-colors border-b border-slate-900/50 hover:bg-[#0f172a]/70 flex items-start gap-2.5 px-2 cursor-pointer select-text",
+                      "group font-mono transition-colors border-b border-slate-900/50 hover:bg-[#18181b]/70 flex items-start gap-2.5 px-2 cursor-pointer select-text",
                       density === "compact" ? "py-1 text-[11px]" : "py-2 text-[12px]",
                       isNewHighlight && "bg-emerald-950/40 text-emerald-200 animate-pulse border-emerald-800/40",
                       wrapLines ? "whitespace-normal break-words" : "whitespace-nowrap"

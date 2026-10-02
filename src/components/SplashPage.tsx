@@ -147,7 +147,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
         exit={{ opacity: 0, scale: 1.02 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center select-none overflow-hidden ${
-          darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"
+          darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900"
         }`}
       >
         {/* High-Visibility Finance Icon Background Grid */}
@@ -164,7 +164,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
                 transition={{ delay: delay * 0.3, duration: 0.5, ease: "easeOut" }}
                 className={`flex items-center justify-center p-3.5 sm:p-4 rounded-xl border transition-colors ${
                   darkMode
-                    ? "bg-slate-900/60 border-slate-800/80 text-slate-400/50 shadow-xs"
+                    ? "bg-[#18181b]/70 border-[#27272a]/80 text-zinc-400/50 shadow-xs"
                     : "bg-white/80 border-slate-200/90 text-slate-500/60 shadow-xs"
                 }`}
               >
@@ -177,7 +177,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
           <div 
             className={`absolute inset-0 pointer-events-none ${
               darkMode
-                ? "bg-[radial-gradient(ellipse_at_center,rgba(2,6,23,0.65)_0%,rgba(2,6,23,0.4)_40%,rgba(2,6,23,0.85)_100%)]"
+                ? "bg-[radial-gradient(ellipse_at_center,rgba(18,18,20,0.65)_0%,rgba(18,18,20,0.4)_40%,rgba(18,18,20,0.92)_100%)]"
                 : "bg-[radial-gradient(ellipse_at_center,rgba(248,250,252,0.72)_0%,rgba(248,250,252,0.45)_40%,rgba(248,250,252,0.9)_100%)]"
             }`}
           />
@@ -195,7 +195,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             }}
             className={`w-24 h-24 rounded-3xl p-3.5 mb-6 flex items-center justify-center shadow-2xl transition-all ${
               darkMode
-                ? "bg-slate-900/95 border border-slate-800 shadow-black/50"
+                ? "bg-[#18181b] border border-[#27272a] shadow-black/50"
                 : "bg-white border border-slate-200 shadow-slate-300/60"
             }`}
           >
@@ -236,7 +236,7 @@ export const SplashPage: React.FC<SplashPageProps> = ({
             <div
               className={`w-full h-2 rounded-full overflow-hidden transition-colors border ${
                 darkMode
-                  ? "bg-slate-900 border-slate-800"
+                  ? "bg-[#18181b] border-[#27272a]"
                   : "bg-slate-200 border-slate-300"
               }`}
             >

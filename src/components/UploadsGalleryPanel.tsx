@@ -944,7 +944,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         
         {/* UNIFIED COMPACT ICON-DOCK SIDEBAR (ALL SCREEN SIZES) */}
         {isSidebarOpen && (
-          <div className="flex flex-col items-center gap-2.5 w-12 sm:w-14 lg:w-16 bg-white dark:bg-[#18181b] rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-2 py-3.5 shadow-2xs shrink-0 transition-colors animate-in fade-in duration-200">
+          <div className="sticky top-4 sm:top-6 z-20 self-start flex flex-col items-center gap-2.5 w-12 sm:w-14 lg:w-16 bg-white/95 dark:bg-[#18181b]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-2 py-3.5 shadow-md dark:shadow-xl shrink-0 transition-all animate-in fade-in duration-200">
             {/* Scope Icons */}
             <div className="flex flex-col items-center gap-1.5 w-full">
               <button

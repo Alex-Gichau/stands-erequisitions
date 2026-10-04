@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { 
   AUTOSEND_DEFAULT_EMAIL, 
@@ -62,7 +62,9 @@ import {
   Trash2,
   FileText,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -100,6 +102,15 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
   });
 
   const [logs, setLogs] = useState<BackupEmailLog[]>([]);
+  // 15-row pagination for backup history logs
+  const [logsPage, setLogsPage] = useState<number>(1);
+  const LOGS_PER_PAGE = 15;
+  const totalLogsPages = Math.ceil(logs.length / LOGS_PER_PAGE) || 1;
+  const paginatedLogs = useMemo(() => {
+    const safePage = Math.min(Math.max(1, logsPage), totalLogsPages);
+    const start = (safePage - 1) * LOGS_PER_PAGE;
+    return logs.slice(start, start + LOGS_PER_PAGE);
+  }, [logs, logsPage, totalLogsPages]);
   const [emailInput, setEmailInput] = useState<string>(AUTOSEND_DEFAULT_EMAIL);
   const [scheduleTimeInput, setScheduleTimeInput] = useState<string>("04:00");
   const [dayOfWeekInput, setDayOfWeekInput] = useState<number>(5);
@@ -1214,8 +1225,9 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-2xl border border-border">
-                <table className="w-full text-left border-collapse">
+              <div className="rounded-2xl border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-muted/50 border-b border-border text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                       <th className="p-3.5">Timestamp</th>
@@ -1227,7 +1239,7 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-xs font-medium">
-                    {logs.map((log) => (
+                    {paginatedLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-muted/30 transition-colors">
                         <td className="p-3.5 whitespace-nowrap text-muted-foreground font-mono text-[11px]">
                           {new Date(log.timestamp).toLocaleString()}
@@ -1275,6 +1287,39 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* 15-Row Pagination Bar for Backup History Logs */}
+              {logs.length > 0 && (
+                <div className="p-4 bg-muted/40 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+                  <div className="text-[11px] font-medium text-muted-foreground">
+                    Showing <span className="font-bold text-foreground">{((logsPage - 1) * LOGS_PER_PAGE) + 1}</span> to <span className="font-bold text-foreground">{Math.min(logsPage * LOGS_PER_PAGE, logs.length)}</span> of <span className="font-bold text-foreground">{logs.length}</span> backup logs
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                      disabled={logsPage === 1}
+                      className="px-3 py-1.5 rounded-xl border border-border bg-card text-foreground text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/60 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <ChevronLeft size={13} className="inline mr-1" />
+                      Prev
+                    </button>
+                    <div className="text-xs font-bold text-muted-foreground">
+                      Page <span className="text-primary font-black">{logsPage}</span> of {totalLogsPages}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLogsPage(p => Math.min(totalLogsPages, p + 1))}
+                      disabled={logsPage >= totalLogsPages}
+                      className="px-3 py-1.5 rounded-xl border border-border bg-card text-foreground text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/60 transition-all cursor-pointer shadow-2xs"
+                    >
+                      Next
+                      <ChevronRight size={13} className="inline ml-1" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             )}
           </div>
         </div>

@@ -217,6 +217,20 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     });
   }, [churchGroups, groupSearchTerm, groupBudgetFilter, getGroupAllocatedBudget]);
 
+  // Church Groups 15-row pagination
+  const [churchGroupPage, setChurchGroupPage] = useState(1);
+  const GROUPS_PER_PAGE = 15;
+  const totalChurchGroupPages = Math.ceil(filteredChurchGroups.length / GROUPS_PER_PAGE) || 1;
+  const paginatedChurchGroups = React.useMemo(() => {
+    const safePage = Math.min(Math.max(1, churchGroupPage), totalChurchGroupPages);
+    const start = (safePage - 1) * GROUPS_PER_PAGE;
+    return filteredChurchGroups.slice(start, start + GROUPS_PER_PAGE);
+  }, [filteredChurchGroups, churchGroupPage, totalChurchGroupPages]);
+
+  React.useEffect(() => {
+    setChurchGroupPage(1);
+  }, [groupSearchTerm, groupBudgetFilter]);
+
   // Pre-calculate per-group aggregates for snappy rendering in table and cards
   const groupMetricsMap = React.useMemo(() => {
     const map = new Map<string, {
@@ -1400,7 +1414,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                      {filteredChurchGroups.map((group) => {
+                      {paginatedChurchGroups.map((group) => {
                         const metrics = groupMetricsMap.get(group.id) || {
                           memberCount: 0,
                           approverCount: 0,
@@ -1573,11 +1587,40 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                     </tfoot>
                   </table>
                 </div>
+
+                {/* 15-Row Pagination Bar for Church Groups Table */}
+                <div className="px-6 py-4 bg-slate-50/80 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Showing <span className="font-bold text-slate-800 dark:text-slate-200">{filteredChurchGroups.length > 0 ? ((churchGroupPage - 1) * GROUPS_PER_PAGE) + 1 : 0}</span> to <span className="font-bold text-slate-800 dark:text-slate-200">{Math.min(churchGroupPage * GROUPS_PER_PAGE, filteredChurchGroups.length)}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{filteredChurchGroups.length}</span> groups
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setChurchGroupPage(p => Math.max(1, p - 1))}
+                      disabled={churchGroupPage === 1}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+                    >
+                      Prev
+                    </button>
+                    <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                      Page <span className="text-primary font-black">{churchGroupPage}</span> of {totalChurchGroupPages}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setChurchGroupPage(p => Math.min(totalChurchGroupPages, p + 1))}
+                      disabled={churchGroupPage >= totalChurchGroupPages}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <AnimatePresence mode="popLayout">
-                  {filteredChurchGroups.map((group) => {
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <AnimatePresence mode="popLayout">
+                    {paginatedChurchGroups.map((group) => {
                     const metrics = groupMetricsMap.get(group.id) || {
                       memberCount: 0,
                       approverCount: 0,
@@ -1726,7 +1769,37 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   <span className="text-[9px] font-black uppercase tracking-[0.15em]">REGISTER NEW GROUP</span>
                 </button>
               </div>
-            )
+
+              {totalChurchGroupPages > 1 && (
+                <div className="bg-white dark:bg-slate-900 px-6 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs shadow-sm">
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Showing <span className="font-bold text-slate-800 dark:text-slate-200">{filteredChurchGroups.length > 0 ? ((churchGroupPage - 1) * GROUPS_PER_PAGE) + 1 : 0}</span> to <span className="font-bold text-slate-800 dark:text-slate-200">{Math.min(churchGroupPage * GROUPS_PER_PAGE, filteredChurchGroups.length)}</span> of <span className="font-bold text-slate-800 dark:text-slate-200">{filteredChurchGroups.length}</span> groups
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setChurchGroupPage(p => Math.max(1, p - 1))}
+                      disabled={churchGroupPage === 1}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+                    >
+                      Prev
+                    </button>
+                    <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                      Page <span className="text-primary font-black">{churchGroupPage}</span> of {totalChurchGroupPages}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setChurchGroupPage(p => Math.min(totalChurchGroupPages, p + 1))}
+                      disabled={churchGroupPage >= totalChurchGroupPages}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
           )}
         </>
       ) : (

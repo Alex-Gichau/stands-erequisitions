@@ -594,6 +594,16 @@ const Dashboard: React.FC<{
     return Object.values(groupTotals).sort((a, b) => b.totalAmount - a.totalAmount);
   }, [activeFiscalYearRequisitions, activeFiscalYearProjects]);
 
+  // 15-Row Pagination for Dashboard Ministry Group table
+  const [groupsTablePage, setGroupsTablePage] = useState(1);
+  const GROUPS_TABLE_ROWS = 15;
+  const totalGroupsTablePages = Math.ceil(requestedPerGroup.length / GROUPS_TABLE_ROWS) || 1;
+  const paginatedRequestedPerGroup = useMemo(() => {
+    const safePage = Math.min(Math.max(1, groupsTablePage), totalGroupsTablePages);
+    const start = (safePage - 1) * GROUPS_TABLE_ROWS;
+    return requestedPerGroup.slice(start, start + GROUPS_TABLE_ROWS);
+  }, [requestedPerGroup, groupsTablePage, totalGroupsTablePages]);
+
   const groupBudgetMap = useMemo(() => {
     const map = new Map<string, number>();
     activeFiscalYearProjects.forEach(p => {
@@ -1643,7 +1653,7 @@ const Dashboard: React.FC<{
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {requestedPerGroup.map((val, i) => {
+                {paginatedRequestedPerGroup.map((val, i) => {
                   const hasBudget = (groupBudgetMap.get(val.groupId) || 0) > 0;
                   return (
                   <tr 
@@ -1705,6 +1715,37 @@ const Dashboard: React.FC<{
               </tbody>
             </table>
           </div>
+
+          {totalGroupsTablePages > 1 && (
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-[10px] text-slate-500 font-medium">
+                Showing {((groupsTablePage - 1) * GROUPS_TABLE_ROWS) + 1} - {Math.min(groupsTablePage * GROUPS_TABLE_ROWS, requestedPerGroup.length)} of {requestedPerGroup.length} groups
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setGroupsTablePage(p => Math.max(1, p - 1))}
+                  disabled={groupsTablePage === 1}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[10px] font-bold cursor-pointer"
+                >
+                  <ChevronLeft size={11} className="inline mr-0.5" />
+                  Prev
+                </button>
+                <span className="text-[10px] font-bold text-slate-600 px-1">
+                  {groupsTablePage} / {totalGroupsTablePages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGroupsTablePage(p => Math.min(totalGroupsTablePages, p + 1))}
+                  disabled={groupsTablePage >= totalGroupsTablePages}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-[10px] font-bold cursor-pointer"
+                >
+                  Next
+                  <ChevronRight size={11} className="inline ml-0.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Visual value distribution chart */}

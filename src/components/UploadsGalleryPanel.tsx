@@ -33,6 +33,7 @@ import {
   Globe,
   Users,
   ChevronRight,
+  ChevronLeft,
   Folder,
   File,
   Clock,
@@ -424,6 +425,21 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     return allAvailableMinistries.filter(m => m.name.toLowerCase().includes(q));
   }, [allAvailableMinistries, deferredSearchQuery]);
 
+  // Parish Ministries Directory 15-row pagination
+  const MINISTRIES_PER_PAGE = 15;
+  const [ministriesPage, setMinistriesPage] = useState<number>(1);
+  const totalMinistriesPages = Math.ceil(filteredMinistries.length / MINISTRIES_PER_PAGE) || 1;
+  const paginatedMinistries = useMemo(() => {
+    const safePage = Math.min(Math.max(1, ministriesPage), totalMinistriesPages);
+    const start = (safePage - 1) * MINISTRIES_PER_PAGE;
+    return filteredMinistries.slice(start, start + MINISTRIES_PER_PAGE);
+  }, [filteredMinistries, ministriesPage, totalMinistriesPages]);
+
+  // Reset ministries page on search or active folder change
+  useEffect(() => {
+    setMinistriesPage(1);
+  }, [deferredSearchQuery, activeFolder]);
+
   // Filter and Search Logic
   const filteredUploads = useMemo(() => {
     return scopedUploadsList.filter((item) => {
@@ -508,6 +524,94 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       return 0;
     });
   }, [scopedUploadsList, activeFolder, selectedFormat, selectedGroup, selectedStatus, deferredSearchQuery, sortBy]);
+
+  // Document Files 15-row pagination
+  const FILES_PER_PAGE = 15;
+  const [filesPage, setFilesPage] = useState<number>(1);
+  const totalFilesPages = Math.ceil(filteredUploads.length / FILES_PER_PAGE) || 1;
+  const paginatedUploads = useMemo(() => {
+    const safePage = Math.min(Math.max(1, filesPage), totalFilesPages);
+    const start = (safePage - 1) * FILES_PER_PAGE;
+    return filteredUploads.slice(start, start + FILES_PER_PAGE);
+  }, [filteredUploads, filesPage, totalFilesPages]);
+
+  // Reset files page on filter, folder, search, or sort change
+  useEffect(() => {
+    setFilesPage(1);
+  }, [activeFolder, deferredSearchQuery, selectedFormat, selectedGroup, selectedStatus, sortBy, scopeFilter]);
+
+  // Reusable 15-row pagination bar
+  const renderPaginationControls = (
+    currentPage: number,
+    totalPages: number,
+    totalItems: number,
+    pageSize: number,
+    onPageChange: (p: number) => void,
+    itemLabel: string
+  ) => {
+    if (totalItems === 0) return null;
+    const startNum = ((currentPage - 1) * pageSize) + 1;
+    const endNum = Math.min(currentPage * pageSize, totalItems);
+
+    return (
+      <div className="px-4 sm:px-6 py-3.5 bg-slate-50/70 dark:bg-[#121214]/70 border-t border-slate-200/80 dark:border-[#27272a] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <div className="text-[11px] font-medium text-slate-500 dark:text-zinc-400">
+          Showing <span className="font-bold text-slate-900 dark:text-white">{startNum}</span> to <span className="font-bold text-slate-900 dark:text-white">{endNum}</span> of <span className="font-bold text-slate-900 dark:text-white">{totalItems}</span> {itemLabel}
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#222227] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-[11px] font-bold cursor-pointer shadow-2xs"
+            title="Previous Page"
+          >
+            <ChevronLeft size={13} />
+            <span>Prev</span>
+          </button>
+
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .map((p, idx, arr) => {
+                const prev = arr[idx - 1];
+                return (
+                  <React.Fragment key={p}>
+                    {prev && p - prev > 1 && (
+                      <span className="px-1 text-slate-400 text-xs">...</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onPageChange(p)}
+                      className={cn(
+                        "w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                        currentPage === p
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-white dark:bg-[#18181b] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#222227] border border-slate-200 dark:border-[#27272a]"
+                      )}
+                    >
+                      {p}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#222227] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-[11px] font-bold cursor-pointer shadow-2xs"
+            title="Next Page"
+          >
+            <span>Next</span>
+            <ChevronRight size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   // Metric counts and total valuation
   const metrics = useMemo(() => {
@@ -1254,37 +1358,43 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 </div>
               ) : viewMode === "grid" ? (
                 /* 1. MINISTRIES GRID VIEW */
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
-                  {filteredMinistries.map((ministry) => (
-                    <div
-                      key={ministry.name}
-                      onClick={() => setActiveFolder(`MINISTRY:${ministry.name}`)}
-                      className="p-4 bg-white dark:bg-[#18181b] hover:bg-slate-50 dark:hover:bg-[#222227] rounded-2xl border border-slate-200/80 dark:border-[#27272a] hover:border-indigo-500/50 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3 shadow-2xs"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-colors border border-indigo-500/20">
-                          <Folder className="w-5 h-5 fill-indigo-500/20" />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                    {paginatedMinistries.map((ministry) => (
+                      <div
+                        key={ministry.name}
+                        onClick={() => setActiveFolder(`MINISTRY:${ministry.name}`)}
+                        className="p-4 bg-white dark:bg-[#18181b] hover:bg-slate-50 dark:hover:bg-[#222227] rounded-2xl border border-slate-200/80 dark:border-[#27272a] hover:border-indigo-500/50 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between space-y-3 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-colors border border-indigo-500/20">
+                            <Folder className="w-5 h-5 fill-indigo-500/20" />
+                          </div>
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#27272a] text-slate-700 dark:text-zinc-300 border border-slate-200/60 dark:border-transparent shadow-2xs">
+                            {ministry.count} {ministry.count === 1 ? "file" : "files"}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#27272a] text-slate-700 dark:text-zinc-300 border border-slate-200/60 dark:border-transparent shadow-2xs">
-                          {ministry.count} {ministry.count === 1 ? "file" : "files"}
-                        </span>
-                      </div>
 
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
-                          {ministry.name}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-zinc-500 font-mono mt-0.5">
-                          {ministry.totalAmount > 0 ? formatCurrency(ministry.totalAmount) : "No linked expenses"}
-                        </p>
-                      </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
+                            {ministry.name}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-500 font-mono mt-0.5">
+                            {ministry.totalAmount > 0 ? formatCurrency(ministry.totalAmount) : "No linked expenses"}
+                          </p>
+                        </div>
 
-                      <div className="pt-2 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-between text-[10px] text-indigo-600 dark:text-indigo-400 font-bold group-hover:translate-x-0.5 transition-transform">
-                        <span>Open Folder</span>
-                        <ChevronRight size={13} />
+                        <div className="pt-2 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-between text-[10px] text-indigo-600 dark:text-indigo-400 font-bold group-hover:translate-x-0.5 transition-transform">
+                          <span>Open Folder</span>
+                          <ChevronRight size={13} />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+
+                  <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden">
+                    {renderPaginationControls(ministriesPage, totalMinistriesPages, filteredMinistries.length, MINISTRIES_PER_PAGE, setMinistriesPage, "ministry folders")}
+                  </div>
                 </div>
               ) : viewMode === "table" ? (
                 /* 2. MINISTRIES ROWS / TABLE VIEW */
@@ -1302,7 +1412,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-[#27272a]">
-                        {filteredMinistries.map((ministry) => (
+                        {paginatedMinistries.map((ministry) => (
                           <tr
                             key={ministry.name}
                             onClick={() => setActiveFolder(`MINISTRY:${ministry.name}`)}
@@ -1353,7 +1463,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
 
                   {/* Medium & Small Screens Card Rows */}
                   <div className="block lg:hidden divide-y divide-slate-100 dark:divide-[#27272a]">
-                    {filteredMinistries.map((ministry) => (
+                    {paginatedMinistries.map((ministry) => (
                       <div
                         key={ministry.name}
                         onClick={() => setActiveFolder(`MINISTRY:${ministry.name}`)}
@@ -1385,6 +1495,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       </div>
                     ))}
                   </div>
+
+                  {/* 15-Row Pagination for Ministries Table */}
+                  {renderPaginationControls(ministriesPage, totalMinistriesPages, filteredMinistries.length, MINISTRIES_PER_PAGE, setMinistriesPage, "ministry folders")}
                 </div>
               ) : (
                 /* 3. MINISTRIES SPLIT INSPECTOR VIEW */
@@ -1396,8 +1509,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       <span className="text-[11px] text-slate-400 dark:text-zinc-500">Select to inspect folder</span>
                     </div>
                     <div className="max-h-[620px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
-                      {filteredMinistries.map((ministry) => {
-                        const isSelected = (selectedMinistryFolder || filteredMinistries[0]?.name) === ministry.name;
+                      {paginatedMinistries.map((ministry) => {
+                        const isSelected = (selectedMinistryFolder || paginatedMinistries[0]?.name) === ministry.name;
                         return (
                           <div
                             key={ministry.name}
@@ -1429,6 +1542,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         );
                       })}
                     </div>
+                    {/* 15-Row Pagination for Ministries Split View */}
+                    {renderPaginationControls(ministriesPage, totalMinistriesPages, filteredMinistries.length, MINISTRIES_PER_PAGE, setMinistriesPage, "folders")}
                   </div>
 
                   {/* Right Ministry Inspector Pane (5 Cols) */}
@@ -1854,169 +1969,180 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             </div>
           ) : viewMode === "grid" ? (
             /* 1. GRID CARDS VIEW */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {filteredUploads.map((item, idx) => {
-                const isSelected = selectedItemIds.has(item.id);
-                return (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      "bg-white dark:bg-[#18181b] rounded-2xl border overflow-hidden shadow-2xs transition-all group hover:shadow-lg dark:hover:shadow-xl hover:border-slate-300 dark:hover:border-[#3f3f46] flex flex-col relative",
-                      isSelected
-                        ? "border-indigo-500 ring-2 ring-indigo-500/20"
-                        : "border-slate-200/80 dark:border-[#27272a]"
-                    )}
-                  >
-                    {/* Media Thumbnail Box */}
-                    <div 
-                      className="aspect-[4/3] bg-slate-100 dark:bg-[#121214] relative overflow-hidden flex items-center justify-center cursor-pointer select-none"
-                      onClick={() => handleOpenProjection(idx)}
-                    >
-                      {item.fileType === "image" ? (
-                        <CachedImage
-                          src={item.url}
-                          alt={item.fileName}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : item.fileType === "pdf" ? (
-                        <div className="w-full h-full p-2 flex items-center justify-center">
-                          <PdfThumbnailPreview
-                            url={item.url}
-                            title={item.fileName}
-                            className="w-full h-full max-h-36 object-contain shadow-2xs rounded-lg"
-                          />
-                        </div>
-                      ) : item.fileType === "spreadsheet" ? (
-                        <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-inner">
-                          <FileSpreadsheet size={32} />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shadow-inner">
-                          <FileText size={32} />
-                        </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                {paginatedUploads.map((item) => {
+                  const isSelected = selectedItemIds.has(item.id);
+                  const openThisItem = () => {
+                    const pIdx = projectionItemsList.findIndex(p => p.id === item.id);
+                    handleOpenProjection(pIdx >= 0 ? pIdx : 0);
+                  };
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        "bg-white dark:bg-[#18181b] rounded-2xl border overflow-hidden shadow-2xs transition-all group hover:shadow-lg dark:hover:shadow-xl hover:border-slate-300 dark:hover:border-[#3f3f46] flex flex-col relative",
+                        isSelected
+                          ? "border-indigo-500 ring-2 ring-indigo-500/20"
+                          : "border-slate-200/80 dark:border-[#27272a]"
                       )}
-
-                      {/* Multi-select Checkbox */}
+                    >
+                      {/* Media Thumbnail Box */}
                       <div 
-                        onClick={(e) => toggleSelectItem(item.id, e)}
-                        className="absolute top-2.5 left-2.5 z-10 p-1.5 rounded-lg bg-white/80 dark:bg-black/60 backdrop-blur-md text-slate-700 dark:text-white border border-slate-200/60 dark:border-transparent hover:bg-white dark:hover:bg-black/80 transition-all cursor-pointer shadow-2xs"
+                        className="aspect-[4/3] bg-slate-100 dark:bg-[#121214] relative overflow-hidden flex items-center justify-center cursor-pointer select-none"
+                        onClick={openThisItem}
                       >
-                        {isSelected ? <CheckSquare size={15} className="text-indigo-600 dark:text-indigo-400" /> : <Square size={15} className="text-slate-400 dark:text-zinc-400" />}
-                      </div>
-
-                      {/* File Format Badge */}
-                      <div className="absolute top-2.5 right-2.5 z-10">
-                        <span className={cn(
-                          "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-2xs",
-                          item.fileType === "pdf" && "bg-purple-600 text-white",
-                          item.fileType === "image" && "bg-amber-600 text-white",
-                          item.fileType === "spreadsheet" && "bg-emerald-600 text-white",
-                          item.fileType === "document" && "bg-blue-600 text-white",
-                          item.fileType === "other" && "bg-slate-700 text-white"
-                        )}>
-                          {item.fileType}
-                        </span>
-                      </div>
-
-                      {/* Hover Open Button Overlay */}
-                      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenProjection(idx);
-                          }}
-                          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg cursor-pointer transform group-hover:scale-100 scale-95 transition-all"
-                        >
-                          <Eye size={14} />
-                          <span>Inspect File</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metadata Body */}
-                    <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                      <div>
-                        <h4 
-                          className="text-xs font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" 
-                          title={item.fileName}
-                          onClick={() => handleOpenProjection(idx)}
-                        >
-                          {item.fileName}
-                        </h4>
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
-                          <span 
-                            className="truncate max-w-[130px] font-medium text-slate-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer" 
-                            title={item.groupName}
-                            onClick={() => {
-                              if (item.groupName) {
-                                setActiveFolder(`MINISTRY:${item.groupName}`);
-                              }
-                            }}
-                          >
-                            {item.groupName || "Parish Ministry"}
-                          </span>
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                            {formatDate(item.date)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Card Footer with Requisition Link & Direct Actions */}
-                      <div className="pt-2 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-between text-[11px]">
-                        {item.requisition ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (item.requisition) {
-                                setSelectedRequisition(item.requisition);
-                                onViewRequisition?.(item.requisition);
-                              }
-                            }}
-                            className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer truncate max-w-[110px]"
-                            title={`Jump to Requisition #${item.requisition.id}`}
-                          >
-                            #{item.requisition.id}
-                          </button>
-                        ) : item.project ? (
-                          <span className="text-cyan-600 dark:text-cyan-400 font-bold truncate max-w-[110px]" title={item.project.name}>
-                            {item.project.id || "Project"}
-                          </span>
+                        {item.fileType === "image" ? (
+                          <CachedImage
+                            src={item.url}
+                            alt={item.fileName}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : item.fileType === "pdf" ? (
+                          <div className="w-full h-full p-2 flex items-center justify-center">
+                            <PdfThumbnailPreview
+                              url={item.url}
+                              title={item.fileName}
+                              className="w-full h-full max-h-36 object-contain shadow-2xs rounded-lg"
+                            />
+                          </div>
+                        ) : item.fileType === "spreadsheet" ? (
+                          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-inner">
+                            <FileSpreadsheet size={32} />
+                          </div>
                         ) : (
-                          <span className="text-slate-400 dark:text-zinc-500 text-[10px] italic">Direct Upload</span>
+                          <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shadow-inner">
+                            <FileText size={32} />
+                          </div>
                         )}
 
-                        <div className="flex items-center gap-1">
+                        {/* Multi-select Checkbox */}
+                        <div 
+                          onClick={(e) => toggleSelectItem(item.id, e)}
+                          className="absolute top-2.5 left-2.5 z-10 p-1.5 rounded-lg bg-white/80 dark:bg-black/60 backdrop-blur-md text-slate-700 dark:text-white border border-slate-200/60 dark:border-transparent hover:bg-white dark:hover:bg-black/80 transition-all cursor-pointer shadow-2xs"
+                        >
+                          {isSelected ? <CheckSquare size={15} className="text-indigo-600 dark:text-indigo-400" /> : <Square size={15} className="text-slate-400 dark:text-zinc-400" />}
+                        </div>
+
+                        {/* File Format Badge */}
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider backdrop-blur-md shadow-2xs",
+                            item.fileType === "pdf" && "bg-purple-600 text-white",
+                            item.fileType === "image" && "bg-amber-600 text-white",
+                            item.fileType === "spreadsheet" && "bg-emerald-600 text-white",
+                            item.fileType === "document" && "bg-blue-600 text-white",
+                            item.fileType === "other" && "bg-slate-700 text-white"
+                          )}>
+                            {item.fileType}
+                          </span>
+                        </div>
+
+                        {/* Hover Open Button Overlay */}
+                        <div className="absolute inset-0 bg-black/40 dark:bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleOpenProjection(idx)}
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
-                            title="Preview file"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openThisItem();
+                            }}
+                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg cursor-pointer transform group-hover:scale-100 scale-95 transition-all"
                           >
-                            <Eye size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDownload(item, e)}
-                            className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
-                            title="Download file"
-                          >
-                            <Download size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleCopyUri(item, e)}
-                            className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
-                            title="Copy link"
-                          >
-                            {copiedId === item.id ? <Check size={13} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={13} />}
+                            <Eye size={14} />
+                            <span>Inspect File</span>
                           </button>
                         </div>
                       </div>
+
+                      {/* Metadata Body */}
+                      <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                        <div>
+                          <h4 
+                            className="text-xs font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" 
+                            title={item.fileName}
+                            onClick={openThisItem}
+                          >
+                            {item.fileName}
+                          </h4>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
+                            <span 
+                              className="truncate max-w-[130px] font-medium text-slate-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer" 
+                              title={item.groupName}
+                              onClick={() => {
+                                if (item.groupName) {
+                                  setActiveFolder(`MINISTRY:${item.groupName}`);
+                                }
+                              }}
+                            >
+                              {item.groupName || "Parish Ministry"}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                              {formatDate(item.date)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card Footer with Requisition Link & Direct Actions */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-between text-[11px]">
+                          {item.requisition ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (item.requisition) {
+                                  setSelectedRequisition(item.requisition);
+                                  onViewRequisition?.(item.requisition);
+                                }
+                              }}
+                              className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer truncate max-w-[110px]"
+                              title={`Jump to Requisition #${item.requisition.id}`}
+                            >
+                              #{item.requisition.id}
+                            </button>
+                          ) : item.project ? (
+                            <span className="text-cyan-600 dark:text-cyan-400 font-bold truncate max-w-[110px]" title={item.project.name}>
+                              {item.project.id || "Project"}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 dark:text-zinc-500 text-[10px] italic">Direct Upload</span>
+                          )}
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={openThisItem}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              title="Preview file"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDownload(item, e)}
+                              className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              title="Download file"
+                            >
+                              <Download size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopyUri(item, e)}
+                              className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              title="Copy link"
+                            >
+                              {copiedId === item.id ? <Check size={13} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              {/* 15-Row Pagination for Files Grid View */}
+              <div className="bg-white dark:bg-[#18181b] rounded-2xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden">
+                {renderPaginationControls(filesPage, totalFilesPages, filteredUploads.length, FILES_PER_PAGE, setFilesPage, "documents")}
+              </div>
             </div>
           ) : viewMode === "table" ? (
             /* 2. TABLE EXPLORER VIEW */
@@ -2045,8 +2171,12 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-[#27272a]">
-                    {filteredUploads.map((item, idx) => {
+                    {paginatedUploads.map((item) => {
                       const isSelected = selectedItemIds.has(item.id);
+                      const openThisItem = () => {
+                        const pIdx = projectionItemsList.findIndex(p => p.id === item.id);
+                        handleOpenProjection(pIdx >= 0 ? pIdx : 0);
+                      };
                       return (
                         <tr 
                           key={item.id}
@@ -2064,7 +2194,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                           <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
                             <div 
                               className="flex items-center gap-2.5 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                              onClick={() => handleOpenProjection(idx)}
+                              onClick={openThisItem}
                             >
                               <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#3f3f46]">
                                 {item.fileType === "pdf" ? <FileText size={14} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={14} /> : <ImageIcon size={14} />}
@@ -2129,7 +2259,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => handleOpenProjection(idx)}
+                                onClick={openThisItem}
                                 className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 dark:hover:bg-[#323238] cursor-pointer transition-colors"
                                 title="Open File Preview"
                               >
@@ -2176,8 +2306,12 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   <span className="text-[11px] font-mono">{selectedItemIds.size} Selected</span>
                 </div>
 
-                {filteredUploads.map((item, idx) => {
+                {paginatedUploads.map((item) => {
                   const isSelected = selectedItemIds.has(item.id);
+                  const openThisItem = () => {
+                    const pIdx = projectionItemsList.findIndex(p => p.id === item.id);
+                    handleOpenProjection(pIdx >= 0 ? pIdx : 0);
+                  };
                   return (
                     <div
                       key={item.id}
@@ -2206,7 +2340,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                               className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleOpenProjection(idx);
+                                openThisItem();
                               }}
                             >
                               {item.fileName}
@@ -2267,7 +2401,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={() => handleOpenProjection(idx)}
+                            onClick={openThisItem}
                             className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 dark:hover:bg-[#323238] cursor-pointer transition-colors"
                             title="Preview File"
                           >
@@ -2295,11 +2429,14 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   );
                 })}
               </div>
+
+              {/* 15-Row Pagination for Files Table View */}
+              {renderPaginationControls(filesPage, totalFilesPages, filteredUploads.length, FILES_PER_PAGE, setFilesPage, "documents")}
             </div>
           ) : (
             /* 3. SPLIT INSPECTOR VIEW */
             (() => {
-              const activeInspectorItem = inspectorItem || filteredUploads[0];
+              const activeInspectorItem = inspectorItem || paginatedUploads[0] || filteredUploads[0];
               return (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
                   {/* Files Table (Left 7 Cols) */}
@@ -2309,7 +2446,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       <span className="text-[11px] text-slate-400 dark:text-zinc-500">Click any row to inspect details</span>
                     </div>
                     <div className="max-h-[650px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
-                      {filteredUploads.map((item, idx) => {
+                      {paginatedUploads.map((item) => {
                         const isSelected = activeInspectorItem?.id === item.id;
                         return (
                           <div
@@ -2347,6 +2484,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         );
                       })}
                     </div>
+                    {/* 15-Row Pagination for Files Split View */}
+                    {renderPaginationControls(filesPage, totalFilesPages, filteredUploads.length, FILES_PER_PAGE, setFilesPage, "files")}
                   </div>
 
                   {/* Inspector Pane (Right 5 Cols) */}

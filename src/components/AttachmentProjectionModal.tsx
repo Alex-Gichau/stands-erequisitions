@@ -43,6 +43,7 @@ import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
 import { Requisition, RequisitionStatus } from "../types";
 
 export interface ProjectorGalleryItem {
+  id?: string;
   url: string;
   fileName?: string;
   title?: string;

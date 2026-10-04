@@ -17,6 +17,7 @@ import {
   TrendingDown,
   Activity,
   ChevronRight,
+  ChevronLeft,
   Save,
   History,
   FileText,
@@ -256,6 +257,21 @@ export const ReportsPanel: React.FC = () => {
 
     return { grossValue, disbursed, approved, pending };
   }, [filteredRequisitions]);
+
+  // Live Audited Ledger Feed 15-row pagination
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const LEDGER_ROWS_PER_PAGE = 15;
+  const totalLedgerPages = Math.ceil(filteredRequisitions.length / LEDGER_ROWS_PER_PAGE) || 1;
+  const paginatedLedgerRequisitions = useMemo(() => {
+    const safePage = Math.min(Math.max(1, ledgerPage), totalLedgerPages);
+    const start = (safePage - 1) * LEDGER_ROWS_PER_PAGE;
+    return filteredRequisitions.slice(start, start + LEDGER_ROWS_PER_PAGE);
+  }, [filteredRequisitions, ledgerPage, totalLedgerPages]);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setLedgerPage(1);
+  }, [startDate, endDate, selectedGroup, selectedStatus, selectedFiscalYear]);
 
   // Helper description of the active filter/period
   const filterDescription = useMemo(() => {
@@ -926,12 +942,12 @@ export const ReportsPanel: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               <AnimatePresence>
-                {filteredRequisitions.map((req, idx) => (
+                {paginatedLedgerRequisitions.map((req, idx) => (
                   <motion.tr 
                     key={req.id} 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: idx * 0.05 }}
+                    transition={{ delay: idx * 0.03 }}
                     className="hover:bg-slate-50/50 transition-colors group cursor-default"
                   >
                     <td className="px-8 py-5">
@@ -1010,6 +1026,65 @@ export const ReportsPanel: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* 15-Row Pagination Bar for Live Audited Ledger Feed */}
+        {filteredRequisitions.length > 0 && (
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+            <div className="text-[11px] font-medium text-slate-500">
+              Showing <span className="font-bold text-slate-900">{((ledgerPage - 1) * LEDGER_ROWS_PER_PAGE) + 1}</span> to <span className="font-bold text-slate-900">{Math.min(ledgerPage * LEDGER_ROWS_PER_PAGE, filteredRequisitions.length)}</span> of <span className="font-bold text-slate-900">{filteredRequisitions.length}</span> ledger entries
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setLedgerPage(p => Math.max(1, p - 1))}
+                disabled={ledgerPage === 1}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-[11px] font-bold cursor-pointer shadow-2xs"
+                title="Previous Page"
+              >
+                <ChevronLeft size={13} />
+                <span>Prev</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalLedgerPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalLedgerPages || Math.abs(p - ledgerPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const prev = arr[idx - 1];
+                    return (
+                      <React.Fragment key={p}>
+                        {prev && p - prev > 1 && (
+                          <span className="px-1 text-slate-400 text-xs">...</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setLedgerPage(p)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            ledgerPage === p
+                              ? "bg-primary text-white shadow-xs"
+                              : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLedgerPage(p => Math.min(totalLedgerPages, p + 1))}
+                disabled={ledgerPage >= totalLedgerPages}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 text-[11px] font-bold cursor-pointer shadow-2xs"
+                title="Next Page"
+              >
+                <span>Next</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI Auto-Generated Report Summary 1-Pager */}

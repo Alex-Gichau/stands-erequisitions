@@ -19,7 +19,9 @@ import {
   Filter, 
   SlidersHorizontal,
   Info,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -109,6 +111,21 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
       };
     });
   }, [filteredSentCampaigns]);
+
+  // Campaign table 15-row pagination
+  const [campaignPage, setCampaignPage] = useState<number>(1);
+  const CAMPAIGNS_PER_PAGE = 15;
+  const totalCampaignPages = Math.ceil(trendData.length / CAMPAIGNS_PER_PAGE) || 1;
+  const paginatedTrendData = useMemo(() => {
+    const safePage = Math.min(Math.max(1, campaignPage), totalCampaignPages);
+    const start = (safePage - 1) * CAMPAIGNS_PER_PAGE;
+    return trendData.slice(start, start + CAMPAIGNS_PER_PAGE);
+  }, [trendData, campaignPage, totalCampaignPages]);
+
+  // Reset page when filter changes
+  React.useEffect(() => {
+    setCampaignPage(1);
+  }, [timeframe, selectedCategory, metricFocus]);
 
   // Aggregate executive metrics
   const summary = useMemo(() => {
@@ -705,14 +722,14 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {trendData.map((item, idx) => {
+              {paginatedTrendData.map((item, idx) => {
                 const badgeColor = getCategoryBadgeColor(item.category);
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-4 px-6 font-bold text-slate-900 dark:text-white max-w-xs truncate">
                       <div className="flex items-center gap-3">
                         <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-black flex items-center justify-center shrink-0">
-                          {idx + 1}
+                          {((campaignPage - 1) * CAMPAIGNS_PER_PAGE) + idx + 1}
                         </span>
                         <span className="truncate">{item.fullTitle}</span>
                       </div>
@@ -775,6 +792,39 @@ export const CampaignAnalyticsDashboard: React.FC<CampaignAnalyticsDashboardProp
             </tbody>
           </table>
         </div>
+
+        {/* 15-Row Pagination Bar for Campaign Analytics */}
+        {trendData.length > 0 && (
+          <div className="px-6 py-3.5 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              Showing <span className="font-bold text-slate-900 dark:text-white">{((campaignPage - 1) * CAMPAIGNS_PER_PAGE) + 1}</span> to <span className="font-bold text-slate-900 dark:text-white">{Math.min(campaignPage * CAMPAIGNS_PER_PAGE, trendData.length)}</span> of <span className="font-bold text-slate-900 dark:text-white">{trendData.length}</span> campaigns
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCampaignPage(p => Math.max(1, p - 1))}
+                disabled={campaignPage === 1}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={13} className="inline mr-1" />
+                Prev
+              </button>
+              <div className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                Page <span className="text-primary font-black">{campaignPage}</span> of {totalCampaignPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCampaignPage(p => Math.min(totalCampaignPages, p + 1))}
+                disabled={campaignPage >= totalCampaignPages}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+              >
+                Next
+                <ChevronRight size={13} className="inline ml-1" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

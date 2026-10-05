@@ -130,6 +130,84 @@ const numberToWords = (numStr: string): string => {
   return result.replace(/\s+/g, " ").trim();
 };
 
+// Disbursement Channel Icons and Logos
+const MpesaLogo: React.FC<{ className?: string }> = ({ className = "h-7 w-auto" }) => (
+  <svg viewBox="0 0 76 36" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Safaricom Green Card */}
+    <rect width="76" height="36" rx="6" fill="#00A34E" />
+    {/* Safaricom Arc Signals */}
+    <path d="M11 9C14.5 6.5 19 6.5 22.5 9" stroke="#E21818" strokeWidth="1.8" strokeLinecap="round" />
+    <path d="M13 12C15.5 10 18 10 20.5 12" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+    {/* Stylized M */}
+    <path d="M7 26V14H10.8L14.2 21.2L17.6 14H21.4V26H18.7V17.2L15.3 24.2H13.1L9.7 17.2V26H7Z" fill="white" />
+    {/* Red PESA Badge */}
+    <rect x="25" y="5" width="46" height="26" rx="4" fill="#E21818" />
+    {/* PESA text in crisp bold sans */}
+    <text x="48" y="22.5" fill="white" fontSize="11" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" textAnchor="middle" letterSpacing="-0.2">PESA</text>
+  </svg>
+);
+
+const BankEftLogo: React.FC<{ className?: string }> = ({ className = "h-7 w-auto" }) => (
+  <svg viewBox="0 0 76 36" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Deep Navy Banking Background */}
+    <rect width="76" height="36" rx="6" fill="#0F2851" />
+    {/* Neoclassical Bank Pillars & Roof */}
+    <path d="M8 14L18 8L28 14V16H8V14Z" fill="#60A5FA" />
+    <rect x="9.5" y="17" width="3" height="8" fill="#93C5FD" rx="0.5" />
+    <rect x="14.8" y="17" width="3" height="8" fill="#93C5FD" rx="0.5" />
+    <rect x="20.1" y="17" width="3" height="8" fill="#93C5FD" rx="0.5" />
+    <rect x="25.4" y="17" width="3" height="8" fill="#93C5FD" rx="0.5" />
+    <rect x="7" y="25.5" width="22" height="3" fill="#60A5FA" rx="0.5" />
+    {/* Electronic Transfer Flow Badge */}
+    <rect x="33" y="5" width="38" height="26" rx="4" fill="#2563EB" />
+    <path d="M42 10.5H53M53 10.5L50 8.5M53 10.5L50 12.5" stroke="#93C5FD" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    <text x="52" y="24" fill="white" fontSize="11" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" textAnchor="middle" letterSpacing="0.8">EFT</text>
+  </svg>
+);
+
+const ChequeLogo: React.FC<{ className?: string }> = ({ className = "h-7 w-auto" }) => (
+  <svg viewBox="0 0 76 36" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Bank Cheque Leaf */}
+    <rect width="76" height="36" rx="6" fill="#FFFBEB" stroke="#D97706" strokeWidth="1.2" />
+    {/* Security Guilloche Top Header Bar */}
+    <path d="M0 6C0 2.68629 2.68629 0 6 0H70C73.3137 0 76 2.68629 76 6V10H0V6Z" fill="#B45309" />
+    <text x="6" y="7.5" fill="#FEF3C7" fontSize="5" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" letterSpacing="0.5">BANK CHEQUE</text>
+    <rect x="52" y="2.5" width="18" height="5" rx="1" fill="#FEF3C7" opacity="0.9" />
+    <text x="61" y="6.2" fill="#B45309" fontSize="4" fontWeight="800" textAnchor="middle">A/C PAYEE</text>
+    {/* Cheque Pay Line */}
+    <rect x="6" y="14" width="38" height="1.5" rx="0.75" fill="#D97706" opacity="0.5" />
+    {/* Amount Box */}
+    <rect x="49" y="12.5" width="21" height="7" rx="1.5" fill="#FEF3C7" stroke="#D97706" strokeWidth="0.9" />
+    <text x="59.5" y="17.5" fill="#92400E" fontSize="5" fontWeight="900" textAnchor="middle">KES •••</text>
+    {/* Cheque Signature Line */}
+    <rect x="6" y="20" width="25" height="1.5" rx="0.75" fill="#D97706" opacity="0.3" />
+    <path d="M42 27C46 24 50 29 56 25C59 23.5 63 26.5 68 25" stroke="#78350F" strokeWidth="1.4" strokeLinecap="round" />
+    {/* MICR Encoding Ribbon */}
+    <text x="14" y="31.5" fill="#78350F" fontSize="4.2" fontFamily="monospace" fontWeight="bold">⑈ 001223 ⑈ 020 ⑈</text>
+  </svg>
+);
+
+const CashLogo: React.FC<{ className?: string }> = ({ className = "h-7 w-auto" }) => (
+  <svg viewBox="0 0 76 36" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Currency Banknote Frame */}
+    <rect x="2" y="2" width="72" height="32" rx="4" fill="#047857" stroke="#065F46" strokeWidth="1" />
+    {/* Inner Guilloche Border */}
+    <rect x="4.5" y="4.5" width="67" height="27" rx="2.5" fill="#059669" stroke="#34D399" strokeWidth="0.8" />
+    {/* Shilling Watermark & Central Medallion */}
+    <circle cx="34" cy="18" r="9.5" fill="#047857" stroke="#6EE7B7" strokeWidth="1" />
+    <text x="34" y="21.5" fill="#ECFDF5" fontSize="8" fontWeight="900" fontFamily="system-ui, -apple-system, sans-serif" textAnchor="middle" letterSpacing="-0.2">KES</text>
+    {/* Security Strip */}
+    <rect x="18" y="4.5" width="2" height="27" fill="#34D399" opacity="0.4" />
+    {/* Denomination Patterns */}
+    <circle cx="10" cy="11" r="2.5" fill="#34D399" opacity="0.8" />
+    <circle cx="10" cy="25" r="2.5" fill="#34D399" opacity="0.8" />
+    {/* Golden Shilling Coin Stack Emblem */}
+    <ellipse cx="60" cy="16" rx="6" ry="5.5" fill="#F59E0B" stroke="#D97706" strokeWidth="0.8" />
+    <ellipse cx="60" cy="20" rx="6" ry="5.5" fill="#FBBF24" stroke="#D97706" strokeWidth="0.8" />
+    <text x="60" y="22" fill="#78350F" fontSize="4.5" fontWeight="900" textAnchor="middle">K</text>
+  </svg>
+);
+
 export const FinanceLedgerPanel: React.FC = () => {
   const { 
     requisitions, 
@@ -831,7 +909,7 @@ export const FinanceLedgerPanel: React.FC = () => {
   const [payoutNotes, setPayoutNotes] = useState("");
   const [isCommitingPayout, setIsCommitingPayout] = useState(false);
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>("ALL");
-  const [isVoucherTimelineCollapsed, setIsVoucherTimelineCollapsed] = useState(false);
+  const [isVoucherTimelineCollapsed, setIsVoucherTimelineCollapsed] = useState(true);
 
   // Payment proof & receipts attachments state
   const [payoutFiles, setPayoutFiles] = useState<File[]>([]);
@@ -853,11 +931,12 @@ export const FinanceLedgerPanel: React.FC = () => {
     setPayoutFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Keep selectedInstallmentId in sync and reset payout files when disbursingReq changes
+  // Keep selectedInstallmentId in sync, always collapse Requisition History, and reset payout files when disbursingReq changes
   React.useEffect(() => {
     if (disbursingReq) {
       setPayoutFiles([]);
       setIsDraggingPayoutFiles(false);
+      setIsVoucherTimelineCollapsed(true);
       if (disbursingReq.enableInstallments && Array.isArray(disbursingReq.installments) && disbursingReq.installments.length > 0) {
         const firstPending = disbursingReq.installments.find(i => i.status === "PENDING");
         if (firstPending) {
@@ -1666,7 +1745,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                               "text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full",
                               fy.status === "OPEN" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400",
                               fy.status === "CLOSED" && "bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-400",
-                              fy.status === "ARCHIVED" && "bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-405"
+                              fy.status === "ARCHIVED" && "bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
                             )}>
                               {fy.status}
                             </span>
@@ -2999,7 +3078,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                           setIsGroupDropdownOpen(true);
                         }}
                         onFocus={() => setIsGroupDropdownOpen(true)}
-                        className="w-full px-4 py-3 bg-slate-550/5 border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-600 outline-none transition-all placeholder:text-slate-400"
+                        className="w-full px-4 py-3 bg-slate-500/5 border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-600 outline-none transition-all placeholder:text-slate-400"
                       />
                       {groupSearchQuery && (
                         <button
@@ -3008,7 +3087,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                             setGroupSearchQuery("");
                             setSelectedGroupId("");
                           }}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650 p-1 hover:bg-slate-200/50 rounded-full"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-200/50 rounded-full"
                         >
                           <X size={14} />
                         </button>
@@ -3028,7 +3107,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -8 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute z-40 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-150"
+                          className="absolute z-40 w-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100"
                         >
                           {filteredGroups.length > 0 ? (
                             filteredGroups.map(cg => {
@@ -3061,14 +3140,14 @@ export const FinanceLedgerPanel: React.FC = () => {
                                     }
                                   }}
                                   className={cn(
-                                    "w-full px-4 py-3 text-left hover:bg-slate-550/5 hover:text-indigo-600 transition-colors flex flex-col gap-0.5",
+                                    "w-full px-4 py-3 text-left hover:bg-slate-500/5 hover:text-indigo-600 transition-colors flex flex-col gap-0.5",
                                     selectedGroupId === cg.name && "bg-indigo-50/50"
                                   )}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{cg.name}</span>
                                     {hasActiveAllocation ? (
-                                      <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-250">
+                                      <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                                         KES {activeAllocation.allocatedBudget.toLocaleString()} Alloc
                                       </span>
                                     ) : (
@@ -3187,7 +3266,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                       placeholder="e.g. 500,000"
                       value={allocationAmount}
                       onChange={handleAmountChange}
-                      className="w-full px-4 py-3 bg-slate-550/5 border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-600 outline-none transition-colors font-mono"
+                      className="w-full px-4 py-3 bg-slate-500/5 border border-slate-200 rounded-xl text-xs font-bold focus:border-indigo-600 outline-none transition-colors font-mono"
                     />
                     {allocationAmount && (
                       <motion.div 
@@ -3245,7 +3324,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                         setReservesSearchQuery("");
                         setReservesPage(1);
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-650"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
                       <X size={12} />
                     </button>
@@ -3442,7 +3521,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteProjectBudget(project)}
-                                  className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-650 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                  className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
                                   title="Delete Reserve"
                                 >
                                   <X size={10} className="shrink-0" />
@@ -3812,7 +3891,7 @@ export const FinanceLedgerPanel: React.FC = () => {
 
           voucherTimeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-          // Requisition Tracking Diagram Stepper Stages
+          // Requisition Tracking Stepper Stages
           const trackingStages = [
             {
               id: "submitted",
@@ -3916,7 +3995,7 @@ export const FinanceLedgerPanel: React.FC = () => {
 
                     {disbursingReq.description && (
                       <div className="text-xs text-slate-600 bg-white/80 p-2.5 rounded-lg border border-slate-200/60 mt-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Purpose / Description</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">For the Purpose Of</span>
                         {disbursingReq.description}
                       </div>
                     )}
@@ -3924,7 +4003,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     {disbursingReq.payableTo && (
                       <div className="flex items-center gap-2 text-xs text-slate-700 font-medium pt-0.5">
                         <CreditCard size={14} className="text-slate-400 shrink-0" />
-                        <span>Payable To / Beneficiary: <strong className="text-slate-900">{disbursingReq.payableTo}</strong></span>
+                        <span>Payable To: <strong className="text-slate-900">{disbursingReq.payableTo}</strong></span>
                       </div>
                     )}
                   </div>
@@ -3935,12 +4014,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Activity size={15} className="text-indigo-600" />
                         <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          Requisition Tracking Diagram
+                          Requisition Tracking
                         </h5>
                       </div>
-                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle2 size={10} /> Authorized for Release
-                      </span>
                     </div>
 
                     {/* Stepper Bar */}
@@ -4011,22 +4087,51 @@ export const FinanceLedgerPanel: React.FC = () => {
                   </div>
 
                   {/* 3. History & Audit Timeline */}
-                  <div className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div 
+                    onClick={() => {
+                      if (isVoucherTimelineCollapsed) {
+                        setIsVoucherTimelineCollapsed(false);
+                      }
+                    }}
+                    className={cn(
+                      "border rounded-xl transition-all shadow-2xs select-none",
+                      isVoucherTimelineCollapsed 
+                        ? "p-3.5 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 cursor-pointer group" 
+                        : "p-4 space-y-3 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                    )}
+                  >
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsVoucherTimelineCollapsed(!isVoucherTimelineCollapsed);
+                      }}
+                      className={cn(
+                        "flex items-center justify-between cursor-pointer select-none",
+                        !isVoucherTimelineCollapsed && "border-b border-slate-100 dark:border-slate-800 pb-2"
+                      )}
+                    >
                       <div className="flex items-center gap-2">
-                        <History size={16} className="text-indigo-600" />
-                        <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                          Requisition History
-                        </h5>
+                        <History size={16} className="text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            Requisition History
+                          </h5>
+                          {isVoucherTimelineCollapsed && (
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Click to open &amp; view full audit lifecycle</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full uppercase">
+                        <span className="text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase">
                           {voucherTimeline.length} Audit Events
                         </span>
                         <button
                           type="button"
-                          onClick={() => setIsVoucherTimelineCollapsed(!isVoucherTimelineCollapsed)}
-                          className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded text-[9px] font-bold uppercase transition-colors flex items-center gap-0.5 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsVoucherTimelineCollapsed(!isVoucherTimelineCollapsed);
+                          }}
+                          className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-300 rounded text-[9px] font-bold uppercase transition-colors flex items-center gap-0.5 cursor-pointer"
                         >
                           <span>{isVoucherTimelineCollapsed ? "Expand" : "Collapse"}</span>
                           {isVoucherTimelineCollapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
@@ -4037,7 +4142,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     {!isVoucherTimelineCollapsed && (
                       <div className="space-y-4 relative ml-1 pt-1">
                         {/* Vertical Connector Line */}
-                        <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
+                        <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 dark:bg-slate-800 rounded-full" />
 
                         {voucherTimeline.map((event) => {
                           let StepIcon = Activity;
@@ -4082,14 +4187,14 @@ export const FinanceLedgerPanel: React.FC = () => {
                               {/* Marker Circle */}
                               <div
                                 className={cn(
-                                  "absolute left-0 top-0.5 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center ring-2 shadow-xs z-10 transition-transform group-hover:scale-105",
-                                  badgeColor === "blue" ? "bg-blue-50 text-blue-600 border-blue-200 ring-blue-100" :
-                                  badgeColor === "teal" ? "bg-teal-50 text-teal-600 border-teal-200 ring-teal-100" :
-                                  badgeColor === "indigo" ? "bg-indigo-50 text-indigo-600 border-indigo-200 ring-indigo-100" :
-                                  badgeColor === "emerald" ? "bg-emerald-50 text-emerald-600 border-emerald-200 ring-emerald-100" :
-                                  badgeColor === "rose" ? "bg-rose-50 text-rose-600 border-rose-200 ring-rose-100" :
-                                  badgeColor === "amber" ? "bg-amber-50 text-amber-600 border-amber-200 ring-amber-100" :
-                                  "bg-slate-50 text-slate-600 border-slate-200 ring-slate-100"
+                                  "absolute left-0 top-0.5 w-7 h-7 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center ring-2 shadow-xs z-10 transition-transform group-hover:scale-105",
+                                  badgeColor === "blue" ? "bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 ring-blue-100 dark:ring-blue-950" :
+                                  badgeColor === "teal" ? "bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800 ring-teal-100 dark:ring-teal-950" :
+                                  badgeColor === "indigo" ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 ring-indigo-100 dark:ring-indigo-950" :
+                                  badgeColor === "emerald" ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 ring-emerald-100 dark:ring-emerald-950" :
+                                  badgeColor === "rose" ? "bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 ring-rose-100 dark:ring-rose-950" :
+                                  badgeColor === "amber" ? "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 ring-amber-100 dark:ring-amber-950" :
+                                  "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 ring-slate-100 dark:ring-slate-800"
                                 )}
                               >
                                 <StepIcon size={12} className="stroke-[2.5]" />
@@ -4098,57 +4203,57 @@ export const FinanceLedgerPanel: React.FC = () => {
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between text-[10px]">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h6 className="font-bold text-slate-900 leading-tight uppercase tracking-tight text-[11px]">
+                                    <h6 className="font-bold text-slate-900 dark:text-slate-100 leading-tight uppercase tracking-tight text-[11px]">
                                       {event.title}
                                     </h6>
                                     <span
                                       className={cn(
                                         "px-1.5 py-0.2 rounded text-[7.5px] font-black uppercase tracking-wider",
-                                        badgeColor === "blue" ? "bg-blue-100 text-blue-800" :
-                                        badgeColor === "teal" ? "bg-teal-100 text-teal-800" :
-                                        badgeColor === "indigo" ? "bg-indigo-100 text-indigo-800" :
-                                        badgeColor === "emerald" ? "bg-emerald-100 text-emerald-800" :
-                                        badgeColor === "rose" ? "bg-rose-100 text-rose-800" :
-                                        badgeColor === "amber" ? "bg-amber-100 text-amber-800" :
-                                        "bg-slate-100 text-slate-800"
+                                        badgeColor === "blue" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300" :
+                                        badgeColor === "teal" ? "bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300" :
+                                        badgeColor === "indigo" ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300" :
+                                        badgeColor === "emerald" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" :
+                                        badgeColor === "rose" ? "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300" :
+                                        badgeColor === "amber" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300" :
+                                        "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
                                       )}
                                     >
                                       {event.type.replace(/_/g, " ")}
                                     </span>
                                   </div>
-                                  <span className="text-[9.5px] text-slate-400 font-mono">
+                                  <span className="text-[9.5px] text-slate-400 dark:text-slate-500 font-mono">
                                     {event.timestamp ? new Date(event.timestamp).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
                                   </span>
                                 </div>
 
-                                <div className="bg-slate-50/80 border border-slate-200/80 rounded-lg p-2.5 space-y-1.5 text-xs">
+                                <div className="bg-slate-50/80 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800 rounded-lg p-2.5 space-y-1.5 text-xs">
                                   <div className="flex items-center justify-between text-[10px]">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="font-bold text-slate-900">{event.actorName}</span>
+                                      <span className="font-bold text-slate-900 dark:text-slate-100">{event.actorName}</span>
                                       {event.role && (
-                                        <span className="text-slate-500 font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-[8.5px]">
+                                        <span className="text-slate-500 dark:text-slate-400 font-mono bg-white dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700 text-[8.5px]">
                                           {event.role}
                                         </span>
                                       )}
                                     </div>
                                     {event.email && (
-                                      <span className="text-slate-400 font-mono text-[9px]">{event.email}</span>
+                                      <span className="text-slate-400 dark:text-slate-500 font-mono text-[9px]">{event.email}</span>
                                     )}
                                   </div>
 
                                   {event.subtitle && (
-                                    <p className="text-[10px] text-slate-600">{event.subtitle}</p>
+                                    <p className="text-[10px] text-slate-600 dark:text-slate-400">{event.subtitle}</p>
                                   )}
 
                                   {/* Authentication method & code */}
                                   {(event.method || event.approvalCode) && (
-                                    <div className="flex items-center justify-between text-[9px] text-slate-500 bg-white/70 px-2 py-1 rounded border border-slate-200/50">
+                                    <div className="flex items-center justify-between text-[9px] text-slate-500 dark:text-slate-400 bg-white/70 dark:bg-slate-900/70 px-2 py-1 rounded border border-slate-200/50 dark:border-slate-800">
                                       <span className="flex items-center gap-1">
                                         <MethodIcon size={11} className="text-slate-400" />
                                         {methodLabel}
                                       </span>
                                       {event.approvalCode && (
-                                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-1 rounded">
+                                        <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-1 rounded">
                                           AUTH: ••••{event.approvalCode.slice(-2)}
                                         </span>
                                       )}
@@ -4157,7 +4262,7 @@ export const FinanceLedgerPanel: React.FC = () => {
 
                                   {/* Note / Audit details */}
                                   {event.note && (
-                                    <p className="text-[10.5px] text-slate-600 italic bg-white p-1.5 rounded border border-slate-100">
+                                    <p className="text-[10.5px] text-slate-600 dark:text-slate-300 italic bg-white dark:bg-slate-900/90 p-1.5 rounded border border-slate-100 dark:border-slate-800">
                                       "{event.note}"
                                     </p>
                                   )}
@@ -4350,74 +4455,101 @@ export const FinanceLedgerPanel: React.FC = () => {
                   )}
 
                   {/* 5. Disbursement Settlement Details (Form inputs) */}
-                  <div className="border border-slate-200 bg-slate-50/70 rounded-xl p-4 space-y-4">
+                  <div className="border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 rounded-xl p-4 space-y-4">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <Banknote size={15} className="text-indigo-600" />
+                      <h5 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                        <Banknote size={15} className="text-indigo-600 dark:text-indigo-400" />
                         Disbursement Payout Release Details
                       </h5>
-                      <span className="text-xs font-mono font-bold text-indigo-700 bg-white px-2.5 py-0.5 rounded-lg border border-slate-200">
+                      <span className="text-xs font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 px-2.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                         KES {payoutAmount.toLocaleString()}.00
                       </span>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Disbursement Channel</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Disbursement Channel</label>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Select payout vehicle</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         {[
-                          { id: "MPESA", label: "M-PESA" },
-                          { id: "EFT", label: "Bank EFT" },
-                          { id: "CHEQUE", label: "Cheque" },
-                          { id: "CASH", label: "Cash" }
-                        ].map((ch) => (
-                          <button
-                            key={ch.id}
-                            type="button"
-                            onClick={() => setDisburseMethod(ch.id as any)}
-                            className={cn(
-                              "py-2 px-3 text-center rounded-lg text-xs font-bold uppercase transition-all cursor-pointer border",
-                              disburseMethod === ch.id 
-                                ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
-                                : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                            )}
-                          >
-                            {ch.label}
-                          </button>
-                        ))}
+                          { id: "MPESA", label: "M-PESA", sub: "Mobile Money", logo: <MpesaLogo className="h-7 w-auto" /> },
+                          { id: "EFT", label: "Bank EFT", sub: "Direct Transfer", logo: <BankEftLogo className="h-7 w-auto" /> },
+                          { id: "CHEQUE", label: "Cheque", sub: "Bank Cheque", logo: <ChequeLogo className="h-7 w-auto" /> },
+                          { id: "CASH", label: "Cash", sub: "Physical Cash", logo: <CashLogo className="h-7 w-auto" /> }
+                        ].map((ch) => {
+                          const isSelected = disburseMethod === ch.id;
+                          return (
+                            <button
+                              key={ch.id}
+                              type="button"
+                              onClick={() => setDisburseMethod(ch.id as any)}
+                              className={cn(
+                                "p-3 rounded-xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer border text-center group relative",
+                                isSelected 
+                                  ? "bg-indigo-50/90 dark:bg-indigo-950/70 border-indigo-600 dark:border-indigo-500 text-indigo-950 dark:text-indigo-200 ring-2 ring-indigo-500/20 shadow-sm" 
+                                  : "bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50/80 dark:hover:bg-slate-800 shadow-2xs"
+                              )}
+                            >
+                              {isSelected && (
+                                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                                  <Check size={10} strokeWidth={3} />
+                                </div>
+                              )}
+                              <div className="group-hover:scale-105 transition-transform flex items-center justify-center py-0.5">
+                                {ch.logo}
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className={cn(
+                                  "text-[11px] font-black uppercase tracking-tight block",
+                                  isSelected ? "text-indigo-950 dark:text-indigo-200 font-black" : "text-slate-800 dark:text-slate-100"
+                                )}>
+                                  {ch.label}
+                                </span>
+                                <span className={cn(
+                                  "text-[8.5px] font-semibold block leading-none",
+                                  isSelected ? "text-indigo-600 dark:text-indigo-400 font-bold" : "text-slate-400 dark:text-slate-400"
+                                )}>
+                                  {ch.sub}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Transaction / Ref Reference</label>
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Transaction / Ref Reference</label>
                       <input
                         type="text"
                         required
                         placeholder="e.g., MPESA-TXN-2831, CHQ #001223"
                         value={referenceNum}
                         onChange={(e) => setReferenceNum(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 font-mono shadow-2xs"
+                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 font-mono shadow-2xs"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Verification Comment (Optional)</label>
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Verification Comment (Optional)</label>
                       <textarea
                         rows={2}
                         placeholder="Provide clerical details, bank transfer receipt references..."
                         value={payoutNotes}
                         onChange={(e) => setPayoutNotes(e.target.value)}
-                        className="w-full p-3 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 shadow-2xs"
+                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-2xs"
                       />
                     </div>
 
                     {/* Drag and Drop File Attachment Field for Payment Documents & Receipts */}
-                    <div className="space-y-2 pt-2 border-t border-slate-200/80">
+                    <div className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
                       <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
-                          <Paperclip size={13} className="text-indigo-600" />
+                        <label className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                          <Paperclip size={13} className="text-indigo-600 dark:text-indigo-400" />
                           Payment Proof &amp; Receipt Attachments
                         </label>
-                        <span className="text-[9px] text-slate-400 font-medium">PDF, Images, Excel, Word (Max 15MB)</span>
+                        <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">PDF, Images, Excel, Word (Max 15MB)</span>
                       </div>
 
                       {/* Drag & Drop Dropzone */}
@@ -4447,10 +4579,10 @@ export const FinanceLedgerPanel: React.FC = () => {
                         }}
                         onClick={() => payoutFileInputRef.current?.click()}
                         className={cn(
-                          "border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group text-center bg-white",
+                          "border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group text-center bg-white dark:bg-slate-900/60",
                           isDraggingPayoutFiles
-                            ? "border-indigo-500 bg-indigo-50/70 scale-[1.01]"
-                            : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/20 shadow-2xs"
+                            ? "border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 scale-[1.01]"
+                            : "border-slate-300 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20 shadow-2xs"
                         )}
                       >
                         <input
@@ -4466,14 +4598,14 @@ export const FinanceLedgerPanel: React.FC = () => {
                             }
                           }}
                         />
-                        <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Upload size={16} className={cn("text-indigo-600", isDraggingPayoutFiles && "animate-bounce")} />
+                        <div className="w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload size={16} className={cn("text-indigo-600 dark:text-indigo-400", isDraggingPayoutFiles && "animate-bounce")} />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-700">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
                             {isDraggingPayoutFiles ? "Drop payment documents here!" : "Click to attach or drag & drop files"}
                           </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
+                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                             Attach bank transfer slips, cheque copies, EFT vouchers, M-Pesa receipts, or cash sale slips
                           </p>
                         </div>
@@ -4677,7 +4809,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                   <button
                     type="submit"
                     disabled={topUpLoading || isDuplicateAccountNumberForEdit || !adjustingAccountNumber.trim()}
-                    className="flex-1 py-2 bg-slate-900 hover:bg-slate-850 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                   >
                     {topUpLoading ? "Updating..." : "Save Changes"}
                   </button>
@@ -4707,7 +4839,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     <p className="text-[10px] text-slate-400">Configure boundaries, labels, and planning notes</p>
                   </div>
                 </div>
-                <button onClick={() => setManagingFy(null)} className="p-2 hover:bg-slate-850 rounded-full transition-all text-slate-400 hover:text-white cursor-pointer">
+                <button onClick={() => setManagingFy(null)} className="p-2 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-white cursor-pointer">
                   <X size={20} />
                 </button>
               </div>

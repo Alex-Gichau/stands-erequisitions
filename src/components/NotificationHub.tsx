@@ -522,7 +522,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
           snippet: `Requested Role: ${u.role}. Click to authorize account.`,
           actionLabel: "Authorize Account",
           timestamp: (u as any).createdAt || (u as any).timestamp || now,
-          tags: ["#USER_AUTH", `#${u.role}`, "Action Required"],
+          tags: ["#USER_AUTH", `#${u.role}`],
           action: async () => {
             await approveUser(u.id);
             setSuccessId(`notif-user-await-${u.id}`);
@@ -968,7 +968,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search comments, approvals, logins..."
-                className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-850 focus:border-indigo-500 transition-all"
+                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-850 focus:border-indigo-500 transition-all"
               />
               {searchQuery && (
                 <button
@@ -988,10 +988,7 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 <CheckCircle2 size={18} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-black tracking-tight leading-tight">You're all caught up!🥳🥳🥳</p>
-                <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium truncate mt-0.5">
-                  All activity logs and comments have been reviewed.
-                </p>
+                <p className="text-xs font-black tracking-tight leading-tight">You're all caught up!🥳</p>
               </div>
             </div>
           )}
@@ -1362,10 +1359,10 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                       {selectedItem.title}
                     </h2>
 
-                    {/* Category Tags (filter out #hashtags) */}
-                    {selectedItem.tags && selectedItem.tags.filter(tag => !tag.startsWith("#")).length > 0 && (
+                    {/* Category Tags (filter out #hashtags and action required) */}
+                    {selectedItem.tags && selectedItem.tags.filter(tag => !tag.startsWith("#") && tag.toLowerCase() !== "action required").length > 0 && (
                       <div className="flex items-center gap-2 flex-wrap pt-1">
-                        {selectedItem.tags.filter(tag => !tag.startsWith("#")).map((tag, tIdx) => (
+                        {selectedItem.tags.filter(tag => !tag.startsWith("#") && tag.toLowerCase() !== "action required").map((tag, tIdx) => (
                           <span 
                             key={tIdx}
                             className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border border-slate-200/60 dark:border-slate-700/60"
@@ -1386,14 +1383,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     {/* Interactive Action Callout Box (Event Directive with transparent background) */}
                     <div className="p-5 rounded-2xl bg-transparent border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-4 my-4">
                       <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 font-mono">
-                            Event Directive
-                          </span>
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                            {selectedItem.title}
-                          </h4>
-                        </div>
 
                         {selectedItem.requisition && (
                           <div className="text-right">

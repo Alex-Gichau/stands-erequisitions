@@ -182,11 +182,24 @@
 
   .google-btn {
     background-color: #ffffff !important;
-    color: #0f172a !important;
+    color: #000000 !important;
+    border-color: #e2e8f0 !important;
   }
   
   .google-btn:hover {
-    background-color: #f8fafc !important;
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
+  }
+
+  .dark .google-btn {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  .dark .google-btn:hover {
+    background-color: #f1f5f9 !important;
+    color: #000000 !important;
   }
 }
 

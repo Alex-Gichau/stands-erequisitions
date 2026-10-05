@@ -41,6 +41,7 @@ import {
   FilePlus,
   Coins,
   ArrowRight,
+  ArrowLeft,
   Image as ImageIcon,
   FolderCheck,
   Tag,
@@ -982,67 +983,6 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   return (
     <div id="uploads-gallery-panel" className="w-full min-h-screen text-slate-900 dark:text-slate-100 p-3 sm:p-5 lg:p-7 space-y-5 transition-colors">
       
-      {/* Top Header & Breadcrumb Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-[#18181b] p-5 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-sm dark:shadow-xl relative overflow-hidden transition-colors">
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 shadow-inner">
-            <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Requisitions & Reciepts File Manager
-              </h1>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
-              Quickly locate specific photos, and documents using smart category filters.
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
-          {/* Export Catalog CSV */}
-          <button
-            type="button"
-            onClick={handleExportCatalogCsv}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-200 dark:hover:text-white rounded-xl text-xs font-bold border border-slate-200 dark:border-[#3f3f46] transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
-            title="Export catalog list of documents to CSV"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden md:inline">Export</span>
-          </button>
-
-          {/* Camera Scanner Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setStagedFiles([]);
-              setIsCameraActive(true);
-              setIsUploadDrawerOpen(true);
-            }}
-            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-500/30 transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
-          >
-            <Camera className="w-4 h-4" />
-            <span>Scan</span>
-          </button>
-
-          {/* Primary Upload Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setStagedFiles([]);
-              setIsCameraActive(false);
-              setIsUploadDrawerOpen(true);
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Upload</span>
-          </button>
-        </div>
-      </div>
-
       {/* Main File Explorer Layout with Collapsible Folder Sidebar */}
       <div className="flex flex-row gap-3 sm:gap-4 lg:gap-5 items-start w-full">
         
@@ -1159,18 +1099,34 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 )}
               >
                 <BarChart3 size={17} />
-                <span className="sr-only">Repository Analytics</span>
+                <span className="sr-only">Analytics</span>
               </button>
             </div>
           </div>
         )}
 
         {/* RIGHT MAIN EXPLORER AREA */}
-        <div className="flex-1 w-full space-y-4">
+        <div className="flex-1 w-full space-y-1">
           
           {/* Controls Bar: Search, Breadcrumb, Sort, View Toggle */}
           <div className="bg-white dark:bg-[#18181b] p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs space-y-4 transition-colors">
             
+                    <div className="flex items-center gap-4 relative z-10">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 shadow-inner">
+            <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                Requisitions & Reciepts File Manager
+              </h1>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+              Quickly locate specific photos, and documents using smart category filters.
+            </p>
+          </div>
+        </div>
+
             {/* Top Row: Search and View Mode Switcher */}
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
               {/* Search Input */}
@@ -1180,7 +1136,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search file name, requisition ref #, ministry, voucher, notes..."
+                  placeholder="Search ministry or requisition..."
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#27272a] rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
                 />
                 {searchQuery && (
@@ -1192,7 +1148,52 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+
               </div>
+
+                      {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
+          {/* Export Catalog CSV */}
+          <button
+            type="button"
+            onClick={handleExportCatalogCsv}
+            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-200 dark:hover:text-white rounded-xl text-xs font-bold border border-slate-200 dark:border-[#3f3f46] transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
+            title="Export catalog list of documents to CSV"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden md:inline">Export</span>
+          </button>
+
+          {/* Camera Scanner Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setStagedFiles([]);
+              setIsCameraActive(true);
+              setIsUploadDrawerOpen(true);
+            }}
+            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-500/30 transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Scan</span>
+          </button>
+
+          {/* Primary Upload Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setStagedFiles([]);
+              setIsCameraActive(false);
+              setIsUploadDrawerOpen(true);
+            }}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Upload</span>
+          </button>
+        </div>
+
+
 
               {/* View Mode & Sorting */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
@@ -1276,7 +1277,18 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             {/* Bottom Row: Active Breadcrumb & Quick Filter Strip */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#27272a]">
               {/* Breadcrumb Indicator */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 flex-wrap">
+                {currentMinistryName && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveFolder("MINISTRY_ALL")}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all border border-indigo-200 dark:border-indigo-800/80 cursor-pointer shadow-2xs group shrink-0 active:scale-95 mr-0.5"
+                    title="Back to all ministry folders"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+                  </button>
+                )}
+
                 <span className="font-bold text-slate-400 dark:text-zinc-500">Location:</span>
                 
                 {isBrowsingMinistries ? (
@@ -1284,14 +1296,18 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveFolder("MINISTRY_ALL")}
-                      className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                      className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
                     >
-                      Parish Ministries
+                      <Folder size={13} className="fill-indigo-500/20" />
+                      <span>Parish Ministries</span>
                     </button>
                     {currentMinistryName && (
                       <>
                         <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600" />
-                        <span className="font-bold text-slate-900 dark:text-white">{currentMinistryName}</span>
+                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                          <FolderOpen size={13} className="text-indigo-500" />
+                          <span>{currentMinistryName}</span>
+                        </span>
                       </>
                     )}
                   </div>
@@ -1334,22 +1350,6 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
           {/* Interactive Parish Ministries Folders Hub (When viewing Ministries Directory) */}
           {activeFolder === "MINISTRY_ALL" && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-white dark:bg-[#18181b] p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shadow-inner">
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white">Parish Ministries Directory</h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400">Showing {filteredMinistries.length} of {allAvailableMinistries.length} parish ministry archives</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold px-3 py-1 bg-slate-100 dark:bg-[#27272a] text-slate-700 dark:text-zinc-300 rounded-xl border border-slate-200/60 dark:border-transparent">
-                    {metrics.total} Total Files · {formatCurrency(metrics.totalValue)}
-                  </span>
-                </div>
-              </div>
 
               {filteredMinistries.length === 0 ? (
                 <div className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-10 text-center shadow-2xs space-y-3">
@@ -1379,9 +1379,6 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                           <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
                             {ministry.name}
                           </h4>
-                          <p className="text-[11px] text-slate-500 dark:text-zinc-500 font-mono mt-0.5">
-                            {ministry.totalAmount > 0 ? formatCurrency(ministry.totalAmount) : "No linked expenses"}
-                          </p>
                         </div>
 
                         <div className="pt-2 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-between text-[10px] text-indigo-600 dark:text-indigo-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -1923,50 +1920,63 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
           ) : activeFolder === "MINISTRY_ALL" ? (
             /* Parish Ministries Directory is the full main view for this folder */
             null
-          ) : filteredUploads.length === 0 ? (
-            <div className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-12 text-center shadow-2xs space-y-4 transition-colors">
-              <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-[#27272a] text-slate-400 dark:text-zinc-500 flex items-center justify-center mx-auto">
-                <FolderOpen size={32} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">No documents found in this directory</h3>
-                <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
-                  {searchQuery 
-                    ? `No files match your search query "${searchQuery}". Try clearing filters.` 
-                    : currentMinistryName 
-                      ? `There are currently no uploaded documents or receipts for the "${currentMinistryName}" ministry.`
-                      : "There are currently no uploaded documents matching the selected criteria."}
-                </p>
-              </div>
-              <div className="pt-2 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveFolder("ALL");
-                    setSelectedFormat("ALL");
-                    setSelectedGroup("ALL");
-                    setSelectedStatus("ALL");
-                    setSearchQuery("");
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-800 dark:text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200 dark:border-[#3f3f46]"
-                >
-                  Reset All Filters
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStagedFiles([]);
-                    if (currentMinistryName) {
-                      setUploadMinistryGroup(currentMinistryName);
-                    }
-                    setIsUploadDrawerOpen(true);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-600/20"
-                >
-                  Upload New File
-                </button>
-              </div>
-            </div>
+          ) : (
+            <div className="space-y-4">
+
+              {filteredUploads.length === 0 ? (
+                <div className="bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-12 text-center shadow-2xs space-y-4 transition-colors">
+                  <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-[#27272a] text-slate-400 dark:text-zinc-500 flex items-center justify-center mx-auto">
+                    <FolderOpen size={32} />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">No documents found in this directory</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto">
+                      {searchQuery 
+                        ? `No files match your search query "${searchQuery}". Try clearing filters.` 
+                        : currentMinistryName 
+                          ? `There are currently no uploaded documents or receipts for the "${currentMinistryName}" ministry.`
+                          : "There are currently no uploaded documents matching the selected criteria."}
+                    </p>
+                  </div>
+                  <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
+                    {currentMinistryName && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveFolder("MINISTRY_ALL")}
+                        className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold transition-all cursor-pointer border border-indigo-200 dark:border-indigo-800/80 flex items-center gap-2 shadow-2xs group"
+                      >
+                        <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
+                        <span>Back to Folders</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveFolder("ALL");
+                        setSelectedFormat("ALL");
+                        setSelectedGroup("ALL");
+                        setSelectedStatus("ALL");
+                        setSearchQuery("");
+                      }}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-800 dark:text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200 dark:border-[#3f3f46]"
+                    >
+                      Reset All Filters
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStagedFiles([]);
+                        if (currentMinistryName) {
+                          setUploadMinistryGroup(currentMinistryName);
+                        }
+                        setIsUploadDrawerOpen(true);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-600/20"
+                    >
+                      Upload New File
+                    </button>
+                  </div>
+                </div>
           ) : viewMode === "grid" ? (
             /* 1. GRID CARDS VIEW */
             <div className="space-y-4">
@@ -2616,7 +2626,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             })()
           )}
         </div>
-      </div>
+      )}
+    </div>
+  </div>
 
       {/* Projection Modal */}
       {isProjectionOpen && projectionItemsList.length > 0 && (

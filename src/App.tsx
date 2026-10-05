@@ -347,7 +347,7 @@ function AppContent() {
   }, [isDoNotDisturb]);
 
   const getPasswordStrength = (password: string) => {
-    if (!password) return { label: "", color: "bg-slate-200" };
+    if (!password) return { label: "", color: "bg-slate-200 dark:bg-slate-700" };
     if (password.length < 6) return { label: "Weak", color: "bg-rose-500" };
     if (password.length < 10) return { label: "Medium", color: "bg-amber-500" };
     return { label: "Strong", color: "bg-emerald-500" };
@@ -1291,17 +1291,23 @@ function AppContent() {
 
   if (window.opener && window.opener !== window) {
     return (
-      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white p-6 text-center">
+      <div className={cn(
+        "min-h-screen flex flex-col items-center justify-center p-6 text-center transition-colors",
+        darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900"
+      )}>
         <Loader2 className="animate-spin text-primary mb-4" size={48} />
-        <h1 className="text-xl font-bold mb-2">Completing Authentication...</h1>
-        <p className="text-zinc-400 text-sm">Please wait while we log you in. This window should close automatically.</p>
+        <h1 className="text-xl font-bold mb-2">Authenticating...</h1>
+        <p className={cn("text-sm", darkMode ? "text-zinc-400" : "text-slate-500")}>Please wait while we log you in</p>
       </div>
     );
   }
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white">
+      <div className={cn(
+        "min-h-screen flex flex-col items-center justify-center transition-colors",
+        darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900"
+      )}>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1309,7 +1315,7 @@ function AppContent() {
         >
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
           <h2 className="text-xl font-black uppercase tracking-widest text-primary/80">STANDS FINANCE</h2>
-          <p className="text-zinc-400 text-[10px] mt-2 font-mono tracking-tighter uppercase">Logging in.</p>
+          <p className={cn("text-[10px] mt-2 font-mono tracking-tighter uppercase", darkMode ? "text-zinc-400" : "text-slate-500")}>Logging in.</p>
         </motion.div>
       </div>
     );
@@ -1317,15 +1323,18 @@ function AppContent() {
 
   if (isLoggingOut) {
     return (
-      <div className="min-h-screen bg-[#121214] flex flex-col items-center justify-center text-white">
+      <div className={cn(
+        "min-h-screen flex flex-col items-center justify-center transition-colors",
+        darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900"
+      )}>
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
           <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-xl font-black uppercase tracking-widest">Logging Out...</h2>
-          <p className="text-zinc-400 text-xs mt-2">You are now about to logout.</p>
+          <h2 className={cn("text-xl font-black uppercase tracking-widest", darkMode ? "text-white" : "text-slate-900")}>Logging Out...</h2>
+          <p className={cn("text-xs mt-2", darkMode ? "text-zinc-400" : "text-slate-500")}>You are now about to logout.</p>
         </motion.div>
       </div>
     );
@@ -1333,17 +1342,53 @@ function AppContent() {
 
   if (!currentUser) {
     return (
-      <div className="h-[100vh] w-[100vw] bg-[#121214] flex items-center justify-center sm:p-6 relative overflow-hidden">
+      <div className={cn(
+        "h-[100vh] w-[100vw] flex items-center justify-center sm:p-6 relative overflow-hidden transition-colors",
+        darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900"
+      )}>
+        {/* Top-Right Theme Mode Toggle Button */}
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            type="button"
+            onClick={() => handleToggleTheme()}
+            id="login-theme-toggle"
+            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className={cn(
+              "flex items-center justify-center w-10 h-10 rounded-full border transition-all cursor-pointer shadow-md active:scale-95",
+              darkMode
+                ? "bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-200"
+                : "bg-white/90 hover:bg-slate-100 border-slate-200 text-slate-700 shadow-slate-200/50"
+            )}
+          >
+            {darkMode ? (
+              <Sun size={17} className="text-amber-400 stroke-[2]" />
+            ) : (
+              <Moon size={17} className="text-slate-700 stroke-[2]" />
+            )}
+          </button>
+        </div>
+
         {/* Ambient background effects */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,#27272a_0%,transparent_50%)] opacity-30" />
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px]" />
-        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px]" />
+        <div className={cn(
+          "absolute top-0 left-0 w-full h-full pointer-events-none transition-opacity",
+          darkMode
+            ? "bg-[radial-gradient(circle_at_50%_50%,#27272a_0%,transparent_50%)] opacity-30"
+            : "bg-[radial-gradient(circle_at_50%_50%,#cbd5e1_0%,transparent_50%)] opacity-50"
+        )} />
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
 
         {/* CSS grid background pattern tilted 30 degrees with radial mask */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none [mask-image:radial-gradient(ellipse_90%_90%_at_50%_50%,#000_50%,transparent_100%)]">
           <div 
-            className="absolute w-[200%] h-[200%] -top-[50%] -left-[50%] bg-[linear-gradient(to_right,rgba(113,113,122,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(113,113,122,0.18)_1px,transparent_1px)] bg-[size:4rem_4rem]"
-            style={{ transform: "rotate(30deg)" }}
+            className={cn(
+              "absolute w-[200%] h-[200%] -top-[50%] -left-[50%]",
+              darkMode
+                ? "bg-[linear-gradient(to_right,rgba(113,113,122,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(113,113,122,0.18)_1px,transparent_1px)]"
+                : "bg-[linear-gradient(to_right,rgba(148,163,184,0.22)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.22)_1px,transparent_1px)]"
+            )}
+            style={{ transform: "rotate(30deg)", backgroundSize: "4rem 4rem" }}
           />
         </div>
 
@@ -1355,11 +1400,16 @@ function AppContent() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-2.5 bg-[#18181b]/95 text-white border border-sky-500/50 shadow-2xl rounded-full backdrop-blur-md text-xs font-semibold ring-1 ring-sky-500/20 pointer-events-none"
+              className={cn(
+                "fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-2.5 shadow-2xl rounded-full backdrop-blur-md text-xs font-semibold ring-1 pointer-events-none",
+                darkMode
+                  ? "bg-[#18181b]/95 text-white border border-sky-500/50 ring-sky-500/20"
+                  : "bg-white/95 text-slate-900 border border-sky-300 ring-sky-200"
+              )}
             >
-              <Loader2 className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
-              <span className="text-zinc-100 font-medium">{dbSavingMessage || "Updating database..."}</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              <Loader2 className="w-4 h-4 text-sky-500 animate-spin shrink-0" />
+              <span className={darkMode ? "text-zinc-100 font-medium" : "text-slate-800 font-medium"}>{dbSavingMessage || "Updating database..."}</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30">
                 Syncing
               </span>
             </motion.div>
@@ -1369,22 +1419,27 @@ function AppContent() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full sm:max-w-md min-h-screen sm:min-h-0 bg-[#18181b] border-x-0 sm:border border-[#27272a] rounded-none sm:rounded-[2.5rem] shadow-2xl p-6 sm:p-12 space-y-6 sm:space-y-8 relative z-10 flex flex-col justify-center no-scrollbar"
+          className={cn(
+            "w-full sm:max-w-md min-h-screen sm:min-h-0 border-x-0 sm:border rounded-none sm:rounded-[2.5rem] p-6 sm:p-12 space-y-6 sm:space-y-8 relative z-10 flex flex-col justify-center no-scrollbar transition-colors",
+            darkMode
+              ? "bg-[#18181b] border-[#27272a] shadow-2xl"
+              : "bg-white border-slate-200 shadow-xl shadow-slate-200/80"
+          )}
         >
           <div className="text-center space-y-4">
             {systemSettings.isSystemOffline && (
-              <div className="p-4 bg-rose-950/40 border border-rose-800/40 rounded-2xl text-left space-y-1.5 mb-2 animate-in slide-in-from-top duration-300">
-                <div className="flex items-center gap-2 text-rose-400 font-bold text-[10px] uppercase tracking-wider">
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/40 rounded-2xl text-left space-y-1.5 mb-2 animate-in slide-in-from-top duration-300">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-[10px] uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse shrink-0" />
-                  <span className="text-rose-400 font-extrabold">Emergency Bypass Active</span>
+                  <span className="font-extrabold">Emergency Bypass Active</span>
                 </div>
-                <p className="text-[10px] text-zinc-300 leading-normal font-semibold">
+                <p className="text-[10px] text-slate-700 dark:text-zinc-300 leading-normal font-semibold">
                   The system is currently <strong>Offline</strong>. Your Admin is working to restore.
                 </p>
                 <button
                   type="button"
                   onClick={() => setAdminBypass(false)}
-                  className="text-[9px] font-black text-rose-400 hover:text-rose-350 uppercase tracking-widest mt-1 underline transition-all cursor-pointer"
+                  className="text-[9px] font-black text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 uppercase tracking-widest mt-1 underline transition-all cursor-pointer"
                 >
                   ← Back
                 </button>
@@ -1392,27 +1447,37 @@ function AppContent() {
             )}
 
             {pendingInvite && (
-              <div className="p-4 bg-sky-950/40 border border-sky-800/40 rounded-2xl text-left space-y-1.5 mb-2 animate-in slide-in-from-top duration-300">
-                <div className="flex items-center gap-2 text-sky-400 font-bold text-[10px] uppercase tracking-wider">
-                  <Mail size={13} className="text-sky-400" />
-                  <span className="text-sky-450 font-black">Invitation Active</span>
+              <div className="p-4 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/40 rounded-2xl text-left space-y-1.5 mb-2 animate-in slide-in-from-top duration-300">
+                <div className="flex items-center gap-2 text-sky-600 dark:text-sky-400 font-bold text-[10px] uppercase tracking-wider">
+                  <Mail size={13} className="text-sky-600 dark:text-sky-400" />
+                  <span className="font-black">Invitation Active</span>
                 </div>
-                <p className="text-[10px] text-zinc-300 leading-relaxed font-semibold">
-                  Logging in via Google as <strong className="text-white font-extrabold">{pendingInvite.email}</strong> will claim your pre-approved privilege as <strong className="text-white font-extrabold">{pendingInvite.role?.replace("_", " ")}</strong> representing <strong className="text-white font-extrabold">{pendingInvite.group || "St Andrews Admin"}</strong>.
+                <p className="text-[10px] text-slate-700 dark:text-zinc-300 leading-relaxed font-semibold">
+                  Logging in via Google as <strong className="text-slate-900 dark:text-white font-extrabold">{pendingInvite.email}</strong> will claim your pre-approved privilege as <strong className="text-slate-900 dark:text-white font-extrabold">{pendingInvite.role?.replace("_", " ")}</strong> representing <strong className="text-slate-900 dark:text-white font-extrabold">{pendingInvite.group || "St Andrews Admin"}</strong>.
                 </p>
               </div>
             )}
 
             <div className="relative inline-block">
-              <div className="w-16 h-16 bg-[#27272a]/80 rounded-2xl flex items-center justify-center border border-[#3f3f46]/50 backdrop-blur-sm p-2 shadow-xl">
+              <div className={cn(
+                "w-16 h-16 rounded-2xl flex items-center justify-center border backdrop-blur-sm p-2 shadow-xl transition-colors",
+                darkMode
+                  ? "bg-[#27272a]/80 border-[#3f3f46]/50"
+                  : "bg-slate-100 border-slate-200 shadow-slate-200/60"
+              )}>
                 <img src="/pcea.svg" alt="PCEA Logo" className="w-full h-full object-contain" />
               </div>
-              
             </div>
             
             <div className="space-y-1">
-              <h1 className="text-2xl font-black text-white uppercase tracking-tighter">STANDS FINANCE</h1>
-              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-[0.25em]">E-Requisition</p>
+              <h1 className={cn(
+                "text-2xl font-black uppercase tracking-tighter transition-colors",
+                darkMode ? "text-white" : "text-slate-900"
+              )}>STANDS FINANCE</h1>
+              <p className={cn(
+                "text-[10px] font-bold uppercase tracking-[0.25em] transition-colors",
+                darkMode ? "text-zinc-400" : "text-slate-500"
+              )}>E-Requisition</p>
             </div>
           </div>
 
@@ -1421,7 +1486,8 @@ function AppContent() {
               type="button"
               onClick={handleGoogleLogin}
               disabled={isSubmitting}
-              className="w-full py-4 bg-white dark:bg-white hover:bg-slate-100 dark:hover:bg-slate-100 text-black dark:text-black rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all transform active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl border border-slate-200 dark:border-slate-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="google-btn w-full py-4 !bg-white hover:!bg-slate-100 !text-black dark:!bg-white dark:hover:!bg-slate-100 dark:!text-black rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all transform active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl !border !border-slate-200 dark:!border-slate-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: "#ffffff", color: "#000000" }}
             >
               <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -1429,19 +1495,25 @@ function AppContent() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
-              <span>Sign In With Google</span>
+              <span className="!text-black dark:!text-black font-black" style={{ color: "#000000" }}>Sign In With Google</span>
             </button>
 
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-full border-t border-[#27272a]" />
-              <span className="relative px-4 bg-[#18181b] text-zinc-400 text-[9px] font-bold uppercase tracking-widest">Or Login Via Email</span>
+              <div className={cn(
+                "absolute w-full border-t transition-colors",
+                darkMode ? "border-[#27272a]" : "border-slate-200"
+              )} />
+              <span className={cn(
+                "relative px-4 text-[9px] font-bold uppercase tracking-widest transition-colors",
+                darkMode ? "bg-[#18181b] text-zinc-400" : "bg-white text-slate-500"
+              )}>Or Login Via Email</span>
             </div>
 
             <form ref={loginFormRef} autoComplete="off" className="space-y-4" onSubmit={handleEmailAuth}>
               <div className="space-y-4">
                 {authMode === "EMAIL_SIGNUP" && (
                   <div className="relative">
-                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                    <UserCircle className={cn("absolute left-4 top-1/2 -translate-y-1/2", darkMode ? "text-zinc-400" : "text-slate-400")} size={16} />
                     <input 
                       type="text"
                       name="name"
@@ -1449,13 +1521,18 @@ function AppContent() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600"
+                      className={cn(
+                        "w-full rounded-xl pl-12 pr-5 py-3 text-xs font-bold outline-none transition-all border",
+                        darkMode 
+                          ? "bg-[#121214] border-[#27272a] text-white placeholder:text-zinc-600 focus:border-primary/50" 
+                          : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:bg-white"
+                      )}
                       placeholder="Full Name"
                     />
                   </div>
                 )}
                 <div className="relative">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                  <Mail className={cn("absolute left-4 top-1/2 -translate-y-1/2", darkMode ? "text-zinc-400" : "text-slate-400")} size={16} />
                   <input 
                     type="email"
                     name="email"
@@ -1463,7 +1540,12 @@ function AppContent() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-12 pr-5 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600"
+                    className={cn(
+                      "w-full rounded-xl pl-12 pr-5 py-3 text-xs font-bold outline-none transition-all border",
+                      darkMode 
+                        ? "bg-[#121214] border-[#27272a] text-white placeholder:text-zinc-600 focus:border-primary/50" 
+                        : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:bg-white"
+                    )}
                     placeholder="name@church.org"
                   />
                 </div>
@@ -1476,13 +1558,21 @@ function AppContent() {
                     maxLength={15}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#121214] border border-[#27272a] rounded-xl pl-5 pr-12 py-3 text-white text-xs font-bold focus:border-primary/50 outline-none transition-all placeholder:text-zinc-600 font-mono"
+                    className={cn(
+                      "w-full rounded-xl pl-5 pr-12 py-3 text-xs font-bold outline-none transition-all border font-mono",
+                      darkMode 
+                        ? "bg-[#121214] border-[#27272a] text-white placeholder:text-zinc-600 focus:border-primary/50" 
+                        : "bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-primary focus:bg-white"
+                    )}
                     placeholder="••••••••"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 hover:scale-105 active:scale-95 transition-all focus:outline-none flex items-center justify-center p-1"
+                    className={cn(
+                      "absolute right-4 top-1/2 -translate-y-1/2 hover:scale-105 active:scale-95 transition-all focus:outline-none flex items-center justify-center p-1",
+                      darkMode ? "text-zinc-400 hover:text-zinc-200" : "text-slate-400 hover:text-slate-600"
+                    )}
                     title={showPassword ? "Hide Password" : "Show Password"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1491,17 +1581,20 @@ function AppContent() {
               </div>
 
               {isSubmitting && (
-                  <div className="absolute inset-0 bg-[#18181b]/95 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl">
+                  <div className={cn(
+                    "absolute inset-0 backdrop-blur-sm z-50 flex items-center justify-center rounded-2xl",
+                    darkMode ? "bg-[#18181b]/95 text-zinc-200" : "bg-white/95 text-slate-800"
+                  )}>
                     <div className="flex flex-col items-center gap-2">
                        <Loader2 className="animate-spin text-primary" size={32} />
-                       <span className="text-xs font-bold text-zinc-200 uppercase tracking-widest">Authenticating...</span>
+                       <span className={cn("text-xs font-bold uppercase tracking-widest", darkMode ? "text-zinc-200" : "text-slate-800")}>Authenticating...</span>
                     </div>
                   </div>
               )}
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl transition-all font-black text-xs shadow-xl shadow-primary/20 flex items-center justify-center gap-2 mt-4"
+                className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl transition-all font-black text-xs shadow-xl shadow-primary/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
               >
                 {isSubmitting ? "Processing..." : authMode === "EMAIL_LOGIN" ? "Login" : "Request Activation"}
               </button>
@@ -1510,7 +1603,7 @@ function AppContent() {
                 <button 
                   type="button"
                   onClick={() => setAuthMode(authMode === "EMAIL_SIGNUP" ? "EMAIL_LOGIN" : "EMAIL_SIGNUP")}
-                  className="w-full py-2 text-primary hover:text-primary/80 font-black text-[9px] uppercase tracking-widest transition-colors"
+                  className="w-full py-2 text-primary hover:text-primary/80 font-black text-[9px] uppercase tracking-widest transition-colors cursor-pointer"
                 >
                   {authMode === "EMAIL_SIGNUP" ? "Already have access? Login" : "Don't Have An Account? Signup Here"}
                 </button>
@@ -1518,14 +1611,14 @@ function AppContent() {
             </form>
           </div>
 
-          <div className="pt-6 border-t border-[#27272a] flex justify-center gap-6">
+          <div className={cn("pt-6 border-t flex justify-center gap-6 transition-colors", darkMode ? "border-[#27272a]" : "border-slate-200")}>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Active</span>
+              <span className={cn("text-[8px] font-black uppercase tracking-widest", darkMode ? "text-zinc-500" : "text-slate-500")}>Active</span>
             </div>
             <div className="flex items-center gap-2">
-              <Lock size={10} className="text-zinc-500" />
-              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Secure</span>
+              <Lock size={10} className={darkMode ? "text-zinc-500" : "text-slate-500"} />
+              <span className={cn("text-[8px] font-black uppercase tracking-widest", darkMode ? "text-zinc-500" : "text-slate-500")}>Secure</span>
             </div>
           </div>
         </motion.div>
@@ -1552,44 +1645,77 @@ function AppContent() {
   // System Offline Shield
   if (systemSettings.isSystemOffline && !adminBypass) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-100 p-6 relative overflow-hidden">
+      <div className={cn(
+        "min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors",
+        darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
+      )}>
         {/* Ambient warm warning backgrounds */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_45%,#991b1b,transparent_60%)] opacity-20 pointer-events-none" />
+        <div className={cn(
+          "absolute top-0 left-0 w-full h-full pointer-events-none transition-opacity",
+          darkMode 
+            ? "bg-[radial-gradient(circle_at_50%_45%,#991b1b,transparent_60%)] opacity-20" 
+            : "bg-[radial-gradient(circle_at_50%_45%,#fecdd3,transparent_60%)] opacity-40"
+        )} />
 
         <div className="relative z-10 max-w-md w-full text-center space-y-6 animate-in fade-in zoom-in-95 duration-500">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="w-24 h-24 bg-rose-950/50 border border-rose-800/40 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl animate-pulse"
+            className={cn(
+              "w-24 h-24 rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl animate-pulse border",
+              darkMode ? "bg-rose-950/50 border-rose-800/40 text-rose-500" : "bg-rose-50 border-rose-200 text-rose-600 shadow-rose-200/50"
+            )}
           >
             <Lock size={48} className="text-rose-500" />
           </motion.div>
 
           <div className="space-y-2">
-            <h1 className="text-3xl font-black uppercase tracking-tighter text-white">System Offline</h1>
+            <h1 className={cn(
+              "text-3xl font-black uppercase tracking-tighter transition-colors",
+              darkMode ? "text-white" : "text-slate-900"
+            )}>System Offline</h1>
             <p className="text-rose-500/85 text-[10px] font-black uppercase tracking-[0.25em]">Critical Sudo Maintenance</p>
           </div>
 
-          <p className="text-slate-400 text-xs font-semibold leading-relaxed max-w-sm mx-auto">
+          <p className={cn(
+            "text-xs font-semibold leading-relaxed max-w-sm mx-auto transition-colors",
+            darkMode ? "text-slate-400" : "text-slate-600"
+          )}>
             The St Andrews E-REQUISITIONS portal is currently offline for scheduled maintenance or emergency configuration. Please check back later.
           </p>
 
-          <div className="pt-6 border-t border-slate-800/60 flex flex-col items-center gap-4 w-full text-center">
+          <div className={cn(
+            "pt-6 border-t flex flex-col items-center gap-4 w-full text-center transition-colors",
+            darkMode ? "border-slate-800/60" : "border-slate-200"
+          )}>
             {currentUser?.role === UserRole.SUPER_ADMIN ? (
               <>
-                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                <p className={cn(
+                  "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border",
+                  darkMode 
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
+                    : "text-emerald-700 bg-emerald-50 border-emerald-200"
+                )}>
                   Authenticated Super Admin
                 </p>
                 <button
                   onClick={() => setAdminBypass(true)}
-                  className="w-full py-3 bg-white text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                  className={cn(
+                    "w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer",
+                    darkMode 
+                      ? "bg-white hover:bg-slate-100 text-slate-950" 
+                      : "bg-slate-900 hover:bg-slate-800 text-white"
+                  )}
                 >
                   <ShieldCheck size={14} />
                   Restore Sudo Control
                 </button>
               </>
             ) : (
-              <span className="text-[9px] text-slate-600 font-black uppercase tracking-widest flex items-center justify-center gap-1.5">
+              <span className={cn(
+                "text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5",
+                darkMode ? "text-slate-400" : "text-slate-600"
+              )}>
                 <Clock size={12} />
                 Maintenance Mode Active
               </span>
@@ -1597,7 +1723,10 @@ function AppContent() {
 
             <button
               onClick={handleLogout}
-              className="text-[9px] text-slate-500 hover:text-white uppercase tracking-widest font-black transition-colors mt-2"
+              className={cn(
+                "text-[9px] uppercase tracking-widest font-black transition-colors mt-2 cursor-pointer",
+                darkMode ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
+              )}
             >
               Sign Out
             </button>
@@ -1611,7 +1740,7 @@ function AppContent() {
   if ((!currentUser.isApproved && currentUser.role !== UserRole.SUPER_ADMIN) || currentUser.isSuspended) {
     return (
       <>
-        <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-mono text-sm">Loading security verification...</div>}>
+        <Suspense fallback={<div className={cn("min-h-screen flex items-center justify-center font-mono text-sm", darkMode ? "bg-[#121214] text-white" : "bg-slate-50 text-slate-900")}>Loading security verification...</div>}>
           <WaitingRoom user={currentUser} onLogout={handleLogout} />
         </Suspense>
         {/* Real-time Toast Notifications */}
@@ -2021,14 +2150,14 @@ function AppContent() {
           </div>
 
           <div className="w-full bg-slate-50/50 dark:bg-slate-900/40 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 p-5 text-left font-mono text-xs space-y-3 max-w-md mx-auto shadow-inner">
-            <div className="flex justify-between items-center text-slate-400">
+            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
               <span className="font-bold text-[9px] uppercase tracking-wider">TARGET REQUISITION:</span>
               <span className="font-bold text-slate-700 dark:text-slate-300">#{accessDeniedReq.id}</span>
             </div>
             {accessDeniedReq.title && (
               <div className="flex justify-between items-start text-slate-500 dark:text-slate-400">
                 <span className="shrink-0 font-bold text-[9px] uppercase tracking-wider">TITLE:</span>
-                <span className="font-bold text-right text-slate-850 dark:text-slate-200 truncate max-w-[200px]">{accessDeniedReq.title}</span>
+                <span className="font-bold text-right text-slate-900 dark:text-slate-200 truncate max-w-[200px]">{accessDeniedReq.title}</span>
               </div>
             )}
             {accessDeniedReq.groupName && (
@@ -2043,7 +2172,7 @@ function AppContent() {
               <span>YOUR METRIC EMAIL:</span>
               <span className="font-bold text-blue-500 dark:text-blue-400">{currentUser?.email}</span>
             </div>
-            <div className="flex justify-between items-center text-slate-550 dark:text-slate-400 text-[10px]">
+            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400 text-[10px]">
               <span>YOUR METRIC ROLE:</span>
               <span className="font-extrabold text-indigo-500 dark:text-indigo-400 uppercase">{currentUser?.role}</span>
             </div>
@@ -2061,7 +2190,7 @@ function AppContent() {
                 setTargetReqId(null);
                 setCurrentView("dashboard");
               }}
-              className="flex-1 px-8 py-3 bg-gradient-to-r from-primary to-indigo-650 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:opacity-95 active:scale-95 transition-all shadow-md cursor-pointer"
+              className="flex-1 px-8 py-3 bg-gradient-to-r from-primary to-indigo-600 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:opacity-95 active:scale-95 transition-all shadow-md cursor-pointer"
             >
               Back to Dashboard
             </button>
@@ -2220,23 +2349,23 @@ function AppContent() {
                   <div className="space-y-3">
                     {/* Current Password */}
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                         <Lock size={12} /> Current Password
                       </label>
                       <div className="relative">
-                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400" />
+                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400 dark:text-slate-500" />
                         <input
                           type={showCurrentPassword ? "text" : "password"}
                           required
                           placeholder="••••••••"
                           value={currentPassword}
                           onChange={(e) => setCurrentPassword(e.target.value)}
-                          className="w-full pl-9 pr-10 py-3 bg-background border border-border rounded-xl text-xs font-bold focus:border-primary focus:outline-none transition-colors"
+                          className="w-full pl-9 pr-10 py-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:border-primary focus:outline-none transition-colors"
                         />
                         <button
                           type="button"
                           onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                         >
                           {showCurrentPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -2245,23 +2374,23 @@ function AppContent() {
 
                     {/* New Password Input */}
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                         <Lock size={12} /> New Password
                       </label>
                       <div className="relative">
-                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400" />
+                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400 dark:text-slate-500" />
                         <input
                           type={showNewPassword ? "text" : "password"}
                           required
                           placeholder="••••••••"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full pl-9 pr-10 py-3 bg-background border border-border rounded-xl text-xs font-bold focus:border-primary focus:outline-none transition-colors"
+                          className="w-full pl-9 pr-10 py-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:border-primary focus:outline-none transition-colors"
                         />
                         <button
                           type="button"
                           onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                         >
                           {showNewPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -2269,25 +2398,25 @@ function AppContent() {
                       {newPassword && (
                         <div className="flex items-center gap-2 mt-1">
                           <div className={`h-1 w-12 rounded-full ${getPasswordStrength(newPassword).color}`} />
-                          <span className="text-[9px] font-bold text-slate-500 uppercase">{getPasswordStrength(newPassword).label}</span>
+                          <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">{getPasswordStrength(newPassword).label}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Confirm Password Input */}
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">
                         <Lock size={12} /> Confirm New Password
                       </label>
                       <div className="relative">
-                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400" />
+                        <Lock size={14} className="absolute left-3 top-3.5 text-slate-400 dark:text-slate-500" />
                         <input
                           type={showConfirmPassword ? "text" : "password"}
                           required
                           placeholder="••••••••"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full pl-9 pr-16 py-3 bg-background border border-border rounded-xl text-xs font-bold focus:border-primary focus:outline-none transition-colors"
+                          className="w-full pl-9 pr-16 py-3 bg-background border border-border rounded-xl text-xs font-bold text-foreground focus:border-primary focus:outline-none transition-colors"
                         />
                         {confirmPassword && (
                           <div className="absolute right-10 top-3.5 flex items-center justify-center pointer-events-none">
@@ -2301,7 +2430,7 @@ function AppContent() {
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600"
+                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                         >
                           {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -2589,7 +2718,7 @@ function AppContent() {
                     await updateSystemSettings({ isSystemOffline: false });
                   }
                 }}
-                className="bg-white hover:bg-slate-100 text-rose-600 px-3 py-1 rounded-lg text-[9px] font-black cursor-pointer transition-colors shrink-0"
+                className="bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-rose-600 dark:text-rose-400 px-3 py-1 rounded-lg text-[9px] font-black cursor-pointer transition-colors shrink-0 border border-transparent dark:border-rose-900/50"
               >
                 Restore System Access
               </button>
@@ -2696,7 +2825,7 @@ function AppContent() {
 
                     {/* Date Range Selection */}
                     <div className="space-y-1.5 text-left">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Date Range</label>
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block font-sans">Date Range</label>
                       <select
                         value={advancedDateRangePreset}
                         onChange={(e) => setAdvancedDateRangePreset(e.target.value as any)}
@@ -2711,7 +2840,7 @@ function AppContent() {
                       {advancedDateRangePreset === "CUSTOM" && (
                         <div className="grid grid-cols-2 gap-2 mt-1.5 animate-in fade-in slide-in-from-top-1">
                           <div className="space-y-0.5">
-                            <label className="text-[8px] font-black text-slate-450 uppercase block font-sans">Start Date</label>
+                            <label className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase block font-sans">Start Date</label>
                             <input
                               type="date"
                               value={advancedCustomStartDate}
@@ -2720,7 +2849,7 @@ function AppContent() {
                             />
                           </div>
                           <div className="space-y-0.5">
-                            <label className="text-[8px] font-black text-slate-450 uppercase block font-sans">End Date</label>
+                            <label className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase block font-sans">End Date</label>
                             <input
                               type="date"
                               value={advancedCustomEndDate}
@@ -2734,7 +2863,7 @@ function AppContent() {
 
                     {/* Budget Line Selection */}
                     <div className="space-y-1.5 text-left">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Budget Line / Ministry Group</label>
+                      <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest block font-sans">Budget Line / Ministry Group</label>
                       <select
                         value={advancedBudgetLine}
                         onChange={(e) => setAdvancedBudgetLine(e.target.value)}
@@ -2801,7 +2930,7 @@ function AppContent() {
                                 </div>
                                 <button
                                   onClick={(e) => removeRecentSearch(term, e)}
-                                  className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-850 rounded p-1 transition-all cursor-pointer bg-transparent border-none"
+                                  className="text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded p-1 transition-all cursor-pointer bg-transparent border-none"
                                   title="Remove search from history"
                                 >
                                   <X size={12} />
@@ -2811,7 +2940,7 @@ function AppContent() {
                           </div>
                         </div>
                       ) : (
-                        <div className="p-3 text-center text-[10px] uppercase font-black tracking-widest text-slate-400">
+                        <div className="p-3 text-center text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500">
                           Type to search church groups or requisitions...
                         </div>
                       )
@@ -2820,7 +2949,7 @@ function AppContent() {
                         {/* Budget Categories section */}
                         {autocompleteSuggestions.groups.length > 0 && (
                           <div className="space-y-1">
-                            <div className="px-2 py-1 text-[9px] font-extrabold text-indigo-505 uppercase tracking-wider">
+                            <div className="px-2 py-1 text-[9px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                               Budget Categories (Ministries)
                             </div>
                             {autocompleteSuggestions.groups.map((group) => (
@@ -2838,9 +2967,9 @@ function AppContent() {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="text-sm">💒</span>
                                   <div className="min-w-0">
-                                    <p className="text-xs font-bold text-slate-850 dark:text-slate-20 truncate">{group.name}</p>
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{group.name}</p>
                                     {group.description && (
-                                      <p className="text-[10px] text-slate-400 truncate font-medium">{group.description}</p>
+                                      <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-medium">{group.description}</p>
                                     )}
                                   </div>
                                 </div>
@@ -2855,7 +2984,7 @@ function AppContent() {
                         {/* Project Lines section */}
                         {autocompleteSuggestions.projects.length > 0 && (
                           <div className="space-y-1 pt-1 border-t border-border/40">
-                            <div className="px-2 py-1 text-[9px] font-extrabold text-emerald-500 uppercase tracking-wider">
+                            <div className="px-2 py-1 text-[9px] font-extrabold text-emerald-500 dark:text-emerald-400 uppercase tracking-wider">
                               Project Allocation Lines
                             </div>
                             {autocompleteSuggestions.projects.map((proj) => (
@@ -2874,7 +3003,7 @@ function AppContent() {
                                   <span className="text-sm">📁</span>
                                   <div className="min-w-0">
                                     <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{proj.name}</p>
-                                    <p className="text-[10px] text-slate-400 font-medium font-mono">
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium font-mono">
                                       FY {proj.fiscalYear || systemSettings.currentFiscalYear} • Budget: KES {proj.allocatedBudget.toLocaleString()}
                                     </p>
                                   </div>
@@ -2889,8 +3018,8 @@ function AppContent() {
 
                         {autocompleteSuggestions.groups.length === 0 && autocompleteSuggestions.projects.length === 0 && (
                           <div className="p-4 text-center space-y-1">
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-extrabold">No matching suggestions</p>
-                            <p className="text-[9px] text-slate-400 italic font-medium">Press Enter to search requisitions instead</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-extrabold">No matching suggestions</p>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 italic font-medium">Press Enter to search requisitions instead</p>
                           </div>
                         )}
                       </div>
@@ -2929,10 +3058,10 @@ function AppContent() {
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-tight transition-all shadow-xs",
                   (currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN)
                     ? "bg-white dark:bg-slate-900 text-primary dark:text-blue-400 border-slate-200 dark:border-slate-800 hover:border-primary/40 hover:bg-primary/5 cursor-pointer"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400"
                 )}
               >
-                <Calendar size={12} className={(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) ? "text-primary dark:text-blue-400" : "text-slate-400"} />
+                <Calendar size={12} className={(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) ? "text-primary dark:text-blue-400" : "text-slate-400 dark:text-slate-500"} />
                 <span>FY {systemSettings.currentFiscalYear}</span>
                 {(currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN) && <ChevronDown size={10} className="opacity-70" />}
               </button>
@@ -3044,7 +3173,7 @@ function AppContent() {
                 className={cn(
                   "w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 relative cursor-pointer border",
                   darkMode
-                    ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-850 shadow-black/40"
+                    ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 shadow-black/40"
                     : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-slate-100/80 shadow-md"
                 )}
               >
@@ -3073,7 +3202,7 @@ function AppContent() {
                     {/* Header */}
                     <div className={cn(
                       "px-5 py-4 border-b flex flex-col gap-2.5",
-                      darkMode ? "border-slate-850 bg-slate-900/50" : "border-slate-100 bg-white"
+                      darkMode ? "border-slate-800 bg-slate-900/50" : "border-slate-100 bg-white"
                     )}>
                       <div className="flex items-center justify-between">
                         <span className={cn(
@@ -3223,10 +3352,10 @@ function AppContent() {
                                 "p-4 transition-all flex items-start relative group cursor-pointer select-none",
                                 isItemUnread
                                   ? darkMode 
-                                    ? "bg-slate-900/60 hover:bg-slate-850" 
+                                    ? "bg-slate-900/60 hover:bg-slate-800" 
                                     : "bg-white hover:bg-slate-50"
                                   : darkMode
-                                    ? "bg-slate-950/20 hover:bg-slate-850/80 opacity-60"
+                                    ? "bg-slate-950/20 hover:bg-slate-800/80 opacity-60"
                                     : "bg-slate-50/40 hover:bg-slate-50 opacity-65"
                               )}
                             >
@@ -3270,7 +3399,7 @@ function AppContent() {
                                   className={cn(
                                     "p-1.5 rounded-lg border transition-all cursor-pointer shadow-xs",
                                     darkMode
-                                      ? "bg-slate-800 border-slate-750 hover:bg-slate-700 text-slate-300"
+                                      ? "bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300"
                                       : "bg-white border-slate-200 hover:bg-slate-100 text-slate-500"
                                   )}
                                   title={isItemUnread ? "Mark as read" : "Mark as unread"}
@@ -3354,7 +3483,7 @@ function AppContent() {
                     className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden z-[60]"
                   >
                     <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">User Information</p>
+                      <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">User Information</p>
                       <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{currentUser.email}</p>
                     </div>
                     <div className="p-2">
@@ -3379,7 +3508,7 @@ function AppContent() {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                       >
-                        <KeyRound size={14} className="text-slate-400" />
+                        <KeyRound size={14} className="text-slate-400 dark:text-slate-500" />
                         UPDATE PASSWORD
                       </button>
                       <button
@@ -3389,7 +3518,7 @@ function AppContent() {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
                       >
-                        <HelpCircle size={14} className="text-slate-400" />
+                        <HelpCircle size={14} className="text-slate-400 dark:text-slate-500" />
                         HOW TO USE
                       </button>
 

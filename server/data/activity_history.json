@@ -64,5 +64,268 @@
     "action": "TEST",
     "details": "test",
     "document_id": "log_test"
+  },
+  {
+    "id": "log-1791215781208-u0bhhppvp",
+    "action": "STATUS_CHANGE",
+    "details": "Requisition 'Annual Youth Camp Transport & Catering Deposit' decision: APPROVE -> New Status: APPROVED_L1",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T15:56:21.208Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002",
+      "title": "Annual Youth Camp Transport & Catering Deposit",
+      "previousStatus": "SUBMITTED",
+      "newStatus": "APPROVED_L1",
+      "decision": "APPROVE",
+      "note": ""
+    },
+    "document_id": "log-1791215781208-u0bhhppvp"
+  },
+  {
+    "id": "log-1791215784613-z3peqv7yq",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Annual Youth Camp Transport & Catering Deposit'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T15:56:24.613Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002",
+      "alertId": "finance-l2-ready-req_2026_002"
+    },
+    "document_id": "log-1791215784613-z3peqv7yq"
+  },
+  {
+    "id": "log-1791215784776-ylc2mhnl4",
+    "action": "STATUS_CHANGE",
+    "details": "Requisition 'Annual Youth Camp Transport & Catering Deposit' decision: APPROVE -> New Status: APPROVED_L2",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T15:56:24.776Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002",
+      "title": "Annual Youth Camp Transport & Catering Deposit",
+      "previousStatus": "APPROVED_L1",
+      "newStatus": "APPROVED_L2",
+      "decision": "APPROVE",
+      "note": ""
+    },
+    "document_id": "log-1791215784776-ylc2mhnl4"
+  },
+  {
+    "id": "log-1791215795535-5dwt0dri0",
+    "action": "EMAIL_DISPATCH",
+    "details": "Email notification (APPROVED_L1) sent to <youth@standrews.org>: \"Alex Gichau has approved \"Annual Youth Camp Transport & Catering Deposit\" requisition (Level 1)\"",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T15:56:35.535Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "recipientEmail": "youth@standrews.org",
+      "recipientName": "Youth Leader",
+      "notificationEmails": [
+        "youth@standrews.org",
+        "thnchege@gmail.com",
+        "muthuripeterm9@gmail.com",
+        "aloysekioko@gmail.com",
+        "warididada.standsyouth@gmail.com",
+        "wmwangi507@gmail.com",
+        "gichaumburu@gmail.com",
+        "insights.financials@gmail.com"
+      ],
+      "requisitionId": "req_2026_002",
+      "requisitionTitle": "Annual Youth Camp Transport & Catering Deposit",
+      "subject": "Alex Gichau has approved \"Annual Youth Camp Transport & Catering Deposit\" requisition (Level 1)",
+      "status": "DELIVERED",
+      "workflowStatus": "APPROVED_L1",
+      "amount": 120000,
+      "simulated": false
+    },
+    "document_id": "log-1791215795535-5dwt0dri0"
+  },
+  {
+    "id": "log-1791215797373-mstx3u2c2",
+    "action": "EMAIL_DISPATCH",
+    "details": "Email notification (APPROVED_L2) sent to <youth@standrews.org>: \"Alex Gichau has approved \"Annual Youth Camp Transport & Catering Deposit\" requisition\"",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T15:56:37.373Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "recipientEmail": "youth@standrews.org",
+      "recipientName": "Youth Leader",
+      "notificationEmails": [
+        "youth@standrews.org",
+        "thnchege@gmail.com",
+        "muthuripeterm9@gmail.com",
+        "aloysekioko@gmail.com",
+        "warididada.standsyouth@gmail.com",
+        "wmwangi507@gmail.com",
+        "gichaumburu@gmail.com",
+        "insights.financials@gmail.com"
+      ],
+      "requisitionId": "req_2026_002",
+      "requisitionTitle": "Annual Youth Camp Transport & Catering Deposit",
+      "subject": "Alex Gichau has approved \"Annual Youth Camp Transport & Catering Deposit\" requisition",
+      "status": "DELIVERED",
+      "workflowStatus": "APPROVED_L2",
+      "amount": 120000,
+      "simulated": false
+    },
+    "document_id": "log-1791215797373-mstx3u2c2"
+  },
+  {
+    "id": "log-1791216218850-vmhj1xlrd",
+    "action": "USER_PROFILE_UPDATE",
+    "details": "Account profile details updated for Alex Gichau",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:03:38.850Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "userId": "v8M6WZQOA1aaxFP7DPRHna9NOOJ2",
+      "email": "gichaumburu@gmail.com",
+      "name": "Alex Gichau",
+      "updates": {
+        "theme": "light"
+      }
+    },
+    "document_id": "log-1791216218850-vmhj1xlrd"
+  },
+  {
+    "id": "log-1791216441874-6abjdx4zv",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Annual Youth Camp Transport & Catering Deposit'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:07:21.874Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002"
+    },
+    "document_id": "log-1791216441874-6abjdx4zv"
+  },
+  {
+    "id": "log-1791216679358-9po3f2v6f",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Annual Youth Camp Transport & Catering Deposit'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:11:19.358Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002"
+    },
+    "document_id": "log-1791216679358-9po3f2v6f"
+  },
+  {
+    "id": "log-1791217292254-5ovcf6epp",
+    "action": "USER_PROFILE_UPDATE",
+    "details": "Account profile details updated for Alex Gichau",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:21:32.254Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "userId": "v8M6WZQOA1aaxFP7DPRHna9NOOJ2",
+      "email": "gichaumburu@gmail.com",
+      "name": "Alex Gichau",
+      "updates": {
+        "theme": "dark"
+      }
+    },
+    "document_id": "log-1791217292254-5ovcf6epp"
+  },
+  {
+    "id": "log-1791217295526-dheinmph9",
+    "action": "USER_PROFILE_UPDATE",
+    "details": "Account profile details updated for Alex Gichau",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:21:35.526Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "userId": "v8M6WZQOA1aaxFP7DPRHna9NOOJ2",
+      "email": "gichaumburu@gmail.com",
+      "name": "Alex Gichau",
+      "updates": {
+        "theme": "light"
+      }
+    },
+    "document_id": "log-1791217295526-dheinmph9"
+  },
+  {
+    "id": "log-1791217628379-etsihqgvy",
+    "action": "FINANCE_ALERT_TRIGGERED",
+    "details": "Automated alert dispatched to FINANCE team for L2 Approved requisition: 'Annual Youth Camp Transport & Catering Deposit'",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:27:08.379Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "requisitionId": "req_2026_002"
+    },
+    "document_id": "log-1791217628379-etsihqgvy"
+  },
+  {
+    "id": "log-1791217828462-onmx9jcd2",
+    "action": "SYSTEM_SETTINGS_UPDATE",
+    "details": "System settings updated: {\"currentFiscalYear\":2027,\"fiscalYearStatus\":\"CLOSED\"}",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:30:28.462Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "updates": {
+        "currentFiscalYear": 2027,
+        "fiscalYearStatus": "CLOSED"
+      }
+    },
+    "document_id": "log-1791217828462-onmx9jcd2"
+  },
+  {
+    "id": "log-1791217828623-hae49f3ck",
+    "action": "FISCAL_YEAR_ACTIVATED",
+    "details": "Admin set currently active Financial Year to 2027",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:30:28.623Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "year": 2027
+    },
+    "document_id": "log-1791217828623-hae49f3ck"
+  },
+  {
+    "id": "log-1791217842403-qx8i4ntxk",
+    "action": "SYSTEM_SETTINGS_UPDATE",
+    "details": "System settings updated: {\"currentFiscalYear\":2026,\"fiscalYearStatus\":\"CLOSED\"}",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:30:42.403Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "updates": {
+        "currentFiscalYear": 2026,
+        "fiscalYearStatus": "CLOSED"
+      }
+    },
+    "document_id": "log-1791217842403-qx8i4ntxk"
+  },
+  {
+    "id": "log-1791217842562-yehovoc0q",
+    "action": "FISCAL_YEAR_ACTIVATED",
+    "details": "Admin set currently active Financial Year to 2026",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:30:42.562Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "year": 2026
+    },
+    "document_id": "log-1791217842562-yehovoc0q"
+  },
+  {
+    "id": "log-1791217845128-uxq1fimlh",
+    "action": "SYSTEM_SETTINGS_UPDATE",
+    "details": "System settings updated: {\"currentFiscalYear\":2027,\"fiscalYearStatus\":\"CLOSED\"}",
+    "performed_by": "Alex Gichau (SUPER_ADMIN)",
+    "timestamp": "2026-10-05T16:30:45.128Z",
+    "group_id": "Youth Ministry",
+    "metadata": {
+      "updates": {
+        "currentFiscalYear": 2027,
+        "fiscalYearStatus": "CLOSED"
+      }
+    },
+    "document_id": "log-1791217845128-uxq1fimlh"
   }
 ]

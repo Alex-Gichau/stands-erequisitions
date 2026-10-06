@@ -272,7 +272,7 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
             Ministry Unspent Budget
           </h3>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
-            Realtime available cash balances for active church group categories.
+            Realtime cash balances for active church group.
           </p>
         </div>
 

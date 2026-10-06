@@ -283,7 +283,7 @@ export const ReportsPanel: React.FC = () => {
     } else if (endDate) {
       parts.push(`Until: ${endDate}`);
     } else {
-      parts.push("Full Historic Records");
+      parts.push("Historic Records");
     }
 
     if (selectedGroup !== "ALL") {
@@ -633,29 +633,6 @@ export const ReportsPanel: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <PieChartIcon size={28} className="text-primary" />
-            Financial Impact Reporting
-          </h2>
-          <p className="text-sm text-slate-500 font-medium max-w-xl">
-            Compile and audit organizational expenditure transactions for internal filing and physical archives.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-           <button
-            onClick={handleSaveReport}
-            disabled={filteredRequisitions.length === 0 || isSaving}
-            className="btn-primary px-6 py-3 flex items-center gap-2"
-          >
-            <Save size={18} className={isSaving ? "animate-spin" : ""} />
-            {isSaving ? "PERSISTING..." : "COMMIT TO AUDIT CHAMBER"}
-          </button>
-        </div>
-      </div>
 
       <GlobalFiscalOverview 
         projects={projects}
@@ -669,7 +646,7 @@ export const ReportsPanel: React.FC = () => {
           <div>
             <h3 className="text-xs font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
               <LayoutGrid size={16} className="text-primary" />
-              Configure Audit Parameters
+              Reports Filters Settings
             </h3>
           </div>
           
@@ -821,7 +798,7 @@ export const ReportsPanel: React.FC = () => {
 
         {/* Quick Period Selection Buttons */}
         <div className="pt-6 flex flex-wrap items-center gap-2 border-t border-slate-100">
-          <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mr-4">PRESET_MACROS:</span>
+          <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mr-4">Click to filter</span>
           {["TODAY", "7_DAYS", "30_DAYS", "THIS_MONTH", "THIS_QUARTER", "THIS_YEAR"].map((preset) => (
             <button
               key={preset}
@@ -1875,25 +1852,13 @@ export const ReportsPanel: React.FC = () => {
           {reports.length === 0 && !syncingTargets.has("reports") && (
             <div className="py-24 text-center">
               <History size={48} className="mx-auto text-slate-100 mb-4" />
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Vault currently empty</p>
+              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Currently empty</p>
               <p className="text-[10px] text-slate-400 mt-2">Certified audit snapshots will appear here once generated.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Physical Archive Protocol Notice */}
-      <div className="p-8 bg-slate-50 rounded-[2rem] border border-slate-200 flex gap-6 items-center">
-        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-primary shadow-sm border border-slate-100 shrink-0">
-          <ShieldCheck size={32} />
-        </div>
-        <div className="space-y-1">
-          <h4 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Audit Integrity Protocol</h4>
-          <p className="text-[11px] text-slate-500 font-medium leading-relaxed max-w-4xl">
-            Certified reports are permanent ledger snapshots. Once committed to the Audit Chamber, they represent the absolute financial state at the time of generation. Ensure all filters are accurate before commitment. Discrepancies should be resolved prior to physical printing for the St Andrews physical archives.
-          </p>
-        </div>
-      </div>
       {/* Export Confirmation Safeguard Modal */}
       <ExportConfirmationModal
         isOpen={!!exportModalParams}

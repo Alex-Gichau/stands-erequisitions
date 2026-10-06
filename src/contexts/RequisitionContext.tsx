@@ -1400,6 +1400,23 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       // Record login in system audit log so it is included in the End-of-Day Slack summary
       await addSystemLog("USER_LOGIN", `User logged in via ${authProvider}: ${email}`, loginMetadata);
+
+      // Dispatch Universe-style security login alert email to the user
+      try {
+        fetch("/api/send-login-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            userName: name,
+            authProvider,
+            deviceInfo: typeof navigator !== "undefined" ? navigator.userAgent : "Desktop Browser",
+            timestamp: new Date().toISOString()
+          })
+        }).catch((e) => console.warn("Login alert email dispatch notice:", e));
+      } catch (alertErr) {
+        console.warn("Could not dispatch login alert email:", alertErr);
+      }
     } catch (err) {
       console.warn("Failed to record login audit log:", err);
     }

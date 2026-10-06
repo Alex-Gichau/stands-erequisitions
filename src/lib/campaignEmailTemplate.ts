@@ -1,7 +1,7 @@
 /**
  * PCEA St. Andrew's Church - Promotional Campaign Email Generator
- * Produces modern, responsive, high-fidelity HTML email templates
- * compatible across all email clients (Gmail, Outlook, iOS Mail, Webmail).
+ * Produces clean, modern, responsive HTML email templates
+ * matching the Universe / Minimalist style reference.
  */
 
 import { CampaignPromotion } from "../types";
@@ -59,44 +59,44 @@ export const PRESET_CAMPAIGN_TEMPLATES = [
     eventTime: "09:30 AM & 11:30 AM EAT",
     eventVenue: "Main Sanctuary & Live Virtual Broadcast",
     targetAmount: 5000000,
-    scriptureVerse: "Let us rise up and build. So they strengthened their hands for this good work.",
-    scriptureReference: "Nehemiah 2:18",
-    ctaText: "Support Harambee Online",
-    ctaUrl: "https://pceastandrews.org"
+    scriptureVerse: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver.",
+    scriptureReference: "2 Corinthians 9:7",
+    ctaText: "Contribute to Harambee Fund",
+    ctaUrl: "https://accounts.pceastandrews.org"
   },
   {
-    id: "easter-festival",
-    title: "Easter Celebration & Resurrection Praise Festival",
+    id: "easter-festival-2026",
+    title: "Easter & Resurrection Praise Weekend 2026",
     category: "SPECIAL_SERVICE" as const,
-    subject: "✝️ Celebrate With Us: Resurrection Sunday Festival of Praise",
-    preheader: "He is risen! Come rejoice with the St. Andrew's community in worship and communion.",
+    subject: "✝️ Celebrate Easter: He is Risen! Special Services & Cantata Schedule",
+    preheader: "Join us for Maundy Thursday, Good Friday, and the Glorious Resurrection Sunday Services.",
     badgeText: "HOLY WEEK & EASTER",
-    headline: "Resurrection Sunday & Festival of Praise",
-    bodyContent: `Beloved St. Andrew's Family,\n\nWe rejoice together in the blessed hope of the Resurrection! You and your loved ones are cordially invited to our Easter Festival of Praise and Holy Communion.\n\nFeaturing uplifting presentations by the Cathedral Choir, Praise Team, and Church School children, this sacred gathering will commemorate the triumph of the Cross and inspire our walk in newness of life.\n\nBring a friend, family member, or neighbour to celebrate this glorious occasion with us. Refreshments will be served after the service on the church grounds.`,
+    headline: "Easter Praise & Resurrection Celebration 2026",
+    bodyContent: `Beloved Family in Christ,\n\nWe invite you to gather with us for our special Easter Services and Resurrection Cantata. Come experience choral anthems, fellowship, and the living hope of the risen Lord.\n\nBring your family, friends, and neighbors as we worship together in spirit and truth across all parish services.`,
     bannerImageUrl: "/campaign-banners/easter-celebration.svg",
-    bannerImageAlt: "Resurrection Sunday Banner",
-    eventDate: "Sunday, April 5, 2026",
-    eventTime: "08:00 AM, 10:00 AM & 12:00 PM EAT",
-    eventVenue: "PCEA St. Andrew's Church Grounds",
-    scriptureVerse: "He is not here; he has risen, just as he said. Come and see the place where he lay.",
-    scriptureReference: "Matthew 28:6",
-    ctaText: "View Easter Program",
+    bannerImageAlt: "Easter Celebration Banner",
+    eventDate: "April 3 - April 5, 2026",
+    eventTime: "07:30 AM, 09:30 AM & 11:30 AM",
+    eventVenue: "PCEA St. Andrew's Church Sanctuary",
+    scriptureVerse: "Praise be to the God and Father of our Lord Jesus Christ! In his great mercy he has given us new birth into a living hope through the resurrection of Jesus Christ from the dead.",
+    scriptureReference: "1 Peter 1:3",
+    ctaText: "View Easter Schedule",
     ctaUrl: "https://pceastandrews.org"
   },
   {
-    id: "youth-mission-2026",
-    title: "NextGen Youth & Young Adults Mission Conference",
+    id: "youth-conference-2026",
+    title: "Youth Ignited: National Evangelism & Leadership Summit",
     category: "YOUTH" as const,
-    subject: "🔥 NextGen 2026: Youth & Young Adults Leadership & Mission Summit",
-    preheader: "Discover your calling, deepen your faith, and connect with peers across Kenya.",
-    badgeText: "YOUTH & MISSIONS",
-    headline: "NextGen Youth Conference & Evangelism Mission",
-    bodyContent: `Calling all youth, teens, university students, and young professionals!\n\nThe PCEA St. Andrew's Youth Ministry invites you to the 2026 NextGen Summit. Under the theme 'Rooted & Unshakable', this 3-day conference will feature dynamic worship sessions, vocational leadership panels, mental health mentorship, and local missions outreach.\n\nCome fellowship, learn, and be empowered to lead with biblical integrity in your career, university, and community.`,
+    subject: "🔥 Youth Ignited 2026: Faith, Purpose & Leadership Conference",
+    preheader: "Calling all high school and university students, young adults, and teens for 3 days of worship and empowerment.",
+    badgeText: "YOUTH MINISTRY",
+    headline: "Youth Ignited: National Leadership Summit 2026",
+    bodyContent: `Hey Young People!\n\nThe St. Andrew's Youth & Teens Ministry is thrilled to host the 2026 Leadership Summit under the theme 'Unashamed & Purpose-Driven'.\n\nEnjoy interactive workshops, worship nights, career panels, and sports mentorship with seasoned Christian leaders.`,
     bannerImageUrl: "/campaign-banners/youth-mission.svg",
     bannerImageAlt: "Youth Mission Banner",
     eventDate: "August 20 - 22, 2026",
     eventTime: "09:00 AM - 04:30 PM Daily",
-    eventVenue: "St. Andrew's Multipurpose Hall",
+    eventVenue: "Youth Multi-Purpose Hall & Grounds",
     targetAmount: 350000,
     scriptureVerse: "Don't let anyone look down on you because you are young, but set an example for the believers in speech, in conduct, in love, in faith and in purity.",
     scriptureReference: "1 Timothy 4:12",
@@ -144,7 +144,8 @@ export function getCategoryBadgeColor(category: string): { bg: string; text: str
 }
 
 /**
- * Builds the complete, robust HTML email string for promotional broadcasts.
+ * Builds the complete, robust HTML email string for promotional broadcasts
+ * matching the clean Universe / Minimalist style reference with waving hand graphic.
  */
 export function buildCampaignEmailHtml(
   campaign: Partial<CampaignPromotion>,
@@ -156,135 +157,29 @@ export function buildCampaignEmailHtml(
     previewMode = false
   } = options;
 
-  const category = campaign.category || "ANNOUNCEMENT";
-  const badgeColors = getCategoryBadgeColor(category);
-  const badgeLabel = campaign.badgeText || category.replace(/_/g, " ");
-
   const headline = campaign.headline || campaign.title || "Special Church Announcement";
   const subject = campaign.subject || "PCEA St. Andrew's Official Communication";
   const preheader = campaign.preheader || "Official campaign communication from PCEA St. Andrew's Church";
-  const creatorName = campaign.creatorName || "STANDS Church Administration";
+  const ctaUrl = campaign.ctaUrl || "https://accounts.pceastandrews.org";
+  const ctaText = campaign.ctaText || "Participate in event";
 
-  // Format body text with paragraphs
+  // Extract clean paragraphs
   const rawBody = campaign.bodyContent || "";
-  const formattedParagraphs = rawBody
+  const paragraphs = rawBody
     .split(/\n\n+/)
-    .map(p => {
-      const trimmed = p.trim();
-      if (!trimmed) return "";
-      return `<p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.65; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${trimmed.replace(/\n/g, '<br />')}</p>`;
-    })
-    .filter(Boolean)
-    .join("\n");
+    .map(p => p.trim())
+    .filter(Boolean);
 
-  // Hero Banner handling
-  let bannerHtml = "";
-  if (campaign.bannerImageUrl) {
-    bannerHtml = `
-      <!-- Banner Image -->
-      <tr>
-        <td style="padding: 0; background-color: #0f172a; text-align: center; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px;">
-          <img 
-            src="${campaign.bannerImageUrl}" 
-            alt="${campaign.bannerImageAlt || headline}" 
-            style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto; border: 0; outline: none; object-fit: cover;" 
-          />
-        </td>
-      </tr>
-    `;
-  }
+  const formattedParagraphs = paragraphs.length > 0
+    ? paragraphs.map(p => `
+        <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #4b5563; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center;">
+          ${p.replace(/\n/g, '<br />')}
+        </p>
+      `).join("\n")
+    : `<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #4b5563; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center;">We are glad to have you join our upcoming church initiative and community mission.</p>`;
 
-  // Scripture Box
-  let scriptureHtml = "";
-  if (campaign.scriptureVerse) {
-    scriptureHtml = `
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #d97706; border-radius: 8px;">
-        <tr>
-          <td style="padding: 16px 20px;">
-            <p style="margin: 0; font-family: Georgia, Cambria, 'Times New Roman', Times, serif; font-style: italic; font-size: 15px; line-height: 1.6; color: #78350f;">
-              &ldquo;${campaign.scriptureVerse}&rdquo;
-            </p>
-            ${campaign.scriptureReference ? `
-              <p style="margin: 8px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.05em;">
-                — ${campaign.scriptureReference}
-              </p>
-            ` : ""}
-          </td>
-        </tr>
-      </table>
-    `;
-  }
-
-  // Event & Highlights Card
+  // Highlights or details
   const hasDetails = Boolean(campaign.eventDate || campaign.eventVenue || campaign.targetAmount);
-  let detailsCardHtml = "";
-  if (hasDetails) {
-    detailsCardHtml = `
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-        <tr>
-          <td style="padding: 16px 20px; background-color: #1e3a8a; border-bottom: 2px solid #d97706;">
-            <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.15em;">
-              📌 CAMPAIGN &amp; EVENT PARTICULARS
-            </span>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 20px;">
-            <table border="0" cellpadding="0" cellspacing="0" width="100%">
-              ${campaign.eventDate ? `
-                <tr>
-                  <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📅</td>
-                  <td style="padding-bottom: 12px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Date &amp; Schedule</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventDate} ${campaign.eventTime ? `&bull; ${campaign.eventTime}` : ""}</div>
-                  </td>
-                </tr>
-              ` : ""}
-              ${campaign.eventVenue ? `
-                <tr>
-                  <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📍</td>
-                  <td style="padding-bottom: 12px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Location / Venue</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventVenue}</div>
-                  </td>
-                </tr>
-              ` : ""}
-              ${campaign.targetAmount ? `
-                <tr>
-                  <td width="30" valign="top" style="font-size: 16px;">🎯</td>
-                  <td>
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Target Budget / Goal</div>
-                    <div style="font-size: 16px; font-weight: 800; color: #d97706; font-family: sans-serif;">KES ${Number(campaign.targetAmount).toLocaleString()}</div>
-                  </td>
-                </tr>
-              ` : ""}
-            </table>
-          </td>
-        </tr>
-      </table>
-    `;
-  }
-
-  // CTA Button
-  let ctaHtml = "";
-  if (campaign.ctaText) {
-    const ctaUrl = campaign.ctaUrl || "https://pceastandrews.org";
-    ctaHtml = `
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 30px 0 20px 0;">
-        <tr>
-          <td align="center">
-            <a 
-              href="${ctaUrl}" 
-              target="_blank" 
-              style="display: inline-block; background-color: #1e3a8a; background-image: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); border: 1px solid #1e3a8a;"
-            >
-              ${campaign.ctaText} &rarr;
-            </a>
-          </td>
-        </tr>
-      </table>
-    `;
-  }
 
   return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
@@ -292,125 +187,137 @@ export function buildCampaignEmailHtml(
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${subject}</title>
-  <style type="text/css">
-    body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; background-color: #f1f5f9; }
-    table { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
-    p { display: block; margin: 0 0 16px 0; }
-    a { color: #1e3a8a; text-decoration: underline; }
-    @media only screen and (max-width: 620px) {
-      .responsive-table { width: 100% !important; }
-      .mobile-padding { padding-left: 20px !important; padding-right: 20px !important; }
-      .headline-text { font-size: 22px !important; line-height: 28px !important; }
-    }
-  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <!-- Preheader text (hidden in display, shows in client inbox snippet) -->
-  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+<body style="margin: 0; padding: 40px 16px; background-color: #f6f8fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #111827;">
+  <!-- Preheader text -->
+  <div style="display: none; font-size: 1px; color: #f6f8fa; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
     ${preheader}
   </div>
 
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; padding: 24px 10px;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td align="center">
+        <!-- Top Wordmark -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 26px; font-weight: 900; color: #94a3b8; letter-spacing: -0.5px; text-transform: lowercase;">
+            stands
+          </div>
+        </div>
+
         <!-- Main Card Container -->
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" class="responsive-table" style="max-width: 600px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06); overflow: hidden;">
-          
-          <!-- Top Header Strip: PCEA St. Andrew's Branding -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); overflow: hidden; box-sizing: border-box;">
           <tr>
-            <td style="background-color: #0f172a; padding: 16px 24px; border-bottom: 2px solid #fbbf24;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding: 40px 36px 32px 36px; text-align: center;">
+              
+              <!-- Waving Hand with Confetti Graphic (Matching Reference) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
                 <tr>
-                  <td width="36" valign="middle">
-                    <img src="https://accounts.pceastandrews.org/pcea.svg" alt="PCEA St Andrew's" width="32" height="32" style="display: block; border-radius: 6px;" onerror="this.style.display='none'" />
-                  </td>
-                  <td valign="middle" style="padding-left: 12px;">
-                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 900; color: #ffffff; letter-spacing: 0.1em; text-transform: uppercase;">
-                      PCEA St. Andrew's Church
-                    </div>
-                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #fbbf24; letter-spacing: 0.15em; text-transform: uppercase;">
-                      E-Requisitions Portal &bull; Official Broadcast
-                    </div>
-                  </td>
-                  <td align="right" valign="middle">
-                    <span style="display: inline-block; background-color: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 4px 10px; font-family: monospace; font-size: 10px; font-weight: 700; color: #fbbf24;">
-                      PROMOTION
-                    </span>
+                  <td align="center">
+                    <svg width="130" height="130" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+                      <!-- Soft Circle Disc -->
+                      <circle cx="80" cy="80" r="60" fill="#F4F5F7" />
+                      <!-- Confetti Sprinkles -->
+                      <rect x="36" y="38" width="6" height="6" rx="1.5" transform="rotate(15 36 38)" fill="#4361EE" />
+                      <rect x="124" y="42" width="5" height="5" rx="1" transform="rotate(-20 124 42)" fill="#3B82F6" />
+                      <rect x="30" y="76" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <rect x="130" y="80" width="5" height="5" rx="1" transform="rotate(25 130 80)" fill="#F43F5E" />
+                      <rect x="44" y="112" width="4" height="4" rx="1" fill="#10B981" />
+                      <rect x="120" y="110" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <!-- Sparkles & Dots -->
+                      <path d="M38 56L35 59L38 62L41 59L38 56Z" fill="#10B981" />
+                      <path d="M118 36L116 38.5L118 41L120 38.5L118 36Z" fill="#F43F5E" />
+                      <circle cx="50" cy="98" r="2" fill="#4361EE" />
+                      <circle cx="126" cy="62" r="2" fill="#4361EE" />
+                      <!-- Motion indicators -->
+                      <path d="M102 48C104 50 105 53 105 56" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" />
+                      <path d="M72 72C70 74 69 76 69 78" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" />
+                      <!-- Navy Cuff -->
+                      <path d="M68 124C68 116 74 110 84 108L98 114C104 118 106 124 105 132L68 124Z" fill="#334155" />
+                      <!-- Waving Hand -->
+                      <path d="M74 72L74 54C74 50.7 76.7 48 80 48C83.3 48 86 50.7 86 54L86 64C86 64 88.5 49 92 49C95.5 49 98 51.5 98 55L98 68C98 68 100.5 56 104 56C107.5 56 110 58.5 110 62L110 82C110 94 102 106 88 108C76 108 70 98 70 88L70 82C66 81 64 77 66 73C68 69 72 70 74 72Z" fill="#EA8C55" />
+                      <path d="M75 74C74 73 72 73 70.5 74.5C69 76 69.5 78 71.5 79L76 82" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M86 66L86 78" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M98 70L98 80" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                    </svg>
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
 
-          ${bannerHtml}
-
-          <!-- Main Content Area -->
-          <tr>
-            <td class="mobile-padding" style="padding: 32px 32px 24px 32px; background-color: #ffffff;">
-              
-              <!-- Badge -->
-              <div style="margin-bottom: 14px;">
-                <span style="display: inline-block; background-color: ${badgeColors.bg}; color: ${badgeColors.text}; border: 1px solid ${badgeColors.border}; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  ${badgeLabel}
-                </span>
-              </div>
-
-              <!-- Headline -->
-              <h1 class="headline-text" style="margin: 0 0 18px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; color: #0f172a; line-height: 1.3; letter-spacing: -0.02em;">
-                ${headline}
+              <!-- Main Greeting Headline -->
+              <h1 style="font-size: 22px; font-weight: 800; color: #111827; margin: 0 0 16px 0; line-height: 1.35; letter-spacing: -0.3px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Welcome to ${headline},<br />${recipientName}!
               </h1>
 
-              ${scriptureHtml}
-
-              <!-- Body Copy -->
-              <div style="margin-top: 16px;">
+              <!-- Body Paragraphs -->
+              <div style="margin-bottom: 28px;">
                 ${formattedParagraphs}
               </div>
 
-              ${detailsCardHtml}
-
-              ${ctaHtml}
-
-              <!-- Divider -->
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;" />
-
-              <!-- Sender Attribution Note -->
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <!-- Primary Blue CTA Button -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
                 <tr>
-                  <td style="font-size: 12px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5;">
-                    Dispatched on behalf of: <strong style="color: #0f172a;">${creatorName}</strong><br />
-                    Recipient Address: <code style="font-family: monospace; font-size: 11px; color: #1e3a8a;">${recipientEmail}</code>
+                  <td align="center">
+                    <a href="${ctaUrl}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 13px 32px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; text-align: center; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      ${ctaText}
+                    </a>
                   </td>
                 </tr>
               </table>
 
+              <!-- Secondary Callout -->
+              <div style="text-align: center; border-top: 1px solid #f3f4f6; padding-top: 24px;">
+                <h3 style="font-size: 15px; font-weight: 700; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Looking to attend an event?
+                </h3>
+                <p style="font-size: 13px; color: #4b5563; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Use STANDS to <a href="${ctaUrl}" style="color: #4361ee; text-decoration: none; font-weight: 600;">discover events</a> happening near you.
+                </p>
+                ${hasDetails ? `
+                  <div style="margin-top: 12px; font-size: 12px; color: #6b7280; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    ${campaign.eventDate ? `📅 <strong>${campaign.eventDate}</strong> ` : ""}
+                    ${campaign.eventVenue ? `&bull; 📍 ${campaign.eventVenue}` : ""}
+                  </div>
+                ` : ""}
+              </div>
+
             </td>
           </tr>
 
-          <!-- Official Church Footer -->
+          <!-- Bottom Have Questions Card Footer -->
           <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 32px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.1em;">
-                Presbyterian Church of East Africa &bull; St. Andrew's Parish
-              </p>
-              <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #64748b; line-height: 1.5;">
-                State House Road / Nyerere Road, P.O. Box 41282 - 00100 Nairobi, Kenya<br />
-                Telephone: +254 20 2723040 / +254 722 208556 &bull; Email: ict.team@pceastandrews.org
-              </p>
-              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #94a3b8;">
-                &copy; ${new Date().getFullYear()} PCEA St. Andrew's Church. All rights reserved. &bull; STANDS eRequisitions System
+            <td style="background-color: #f9fafb; border-top: 1px solid #f3f4f6; padding: 24px 32px; text-align: center;">
+              <h4 style="font-size: 15px; font-weight: 800; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Have questions?
+              </h4>
+              <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                We are here to help, learn more about STANDS <a href="${ctaUrl}/#help" style="color: #4361ee; text-decoration: none; font-weight: 600;">here</a> or <a href="mailto:ict.team@pceastandrews.org" style="color: #4361ee; text-decoration: none; font-weight: 600;">contact us</a>
               </p>
             </td>
           </tr>
-
         </table>
 
-        <!-- Unsubscribe / Preferences Note -->
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin-top: 14px;">
+        <!-- Navigation Links Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 22px;">
           <tr>
-            <td align="center" style="font-size: 11px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4;">
-              This notification is an official church communication. If you received this email in error, please notify our ICT secretariat.
+            <td align="center" style="font-size: 13px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <a href="${ctaUrl}/#login" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Log in</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${ctaUrl}/#how-it-works" style="color: #4361ee; text-decoration: none; margin: 0 10px;">How it works</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${ctaUrl}/#help" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Get help</a>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer Notice Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 16px;">
+          <tr>
+            <td align="center" style="font-size: 11px; color: #9ca3af; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              Made with ❤️ in Nairobi<br />
+              PCEA St. Andrew's Church, State House Road / Nyerere Road, Nairobi, Kenya<br />
+              &copy; ${new Date().getFullYear()} STANDS.com &bull; 
+              <a href="${ctaUrl}/#settings" style="color: #4361ee; text-decoration: none;">Manage Preferences</a> &bull; 
+              <a href="${ctaUrl}/#unsubscribe" style="color: #4361ee; text-decoration: none;">Unsubscribe</a>
             </td>
           </tr>
         </table>

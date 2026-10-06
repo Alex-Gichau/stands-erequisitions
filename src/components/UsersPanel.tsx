@@ -1813,7 +1813,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   STANDS Finance Email Broadcaster
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  Compose and dispatch system-wide newsletters, announcements, and bulletins. All outgoing traffic is routed through <strong className="font-semibold text-slate-700 dark:text-slate-350">ict.team@pceastandrews.org</strong> under the sender alias <strong className="font-semibold text-slate-700 dark:text-slate-350">"STANDS Finance"</strong>.
+                  Compose and dispatch system-wide newsletters, announcements, and bulletins. 
                 </p>
               </div>
 
@@ -1836,7 +1836,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
                 <div>
                   <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-1">Compose Message</h3>
-                  <p className="text-[10px] text-slate-400 font-mono tracking-widest">TRANSACTION_BROADCAST_COMPOSER</p>
+
                 </div>
 
                 {/* Templates Quick Bar */}

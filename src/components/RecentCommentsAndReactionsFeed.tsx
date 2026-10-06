@@ -398,7 +398,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             Recent Comments & Reactions
           </h3>
           <p className="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-medium leading-relaxed max-w-2xl">
-            Realtime discussion cards and reactions from team members. Click any card or title badge to jump straight to the requisition details.
+            Discussions, comments and reactions from team members.
           </p>
         </div>
 

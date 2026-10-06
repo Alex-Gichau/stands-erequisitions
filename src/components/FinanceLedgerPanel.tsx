@@ -1310,7 +1310,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     }
   }, [totalPayoutQueuePages, payoutQueuePage]);
 
-  // Double-Entry Ledger Books Pagination state (15 rows)
+  // Ledger Book Pagination state (15 rows)
   const [ledgerPage, setLedgerPage] = useState(1);
   const ledgerItemsPerPage = 15;
 
@@ -1963,7 +1963,6 @@ export const FinanceLedgerPanel: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Accounting & Budgets</h1>
-          <p className="text-slate-500 text-sm">Checking, budget allocations, and disbursement controls.</p>
         </div>
       </div>
 
@@ -1978,9 +1977,6 @@ export const FinanceLedgerPanel: React.FC = () => {
               <h3 id="time-horizon-header-title" className="text-xs font-black text-slate-800 uppercase tracking-widest">
                 Requisitions Vouchers Approved & Disbursed
               </h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                Totals for approved & disbursed vouchers
-              </p>
             </div>
           </div>
         </div>
@@ -2193,7 +2189,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     : "bg-slate-50 text-slate-500 hover:bg-slate-100"
                 )}
               >
-                All Entries
+                All Disbursements
               </button>
               <button 
                 onClick={() => setStatusFilter("PENDING_DISBURSAL")}
@@ -2205,7 +2201,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                 )}
               >
                 <Clock size={12} />
-                Pending Disbursal ({metrics.pendingDisbursalCount})
+                Pending ({metrics.pendingDisbursalCount})
               </button>
               <button 
                 onClick={() => setStatusFilter("DISBURSED")}
@@ -2217,7 +2213,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                 )}
               >
                 <CheckCircle2 size={12} />
-                Disbursed Logs
+                Disbursed History
               </button>
             </div>
 
@@ -2285,7 +2281,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                     <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">
                       Payout Queue ({payoutQueueEntries.length})
                     </h3>
-                    <p className="text-[10px] text-slate-500">Authorized requests ready for immediate payment processing.</p>
                   </div>
                 </div>
                 <div className="text-[10px] text-amber-800/80 font-mono font-bold bg-amber-100/70 border border-amber-200 px-2.5 py-1 rounded-lg self-start sm:self-auto">
@@ -2385,8 +2380,7 @@ export const FinanceLedgerPanel: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-800">Double-Entry Ledger Books</h3>
-                <p className="text-[10px] text-slate-500">Every payout and reserve commitment balance ledger transaction.</p>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-slate-800">Ledger Book</h3>
               </div>
               <div className="text-[10px] text-slate-400 font-bold">
                 {ledgerEntries.length > 0 
@@ -2405,11 +2399,11 @@ export const FinanceLedgerPanel: React.FC = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                      <th className="py-3 px-6">Voucher/Code</th>
-                      <th className="py-3 px-4">Account Allocation Context</th>
-                      <th className="py-3 px-4 text-right">Debit (Econ)</th>
-                      <th className="py-3 px-4 text-right">Credit (Asset)</th>
-                      <th className="py-3 px-4">Status & Action</th>
+                      <th className="py-3 px-6">Requisition ID</th>
+                      <th className="py-3 px-4">Requisition Context</th>
+                      <th className="py-3 px-4 text-right">Debit</th>
+                      <th className="py-3 px-4 text-right">Credit</th>
+                      <th className="py-3 px-4">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
@@ -2522,7 +2516,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                                     </div>
                                   </div>
 
-                                  <p><strong>Accounting Narrative:</strong> {req.description || "No description provided."}</p>
+                                  <p><strong>For the Purpose:</strong> {req.description || "No description provided."}</p>
                                   {req.amountWords && <p><strong>Amount in Words:</strong> {req.amountWords}</p>}
 
                                   {/* Installment schedule breakdown in expanded view */}
@@ -2628,11 +2622,11 @@ export const FinanceLedgerPanel: React.FC = () => {
 
                                   {Array.isArray(req.approvalHistory) && req.approvalHistory.length > 0 && (
                                     <div className="space-y-1 pt-2">
-                                      <p className="font-bold text-slate-700">Audit Chamber Protocol Logs & Approver Trail:</p>
+                                      <p className="font-bold text-slate-700">Requisition Trail:</p>
                                       <div className="space-y-1">
                                         {req.approvalHistory.map((h, i) => (
                                           <p key={i} className="font-mono text-[9px] text-slate-600 bg-white p-1.5 rounded-md border border-slate-200 flex justify-between items-center">
-                                            <span>[{new Date(h.timestamp).toLocaleTimeString()}] [{h.role}] <strong>{h.approverName}</strong> ({h.method}): "{h.note || "No custom ledger notes provided"}"</span>
+                                            <span>[{new Date(h.timestamp).toLocaleTimeString()}] [{h.role}] <strong>{h.approverName}</strong> ({h.method}): "{h.note || "No notes"}"</span>
                                             <span className={h.decision === "APPROVE" ? "text-emerald-700 font-bold" : "text-amber-700 font-bold"}>{h.decision}</span>
                                           </p>
                                         ))}
@@ -4121,22 +4115,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full uppercase">
-                          {voucherTimeline.length} Audit Events
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsVoucherTimelineCollapsed(!isVoucherTimelineCollapsed);
-                          }}
-                          className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-300 rounded text-[9px] font-bold uppercase transition-colors flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <span>{isVoucherTimelineCollapsed ? "Expand" : "Collapse"}</span>
-                          {isVoucherTimelineCollapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
-                        </button>
-                      </div>
                     </div>
 
                     {!isVoucherTimelineCollapsed && (
@@ -4520,7 +4498,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Transaction / Ref Reference</label>
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Transaction Reference</label>
                       <input
                         type="text"
                         required
@@ -4528,17 +4506,6 @@ export const FinanceLedgerPanel: React.FC = () => {
                         value={referenceNum}
                         onChange={(e) => setReferenceNum(e.target.value)}
                         className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 font-mono shadow-2xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block">Verification Comment (Optional)</label>
-                      <textarea
-                        rows={2}
-                        placeholder="Provide clerical details, bank transfer receipt references..."
-                        value={payoutNotes}
-                        onChange={(e) => setPayoutNotes(e.target.value)}
-                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 shadow-2xs"
                       />
                     </div>
 

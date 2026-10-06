@@ -708,7 +708,7 @@ export const VendorsPanel: React.FC = () => {
                   {/* Vendor Name */}
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                      🤝 Trade / Registered Vendor Name *
+                      🤝 Vendor Name *
                     </label>
                     <input
                       type="text"
@@ -723,7 +723,7 @@ export const VendorsPanel: React.FC = () => {
                   {/* Offerings Category Multi-Select Dropdown */}
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                      🛍️ Select Products / Services Offered (Standardized Categories)
+                      🛍️ Select Products / Services Offered
                     </label>
                     
                     <div className="relative">
@@ -753,7 +753,7 @@ export const VendorsPanel: React.FC = () => {
                               </span>
                             ))
                           ) : (
-                            <span className="text-slate-400 text-xs font-semibold">Click to open categories multiselect dropdown...</span>
+                            <span className="text-slate-400 text-xs font-semibold">Click to open categories...</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0 border-l border-slate-200 dark:border-slate-700 pl-3">
@@ -768,7 +768,7 @@ export const VendorsPanel: React.FC = () => {
                       {isCategoryDropdownOpen && (
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-50 p-4 max-h-60 overflow-y-auto space-y-2">
                           <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 pb-2 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <span>Standardized Product & Service Categories</span>
+                            <span>Product & Service Categories</span>
                             <span className="text-primary font-mono">{VENDOR_SERVICE_CATEGORIES.length} Categories</span>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
@@ -818,7 +818,7 @@ export const VendorsPanel: React.FC = () => {
                   {/* Contact Reference */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                      📞 Contact Reference (Phone/Email)
+                      📞 Contact Phone/Email
                     </label>
                     <input
                       type="text"
@@ -832,7 +832,7 @@ export const VendorsPanel: React.FC = () => {
                   {/* Physical Location */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 block">
-                      📍 Business Operations / Physical Location
+                      📍 Physical Location
                     </label>
                     <input
                       type="text"
@@ -863,7 +863,7 @@ export const VendorsPanel: React.FC = () => {
                     ) : (
                       <Store size={16} />
                     )}
-                    <span>{editingVendorId ? "Save Vendor Changes" : canEdit ? "Register Vendor Partner" : "Propose Vendor"}</span>
+                    <span>{editingVendorId ? "Save Changes" : canEdit ? "Register Vendor" : "Propose Vendor"}</span>
                   </button>
                 </div>
               </form>
@@ -958,40 +958,6 @@ export const VendorsPanel: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Top 3 Vendors Summary Card */}
-          {stats.topVendors.length > 0 && (
-            <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-slate-800 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-8 opacity-10 transition-transform group-hover:scale-125 duration-700">
-                <Package size={100} className="text-white" />
-              </div>
-              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Briefcase size={18} className="text-primary" />
-                    Approved Vendors
-                  </h3>
-                  <p className="text-xs text-slate-400 leading-relaxed max-w-md font-medium">
-                    Most utilized vendors across the financial ledger, prioritized by total requisition volume.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 max-w-3xl">
-                  {stats.topVendors.map((vendor, idx) => (
-                    <div key={vendor.name} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center gap-4 group/item hover:bg-white/10 transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center font-black text-xs">
-                        #{idx + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-black text-white uppercase tracking-tight truncate" title={vendor.name}>{vendor.name}</div>
-                        <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">{vendor.count} Transactions</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Filters and Search */}
           <div className="bg-white/40 backdrop-blur-xl border-2 border-slate-100 rounded-[2.5rem] p-6 md:p-10 shadow-sm space-y-8">

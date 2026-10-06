@@ -83,7 +83,6 @@ export const GlobalFiscalOverview: React.FC<GlobalFiscalOverviewProps> = ({
           
           <p className="text-slate-500 text-xs md:text-sm leading-relaxed max-w-md">
             This requisitions data runs across {fiscalStats.projectsCount} ministry groups. 
-            The data is monitored and updated displayed in realtime.
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2">

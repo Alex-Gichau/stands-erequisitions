@@ -2503,18 +2503,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3">
                       <div className="flex items-center gap-2">
                         <Info size={16} className="text-indigo-600 dark:text-indigo-400" />
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white">Document Inspector</h3>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white">Document Details</h3>
                       </div>
-                      {activeInspectorItem && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenProjection(filteredUploads.findIndex(i => i.id === activeInspectorItem.id))}
-                          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Maximize2 size={12} />
-                          <span>Fullscreen</span>
-                        </button>
-                      )}
                     </div>
 
                     {activeInspectorItem ? (

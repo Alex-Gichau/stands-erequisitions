@@ -2734,6 +2734,108 @@ Your response MUST adhere strictly to the JSON schema specified.
     }
   }
 
+  /**
+   * Generates a clean, modern, minimalist email body design
+   * matching the user's reference:
+   * - Centered white card (28px border-radius) on subtle neutral backdrop
+   * - Top black capsule badge pill
+   * - Large bold sans-serif headline
+   * - Clear sub-message
+   * - Solid black pill action button
+   * - Clean light-gray bottom card panel for details / metadata / link
+   * - Subtle footer note
+   */
+  function buildSimpleEmailHtml({
+    badgeText,
+    headline,
+    subMessage,
+    contentHtml,
+    ctaText,
+    ctaUrl,
+    cardHtml,
+    footerNote = "PCEA St. Andrew's Church • STANDS eRequisitions"
+  }: {
+    badgeText: string;
+    headline: string;
+    subMessage?: string;
+    contentHtml?: string;
+    ctaText?: string;
+    ctaUrl?: string;
+    cardHtml?: string;
+    footerNote?: string;
+  }): string {
+    const ctaButtonHtml = (ctaText && ctaUrl) ? `
+      <div style="margin: 0 0 24px 0; text-align: center;">
+        <a href="${ctaUrl}" target="_blank" style="display: inline-block; background-color: #09090b; color: #ffffff; padding: 13px 32px; border-radius: 9999px; font-weight: 700; font-size: 14px; text-decoration: none; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          ${ctaText}
+        </a>
+      </div>
+    ` : "";
+
+    const middleContentHtml = contentHtml ? `
+      <div style="font-size: 14px; color: #3f3f46; line-height: 1.6; margin: 0 0 24px 0; text-align: left;">
+        ${contentHtml}
+      </div>
+    ` : "";
+
+    const bottomCardHtml = cardHtml ? `
+      <div style="background-color: #f4f4f5; border-radius: 20px; padding: 20px 22px; text-align: left; margin-top: 8px;">
+        ${cardHtml}
+      </div>
+    ` : "";
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${headline}</title>
+</head>
+<body style="margin: 0; padding: 40px 16px; background-color: #e4e4e7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #18181b;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center">
+        <div style="max-width: 480px; width: 100%; background-color: #ffffff; border-radius: 28px; padding: 44px 32px 32px 32px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06); text-align: center; box-sizing: border-box;">
+          
+          <!-- Top Pill Badge (matching reference) -->
+          <div style="display: inline-block; background-color: #18181b; color: #ffffff; font-size: 13px; font-weight: 800; letter-spacing: 0.8px; padding: 6px 20px; border-radius: 9999px; text-transform: uppercase;">
+            ${badgeText}
+          </div>
+
+          <!-- Bold Headline -->
+          <h1 style="font-size: 26px; font-weight: 800; color: #18181b; margin: 20px 0 10px 0; line-height: 1.25; letter-spacing: -0.5px;">
+            ${headline}
+          </h1>
+
+          <!-- Clean Subtitle / Message -->
+          ${subMessage ? `
+          <p style="font-size: 14px; color: #71717a; line-height: 1.55; margin: 0 0 24px 0; font-weight: 400;">
+            ${subMessage}
+          </p>
+          ` : ""}
+
+          <!-- Middle Custom Content -->
+          ${middleContentHtml}
+
+          <!-- Primary Black Pill CTA Button -->
+          ${ctaButtonHtml}
+
+          <!-- Bottom Light Gray Card Section -->
+          ${bottomCardHtml}
+
+          <!-- Footer Note -->
+          <div style="margin-top: 24px; font-size: 11px; color: #a1a1aa; line-height: 1.4; text-align: center;">
+            ${footerNote}
+          </div>
+
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
   // Helper function to generate diagrammatic representation of requisition status for email updates
   function generateRequisitionStatusDiagramHtml(status: string): string {
     const currentStatus = (status || "").toUpperCase();
@@ -3377,83 +3479,45 @@ Your response MUST adhere strictly to the JSON schema specified.
             nextStepsText = `You can log in to the portal at any time to track progress.`;
         }
 
-        const bodyHtml = `
-          <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <!-- Header Banner -->
-            <div style="background-color: #0f172a; padding: 24px; text-align: left;">
-              <span style="color: #38bdf8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">STANDS eRequisitions</span>
-              <h1 style="color: #ffffff; font-size: 20px; font-weight: 700; margin: 6px 0 0 0; tracking: -0.5px;">${headerTitle}</h1>
+        const statusBadge = status === "APPROVED_L1" ? "APPROVED L1"
+          : status === "APPROVED_L2" ? "APPROVED L2"
+          : status === "DISBURSED" ? "DISBURSED"
+          : status === "REJECTED" ? "REJECTED"
+          : status === "REVISED" ? "REVISION"
+          : status === "SUBMITTED" ? "SUBMITTED"
+          : (status || "REQUISITION").replace(/_/g, " ").toUpperCase();
+
+        const headlineTitle = status === "APPROVED_L1" ? "Approved by Level 1"
+          : status === "APPROVED_L2" ? "Approved by Level 2"
+          : status === "DISBURSED" ? "Disbursement Released"
+          : status === "REJECTED" ? "Requisition Rejected"
+          : status === "REVISED" ? "Revision Requested"
+          : status === "SUBMITTED" ? "Requisition Submitted"
+          : headerTitle;
+
+        const bodyHtml = buildSimpleEmailHtml({
+          badgeText: statusBadge,
+          headline: headlineTitle,
+          subMessage: `Hello ${firstName}, ${mainMessage.replace(/<[^>]*>?/gm, '')}`,
+          ctaText: "View Requisition",
+          ctaUrl: reqUrl,
+          cardHtml: `
+            <div style="font-size: 14px; font-weight: 800; color: #18181b; margin-bottom: 4px;">
+              ${reqName}
             </div>
-
-            <!-- Body Content -->
-            <div style="padding: 24px; color: #334155;">
-              <p style="font-size: 15px; line-height: 1.5; margin-top: 0; color: #0f172a;">Hello <strong>${firstName}</strong>,</p>
-              <p style="font-size: 14px; line-height: 1.6; color: #475569; margin-bottom: 16px;">${mainMessage}</p>
-
-              <!-- Requisition Workflow Status Diagrammatic Representation -->
-              ${generateRequisitionStatusDiagramHtml(status)}
-
-              ${decisionBoxHtml}
-
-              <!-- Direct Action Button -->
-              <div style="margin: 20px 0; text-align: center;">
-                <a href="${reqUrl}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; text-decoration: none; box-shadow: 0 2px 4px rgba(2,132,199,0.2);">
-                  View Requisition in Portal
-                </a>
-              </div>
-
-              <!-- Comprehensive Requisition Details -->
-              <div style="margin-top: 24px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px;">
-                <h3 style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.8px; margin: 0 0 12px 0; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px;">Requisition Details</h3>
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #334155;">
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600; width: 38%;">Requisition Name:</td>
-                    <td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${reqName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requisition URL:</td>
-                    <td style="padding: 6px 0; word-break: break-all; font-weight: 600; color: #0284c7;">
-                      <a href="${reqUrl}" style="color: #0284c7; text-decoration: underline; word-break: break-all;">${reqUrl}</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Ministry / Group:</td>
-                    <td style="padding: 6px 0; font-weight: 700; color: #0284c7;">${ministryName}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Total Amount:</td>
-                    <td style="padding: 6px 0; font-weight: 800; color: #0f172a; font-size: 14px;">${formattedAmount}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Requester:</td>
-                    <td style="padding: 6px 0; font-weight: 500; color: #334155;">${requesterName || "Requester"} ${requesterEmail ? `(${requesterEmail})` : ""}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Payee / Vendor:</td>
-                    <td style="padding: 6px 0; font-weight: 500; color: #334155;">${payableTo || "N/A"}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600;">Submission Date:</td>
-                    <td style="padding: 6px 0; color: #64748b;">${formattedSubmittedAt}</td>
-                  </tr>
-                  ${description ? `
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-weight: 600; vertical-align: top;">Description:</td>
-                    <td style="padding: 6px 0; color: #334155; line-height: 1.4;">${description}</td>
-                  </tr>
-                  ` : ""}
-                </table>
-              </div>
-
-              <div style="margin-top: 20px; font-size: 13px; color: #475569; line-height: 1.5; background-color: #f1f5f9; padding: 12px 14px; border-radius: 6px;">
-                <strong>Next Steps:</strong> ${nextStepsText}
-              </div>
-
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0 16px 0;" />
-              <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated system notification from ST. ANDREWS CHURCH eRequisitions Portal.</p>
+            <div style="font-size: 12px; color: #71717a; margin-bottom: 12px; line-height: 1.5;">
+              Amount: <strong style="color: #18181b;">${formattedAmount}</strong> &bull; Ministry: <strong style="color: #18181b;">${ministryName}</strong>
+              ${payableTo ? `<br/>Payable to: <strong style="color: #18181b;">${payableTo}</strong>` : ""}
+              ${decisionNote ? `<br/><span style="font-style: italic; color: #52525b;">Note: "${decisionNote}"</span>` : ""}
             </div>
-          </div>
-        `;
+            <div style="background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-family: monospace; color: #52525b; word-break: break-all;">
+              ${reqUrl}
+            </div>
+            <div style="font-size: 11px; color: #a1a1aa; margin-top: 10px; line-height: 1.4;">
+              Requester: ${requesterName || "Requester"} &bull; Submitted: ${formattedSubmittedAt}
+            </div>
+          `
+        });
 
         if (!process.env.SMTP_PASS) {
           console.warn(`SMTP_PASS is not configured. Email to ${firstName} <${recEmail}> recorded as simulated.`);
@@ -3572,27 +3636,20 @@ Your response MUST adhere strictly to the JSON schema specified.
 
       for (const recipient of resolvedRecipients) {
         try {
+          const bulkHtml = buildSimpleEmailHtml({
+            badgeText: "Official Notice",
+            headline: subject,
+            contentHtml: content.replace(/\n/g, '<br />'),
+            ctaText: "Open eRequisitions Portal",
+            ctaUrl: `${process.env.APP_URL || "https://accounts.pceastandrews.org"}/#requisitions`,
+            footerNote: `This communication was dispatched on behalf of ${fromName} • ict.team@pceastandrews.org`
+          });
+
           await transporter.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to: recipient,
             subject,
-            html: `
-              <div style="font-family: sans-serif; padding: 25px; color: #1e293b; background-color: #f8fafc; max-width: 600px; margin: 0 auto; border-radius: 12px; border: 1px solid #e2e8f0;">
-                <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #3b82f6; padding-bottom: 15px;">
-                  <h1 style="color: #1e3a8a; margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 0.1em;">${fromName} Update</h1>
-                  <p style="color: #64748b; font-size: 11px; margin: 4px 0 0 0; font-weight: bold; letter-spacing: 0.05em;">PCEA ST ANDREW'S CHURCH</p>
-                </div>
-                <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); line-height: 1.6; color: #334155;">
-                  ${content.replace(/\n/g, '<br />')}
-                </div>
-                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-                <div style="text-align: center; font-size: 11px; color: #94a3b8;">
-                  <p style="margin: 4px 0;">This communication was sent on behalf of ${fromName}.</p>
-                  <p style="margin: 4px 0;">If you have any inquiries, contact the ICT Team at ${fromEmail}.</p>
-                  <p style="margin: 12px 0 0 0; font-weight: bold;">STANDS Finance &copy; 2026</p>
-                </div>
-              </div>
-            `
+            html: bulkHtml
           });
           successful.push(recipient);
         } catch (mailErr: any) {
@@ -3623,145 +3680,29 @@ Your response MUST adhere strictly to the JSON schema specified.
   // --- PROMOTIONAL CAMPAIGN EMAIL SYSTEM (SCHEDULED & IMMEDIATE BROADCASTS) ---
 
   function generateCampaignEmailHtmlServer(campaign: any, recipientEmail: string = "member@pceastandrews.org", recipientName: string = "Church Member"): string {
-    const category = campaign.category || "ANNOUNCEMENT";
-    const badgeLabel = campaign.badgeText || category.replace(/_/g, " ");
     const headline = campaign.headline || campaign.title || "Special Church Announcement";
     const subject = campaign.subject || "PCEA St. Andrew's Church Announcement";
     const preheader = campaign.preheader || "Official campaign broadcast from PCEA St. Andrew's Church";
-    const creatorName = campaign.creatorName || "STANDS Church Administration";
-
-    // Category badge color mapping
-    let badgeBg = "#f1f5f9";
-    let badgeText = "#334155";
-    let badgeBorder = "#e2e8f0";
-    if (category === "FUNDRAISING") { badgeBg = "#fef3c7"; badgeText = "#b45309"; badgeBorder = "#fde68a"; }
-    else if (category === "SPECIAL_SERVICE") { badgeBg = "#ede9fe"; badgeText = "#6d28d9"; badgeBorder = "#ddd6fe"; }
-    else if (category === "EVENT") { badgeBg = "#e0f2fe"; badgeText = "#0369a1"; badgeBorder = "#bae6fd"; }
-    else if (category === "YOUTH") { badgeBg = "#ccfbf1"; badgeText = "#0f766e"; badgeBorder = "#99f6e4"; }
-    else if (category === "STEWARDSHIP") { badgeBg = "#d1fae5"; badgeText = "#047857"; badgeBorder = "#a7f3d0"; }
-    else if (category === "FELLOWSHIP") { badgeBg = "#fce7f3"; badgeText = "#be185d"; badgeBorder = "#fbcfe8"; }
-
-    // Normalize banner URL for remote email clients
-    let bannerSrc = campaign.bannerImageUrl || "";
-    if (bannerSrc && bannerSrc.startsWith("/") && !bannerSrc.startsWith("//")) {
-      bannerSrc = `https://accounts.pceastandrews.org${bannerSrc}`;
-    }
+    const appUrl = process.env.APP_URL || "https://accounts.pceastandrews.org";
+    const ctaUrl = campaign.ctaUrl || appUrl;
+    const ctaText = campaign.ctaText || "Participate now";
 
     // Format body text with paragraphs
     const rawBody = campaign.bodyContent || "";
-    const formattedParagraphs = rawBody
+    const paragraphs = rawBody
       .split(/\n\n+/)
-      .map((p: string) => {
-        const trimmed = p.trim();
-        if (!trimmed) return "";
-        return `<p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.65; color: #334155; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">${trimmed.replace(/\n/g, '<br />')}</p>`;
-      })
-      .filter(Boolean)
-      .join("\n");
+      .map((p: string) => p.trim())
+      .filter(Boolean);
 
-    let bannerHtml = "";
-    if (bannerSrc) {
-      bannerHtml = `
-        <tr>
-          <td style="padding: 0; background-color: #0f172a; text-align: center; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px;">
-            <img 
-              src="${bannerSrc}" 
-              alt="${campaign.bannerImageAlt || headline}" 
-              style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto; border: 0; outline: none; object-fit: cover;" 
-            />
-          </td>
-        </tr>
-      `;
-    }
-
-    let scriptureHtml = "";
-    if (campaign.scriptureVerse) {
-      scriptureHtml = `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0; background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #d97706; border-radius: 8px;">
-          <tr>
-            <td style="padding: 16px 20px;">
-              <p style="margin: 0; font-family: Georgia, Cambria, 'Times New Roman', Times, serif; font-style: italic; font-size: 15px; line-height: 1.6; color: #78350f;">
-                &ldquo;${campaign.scriptureVerse}&rdquo;
-              </p>
-              ${campaign.scriptureReference ? `
-                <p style="margin: 8px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 700; color: #b45309; text-transform: uppercase; letter-spacing: 0.05em;">
-                  — ${campaign.scriptureReference}
-                </p>
-              ` : ""}
-            </td>
-          </tr>
-        </table>
-      `;
-    }
+    const formattedParagraphs = paragraphs.length > 0
+      ? paragraphs.map((p: string) => `
+          <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #4b5563; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center;">
+            ${p.replace(/\n/g, '<br />')}
+          </p>
+        `).join("\n")
+      : `<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #4b5563; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; text-align: center;">We are glad to have you join our upcoming church initiative and community mission.</p>`;
 
     const hasDetails = Boolean(campaign.eventDate || campaign.eventVenue || campaign.targetAmount);
-    let detailsCardHtml = "";
-    if (hasDetails) {
-      detailsCardHtml = `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 24px 0; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          <tr>
-            <td style="padding: 16px 20px; background-color: #1e3a8a; border-bottom: 2px solid #d97706;">
-              <span style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 0.15em;">
-                📌 CAMPAIGN &amp; EVENT PARTICULARS
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 20px;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                ${campaign.eventDate ? `
-                  <tr>
-                    <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📅</td>
-                    <td style="padding-bottom: 12px;">
-                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Date &amp; Schedule</div>
-                      <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventDate} ${campaign.eventTime ? `&bull; ${campaign.eventTime}` : ""}</div>
-                    </td>
-                  </tr>
-                ` : ""}
-                ${campaign.eventVenue ? `
-                  <tr>
-                    <td width="30" valign="top" style="padding-bottom: 12px; font-size: 16px;">📍</td>
-                    <td style="padding-bottom: 12px;">
-                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Location / Venue</div>
-                      <div style="font-size: 14px; font-weight: 600; color: #0f172a; font-family: sans-serif;">${campaign.eventVenue}</div>
-                    </td>
-                  </tr>
-                ` : ""}
-                ${campaign.targetAmount ? `
-                  <tr>
-                    <td width="30" valign="top" style="font-size: 16px;">🎯</td>
-                    <td>
-                      <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; font-family: sans-serif;">Target Budget / Goal</div>
-                      <div style="font-size: 16px; font-weight: 800; color: #d97706; font-family: sans-serif;">KES ${Number(campaign.targetAmount).toLocaleString()}</div>
-                    </td>
-                  </tr>
-                ` : ""}
-              </table>
-            </td>
-          </tr>
-        </table>
-      `;
-    }
-
-    let ctaHtml = "";
-    if (campaign.ctaText) {
-      const ctaUrl = campaign.ctaUrl || "https://pceastandrews.org";
-      ctaHtml = `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 30px 0 20px 0;">
-          <tr>
-            <td align="center">
-              <a 
-                href="${ctaUrl}" 
-                target="_blank" 
-                style="display: inline-block; background-color: #1e3a8a; background-image: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #ffffff; text-decoration: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.08em; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25); border: 1px solid #1e3a8a;"
-              >
-                ${campaign.ctaText} &rarr;
-              </a>
-            </td>
-          </tr>
-        </table>
-      `;
-    }
 
     return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
@@ -3770,105 +3711,296 @@ Your response MUST adhere strictly to the JSON schema specified.
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <div style="display: none; font-size: 1px; color: #f1f5f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+<body style="margin: 0; padding: 40px 16px; background-color: #f6f8fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #111827;">
+  <div style="display: none; font-size: 1px; color: #f6f8fa; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
     ${preheader}
   </div>
 
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; padding: 24px 10px;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
     <tr>
       <td align="center">
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06); overflow: hidden;">
-          
-          <!-- Top Header Strip: PCEA St. Andrew's Branding -->
+        <!-- Top Wordmark -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 26px; font-weight: 900; color: #94a3b8; letter-spacing: -0.5px; text-transform: lowercase;">
+            stands
+          </div>
+        </div>
+
+        <!-- Main Card Container -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); overflow: hidden; box-sizing: border-box;">
           <tr>
-            <td style="background-color: #0f172a; padding: 16px 24px; border-bottom: 2px solid #fbbf24;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding: 40px 36px 32px 36px; text-align: center;">
+              
+              <!-- Waving Hand with Confetti Graphic (Matching Reference) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
                 <tr>
-                  <td width="36" valign="middle">
-                    <img src="https://accounts.pceastandrews.org/pcea.svg" alt="PCEA St Andrew's" width="32" height="32" style="display: block; border-radius: 6px;" />
-                  </td>
-                  <td valign="middle" style="padding-left: 12px;">
-                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; font-weight: 900; color: #ffffff; letter-spacing: 0.1em; text-transform: uppercase;">
-                      PCEA St. Andrew's Church
-                    </div>
-                    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; font-weight: 700; color: #fbbf24; letter-spacing: 0.15em; text-transform: uppercase;">
-                      E-Requisitions Portal &bull; Official Broadcast
-                    </div>
-                  </td>
-                  <td align="right" valign="middle">
-                    <span style="display: inline-block; background-color: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 4px 10px; font-family: monospace; font-size: 10px; font-weight: 700; color: #fbbf24;">
-                      PROMOTION
-                    </span>
+                  <td align="center">
+                    <svg width="130" height="130" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+                      <circle cx="80" cy="80" r="60" fill="#F4F5F7" />
+                      <rect x="36" y="38" width="6" height="6" rx="1.5" transform="rotate(15 36 38)" fill="#4361EE" />
+                      <rect x="124" y="42" width="5" height="5" rx="1" transform="rotate(-20 124 42)" fill="#3B82F6" />
+                      <rect x="30" y="76" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <rect x="130" y="80" width="5" height="5" rx="1" transform="rotate(25 130 80)" fill="#F43F5E" />
+                      <rect x="44" y="112" width="4" height="4" rx="1" fill="#10B981" />
+                      <rect x="120" y="110" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <path d="M38 56L35 59L38 62L41 59L38 56Z" fill="#10B981" />
+                      <path d="M118 36L116 38.5L118 41L120 38.5L118 36Z" fill="#F43F5E" />
+                      <circle cx="50" cy="98" r="2" fill="#4361EE" />
+                      <circle cx="126" cy="62" r="2" fill="#4361EE" />
+                      <path d="M102 48C104 50 105 53 105 56" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" />
+                      <path d="M72 72C70 74 69 76 69 78" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" />
+                      <path d="M68 124C68 116 74 110 84 108L98 114C104 118 106 124 105 132L68 124Z" fill="#334155" />
+                      <path d="M74 72L74 54C74 50.7 76.7 48 80 48C83.3 48 86 50.7 86 54L86 64C86 64 88.5 49 92 49C95.5 49 98 51.5 98 55L98 68C98 68 100.5 56 104 56C107.5 56 110 58.5 110 62L110 82C110 94 102 106 88 108C76 108 70 98 70 88L70 82C66 81 64 77 66 73C68 69 72 70 74 72Z" fill="#EA8C55" />
+                      <path d="M75 74C74 73 72 73 70.5 74.5C69 76 69.5 78 71.5 79L76 82" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M86 66L86 78" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M98 70L98 80" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                    </svg>
                   </td>
                 </tr>
               </table>
-            </td>
-          </tr>
 
-          ${bannerHtml}
-
-          <!-- Main Content Area -->
-          <tr>
-            <td style="padding: 32px 32px 24px 32px; background-color: #ffffff;">
-              <div style="margin-bottom: 14px;">
-                <span style="display: inline-block; background-color: ${badgeBg}; color: ${badgeText}; border: 1px solid ${badgeBorder}; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  ${badgeLabel}
-                </span>
-              </div>
-
-              <h1 style="margin: 0 0 18px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 900; color: #0f172a; line-height: 1.3; letter-spacing: -0.02em;">
-                ${headline}
+              <!-- Main Greeting Headline -->
+              <h1 style="font-size: 22px; font-weight: 800; color: #111827; margin: 0 0 16px 0; line-height: 1.35; letter-spacing: -0.3px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Welcome to ${headline},<br />${recipientName}!
               </h1>
 
-              ${scriptureHtml}
-
-              <div style="margin-top: 16px;">
+              <!-- Body Paragraphs -->
+              <div style="margin-bottom: 28px;">
                 ${formattedParagraphs}
               </div>
 
-              ${detailsCardHtml}
-
-              ${ctaHtml}
-
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;" />
-
-              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <!-- Primary Blue CTA Button -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
                 <tr>
-                  <td style="font-size: 12px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5;">
-                    Dispatched on behalf of: <strong style="color: #0f172a;">${creatorName}</strong><br />
-                    Recipient Address: <code style="font-family: monospace; font-size: 11px; color: #1e3a8a;">${recipientEmail}</code>
+                  <td align="center">
+                    <a href="${ctaUrl}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 13px 32px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; text-align: center; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      ${ctaText}
+                    </a>
                   </td>
                 </tr>
               </table>
+
+              <!-- Secondary Callout -->
+              <div style="text-align: center; border-top: 1px solid #f3f4f6; padding-top: 24px;">
+                <h3 style="font-size: 15px; font-weight: 700; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Looking to attend an event?
+                </h3>
+                <p style="font-size: 13px; color: #4b5563; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Use STANDS to <a href="${ctaUrl}" style="color: #4361ee; text-decoration: none; font-weight: 600;">discover events</a> happening near you.
+                </p>
+                ${hasDetails ? `
+                  <div style="margin-top: 12px; font-size: 12px; color: #6b7280; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                    ${campaign.eventDate ? `📅 <strong>${campaign.eventDate}</strong> ` : ""}
+                    ${campaign.eventVenue ? `&bull; 📍 ${campaign.eventVenue}` : ""}
+                  </div>
+                ` : ""}
+              </div>
+
             </td>
           </tr>
 
-          <!-- Official Church Footer -->
+          <!-- Bottom Have Questions Card Footer -->
           <tr>
-            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 32px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.1em;">
-                Presbyterian Church of East Africa &bull; St. Andrew's Parish
-              </p>
-              <p style="margin: 0 0 10px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; color: #64748b; line-height: 1.5;">
-                State House Road / Nyerere Road, P.O. Box 41282 - 00100 Nairobi, Kenya<br />
-                Telephone: +254 20 2723040 / +254 722 208556 &bull; Email: ict.team@pceastandrews.org
-              </p>
-              <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 10px; color: #94a3b8;">
-                &copy; ${new Date().getFullYear()} PCEA St. Andrew's Church. All rights reserved. &bull; STANDS eRequisitions System
+            <td style="background-color: #f9fafb; border-top: 1px solid #f3f4f6; padding: 24px 32px; text-align: center;">
+              <h4 style="font-size: 15px; font-weight: 800; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Have questions?
+              </h4>
+              <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                We are here to help, learn more about STANDS <a href="${ctaUrl}/#help" style="color: #4361ee; text-decoration: none; font-weight: 600;">here</a> or <a href="mailto:ict.team@pceastandrews.org" style="color: #4361ee; text-decoration: none; font-weight: 600;">contact us</a>
               </p>
             </td>
           </tr>
-
         </table>
 
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin-top: 14px;">
+        <!-- Navigation Links Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 22px;">
           <tr>
-            <td align="center" style="font-size: 11px; color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4;">
-              This notification is an official church communication. If you received this email in error, please notify our ICT secretariat.
+            <td align="center" style="font-size: 13px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <a href="${ctaUrl}/#login" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Log in</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${ctaUrl}/#how-it-works" style="color: #4361ee; text-decoration: none; margin: 0 10px;">How it works</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${ctaUrl}/#help" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Get help</a>
             </td>
           </tr>
         </table>
+
+        <!-- Footer Notice Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 16px;">
+          <tr>
+            <td align="center" style="font-size: 11px; color: #9ca3af; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              Made with ❤️ in Nairobi<br />
+              PCEA St. Andrew's Church, State House Road / Nyerere Road, Nairobi, Kenya<br />
+              &copy; ${new Date().getFullYear()} STANDS.com &bull; 
+              <a href="${ctaUrl}/#settings" style="color: #4361ee; text-decoration: none;">Manage Preferences</a> &bull; 
+              <a href="${ctaUrl}/#unsubscribe" style="color: #4361ee; text-decoration: none;">Unsubscribe</a>
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  // --- LOGIN SECURITY ALERT EMAIL GENERATOR (Universe / Minimalist Style) ---
+  function generateLoginAlertEmailHtml({
+    userName = "Member",
+    userEmail,
+    authProvider = "Email & Password",
+    deviceInfo = "Desktop Web Browser",
+    ipAddress = "127.0.0.1",
+    timestamp = new Date().toISOString()
+  }: {
+    userName?: string;
+    userEmail: string;
+    authProvider?: string;
+    deviceInfo?: string;
+    ipAddress?: string;
+    timestamp?: string;
+  }): string {
+    const appUrl = process.env.APP_URL || "https://accounts.pceastandrews.org";
+    const formattedDate = new Date(timestamp).toLocaleString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short"
+    });
+
+    return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Security Alert: New Sign-In to STANDS eRequisitions</title>
+</head>
+<body style="margin: 0; padding: 40px 16px; background-color: #f6f8fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #111827;">
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td align="center">
+        <!-- Top Wordmark Header -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 26px; font-weight: 900; color: #94a3b8; letter-spacing: -0.5px; text-transform: lowercase;">
+            stands
+          </div>
+        </div>
+
+        <!-- Main Card Container -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; background-color: #ffffff; border-radius: 14px; border: 1px solid #e5e7eb; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); overflow: hidden; box-sizing: border-box;">
+          <tr>
+            <td style="padding: 40px 36px 32px 36px; text-align: center;">
+              
+              <!-- Waving Hand & Security Shield with Confetti Graphic (Matching Reference) -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="center">
+                    <svg width="130" height="130" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block; margin: 0 auto;">
+                      <circle cx="80" cy="80" r="60" fill="#F4F5F7" />
+                      <rect x="36" y="38" width="6" height="6" rx="1.5" transform="rotate(15 36 38)" fill="#4361EE" />
+                      <rect x="124" y="42" width="5" height="5" rx="1" transform="rotate(-20 124 42)" fill="#3B82F6" />
+                      <rect x="30" y="76" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <rect x="130" y="80" width="5" height="5" rx="1" transform="rotate(25 130 80)" fill="#F43F5E" />
+                      <rect x="44" y="112" width="4" height="4" rx="1" fill="#10B981" />
+                      <rect x="120" y="110" width="5" height="5" rx="1" fill="#F59E0B" />
+                      <path d="M38 56L35 59L38 62L41 59L38 56Z" fill="#10B981" />
+                      <path d="M118 36L116 38.5L118 41L120 38.5L118 36Z" fill="#F43F5E" />
+                      <circle cx="50" cy="98" r="2" fill="#4361EE" />
+                      <circle cx="126" cy="62" r="2" fill="#4361EE" />
+                      <path d="M102 48C104 50 105 53 105 56" stroke="#94A3B8" stroke-width="1.8" stroke-linecap="round" />
+                      <path d="M72 72C70 74 69 76 69 78" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round" />
+                      <path d="M68 124C68 116 74 110 84 108L98 114C104 118 106 124 105 132L68 124Z" fill="#334155" />
+                      <path d="M74 72L74 54C74 50.7 76.7 48 80 48C83.3 48 86 50.7 86 54L86 64C86 64 88.5 49 92 49C95.5 49 98 51.5 98 55L98 68C98 68 100.5 56 104 56C107.5 56 110 58.5 110 62L110 82C110 94 102 106 88 108C76 108 70 98 70 88L70 82C66 81 64 77 66 73C68 69 72 70 74 72Z" fill="#EA8C55" />
+                      <path d="M75 74C74 73 72 73 70.5 74.5C69 76 69.5 78 71.5 79L76 82" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M86 66L86 78" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                      <path d="M98 70L98 80" stroke="#D97706" stroke-width="1.2" stroke-linecap="round" />
+                    </svg>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Main Greeting Headline -->
+              <h1 style="font-size: 22px; font-weight: 800; color: #111827; margin: 0 0 16px 0; line-height: 1.35; letter-spacing: -0.3px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Welcome to STANDS,<br />${userName}!
+              </h1>
+
+              <!-- Body Paragraph -->
+              <p style="font-size: 14px; line-height: 1.6; color: #4b5563; margin: 0 0 24px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center;">
+                We detected a recent sign-in to your STANDS eRequisitions account. <a href="${appUrl}/#settings" style="color: #4361ee; text-decoration: none; font-weight: 600;">Learn more</a> on how you can manage your trusted devices.
+              </p>
+
+              <!-- Primary Blue CTA Button -->
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 28px;">
+                <tr>
+                  <td align="center">
+                    <a href="${appUrl}/#requisitions" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 13px 32px; border-radius: 8px; font-weight: 700; font-size: 14px; text-decoration: none; text-align: center; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                      Review your account
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Secondary Callout: Device & Session Details -->
+              <div style="text-align: center; border-top: 1px solid #f3f4f6; padding-top: 24px;">
+                <h3 style="font-size: 15px; font-weight: 700; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Didn't recognize this activity?
+                </h3>
+                <p style="font-size: 13px; color: #4b5563; line-height: 1.5; margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                  Use STANDS to <a href="${appUrl}/#settings" style="color: #4361ee; text-decoration: none; font-weight: 600;">reset your password</a> and safeguard your access credentials immediately.
+                </p>
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; text-align: left; font-size: 12px; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6;">
+                  <div>💻 <strong>Device:</strong> ${deviceInfo}</div>
+                  <div>🔑 <strong>Method:</strong> ${authProvider}</div>
+                  <div>🕒 <strong>Time:</strong> ${formattedDate}</div>
+                  <div>🌐 <strong>Account:</strong> ${userEmail}</div>
+                </div>
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Bottom Have Questions Card Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; border-top: 1px solid #f3f4f6; padding: 24px 32px; text-align: center;">
+              <h4 style="font-size: 15px; font-weight: 800; color: #111827; margin: 0 0 6px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                Have questions?
+              </h4>
+              <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                We are here to help, learn more about STANDS <a href="${appUrl}/#help" style="color: #4361ee; text-decoration: none; font-weight: 600;">here</a> or <a href="mailto:ict.team@pceastandrews.org" style="color: #4361ee; text-decoration: none; font-weight: 600;">contact us</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Navigation Links Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 22px;">
+          <tr>
+            <td align="center" style="font-size: 13px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <a href="${appUrl}/#login" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Log in</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${appUrl}/#how-it-works" style="color: #4361ee; text-decoration: none; margin: 0 10px;">How it works</a>
+              <span style="color: #cbd5e1;">&bull;</span>
+              <a href="${appUrl}/#help" style="color: #4361ee; text-decoration: none; margin: 0 10px;">Get help</a>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer Notice Below Card -->
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin-top: 16px;">
+          <tr>
+            <td align="center" style="font-size: 11px; color: #9ca3af; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              Made with ❤️ in Nairobi<br />
+              PCEA St. Andrew's Church, State House Road / Nyerere Road, Nairobi, Kenya<br />
+              &copy; ${new Date().getFullYear()} STANDS.com &bull; 
+              <a href="${appUrl}/#settings" style="color: #4361ee; text-decoration: none;">Manage Preferences</a> &bull; 
+              <a href="${appUrl}/#unsubscribe" style="color: #4361ee; text-decoration: none;">Unsubscribe</a>
+            </td>
+          </tr>
+        </table>
+
       </td>
     </tr>
   </table>
@@ -4323,75 +4455,35 @@ Your response MUST adhere strictly to the JSON schema specified.
           `).join('')
         : `<div style="text-align: center; padding: 20px; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">No recent disbursements to show.</div>`;
 
-      const bodyHtml = `
-        <div style="background-color: #f1f5f9; padding: 40px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-          <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; text-align: left; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);">
-            <!-- Header banner with church branding colors -->
+      const bodyHtml = buildSimpleEmailHtml({
+        badgeText: `${frequency} Summary`,
+        headline: "Requisitions Activity Digest",
+        subMessage: `Hello ${userFirstName}, here is your ${frequency.toLowerCase()} summary of workflow activities, pending approvals, and disbursements.`,
+        ctaText: "View eRequisitions Dashboard",
+        ctaUrl: `${process.env.APP_URL || "https://accounts.pceastandrews.org"}/#requisitions`,
+        contentHtml: `
+          <!-- Summary Metrics Cards -->
+          <table border="0" cellpadding="0" cellspacing="8" width="100%" style="margin-bottom: 16px;">
             <tr>
-              <td style="background-color: #0f172a; padding: 40px 30px; text-align: center;">
-                <div style="font-size: 10px; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">PCEA ST. ANDREWS CHURCH</div>
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">STANDS eRequisitions</h1>
-                <div style="display: inline-block; margin-top: 15px; background-color: rgba(251, 191, 36, 0.15); color: #fbbf24; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 30px; border: 1px solid rgba(251, 191, 36, 0.3); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  ${frequency} EXECUTIVE DIGEST
-                </div>
+              <td width="50%" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 14px; padding: 14px; text-align: center;">
+                <div style="font-size: 26px; font-weight: 800; color: #854d0e; line-height: 1; margin-bottom: 2px;">${pendingCount}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #a16207; text-transform: uppercase; letter-spacing: 0.5px;">Pending Approval</div>
               </td>
-            </tr>
-
-            <!-- Body contents -->
-            <tr>
-              <td style="padding: 40px 30px;">
-                <p style="font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Hello ${userFirstName},</p>
-                <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 30px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  Here is your automated requisitions summary of active approvals, drafted logs, and recently disbursed financial vouchers across your department.
-                </p>
-
-                <!-- Statistics Grid -->
-                <table border="0" cellpadding="0" cellspacing="12" width="100%" style="margin-left: -12px; margin-right: -12px; margin-bottom: 25px;">
-                  <tr>
-                    <td width="50%" valign="top" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px; text-align: center;">
-                      <div style="font-size: 32px; font-weight: 800; color: #1d4ed8; line-height: 1; margin-bottom: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${pendingCount}</div>
-                      <div style="font-size: 11px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 1.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Pending Approval</div>
-                    </td>
-                    <td width="50%" valign="top" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 20px; text-align: center;">
-                      <div style="font-size: 32px; font-weight: 800; color: #d97706; line-height: 1; margin-bottom: 6px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${draftsCount}</div>
-                      <div style="font-size: 11px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 1.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">Voucher Drafts</div>
-                    </td>
-                  </tr>
-                </table>
-
-                <!-- Recently Disbursed Heading -->
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 30px; margin-bottom: 15px;">
-                  <tr>
-                    <td style="font-size: 13px; font-weight: 800; color: #000000; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 6px; border-bottom: 2px solid #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                      💳 Recently Disbursed (Last 2)
-                    </td>
-                  </tr>
-                </table>
-
-                <!-- Items list -->
-                <div style="margin-bottom: 10px;">
-                  ${disbursedHtml}
-                </div>
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
-                <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin: 0 0 12px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  You are receiving this summary because digest notification alerts are activated on your user profile credentials.
-                </p>
-                <div style="display: inline-block; background-color: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  SHARED VIA AUTHORIZED SENDER: ict.team@pceastandrews.org
-                </div>
-                <p style="font-size: 10px; color: #cbd5e1; margin-top: 15px; margin-bottom: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-                  PCEA St. Andrews Church © ${new Date().getFullYear()} eRequisition Core Systems.
-                </p>
+              <td width="50%" style="background-color: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px; padding: 14px; text-align: center;">
+                <div style="font-size: 26px; font-weight: 800; color: #18181b; line-height: 1; margin-bottom: 2px;">${draftsCount}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Draft Requisitions</div>
               </td>
             </tr>
           </table>
-        </div>
-      `;
+        `,
+        cardHtml: `
+          <div style="font-size: 12px; font-weight: 800; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+            💳 Recently Disbursed
+          </div>
+          ${disbursedHtml}
+        `,
+        footerNote: `Shared from ict.team@pceastandrews.org • You received this because you enabled ${frequency.toLowerCase()} email notifications in your profile.`
+      });
 
       await transporter.sendMail({
         from: `"STANDS Summary" <ict.team@pceastandrews.org>`,
@@ -4617,104 +4709,47 @@ Your response MUST adhere strictly to the JSON schema specified.
       `).join("")
       : `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #64748b; font-size: 13px;">No unapproved requisitions currently waiting.</td></tr>`;
 
-    const bodyHtml = `
-      <div style="background-color: #f1f5f9; padding: 35px 10px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 650px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);">
-          <!-- Header -->
+    const bodyHtml = buildSimpleEmailHtml({
+      badgeText: "14-Day Digest",
+      headline: "Unapproved Requisitions Digest",
+      subMessage: "This is your automated bi-weekly requisitions update for items awaiting review and approval across departments.",
+      ctaText: "Review Pending Requisitions",
+      ctaUrl: portalUrl,
+      contentHtml: `
+        <!-- Metrics Grid -->
+        <table border="0" cellpadding="0" cellspacing="8" width="100%" style="margin-bottom: 16px;">
           <tr>
-            <td style="background-color: #0f172a; padding: 36px 28px; text-align: center;">
-              <div style="font-size: 10px; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 8px;">
-                PCEA ST. ANDREWS CHURCH
-              </div>
-              <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
-                STANDS eRequisitions
-              </h1>
-              <div style="display: inline-block; margin-top: 14px; background-color: rgba(251, 191, 36, 0.15); color: #fbbf24; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(251, 191, 36, 0.3);">
-                ⏳ 14-DAYS REQUISITIONS SUMMARY
-              </div>
+            <td width="50%" style="background-color: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 14px; padding: 14px; text-align: center;">
+              <div style="font-size: 26px; font-weight: 800; color: #18181b; line-height: 1; margin-bottom: 2px;">${summaryData.totalCount}</div>
+              <div style="font-size: 10px; font-weight: 700; color: #71717a; text-transform: uppercase; letter-spacing: 0.5px;">Awaiting Action</div>
             </td>
-          </tr>
-
-          <!-- Intro -->
-          <tr>
-            <td style="padding: 32px 28px 20px;">
-              <p style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 0; margin-bottom: 6px;">
-                UPDATE | Un-approved Requisitions (Last 14 Days)
-              </p>
-              <p style="font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 24px;">
-                This is an automated bi-weekly requisitions update currently awaiting review. 
-              </p>
-
-              <!-- Metrics Grid -->
-              <table border="0" cellpadding="0" cellspacing="10" width="100%" style="margin-left: -10px; margin-right: -10px; margin-bottom: 24px;">
-                <tr>
-                  <td width="50%" valign="top" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; text-align: center;">
-                    <div style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1; margin-bottom: 4px;">${summaryData.totalCount}</div>
-                    <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Unapproved</div>
-                  </td>
-                  <td width="50%" valign="top" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 12px; padding: 16px; text-align: center;">
-                    <div style="font-size: 24px; font-weight: 800; color: #a16207; line-height: 1; margin-bottom: 4px;">KES ${summaryData.totalAmount.toLocaleString()}</div>
-                    <div style="font-size: 10px; font-weight: 800; color: #854d0e; text-transform: uppercase; letter-spacing: 1px;">Pending Amount</div>
-                  </td>
-                </tr>
-                <tr>
-                  <td width="50%" valign="top" style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 12px 16px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 800; color: #1d4ed8; line-height: 1; margin-bottom: 2px;">${summaryData.level1Count}</div>
-                    <div style="font-size: 9px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 1 Approver</div>
-                  </td>
-                  <td width="50%" valign="top" style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 12px 16px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 800; color: #7e22ce; line-height: 1; margin-bottom: 2px;">${summaryData.level2Count}</div>
-                    <div style="font-size: 9px; font-weight: 700; color: #9333ea; text-transform: uppercase; letter-spacing: 1px;">Awaiting Level 2 Approver</div>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Itemized Table -->
-              <div style="margin-top: 24px; margin-bottom: 24px; overflow-x: auto;">
-                <div style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 8px; border-bottom: 2px solid #0f172a; margin-bottom: 8px;">
-                  📋 Unapproved Requisitions (${summaryData.items.length > 15 ? `Showing 15 of ${summaryData.totalCount}` : summaryData.totalCount})
-                </div>
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
-                  <thead>
-                    <tr style="background-color: #f1f5f9; text-align: left;">
-                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Requisition</th>
-                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Requester</th>
-                      <th align="right" style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px;">Amount</th>
-                      <th style="padding: 8px 10px; font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; text-align: center;">Pending</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${rowsHtml}
-                  </tbody>
-                </table>
-              </div>
-
-              <!-- Call to Action Button -->
-              <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
-                <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-size: 13px; font-weight: 800; letter-spacing: 0.5px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);">
-                  Review Requisitions →
-                </a>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 24px 28px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="font-size: 11px; color: #64748b; line-height: 1.5; margin: 0 0 10px;">
-                <strong>This automated digest is sent every 14-day schedule.</strong>: 
-              </p>
-              <div style="display: inline-block; background-color: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 4px;">
-                To Respond Contact : finance@pceastandrews.org
-              </div>
-              <p style="font-size: 10px; color: #94a3b8; margin-top: 14px; margin-bottom: 0;">
-                PCEA St. Andrew's Church © ${new Date().getFullYear()} STANDS eRequisitions
-              </p>
+            <td width="50%" style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 14px; padding: 14px; text-align: center;">
+              <div style="font-size: 22px; font-weight: 800; color: #854d0e; line-height: 1; margin-bottom: 2px;">KES ${summaryData.totalAmount.toLocaleString()}</div>
+              <div style="font-size: 10px; font-weight: 700; color: #a16207; text-transform: uppercase; letter-spacing: 0.5px;">Pending Total</div>
             </td>
           </tr>
         </table>
-      </div>
-    `;
+      `,
+      cardHtml: `
+        <div style="font-size: 12px; font-weight: 800; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+          📋 Unapproved Requisitions (${summaryData.items.length > 15 ? `Showing 15 of ${summaryData.totalCount}` : summaryData.totalCount})
+        </div>
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse;">
+          <thead>
+            <tr style="background-color: #e4e4e7; text-align: left;">
+              <th style="padding: 6px 8px; font-size: 10px; font-weight: 800; color: #3f3f46; text-transform: uppercase;">Requisition</th>
+              <th style="padding: 6px 8px; font-size: 10px; font-weight: 800; color: #3f3f46; text-transform: uppercase;">Requester</th>
+              <th align="right" style="padding: 6px 8px; font-size: 10px; font-weight: 800; color: #3f3f46; text-transform: uppercase;">Amount</th>
+              <th style="padding: 6px 8px; font-size: 10px; font-weight: 800; color: #3f3f46; text-transform: uppercase; text-align: center;">Stage</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      `,
+      footerNote: "Automated 14-day digest schedule • To respond, contact finance@pceastandrews.org"
+    });
 
     let emailDelivered = false;
     let emailError: string | null = null;
@@ -4989,22 +5024,22 @@ Your response MUST adhere strictly to the JSON schema specified.
     }
 
     try {
-      const testHtml = `
-        <div style="max-width: 600px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-          <div style="background-color: #0f172a; padding: 24px; text-align: left;">
-            <span style="color: #38bdf8; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;">STANDS eRequisitions</span>
-            <h1 style="color: #ffffff; font-size: 18px; font-weight: 700; margin: 6px 0 0 0;">System Audit Diagnostic Verification</h1>
+      const testHtml = buildSimpleEmailHtml({
+        badgeText: "Diagnostic Test",
+        headline: "System Audit Verification",
+        subMessage: "This is an automated diagnostic test message generated by the System Administrator to test SMTP mailer routing and verify live system audit logging.",
+        cardHtml: `
+          <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;">
+            <div style="font-size: 13px; font-weight: 800; color: #065f46;">Diagnostic Status: PASSED</div>
+            <div style="font-size: 11px; color: #047857; margin-top: 2px;">Subject: ${subject}</div>
+            <div style="font-size: 11px; color: #047857; margin-top: 2px;">Timestamp: ${timestamp}</div>
           </div>
-          <div style="padding: 24px; color: #334155;">
-            <p style="font-size: 14px; line-height: 1.6;">This is an automated diagnostic email generated by the System Administrator to test SMTP mailer routing and verify live system audit logging.</p>
-            <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 6px; margin: 16px 0;">
-              <p style="margin: 0; font-size: 13px; font-weight: 700; color: #065f46;">Diagnostic Check: PASSED</p>
-              <p style="margin: 4px 0 0 0; font-size: 12px; color: #047857;">Timestamp: ${timestamp}</p>
-            </div>
-            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 24px;">PCEA St. Andrew's Church eRequisitions Audit Ledger</p>
+          <div style="font-size: 11px; color: #71717a;">
+            Recipient: ${to} &bull; Performed by: ${performer}
           </div>
-        </div>
-      `;
+        `,
+        footerNote: "PCEA St. Andrew's Church eRequisitions Audit Ledger"
+      });
 
       await transporter.sendMail({
         from: `"STANDS eRequisitions" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
@@ -5050,6 +5085,102 @@ Your response MUST adhere strictly to the JSON schema specified.
       res.status(500).json({
         success: false,
         error: err.message || "Failed to dispatch test email"
+      });
+    }
+  });
+
+  // API Route for Sending User Security Login Alerts (Universe / Minimalist Style)
+  app.post("/api/send-login-alert", async (req, res) => {
+    const { email, userName, authProvider, deviceInfo, ipAddress, timestamp } = req.body;
+    const targetEmail = (email || "").trim().toLowerCase();
+
+    if (!targetEmail || !targetEmail.includes("@")) {
+      return res.status(400).json({ success: false, error: "Valid recipient email address is required." });
+    }
+
+    const eventTime = timestamp || new Date().toISOString();
+    const loginName = userName || extractFirstName("", targetEmail);
+    const subject = `🛡️ Security Notice: New Sign-In to STANDS eRequisitions (${loginName})`;
+
+    const emailHtml = generateLoginAlertEmailHtml({
+      userName: loginName,
+      userEmail: targetEmail,
+      authProvider: authProvider || "Email & Password",
+      deviceInfo: deviceInfo || "Web Browser",
+      ipAddress: ipAddress || "127.0.0.1",
+      timestamp: eventTime
+    });
+
+    if (!process.env.SMTP_PASS) {
+      console.warn(`[Login Alert] SMTP_PASS not set. Login Alert email to <${targetEmail}> logged as simulated.`);
+      persistActivity({
+        action: "LOGIN_ALERT_EMAIL_SIMULATED",
+        details: `Simulated Security Login Alert sent to <${targetEmail}> for sign-in via ${authProvider || "Credentials"} (SMTP not configured).`,
+        performedBy: "SECURITY_MAILER",
+        timestamp: eventTime,
+        metadata: {
+          recipientEmail: targetEmail,
+          authProvider,
+          deviceInfo,
+          ipAddress,
+          status: "SIMULATED"
+        }
+      });
+
+      return res.json({
+        success: true,
+        deliveredTo: targetEmail,
+        simulated: true,
+        message: "Login alert email logged in system audit trail (Simulation Mode)."
+      });
+    }
+
+    try {
+      await transporter.sendMail({
+        from: `"STANDS Security" <${process.env.SMTP_USER || "ict.team@pceastandrews.org"}>`,
+        to: targetEmail,
+        subject,
+        html: emailHtml
+      });
+
+      persistActivity({
+        action: "LOGIN_ALERT_EMAIL_DISPATCH",
+        details: `Security Login Alert email dispatched to <${targetEmail}> for sign-in via ${authProvider || "Credentials"}`,
+        performedBy: "SECURITY_MAILER",
+        timestamp: eventTime,
+        metadata: {
+          recipientEmail: targetEmail,
+          authProvider,
+          deviceInfo,
+          ipAddress,
+          status: "DELIVERED"
+        }
+      });
+
+      return res.json({
+        success: true,
+        deliveredTo: targetEmail,
+        status: "DELIVERED",
+        message: `Security login alert delivered to ${targetEmail}.`
+      });
+    } catch (mailErr: any) {
+      console.error("[Login Alert Error]:", mailErr);
+      persistActivity({
+        action: "LOGIN_ALERT_EMAIL_FAILED",
+        details: `Security Login Alert to <${targetEmail}> failed: ${mailErr.message || "Unknown error"}`,
+        performedBy: "SECURITY_MAILER",
+        timestamp: eventTime,
+        metadata: {
+          recipientEmail: targetEmail,
+          error: mailErr.message
+        }
+      });
+
+      return res.json({
+        success: true,
+        deliveredTo: targetEmail,
+        simulated: true,
+        warning: mailErr.message
       });
     }
   });
@@ -7541,77 +7672,47 @@ Your response MUST adhere strictly to the JSON schema specified.
       // 1. Send Email Attachment if feature enabled
       if (features.sendEmail !== false) {
         const subject = `[${freqLabel} BACKUP ${isEncrypted ? "🔒 AES-256 ENCRYPTED" : ""} - ${config.scheduleTime || "04:00"}] STANDS Database Snapshot (${dateStr})`;
-        const html = `
-          <div style="font-family: Arial, sans-serif; max-width: 620px; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; margin: 0 auto;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <div style="display: inline-block; background: #4f46e5; color: white; padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">
-                🛡️ STANDS eRequisitions System Backup (${freqLabel})
-              </div>
-            </div>
-            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; text-align: center; font-weight: 800;">
-              ${isEncrypted ? "🔒 AES-256-GCM Encrypted Snapshot Attached" : "Database Snapshot Attached"}
-            </h2>
-            <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-              Hello Super Administrator,
-            </p>
-            <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-              Your scheduled automated system database snapshot (${freqLabel} cycle at ${config.scheduleTime || "04:00"}) has been compiled and securely attached for recipient <strong>${targetEmail}</strong>.
-            </p>
-
+        const html = buildSimpleEmailHtml({
+          badgeText: `${freqLabel} System Backup`,
+          headline: isEncrypted ? "🔒 Encrypted Database Snapshot" : "Database Snapshot Backup",
+          subMessage: `Your scheduled automated system database snapshot (${freqLabel} cycle at ${config.scheduleTime || "04:00"}) has been compiled and securely attached.`,
+          cardHtml: `
             ${isEncrypted ? `
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 10px; margin: 16px 0; font-size: 13px; color: #1e40af;">
-              🔒 <strong>Disaster Recovery AES-256-GCM Encryption Active:</strong> This backup snapshot is cryptographically encrypted at rest using PBKDF2 (100,000 iterations) and AES-256-GCM authenticated cipher with SHA-256 integrity verification.
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 12px; color: #1e40af;">
+              🔒 <strong>AES-256-GCM Encryption Active:</strong> Cryptographically encrypted at rest with PBKDF2 and SHA-256 integrity verification.
             </div>` : ""}
-
-            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-              <h4 style="margin: 0 0 14px 0; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 1px; font-weight: 800;">
-                Snapshot Metrics Summary
-              </h4>
-              <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Schedule Policy:</td>
-                  <td style="padding: 8px 0; font-weight: bold; color: #10b981; text-align: right;">${freqLabel} (${config.scheduleTime || "04:00"})</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Target Email:</td>
-                  <td style="padding: 8px 0; font-weight: bold; color: #4f46e5; text-align: right;">${targetEmail}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Security Standard:</td>
-                  <td style="padding: 8px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM Authenticated" : "Plaintext JSON"}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">File Attachment:</td>
-                  <td style="padding: 8px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Snapshot Size:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${sizeKb} KB</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Total Requisitions:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Registered Users:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalUsers}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;">
-                  <td style="padding: 8px 0; color: #64748b;">Church Groups/Ministries:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalGroups}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #64748b;">Dispatched Timestamp:</td>
-                  <td style="padding: 8px 0; font-weight: bold; text-align: right;">${new Date(timestamp).toLocaleString()}</td>
-                </tr>
-              </table>
+            <div style="font-size: 12px; font-weight: 800; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              Snapshot Metrics
             </div>
-
-            <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-              This is an automated system security backup dispatch from PCEA St. Andrews STANDS eRequisitions.
-            </p>
-          </div>
-        `;
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+              <tr style="border-bottom: 1px solid #e4e4e7;">
+                <td style="padding: 6px 0; color: #71717a;">Policy &amp; Schedule:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #10b981; text-align: right;">${freqLabel} (${config.scheduleTime || "04:00"})</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e4e4e7;">
+                <td style="padding: 6px 0; color: #71717a;">Target Recipient:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: #18181b; text-align: right;">${targetEmail}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e4e4e7;">
+                <td style="padding: 6px 0; color: #71717a;">Security Standard:</td>
+                <td style="padding: 6px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM" : "Plaintext JSON"}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e4e4e7;">
+                <td style="padding: 6px 0; color: #71717a;">Attachment:</td>
+                <td style="padding: 6px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName} (${sizeKb} KB)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e4e4e7;">
+                <td style="padding: 6px 0; color: #71717a;">Total Requisitions:</td>
+                <td style="padding: 6px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: #71717a;">Timestamp:</td>
+                <td style="padding: 6px 0; font-weight: bold; text-align: right;">${new Date(timestamp).toLocaleString()}</td>
+              </tr>
+            </table>
+          `,
+          footerNote: "Automated system security backup dispatch • PCEA St. Andrew's Church STANDS eRequisitions"
+        });
 
         try {
           await transporter.sendMail({
@@ -7809,73 +7910,43 @@ Your response MUST adhere strictly to the JSON schema specified.
       const fileBuffer = Buffer.from(fileContent, "utf-8");
 
       const subject = `[AUTOSEND BACKUP ${isEncrypted ? "🔒 AES-256 ENCRYPTED" : ""}] System Database Snapshot (${dateStr})`;
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 620px; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; margin: 0 auto;">
-          <div style="text-align: center; margin-bottom: 20px;">
-            <div style="display: inline-block; background: #4f46e5; color: white; padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">
-              🛡️ STANDS eRequisitions System Backup
-            </div>
-          </div>
-          <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; text-align: center; font-weight: 800;">
-            ${isEncrypted ? "🔒 AES-256-GCM Encrypted Snapshot Attached" : "Database Snapshot Attached"}
-          </h2>
-          <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-            Hello Super Administrator,
-          </p>
-          <p style="font-size: 14px; color: #475569; line-height: 1.6;">
-            A system backup snapshot of the STANDS eRequisitions database has been compiled and securely attached as a file for recipient <strong>${targetEmail}</strong>.
-          </p>
-
+      const html = buildSimpleEmailHtml({
+        badgeText: "System Backup",
+        headline: isEncrypted ? "🔒 Encrypted Database Snapshot" : "Database Snapshot Backup",
+        subMessage: `A system backup snapshot of the STANDS eRequisitions database has been compiled and securely attached.`,
+        cardHtml: `
           ${isEncrypted ? `
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px 16px; border-radius: 10px; margin: 16px 0; font-size: 13px; color: #1e40af;">
-            🔒 <strong>Disaster Recovery AES-256-GCM Encryption Active:</strong> This backup snapshot is cryptographically encrypted at rest using PBKDF2 (100,000 iterations) and AES-256-GCM authenticated cipher with SHA-256 integrity verification.
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 12px; color: #1e40af;">
+            🔒 <strong>AES-256-GCM Encryption Active:</strong> Cryptographically encrypted at rest with PBKDF2 and SHA-256 integrity verification.
           </div>` : ""}
-
-          <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin: 20px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <h4 style="margin: 0 0 14px 0; font-size: 12px; text-transform: uppercase; color: #64748b; letter-spacing: 1px; font-weight: 800;">
-              Snapshot Summary Metrics
-            </h4>
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Target Email:</td>
-                <td style="padding: 8px 0; font-weight: bold; color: #4f46e5; text-align: right;">${targetEmail}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Security Standard:</td>
-                <td style="padding: 8px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM Authenticated" : "Plaintext JSON"}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">File Attachment:</td>
-                <td style="padding: 8px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Snapshot Size:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${sizeKb} KB</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Total Requisitions:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Registered Users:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalUsers}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 0; color: #64748b;">Church Groups/Ministries:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalGroups}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #64748b;">Dispatched Timestamp:</td>
-                <td style="padding: 8px 0; font-weight: bold; text-align: right;">${new Date(timestamp).toLocaleString()}</td>
-              </tr>
-            </table>
+          <div style="font-size: 12px; font-weight: 800; color: #18181b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+            Snapshot Summary Metrics
           </div>
-
-          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-            This is an automated system security backup dispatch from PCEA St. Andrews STANDS eRequisitions.
-          </p>
-        </div>
-      `;
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 6px 0; color: #71717a;">Target Recipient:</td>
+              <td style="padding: 6px 0; font-weight: bold; color: #18181b; text-align: right;">${targetEmail}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 6px 0; color: #71717a;">Security Standard:</td>
+              <td style="padding: 6px 0; font-weight: bold; color: ${isEncrypted ? "#2563eb" : "#d97706"}; text-align: right;">${isEncrypted ? "AES-256-GCM" : "Plaintext JSON"}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 6px 0; color: #71717a;">Attachment:</td>
+              <td style="padding: 6px 0; font-weight: bold; font-family: monospace; text-align: right;">${fileName} (${sizeKb} KB)</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 6px 0; color: #71717a;">Total Requisitions:</td>
+              <td style="padding: 6px 0; font-weight: bold; text-align: right;">${rawPayload.summary.totalRequisitions}</td>
+            </tr>
+            <tr>
+              <td style="padding: 6px 0; color: #71717a;">Timestamp:</td>
+              <td style="padding: 6px 0; font-weight: bold; text-align: right;">${new Date(timestamp).toLocaleString()}</td>
+            </tr>
+          </table>
+        `,
+        footerNote: "Automated system security backup dispatch • PCEA St. Andrew's Church STANDS eRequisitions"
+      });
 
       let emailStatus = "DELIVERED";
       let warning = null;

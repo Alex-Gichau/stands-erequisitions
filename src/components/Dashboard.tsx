@@ -978,7 +978,7 @@ const Dashboard: React.FC<{
                 </h3>
                 <p className="opacity-80 text-xs md:text-sm max-w-md">
                   {activeMinistryView === "ALL" 
-                    ? "Combined budget absorption rate and live cash reserves across all your assigned portfolios." 
+                    ? "Combined budget across all your assigned ministries." 
                     : `Live fiscal monitoring for your specific project allocation: ${activeMinistryView}.`}
                 </p>
               </div>

@@ -119,6 +119,7 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
   const [encryptionEnabledInput, setEncryptionEnabledInput] = useState<boolean>(true);
   const [backupPassphraseInput, setBackupPassphraseInput] = useState<string>("");
   const [showPassphrase, setShowPassphrase] = useState<boolean>(false);
+  const [showRestorePassphrase, setShowRestorePassphrase] = useState<boolean>(false);
 
   // Disaster Recovery state
   const [drReadiness, setDrReadiness] = useState<DisasterRecoveryReadiness | null>(null);
@@ -1648,13 +1649,23 @@ export const AutosendBackupMonitoringPanel: React.FC = () => {
                 </button>
               </div>
 
-              <input
-                type="password"
-                placeholder="Enter passphrase if different from default..."
-                value={restorePassphraseInput}
-                onChange={(e) => setRestorePassphraseInput(e.target.value)}
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-xs font-mono text-foreground focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showRestorePassphrase ? "text" : "password"}
+                  placeholder="Enter passphrase if different from default..."
+                  value={restorePassphraseInput}
+                  onChange={(e) => setRestorePassphraseInput(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-xs font-mono text-foreground focus:ring-2 focus:ring-indigo-500 outline-none pr-11"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRestorePassphrase(!showRestorePassphrase)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                  title={showRestorePassphrase ? "Hide passphrase" : "Show passphrase"}
+                >
+                  {showRestorePassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
 
               {verificationResult && (
                 <div className={`p-4 rounded-xl border text-xs space-y-2 ${

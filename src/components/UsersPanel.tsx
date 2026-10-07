@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRequisitions } from "../contexts/RequisitionContext";
 import { UserRole, UserProfile } from "../types";
 import { cn } from "../lib/utils";
@@ -178,7 +178,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     return counts;
   }, [users, churchGroups]);
 
-  // Group search & filtering states under identity & affiliations
+  // Group search & filtering states under Users & Church Groups
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [groupBudgetFilter, setGroupBudgetFilter] = useState<"ALL" | "WITH_BUDGET" | "NO_BUDGET">("ALL");
 
@@ -432,50 +432,41 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
     setEditSuccess(null);
   };
 
-  const [isReconcilingGroups, setIsReconcilingGroups] = useState(false);
+  // Dynamic Self-Healing Auto-Enforcement of Church Group Allocations
+  const autoEnforceInProgressRef = React.useRef(false);
+  useEffect(() => {
+    if (!users || users.length === 0 || autoEnforceInProgressRef.current) return;
+    
+    const unallocatedUsers = users.filter((u) => {
+      const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(u);
+      return !u.group || 
+             u.group === "INDEPENDENT" || 
+             u.group === "UNALLOCATED" || 
+             u.group !== cleanGroup || 
+             !u.groups || 
+             u.groups.length === 0 ||
+             JSON.stringify(u.groups) !== JSON.stringify(cleanGroups);
+    });
 
-  const handleEnforceAllGroupAllocations = async () => {
-    setIsReconcilingGroups(true);
-    let updatedCount = 0;
-    try {
-      for (const u of users) {
-        const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(u);
-        const needsUpdate = !u.group || 
-                            u.group === "INDEPENDENT" || 
-                            u.group === "UNALLOCATED" || 
-                            u.group !== cleanGroup || 
-                            !u.groups || 
-                            u.groups.length === 0 ||
-                            JSON.stringify(u.groups) !== JSON.stringify(cleanGroups);
-        
-        if (needsUpdate) {
-          await updateUserProfile(u.id, {
-            group: cleanGroup,
-            groups: cleanGroups
-          });
-          updatedCount++;
+    if (unallocatedUsers.length > 0) {
+      autoEnforceInProgressRef.current = true;
+      (async () => {
+        try {
+          for (const u of unallocatedUsers) {
+            const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(u);
+            await updateUserProfile(u.id, {
+              group: cleanGroup,
+              groups: cleanGroups
+            });
+          }
+        } catch (err) {
+          console.warn("[Auto-Enforce Group Allocation] Dynamic auto-reconciliation note:", err);
+        } finally {
+          autoEnforceInProgressRef.current = false;
         }
-      }
-      triggerToast({
-        type: "SYSTEM_INFO",
-        severity: "LOW",
-        message: updatedCount > 0 
-          ? `Verified and assigned ${updatedCount} member(s) to canonical church groups!`
-          : "All registered members are verified and allocated to active church groups.",
-        timestamp: new Date().toISOString()
-      });
-    } catch (err: any) {
-      console.error("Failed to enforce group allocations:", err);
-      triggerToast({
-        type: "SECURITY_UPDATE",
-        severity: "HIGH",
-        message: "Failed to enforce church group allocations.",
-        timestamp: new Date().toISOString()
-      });
-    } finally {
-      setIsReconcilingGroups(false);
+      })();
     }
-  };
+  }, [users, updateUserProfile]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -641,9 +632,9 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <Users size={24} className="text-primary" />
-            Identity & Affiliation
+            Users & Church Groups
           </h2>
-          <p className="text-xs md:text-sm text-slate-500">Manage user directory and organizational structure.</p>
+          <p className="text-xs md:text-sm text-slate-500">Manage users, ministries and church groups.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -665,18 +656,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               <span className="text-[10px] md:text-xs uppercase tracking-widest font-black">NEW CHURCH GROUP</span>
             </button>
           )}
-          <button 
-            type="button"
-            disabled={isReconcilingGroups}
-            onClick={handleEnforceAllGroupAllocations}
-            className="w-full md:w-auto px-4 py-3 md:py-2.5 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 hover:bg-teal-100 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
-            title="Audit and enforce that every member is allocated to a valid church group"
-          >
-            <Building2 size={18} className={cn("text-teal-600 dark:text-teal-400", isReconcilingGroups && "animate-spin")} />
-            <span className="text-[10px] md:text-xs uppercase tracking-widest font-black">
-              {isReconcilingGroups ? "ENFORCING..." : "ENFORCE ALLOCATIONS"}
-            </span>
-          </button>
           <button 
             onClick={() => {
               setIsModalOpen(true);
@@ -1207,15 +1186,6 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   </button>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setIsGroupModalOpen(true)}
-                className="px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 shrink-0 transition-all cursor-pointer"
-              >
-                <Building2 size={15} />
-                <span>New Group</span>
-              </button>
             </div>
 
             {/* Budget Allocation Status Filter Bar */}
@@ -2231,19 +2201,19 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-2xl md:rounded-3xl w-full max-w-xl max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col my-auto"
+              className="bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl w-full max-w-xl max-h-[92vh] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col my-auto text-slate-900 dark:text-slate-100"
             >
-              <div className="px-4 md:px-8 py-4 md:py-6 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-20 shrink-0">
+              <div className="px-4 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-transparent flex items-center justify-between sticky top-0 z-20 shrink-0">
                 <div>
-                  <h3 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-[0.2em]">
+                  <h3 className="text-[10px] md:text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-[0.2em]">
                     {isModalOpen ? "New Member Credentials" : "Update Member Transaction"}
                   </h3>
                 </div>
                 <button 
                   onClick={() => { setIsModalOpen(false); setEditingUser(null); setError(null); setSuccess(null); setGeneratedInvite(null); }}
-                  className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-500 dark:text-slate-400"
                 >
-                  <X size={20} className="text-slate-500 md:w-5 md:h-5" />
+                  <X size={20} className="md:w-5 md:h-5" />
                 </button>
               </div>
 
@@ -2669,15 +2639,15 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-2xl md:rounded-3xl w-full max-w-md max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col my-auto"
+              className="bg-white dark:bg-slate-900 rounded-2xl md:rounded-3xl w-full max-w-md max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col my-auto text-slate-900 dark:text-slate-100"
             >
-              <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10 bg-white shrink-0">
+              <div className="px-6 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between sticky top-0 z-10 bg-transparent shrink-0">
                 <div>
-                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">New Church Group</h3>
+                  <h3 className="text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-[0.2em]">New Church Group</h3>
                   <p className="text-[10px] text-slate-400 font-mono tracking-widest mt-1">SYS_STRUCT_MOD</p>
                 </div>
-                <button onClick={() => setIsGroupModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
-                  <X size={20} className="text-slate-400" />
+                <button onClick={() => setIsGroupModalOpen(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-400">
+                  <X size={20} />
                 </button>
               </div>
 

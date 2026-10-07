@@ -1929,7 +1929,7 @@ const DocumentPreviewModal = ({
         )}
       >
         {/* Header bar */}
-        <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 select-none shrink-0 z-20">
+        <div className="px-5 py-3.5 bg-transparent border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 select-none shrink-0 z-20">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
               <FileText size={18} />
@@ -6249,27 +6249,27 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           if (roleStr.includes("L1") || roleStr.includes("APPROVER_L1") || roleStr.toLowerCase().includes("compliance")) {
             type = "L1_APPROVED";
             title = "L1 Approved";
-            subtitle = "First level verification & audit clearance";
+            
           } else if (roleStr.includes("L2") || roleStr.includes("APPROVER_L2") || roleStr.toLowerCase().includes("keymaster")) {
             type = "L2_APPROVED";
             title = "L2 Approved";
-            subtitle = "Second level consensus consent";
+            
           } else if (roleStr.toLowerCase().includes("finance") || (note.note || "").toLowerCase().includes("disburs") || (note.note || "").toLowerCase().includes("payment")) {
             type = "DISBURSED";
             title = "Requisition Funds Disbursed";
-            subtitle = "Financial transaction settled and paid";
+            
           } else {
             type = "GENERIC";
             title = "Validated & Approved";
           }
         } else if (decision === "REJECT") {
           type = "REJECTED";
-          title = "Requisition Returned / Rejected";
-          subtitle = "Process halted by reviewer";
+          title = "Requisition Rejected";
+          
         } else if (decision === "ESCALATE") {
           type = "ESCALATED";
           title = "Transaction Escalated";
-          subtitle = "Review forwarded to higher authority";
+          
         }
 
         timeline.push({
@@ -6384,7 +6384,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       className={containerClass}
     >
       <div className={cn(
-        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-white dark:bg-slate-900 gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
+        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-transparent gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
         isPage ? "rounded-t-2xl" : "rounded-t-none md:rounded-t-2xl"
       )}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">

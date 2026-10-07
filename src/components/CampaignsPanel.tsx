@@ -879,7 +879,7 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
             >
               {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-transparent">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                     <Megaphone size={18} />
@@ -1532,7 +1532,7 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900">
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-transparent">
                 <div className="space-y-0.5">
                   <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
                     Rendered Email Preview: {previewCampaign.title}

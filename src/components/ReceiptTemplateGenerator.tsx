@@ -116,7 +116,7 @@ export const ReceiptTemplateGenerator: React.FC<ReceiptTemplateGeneratorProps> =
         className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-[2rem] w-full max-w-3xl my-auto shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]"
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 sm:px-8 sm:py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/80 sticky top-0 z-20 shrink-0">
+        <div className="px-6 py-4 sm:px-8 sm:py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-transparent sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-slate-900 dark:bg-slate-800 rounded-xl flex items-center justify-center text-white shadow-md">
               <FileText size={20} />

@@ -124,28 +124,26 @@ export const ExportConfirmationModal: React.FC<ExportConfirmationModalProps> = (
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]"
           >
-            {/* Header */}
-            <div className="p-6 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex items-start justify-between gap-4 relative overflow-hidden">
-              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
-              
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shrink-0 shadow-inner">
-                  <Download className="text-blue-300" size={24} />
+            {/* Header - No background, follows dark and white theme */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white flex items-start justify-between gap-4 bg-transparent shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                  <Download size={24} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-200 border border-blue-400/30">
+                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
                       Export Safeguard Verification
                     </span>
                   </div>
                   <h3 className="text-lg font-black tracking-tight mt-0.5 leading-snug">{title}</h3>
-                  <p className="text-xs text-blue-200/80 font-medium">{reportType}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{reportType}</p>
                 </div>
               </div>
 
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer shrink-0 relative z-10"
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer shrink-0"
                 aria-label="Close modal"
               >
                 <X size={18} />

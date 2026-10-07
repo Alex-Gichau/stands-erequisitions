@@ -346,14 +346,14 @@ export const ApprovalsPanel: React.FC = () => {
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 flex flex-col"
+              className="bg-white dark:bg-slate-900 rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col text-slate-900 dark:text-slate-100"
             >
               {approvalStep === "DETAILS" && selectedReq && (
                 <div className="flex flex-col h-full">
-                  <div className="px-5 md:px-8 py-4 md:py-6 border-b border-slate-100 bg-white flex items-center justify-between sticky top-0 z-10">
-                    <h3 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Detailed Review</h3>
-                    <button onClick={() => setSelectedReq(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                      <X size={20} className="text-slate-500 md:w-5 md:h-5" />
+                  <div className="px-5 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-transparent flex items-center justify-between sticky top-0 z-10">
+                    <h3 className="text-[10px] md:text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-[0.2em]">Detailed Review</h3>
+                    <button onClick={() => setSelectedReq(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-500 dark:text-slate-400">
+                      <X size={20} className="md:w-5 md:h-5" />
                     </button>
                   </div>
                   

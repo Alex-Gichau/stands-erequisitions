@@ -1046,7 +1046,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         animate={{ y: 0, opacity: 1 }}
         className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl w-full max-w-3xl h-full md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden border-t md:border border-slate-200 dark:border-slate-800 flex flex-col cursor-default"
       >
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between sticky top-0 z-10">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-transparent flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <div>
               <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">

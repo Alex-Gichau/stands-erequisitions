@@ -1628,10 +1628,6 @@ const Dashboard: React.FC<{
 
           {unbudgetedGroups.length > 0 && (
             <div className="sm:hidden px-4 py-2 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between text-[10px] text-amber-800">
-              <span className="flex items-center gap-1 font-medium">
-                <AlertTriangle size={11} className="text-amber-600 shrink-0" />
-                {unbudgetedGroups.length} groups have no allocated budget
-              </span>
               <button
                 type="button"
                 onClick={() => onViewChange?.("finance")}
@@ -1929,23 +1925,23 @@ const Dashboard: React.FC<{
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-5xl h-full md:h-auto md:max-h-[85vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col cursor-default"
+              className="bg-white dark:bg-slate-900 rounded-none md:rounded-3xl w-full max-w-5xl h-full md:h-auto md:max-h-[85vh] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col cursor-default text-slate-900 dark:text-slate-100"
             >
-              <div className="px-8 py-6 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+              <div className="px-8 py-6 border-b border-slate-200 dark:border-slate-800 bg-transparent flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-sm border border-indigo-500/20">
                     <Users size={24} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-wider">{selectedGroupDetails.groupName}</h3>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase tracking-wider">{selectedGroupDetails.groupName}</h3>
                     <p className="text-xs font-mono text-slate-400 uppercase tracking-widest mt-0.5">All Group Account Requisitions</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setSelectedGroupDetails(null)} 
-                  className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-500 dark:text-slate-400"
                 >
-                  <X size={20} className="text-slate-500" />
+                  <X size={20} />
                 </button>
               </div>
 
@@ -2058,21 +2054,21 @@ const Dashboard: React.FC<{
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto shadow-2xl overflow-hidden border border-slate-200 flex flex-col cursor-default"
+              className="bg-white dark:bg-slate-900 rounded-none md:rounded-3xl w-full max-w-xl h-full md:h-auto shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col cursor-default text-slate-900 dark:text-slate-100"
             >
-              <div className="px-6 py-4.5 border-b border-rose-100 bg-amber-50/50 flex items-center justify-between">
+              <div className="px-6 py-4.5 border-b border-slate-100 dark:border-slate-800 bg-transparent flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-[0.2em] flex items-center gap-1.5">
-                    <TrendingUp size={16} className="text-amber-600" />
+                  <h3 className="text-xs font-black text-amber-600 dark:text-amber-400 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                    <TrendingUp size={16} className="text-amber-600 dark:text-amber-400" />
                     Apply for Supplementary Budget
                   </h3>
-                  <p className="text-[10px] text-slate-500 font-mono tracking-wide mt-1">SYS_LEDGER_INCREASE_V1</p>
+                  <p className="text-[10px] text-slate-400 font-mono tracking-wide mt-1">SYS_LEDGER_INCREASE_V1</p>
                 </div>
                 <button 
-                  onClick={() => setIsSupplementaryModalOpen(false)}
-                  className="p-2 hover:bg-slate-200/50 rounded-full transition-colors cursor-pointer"
+                  onClick={() => setIsSupplementaryModalOpen(false)} 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-400"
                 >
-                  <X size={18} className="text-slate-400" />
+                  <X size={18} />
                 </button>
               </div>
 
@@ -2231,15 +2227,15 @@ const Dashboard: React.FC<{
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl max-w-lg w-full border border-slate-100 shadow-2xl overflow-hidden cursor-default"
+              className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden cursor-default text-slate-900 dark:text-slate-100"
             >
-              <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-transparent flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white/10 rounded-2xl backdrop-blur-md">
-                    <CalendarRange size={20} className="text-purple-300" />
+                  <div className="p-2.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-2xl border border-purple-500/20">
+                    <CalendarRange size={20} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black uppercase tracking-wider text-white">
+                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
                       {editingCalendarEvent ? "Edit Calendar Event" : "Schedule Calendar Event"}
                     </h3>
                     <p className="text-[10px] text-slate-400 uppercase font-mono tracking-tight">
@@ -2249,7 +2245,7 @@ const Dashboard: React.FC<{
                 </div>
                 <button 
                   onClick={() => setIsCalendarModalOpen(false)} 
-                  className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
                 >
                   <X size={18} />
                 </button>

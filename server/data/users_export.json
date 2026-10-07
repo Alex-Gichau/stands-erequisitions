@@ -901,9 +901,9 @@
     "role": "SUPER_ADMIN",
     "approverCode": "",
     "groups": [
-      "ICT Ministry"
+      "Youth Ministry"
     ],
-    "group": "ICT Ministry",
+    "group": "Youth Ministry",
     "name": "Alex Gichau",
     "activeDevices": [
       {
@@ -934,19 +934,23 @@
         "id": "dev_l6xlolw_munzb87x",
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
         "login_time": "2026-10-01T06:53:22.034Z",
-        "last_active": "2026-10-01T07:08:06.792Z",
-        "lastActive": "2026-10-01T07:17:16.012Z",
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+        "last_active": "2026-10-01T07:17:16.012Z"
+      },
+      {
+        "id": "dev_uhevjs2_muuskt7y",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "loginTime": "2026-10-06T20:10:39.774Z",
+        "lastActive": "2026-10-06T20:10:39.774Z"
       }
     ],
-    "lastSeen": "2026-10-01T08:48:57.626Z",
+    "lastSeen": "2026-10-06T20:22:13.697Z",
     "profilePromptPreference": "NEVER",
     "phone": "",
     "department": "",
     "tempPassword": "SaoYyy7Ckx9!",
     "theme": "dark",
     "is_online": true,
-    "last_seen": "2026-10-01T08:48:57.626Z",
+    "last_seen": "2026-10-06T20:22:13.697Z",
     "active_devices": [
       {
         "login_time": "2026-06-18T16:35:37.354Z",
@@ -976,12 +980,16 @@
         "id": "dev_l6xlolw_munzb87x",
         "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
         "login_time": "2026-10-01T06:53:22.034Z",
-        "last_active": "2026-10-01T07:08:06.792Z",
-        "lastActive": "2026-10-01T07:17:16.012Z",
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+        "last_active": "2026-10-01T07:17:16.012Z"
+      },
+      {
+        "id": "dev_uhevjs2_muuskt7y",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "loginTime": "2026-10-06T20:10:39.774Z",
+        "lastActive": "2026-10-06T20:10:39.774Z"
       }
     ],
-    "updated_at": "2026-10-01T07:17:16.012Z"
+    "updated_at": "2026-10-06T20:10:39.774Z"
   },
   {
     "document_id": "lkaDpjBVA0gDf7OCSiweA2pHGCI3",

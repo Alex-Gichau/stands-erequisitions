@@ -488,17 +488,17 @@ export const TransactionsPanel: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 space-y-6"
+              className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-slate-900 dark:text-slate-100"
             >
-              <div className="flex items-center gap-4 text-rose-600 bg-rose-50 p-4 rounded-2xl border border-rose-100">
+              <div className="flex items-center gap-4 text-rose-600 bg-rose-50 dark:bg-rose-950/40 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/50">
                 <Trash2 className="w-8 h-8 shrink-0" />
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Clear Web Transactions</h3>
-                  <p className="text-xs text-slate-600 font-medium">Clear mock and web transaction records</p>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">Clear Web Transactions</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">Clear mock and web transaction records</p>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 This action will remove current simulated web transactions from the database ledger view. Official disbursed funds transactions can be re-synchronized and stored at any time using the <strong>Store Disbursed Funds</strong> action.
               </p>
 
@@ -506,7 +506,7 @@ export const TransactionsPanel: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowClearConfirm(false)}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -531,27 +531,27 @@ export const TransactionsPanel: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-[2rem] p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-100 space-y-6 relative overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 md:p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 relative overflow-hidden text-slate-900 dark:text-slate-100"
             >
               <button
                 onClick={() => setSelectedTx(null)}
-                className="absolute right-6 top-6 p-2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors"
+                className="absolute right-6 top-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
 
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+              <div className="flex items-center gap-3 bg-transparent">
+                <div className="w-12 h-12 rounded-2xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-100 dark:border-sky-900/50">
                   <ShieldCheck size={24} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Disbursement Record</span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded-md uppercase">
+                    <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-[9px] font-black rounded-md uppercase border border-emerald-300 dark:border-emerald-800">
                       Official Disbursed Ledger
                     </span>
                   </div>
-                  <h3 className="text-lg font-black text-slate-900">{selectedTx.description}</h3>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">{selectedTx.description}</h3>
                 </div>
               </div>
 

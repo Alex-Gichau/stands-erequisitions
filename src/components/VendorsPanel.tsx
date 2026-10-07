@@ -1809,20 +1809,20 @@ export const VendorsPanel: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 flex flex-col"
+              className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-2xl max-h-[90vh] shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col text-slate-900 dark:text-slate-100"
             >
               {/* Modal Header */}
-              <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between sticky top-0 z-10">
+              <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 bg-transparent flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center text-xl font-black shadow-lg shadow-primary/20">
                     {viewingVendor.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">{viewingVendor.name}</h3>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.2em]">{viewingVendor.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={cn(
                         "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border",
-                        viewingVendor.status === "APPROVED" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                        viewingVendor.status === "APPROVED" ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50" : "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/50"
                       )}>
                         {viewingVendor.status || "PENDING"}
                       </span>
@@ -1832,9 +1832,9 @@ export const VendorsPanel: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setViewingVendor(null)}
-                  className="p-2 hover:bg-slate-200 rounded-full transition-colors group"
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors group cursor-pointer"
                 >
-                  <X size={20} className="text-slate-400 group-hover:text-slate-600" />
+                  <X size={20} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200" />
                 </button>
               </div>
 

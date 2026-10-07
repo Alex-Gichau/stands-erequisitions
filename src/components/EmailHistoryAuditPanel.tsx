@@ -1371,16 +1371,16 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       {/* 4. Log Inspection Modal */}
       {selectedLog && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto text-slate-900 dark:text-slate-100">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 bg-transparent">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
+                <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-2xl">
                   <Mail size={20} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black uppercase text-slate-900 tracking-tight">Email Dispatch Audit Record</h3>
+                    <h3 className="text-base font-black uppercase text-slate-900 dark:text-white tracking-tight">Email Dispatch Audit Record</h3>
                     {getStatusBadge(selectedLog.status)}
                   </div>
                   <p className="text-xs text-slate-500 font-mono mt-0.5">ID: {selectedLog.id}</p>
@@ -1388,7 +1388,7 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
               </div>
               <button
                 onClick={() => setSelectedLog(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1496,20 +1496,20 @@ export const EmailHistoryAuditPanel: React.FC<EmailHistoryAuditPanelProps> = ({ 
       {/* 5. Diagnostic Test Email Modal */}
       {showTestEmailModal && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl text-slate-900 dark:text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 bg-transparent">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
                   <Send size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black uppercase text-slate-900 tracking-wider">Send Diagnostic Test Email</h3>
-                  <p className="text-[11px] text-slate-500 font-medium">Verify SMTP mailer routing & log live audit event</p>
+                  <h3 className="text-sm font-black uppercase text-slate-900 dark:text-white tracking-wider">Send Diagnostic Test Email</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Verify SMTP mailer routing & log live audit event</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowTestEmailModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
               >
                 <X size={16} />
               </button>

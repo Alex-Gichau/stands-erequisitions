@@ -315,10 +315,10 @@ export const ChurchGroupDetailsModal: React.FC<ChurchGroupDetailsModalProps> = (
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 6 }}
         transition={{ duration: 0.18 }}
-        className="bg-slate-50 dark:bg-slate-950 w-full h-full flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-950 w-full h-full flex flex-col overflow-hidden"
       >
         {/* Modal Header */}
-        <div className="px-6 lg:px-10 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-20 shadow-2xs">
+        <div className="px-6 lg:px-10 py-4 border-b border-slate-200 dark:border-slate-800 bg-transparent sticky top-0 z-20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary dark:bg-blue-500/10 dark:text-blue-400 flex items-center justify-center shrink-0 border border-primary/20">

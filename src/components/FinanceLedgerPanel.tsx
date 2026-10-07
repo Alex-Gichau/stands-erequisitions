@@ -3929,20 +3929,20 @@ export const FinanceLedgerPanel: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[90vh] max-w-2xl w-full overflow-hidden flex flex-col"
+                className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] max-w-2xl w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
               >
-                {/* Header */}
-                <div className="bg-slate-900 text-white p-5 sticky top-0 z-10 flex items-center justify-between">
+                {/* Header - No background, follows dark and white theme */}
+                <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-5 sticky top-0 z-10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-600/30 rounded-xl border border-indigo-400/30">
-                      <Receipt className="text-indigo-400 animate-pulse" size={22} />
+                    <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+                      <Receipt className="animate-pulse" size={22} />
                     </div>
                     <div>
-                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Disbursement & Settlement Voucher</h3>
-                      <p className="text-[11px] text-slate-400">Review authorization lifecycle and audit timeline before funds release.</p>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Disbursement & Settlement Voucher</h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Review authorization lifecycle and audit timeline before funds release.</p>
                     </div>
                   </div>
-                  <button onClick={() => setDisbursingReq(null)} className="p-2 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-white cursor-pointer">
+                  <button onClick={() => setDisbursingReq(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                     <X size={20} />
                   </button>
                 </div>
@@ -4691,17 +4691,19 @@ export const FinanceLedgerPanel: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col"
+              className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 dark:border-slate-800 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
             >
-              <div className="bg-[#4f46e5] text-white p-5 sticky top-0 z-10 flex items-center justify-between">
+              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-5 sticky top-0 z-10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <TrendingUp size={18} />
+                  <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+                    <TrendingUp size={18} />
+                  </div>
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-widest text-[#e0e7ff]">Modify Budget Limits</h3>
-                    <p className="text-[10px] text-indigo-100">Set overall allocations and requisition caps on ledger lines.</p>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Modify Budget Limits</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Set overall allocations and requisition caps on ledger lines.</p>
                   </div>
                 </div>
-                <button onClick={() => setAdjustingProject(null)} className="p-2 hover:bg-indigo-700 rounded-full transition-all text-indigo-100 hover:text-white">
+                <button onClick={() => setAdjustingProject(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                   <X size={20} />
                 </button>
               </div>
@@ -4796,17 +4798,19 @@ export const FinanceLedgerPanel: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col text-slate-800"
+              className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 dark:border-slate-800 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
             >
-              <div className="bg-slate-900 text-white p-5 sticky top-0 z-10 flex items-center justify-between">
+              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-5 sticky top-0 z-10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Settings size={18} />
+                  <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
+                    <Settings size={18} />
+                  </div>
                   <div>
-                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Manage FY {managingFy.year}</h3>
-                    <p className="text-[10px] text-slate-400">Configure boundaries, labels, and planning notes</p>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Manage FY {managingFy.year}</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure boundaries, labels, and planning notes</p>
                   </div>
                 </div>
-                <button onClick={() => setManagingFy(null)} className="p-2 hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-white cursor-pointer">
+                <button onClick={() => setManagingFy(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
                   <X size={20} />
                 </button>
               </div>

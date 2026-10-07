@@ -65,6 +65,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { SystemHealth } from "./SystemHealth";
 import { AutosendBackupMonitoringPanel } from "./AutosendBackupMonitoringPanel";
 import { UserAvatar } from "./UserAvatar";
+import { MobileConfirmationModal } from "./MobileConfirmationModal";
 import { 
   isDesktopNotificationSupported, 
   getDesktopNotificationPermission, 
@@ -98,6 +99,8 @@ export const SettingsPanel: React.FC = () => {
 
   const [mongoTab, setMongoTab] = React.useState<number>(0);
   const [localActiveDevices, setLocalActiveDevices] = React.useState<any[]>([]);
+  const [showMobileConfirmPreview, setShowMobileConfirmPreview] = React.useState(false);
+  const [mobileConfirmPreviewState, setMobileConfirmPreviewState] = React.useState<"confirm" | "processing" | "success">("confirm");
 
   React.useEffect(() => {
     if (currentUser?.activeDevices) {
@@ -1694,6 +1697,68 @@ export const SettingsPanel: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* SECTION: MOBILE UI CONFIRMATION POPUP PREVIEW */}
+                  <div className="p-6 rounded-3xl border border-emerald-200/80 dark:border-emerald-900/50 bg-gradient-to-b from-emerald-50/50 to-white dark:from-slate-800/40 dark:to-slate-800/20 space-y-4 max-w-3xl shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-100 dark:border-slate-700">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/20 shrink-0">
+                          <Smartphone size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                              Mobile UI Confirmation Screen Experience
+                            </h3>
+                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              Interactive
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Mobile bottom-sheet popup with top drag handle, transparent header, animated flying paper airplane, and celebratory green scalloped rosette seal.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileConfirmPreviewState("confirm");
+                          setShowMobileConfirmPreview(true);
+                        }}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-2"
+                      >
+                        <Sparkles size={14} />
+                        <span>Launch Full Mobile Flow</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileConfirmPreviewState("processing");
+                          setShowMobileConfirmPreview(true);
+                        }}
+                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+                      >
+                        <Send size={14} />
+                        <span>Airplane Processing Phase</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileConfirmPreviewState("success");
+                          setShowMobileConfirmPreview(true);
+                        }}
+                        className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2"
+                      >
+                        <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>Rosette Success Seal</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* SECTION: AUTOMATED BI-WEEKLY UNAPPROVED SUMMARY EMAIL */}
                   <div className="p-6 rounded-3xl border border-blue-200/80 dark:border-blue-900/50 bg-gradient-to-b from-blue-50/50 to-white dark:from-slate-800/40 dark:to-slate-800/20 space-y-5 max-w-3xl shadow-sm">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-blue-100 dark:border-slate-700">
@@ -2304,6 +2369,43 @@ sudo systemctl enable mongod`}
         <span>STANDS eRequisition System & Governance</span>
         <span>St. Andrew's PCEA eRequisitions</span>
       </div>
+
+      {/* Mobile Confirmation Screen Modal Demonstration */}
+      <MobileConfirmationModal
+        isOpen={showMobileConfirmPreview}
+        onClose={() => setShowMobileConfirmPreview(false)}
+        initialState={mobileConfirmPreviewState}
+        title="Confirm Requisition Disbursement"
+        message="Review the transaction summary below before authorizing this payout."
+        amount={45000}
+        currency="KES"
+        recipient="Youth Ministry Fellowship"
+        details={[
+          { label: "Voucher Ref", value: "VCH-2026-081" },
+          { label: "Payment Mode", value: "M-Pesa / Bank EFT" },
+          { label: "Department", value: "Christian Education" },
+          { label: "Budget Line", value: "FY 2026 Active Pool" }
+        ]}
+        confirmText="CONFIRM & DISBURSE"
+        cancelText="CANCEL"
+        processingTitle="Processing..."
+        processingSubtitle="Your transfer is processing securely"
+        successTitle="Success!"
+        successSubtitle="Your transfer was successful"
+        buttonText="Nice one!"
+        onConfirm={async () => {
+          await new Promise((r) => setTimeout(r, 1600));
+        }}
+        onSuccessButtonClick={() => {
+          setShowMobileConfirmPreview(false);
+          triggerToast({
+            type: "SYSTEM_INFO",
+            severity: "LOW",
+            message: "Mobile confirmation completed with success seal!",
+            timestamp: new Date().toISOString()
+          });
+        }}
+      />
     </div>
   );
 };

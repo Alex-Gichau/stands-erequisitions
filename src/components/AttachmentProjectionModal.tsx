@@ -27,7 +27,9 @@ import {
   PinOff,
   Building2,
   Tag,
-  FolderOpen
+  FolderOpen,
+  Sun,
+  Moon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -71,6 +73,8 @@ export interface AttachmentProjectionModalProps {
   amountWords?: string;
   requesterName?: string;
   status?: string;
+  darkMode?: boolean;
+  onToggleTheme?: () => void;
 }
 
 export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps> = ({
@@ -85,8 +89,52 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   amount: customAmount,
   amountWords: customAmountWords,
   requesterName: customRequesterName,
-  status: customStatus
+  status: customStatus,
+  darkMode: propDarkMode,
+  onToggleTheme
 }) => {
+  // Theme Detection & Synchronization (Light & Dark Mode)
+  const [internalDark, setInternalDark] = useState<boolean>(() => {
+    if (typeof propDarkMode === "boolean") return propDarkMode;
+    return typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  });
+
+  const isDark = typeof propDarkMode === "boolean" ? propDarkMode : internalDark;
+
+  useEffect(() => {
+    const syncTheme = () => {
+      const activeDark = document.documentElement.classList.contains("dark");
+      setInternalDark(activeDark);
+    };
+    syncTheme();
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    window.addEventListener("storage", syncTheme);
+    window.addEventListener("theme-change", syncTheme);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("storage", syncTheme);
+      window.removeEventListener("theme-change", syncTheme);
+    };
+  }, []);
+
+  const handleToggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme();
+      return;
+    }
+    const nextDark = !isDark;
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("darkMode", String(nextDark));
+    setInternalDark(nextDark);
+    window.dispatchEvent(new CustomEvent("theme-change", { detail: { darkMode: nextDark } }));
+    window.dispatchEvent(new Event("storage"));
+  };
+
   // Normalize attachments array
   const attachments = useMemo(() => {
     if (rawAttachments && Array.isArray(rawAttachments) && rawAttachments.length > 0) {
@@ -309,6 +357,11 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           e.preventDefault();
           setShowThumbnailsStrip((prev) => !prev);
           break;
+        case "m":
+        case "M":
+          e.preventDefault();
+          handleToggleTheme();
+          break;
         case "f":
         case "F":
           e.preventDefault();
@@ -426,13 +479,13 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
 
   if (attachments.length === 0) {
     return (
-      <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center text-white shadow-2xl">
-          <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+      <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-900/60 dark:bg-slate-950/95 backdrop-blur-md p-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full text-center text-slate-900 dark:text-white shadow-2xl">
+          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-500 dark:text-slate-400">
             <FileText size={32} />
           </div>
           <h3 className="text-lg font-bold">No Attachments to Project</h3>
-          <p className="text-xs text-slate-400 mt-2 mb-6">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 mb-6">
             There are no supporting vouchers, receipts, or documents attached to this record.
           </p>
           <button
@@ -450,7 +503,10 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[160] flex flex-col select-none overflow-hidden bg-slate-950 text-slate-100"
+      className={cn(
+        "fixed inset-0 z-[160] flex flex-col select-none overflow-hidden transition-colors duration-200",
+        isDark ? "dark bg-slate-950 text-slate-100" : "bg-slate-100 text-slate-900"
+      )}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
     >
@@ -460,7 +516,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
         onMouseEnter={() => setIsHeaderVisible(true)}
       />
 
-      {/* AUTOHIDE TOP PROJECTION CONTROL BAR */}
+      {/* AUTOHIDE TOP PROJECTION CONTROL BAR - No background, follows dark and white theme */}
       <motion.header
         initial={{ y: 0 }}
         animate={{ y: isHeaderVisible ? 0 : -80 }}
@@ -470,50 +526,50 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           setIsHeaderVisible(true);
         }}
         onMouseLeave={resetHeaderTimer}
-        className="fixed top-0 left-0 right-0 px-6 py-3 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-4 z-[180] shadow-2xl"
+        className="fixed top-0 left-0 right-0 px-4 sm:px-6 py-3 bg-transparent backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between gap-3 sm:gap-4 z-[180] shadow-xs dark:shadow-2xl transition-colors"
       >
         {/* Left: Current Attachment & Requisition Info */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shadow-sm shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-600/30 border border-indigo-200 dark:border-indigo-400/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs shrink-0">
             <FileText size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-black uppercase tracking-wider font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 text-[9px] font-black uppercase tracking-wider font-mono">
                 DOCUMENT VIEWER
               </span>
-              <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[9px] font-bold uppercase font-mono">
+              <span className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-white/10 text-slate-700 dark:text-white text-[9px] font-bold uppercase font-mono">
                 {currentIndex + 1} OF {attachments.length}
               </span>
               {reqId && (
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold font-mono">
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[9px] font-bold font-mono">
                   #{reqId}
                 </span>
               )}
             </div>
-            <h2 className="text-xs md:text-sm font-bold text-white truncate mt-0.5 max-w-sm md:max-w-md lg:max-w-lg">
+            <h2 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white truncate mt-0.5 max-w-sm md:max-w-md lg:max-w-lg">
               {currentFileName}
             </h2>
           </div>
         </div>
 
         {/* Center: Stage Tools (Zoom, Rotate, Stamp) */}
-        <div className="hidden lg:flex items-center gap-1.5 bg-white/5 p-1 rounded-2xl border border-white/10">
+        <div className="hidden lg:flex items-center gap-1.5 bg-white/80 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shadow-xs dark:shadow-none">
           <button
             type="button"
             onClick={() => setZoom((prev) => Math.max(prev - 0.25, 0.5))}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer"
             title="Zoom Out (-)"
           >
             <ZoomOut size={16} />
           </button>
-          <span className="text-[11px] font-mono font-bold text-white px-2 w-14 text-center">
+          <span className="text-[11px] font-mono font-bold text-slate-800 dark:text-white px-2 w-14 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
             onClick={() => setZoom((prev) => Math.min(prev + 0.25, 4))}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer"
             title="Zoom In (+)"
           >
             <ZoomIn size={16} />
@@ -525,27 +581,29 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
               setOffset({ x: 0, y: 0 });
               setRotation(0);
             }}
-            className="px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer"
+            className="px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all cursor-pointer"
             title="Reset Zoom & Rotation (0)"
           >
             Reset
           </button>
-          <div className="w-px h-5 bg-white/10 mx-1" />
+          <div className="w-px h-5 bg-slate-200 dark:bg-white/10 mx-1" />
           <button
             type="button"
             onClick={() => setRotation((prev) => (prev + 90) % 360)}
-            className="p-2 hover:bg-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer"
             title="Rotate 90° Clockwise (R)"
           >
             <RotateCw size={16} />
           </button>
-          <div className="w-px h-5 bg-white/10 mx-1" />
+          <div className="w-px h-5 bg-slate-200 dark:bg-white/10 mx-1" />
           <button
             type="button"
             onClick={() => setSelectedStamp((prev) => (prev ? null : "VERIFIED"))}
             className={cn(
               "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
-              selectedStamp ? "bg-emerald-600 text-white shadow-md" : "text-slate-300 hover:bg-white/10"
+              selectedStamp
+                ? "bg-emerald-600 text-white shadow-md"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
             )}
             title="Toggle Audit Verified Stamp"
           >
@@ -553,14 +611,29 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           </button>
         </div>
 
-        {/* Right: Actions (Open Requisition Detail, Side Panel Toggle, Fullscreen, Print, Download, Close) */}
+        {/* Right: Actions (Theme Toggle, Open Requisition Detail, Side Panel Toggle, Fullscreen, Print, Download, Close) */}
         <div className="flex items-center gap-2">
+          {/* Theme Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={handleToggleTheme}
+            className="p-2.5 bg-white/80 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
+            title={isDark ? "Switch to Light Mode (M)" : "Switch to Dark Mode (M)"}
+            aria-label="Toggle Dark and Light Mode"
+          >
+            {isDark ? (
+              <Sun size={16} className="text-amber-400 stroke-[2.2]" />
+            ) : (
+              <Moon size={16} className="text-slate-700 stroke-[2.2]" />
+            )}
+          </button>
+
           {/* Open Requisition Details Button */}
           {activeRequisition && (
             <button
               type="button"
               onClick={handleOpenRequisitionDetails}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950 cursor-pointer"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs dark:shadow-emerald-950 cursor-pointer"
               title="Open Requisition Details (shows all attachment documents)"
             >
               <FileText size={14} />
@@ -573,10 +646,10 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
             type="button"
             onClick={() => setShowSideDetails((prev) => !prev)}
             className={cn(
-              "p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer",
+              "p-2.5 rounded-xl border transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs",
               showSideDetails
-                ? "bg-indigo-600 border-indigo-500 text-white shadow-lg"
-                : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                ? "bg-indigo-600 border-indigo-500 text-white shadow-md"
+                : "bg-white/80 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10"
             )}
             title="Toggle Requisition Details Side Panel (D)"
           >
@@ -589,10 +662,10 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
             type="button"
             onClick={() => setIsHeaderPinned((prev) => !prev)}
             className={cn(
-              "p-2.5 rounded-xl border transition-all text-xs font-bold cursor-pointer hidden md:flex",
+              "p-2.5 rounded-xl border transition-all text-xs font-bold cursor-pointer hidden md:flex shadow-xs",
               isHeaderPinned
-                ? "bg-white/20 border-white/30 text-white"
-                : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                ? "bg-slate-200 dark:bg-white/20 border-slate-300 dark:border-white/30 text-slate-900 dark:text-white"
+                : "bg-white/80 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
             )}
             title={isHeaderPinned ? "Header Pinned (Always Visible)" : "Autohide Header Enabled"}
           >
@@ -602,7 +675,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           <button
             type="button"
             onClick={handlePrint}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2.5 bg-white/80 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer shadow-xs"
             title="Print Document"
           >
             <Printer size={16} />
@@ -611,7 +684,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           <button
             type="button"
             onClick={downloadCurrentAttachment}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2.5 bg-white/80 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer shadow-xs"
             title="Download File"
           >
             <Download size={16} />
@@ -620,7 +693,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="p-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all cursor-pointer"
+            className="p-2.5 bg-white/80 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-white rounded-xl transition-all cursor-pointer shadow-xs"
             title="Toggle Fullscreen (F)"
           >
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -629,7 +702,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           <button
             type="button"
             onClick={onClose}
-            className="p-2.5 bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 rounded-xl transition-all ml-1 cursor-pointer"
+            className="p-2.5 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white border border-rose-500/50 rounded-xl shadow-md shadow-rose-600/20 transition-all ml-1 cursor-pointer active:scale-95"
             title="Exit Projector (ESC)"
           >
             <X size={18} />
@@ -655,7 +728,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
             }}
           >
             {isImage ? (
-              <div className="relative group shadow-2xl rounded-2xl overflow-hidden max-h-[80vh] max-w-[85vw] border border-white/10 bg-slate-900/60">
+              <div className="relative group shadow-2xl rounded-2xl overflow-hidden max-h-[80vh] max-w-[85vw] border border-slate-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-900/60">
                 <img
                   src={currentUrl}
                   alt={currentFileName}
@@ -664,14 +737,14 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 />
                 {selectedStamp && (
                   <div className="absolute top-8 right-8 rotate-[-12deg] pointer-events-none">
-                    <div className="border-4 border-emerald-400 text-emerald-400 font-black text-2xl px-6 py-2 rounded-2xl tracking-widest uppercase bg-slate-950/80 backdrop-blur-md shadow-2xl">
+                    <div className="border-4 border-emerald-500 dark:border-emerald-400 text-emerald-600 dark:text-emerald-400 font-black text-2xl px-6 py-2 rounded-2xl tracking-widest uppercase bg-white/90 dark:bg-slate-950/80 backdrop-blur-md shadow-2xl">
                       {selectedStamp}
                     </div>
                   </div>
                 )}
               </div>
             ) : isPdf ? (
-              <div className="w-[82vw] md:w-[70vw] lg:w-[60vw] h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
+              <div className="w-[82vw] md:w-[70vw] lg:w-[60vw] h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 relative">
                 <iframe
                   src={`${currentUrl}#toolbar=1&navpanes=0&scrollbar=1`}
                   title={currentFileName}
@@ -679,12 +752,12 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 />
               </div>
             ) : isExcel ? (
-              <div className="p-10 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30 shadow-lg">
+              <div className="p-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30 shadow-lg">
                   <FileSpreadsheet size={36} />
                 </div>
-                <h4 className="text-base font-bold text-white truncate">{currentFileName}</h4>
-                <p className="text-xs text-slate-400 mt-2 mb-6">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white truncate">{currentFileName}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 mb-6">
                   Excel Spreadsheet Attachment &bull; Download to inspect detailed budget sheets and formulas.
                 </p>
                 <button
@@ -697,12 +770,12 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 </button>
               </div>
             ) : (
-              <div className="p-10 bg-slate-900 border border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 shadow-lg">
+              <div className="p-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl text-center max-w-md shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4 border border-indigo-500/30 shadow-lg">
                   <FileText size={36} />
                 </div>
-                <h4 className="text-base font-bold text-white truncate">{currentFileName}</h4>
-                <p className="text-xs text-slate-400 mt-2 mb-6">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white truncate">{currentFileName}</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 mb-6">
                   Document Attachment &bull; Download or inspect using system office suite.
                 </p>
                 <button
@@ -724,7 +797,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 type="button"
                 onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
                 disabled={currentIndex === 0}
-                className="absolute left-6 top-1/2 -translate-y-1/2 p-3.5 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
+                className="absolute left-6 top-1/2 -translate-y-1/2 p-3.5 bg-white/90 dark:bg-slate-900/80 hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-white rounded-full backdrop-blur-md border border-slate-200 dark:border-white/20 transition-all shadow-xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
                 title="Previous Attachment (Left Arrow)"
               >
                 <ChevronLeft size={22} />
@@ -733,7 +806,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 type="button"
                 onClick={() => setCurrentIndex((prev) => Math.min(prev + 1, attachments.length - 1))}
                 disabled={currentIndex === attachments.length - 1}
-                className="absolute right-6 top-1/2 -translate-y-1/2 p-3.5 bg-slate-900/80 hover:bg-indigo-600 text-white rounded-full backdrop-blur-md border border-white/20 transition-all shadow-2xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
+                className="absolute right-6 top-1/2 -translate-y-1/2 p-3.5 bg-white/90 dark:bg-slate-900/80 hover:bg-indigo-600 hover:text-white text-slate-700 dark:text-white rounded-full backdrop-blur-md border border-slate-200 dark:border-white/20 transition-all shadow-xl disabled:opacity-30 disabled:pointer-events-none hover:scale-110 active:scale-95 z-30 cursor-pointer"
                 title="Next Attachment (Right Arrow)"
               >
                 <ChevronRight size={22} />
@@ -750,22 +823,22 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 380, opacity: 0 }}
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
-              className="w-80 sm:w-96 bg-slate-900/95 backdrop-blur-2xl border-l border-white/10 flex flex-col h-full z-40 shrink-0 shadow-2xl overflow-y-auto"
+              className="w-80 sm:w-96 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-l border-slate-200 dark:border-white/10 flex flex-col h-full z-40 shrink-0 shadow-2xl overflow-y-auto text-slate-800 dark:text-slate-200"
             >
               {/* Side Panel Header */}
-              <div className="p-4 border-b border-white/10 flex items-center justify-between gap-2 bg-slate-950/60 sticky top-0 z-10">
+              <div className="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between gap-2 bg-transparent sticky top-0 z-10">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
                     <Layers size={14} />
                   </div>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200">
                     Requisition Details
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowSideDetails(false)}
-                  className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   title="Close Side Panel"
                 >
                   <X size={15} />
@@ -773,44 +846,44 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
               </div>
 
               {/* Side Panel Body */}
-              <div className="p-4 space-y-5 text-xs text-slate-300">
+              <div className="p-4 space-y-5 text-xs text-slate-600 dark:text-slate-300">
                 {/* Requisition ID & Status Badges */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     {reqId ? (
-                      <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-bold">
+                      <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 text-[10px] font-mono font-bold">
                         #{reqId}
                       </span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-400 text-[10px] font-bold">
+                      <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold">
                         Standalone Upload
                       </span>
                     )}
-                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
                       {displayStatus}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-white leading-snug">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
                     {displayTitle}
                   </h4>
                 </div>
 
                 {/* Ministry & Financial Info */}
-                <div className="bg-slate-950/60 rounded-2xl p-3.5 border border-white/5 space-y-2.5">
+                <div className="bg-slate-50 dark:bg-slate-950/60 rounded-2xl p-3.5 border border-slate-200/70 dark:border-white/5 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Ministry / Group</span>
-                    <span className="font-bold text-slate-200">{displayGroupName}</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Ministry / Group</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{displayGroupName}</span>
                   </div>
                   {displayAmount !== undefined && (
-                    <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Requisition Amount</span>
-                      <span className="font-mono font-black text-amber-300 text-sm">
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-white/5">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Requisition Amount</span>
+                      <span className="font-mono font-black text-amber-600 dark:text-amber-300 text-sm">
                         {formatCurrency(displayAmount)}
                       </span>
                     </div>
                   )}
                   {displayAmountWords && (
-                    <p className="text-[10px] text-slate-400 italic pt-1 border-t border-white/5">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 italic pt-1 border-t border-slate-200/60 dark:border-white/5">
                       "{displayAmountWords}"
                     </p>
                   )}
@@ -819,25 +892,25 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 {/* Requester & Payee Details */}
                 <div className="space-y-2 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Requester:</span>
-                    <strong className="text-white">{displayRequester}</strong>
+                    <span className="text-slate-500 dark:text-slate-400">Requester:</span>
+                    <strong className="text-slate-900 dark:text-white">{displayRequester}</strong>
                   </div>
                   {activeRequisition?.payableTo && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Payable To:</span>
-                      <strong className="text-white">{activeRequisition.payableTo}</strong>
+                      <span className="text-slate-500 dark:text-slate-400">Payable To:</span>
+                      <strong className="text-slate-900 dark:text-white">{activeRequisition.payableTo}</strong>
                     </div>
                   )}
                   {activeRequisition?.createdAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Date Created:</span>
-                      <span className="text-slate-300">{formatDate(activeRequisition.createdAt)}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Date Created:</span>
+                      <span className="text-slate-700 dark:text-slate-300">{formatDate(activeRequisition.createdAt)}</span>
                     </div>
                   )}
                   {(activeRequisition?.description || (activeRequisition as any)?.purpose) && (
-                    <div className="pt-2 border-t border-white/5">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Expenditure Purpose</span>
-                      <p className="text-slate-300 text-[11px] leading-relaxed bg-slate-950/40 p-2.5 rounded-xl border border-white/5">
+                    <div className="pt-2 border-t border-slate-200/60 dark:border-white/5">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block mb-1">Expenditure Purpose</span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed bg-slate-50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-200/60 dark:border-white/5">
                         {activeRequisition.description || (activeRequisition as any).purpose}
                       </p>
                     </div>
@@ -845,11 +918,11 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                 </div>
 
                 {/* Attachments (Documents) Section in Side Panel */}
-                <div className="space-y-2.5 pt-2 border-t border-white/10">
+                <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-white/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <FileText size={13} className="text-indigo-400" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">
+                      <FileText size={13} className="text-indigo-600 dark:text-indigo-400" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
                         Attachment Documents ({requisitionAttachments.length || attachments.length})
                       </span>
                     </div>
@@ -868,29 +941,29 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                           className={cn(
                             "p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 group",
                             isCurrent
-                              ? "bg-indigo-600/30 border-indigo-400 text-white shadow-md"
-                              : "bg-slate-950/40 border-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                              ? "bg-indigo-50 dark:bg-indigo-600/30 border-indigo-400 text-indigo-950 dark:text-white shadow-xs"
+                              : "bg-slate-50/80 dark:bg-slate-950/40 border-slate-200/60 dark:border-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                           )}
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={cn(
-                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs",
-                              isCurrent ? "bg-indigo-600 text-white" : "bg-white/5 text-slate-400 group-hover:text-white"
+                              "w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold",
+                              isCurrent ? "bg-indigo-600 text-white" : "bg-slate-200 dark:bg-white/5 text-slate-700 dark:text-slate-400 group-hover:bg-slate-300 dark:group-hover:text-white"
                             )}>
                               {idx + 1}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-[11px] font-bold truncate max-w-[160px] text-slate-200">
+                              <p className="text-[11px] font-bold truncate max-w-[160px] text-slate-800 dark:text-slate-200">
                                 {name}
                               </p>
                               {isCurrent && (
-                                <span className="text-[9px] font-mono text-emerald-400 font-bold uppercase block">
+                                <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold uppercase block">
                                   Currently Viewing
                                 </span>
                               )}
                             </div>
                           </div>
-                          <Eye size={13} className={cn("shrink-0", isCurrent ? "text-emerald-400" : "opacity-0 group-hover:opacity-100")} />
+                          <Eye size={13} className={cn("shrink-0", isCurrent ? "text-emerald-600 dark:text-emerald-400" : "opacity-0 group-hover:opacity-100")} />
                         </div>
                       );
                     })}
@@ -899,16 +972,16 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
 
                 {/* Primary Action Button: Open Actual Requisition Detail */}
                 {activeRequisition && (
-                  <div className="pt-3 border-t border-white/10">
+                  <div className="pt-3 border-t border-slate-200 dark:border-white/10">
                     <button
                       type="button"
                       onClick={handleOpenRequisitionDetails}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-950 cursor-pointer"
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer"
                     >
                       <ExternalLink size={14} />
                       <span>Open Full Requisition Details</span>
                     </button>
-                    <p className="text-[10px] text-slate-400 text-center mt-1.5">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 text-center mt-1.5">
                       View full approval ledger, vouchers, and thread discussion
                     </p>
                   </div>
@@ -921,7 +994,7 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
 
       {/* BOTTOM THUMBNAILS CAROUSEL & KEYBOARD HINTS */}
       {showThumbnailsStrip && attachments.length > 1 && (
-        <footer className="px-6 py-2.5 bg-slate-950/95 backdrop-blur-xl border-t border-white/10 flex items-center justify-between gap-4 z-40 shrink-0 overflow-x-auto">
+        <footer className="px-6 py-2.5 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-4 z-40 shrink-0 overflow-x-auto transition-colors">
           {/* Thumbnails strip */}
           <div className="flex items-center gap-2.5 overflow-x-auto py-1">
             {attachments.map((att, idx) => {
@@ -934,16 +1007,16 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
                   type="button"
                   onClick={() => setCurrentIndex(idx)}
                   className={cn(
-                    "relative w-14 h-11 rounded-xl overflow-hidden border-2 transition-all shrink-0 group flex items-center justify-center bg-slate-900 cursor-pointer",
+                    "relative w-14 h-11 rounded-xl overflow-hidden border-2 transition-all shrink-0 group flex items-center justify-center bg-slate-100 dark:bg-slate-900 cursor-pointer",
                     isSelected
-                      ? "border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)] scale-105"
-                      : "border-white/10 hover:border-white/40 opacity-60 hover:opacity-100"
+                      ? "border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] scale-105"
+                      : "border-slate-200 dark:border-white/10 hover:border-slate-400 dark:hover:border-white/40 opacity-70 hover:opacity-100"
                   )}
                   title={name}
                 >
                   <CachedImage src={url} alt={name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-slate-950/40 flex items-center justify-center">
-                    <span className="text-[9px] font-black text-white px-1 py-0.5 rounded bg-slate-950/80 font-mono">
+                  <div className="absolute inset-0 bg-slate-900/30 dark:bg-slate-950/40 flex items-center justify-center">
+                    <span className="text-[9px] font-black text-white px-1 py-0.5 rounded bg-slate-900/80 font-mono">
                       #{idx + 1}
                     </span>
                   </div>
@@ -953,24 +1026,27 @@ export const AttachmentProjectionModal: React.FC<AttachmentProjectionModalProps>
           </div>
 
           {/* Quick Shortcuts Helper */}
-          <div className="hidden xl:flex items-center gap-3 text-[10px] text-slate-400 shrink-0 font-mono">
+          <div className="hidden xl:flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 shrink-0 font-mono">
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">&larr; &rarr;</kbd> Slides
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">&larr; &rarr;</kbd> Slides
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">+/-</kbd> Zoom
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">+/-</kbd> Zoom
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">R</kbd> Rotate
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">R</kbd> Rotate
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">D</kbd> Details
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">M</kbd> Theme
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">F</kbd> Fullscreen
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">D</kbd> Details
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white font-bold">ESC</kbd> Exit
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">F</kbd> Fullscreen
+            </span>
+            <span>
+              <kbd className="px-1.5 py-0.5 bg-slate-200 dark:bg-white/10 rounded text-slate-800 dark:text-white font-bold">ESC</kbd> Exit
             </span>
           </div>
         </footer>

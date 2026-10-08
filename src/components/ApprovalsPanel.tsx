@@ -350,7 +350,7 @@ export const ApprovalsPanel: React.FC = () => {
             >
               {approvalStep === "DETAILS" && selectedReq && (
                 <div className="flex flex-col h-full">
-                  <div className="px-5 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-transparent flex items-center justify-between sticky top-0 z-10">
+                  <div className="px-5 md:px-8 py-4 md:py-6 border-b border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
                     <h3 className="text-[10px] md:text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-[0.2em]">Detailed Review</h3>
                     <button onClick={() => setSelectedReq(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors cursor-pointer text-slate-500 dark:text-slate-400">
                       <X size={20} className="md:w-5 md:h-5" />
@@ -358,10 +358,10 @@ export const ApprovalsPanel: React.FC = () => {
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-5 md:space-y-6">
-                    <div className="bg-slate-50 rounded-xl md:rounded-2xl p-4 md:p-6 border border-slate-100">
+                    <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl md:rounded-2xl p-4 md:p-6 border border-slate-100 dark:border-slate-800">
                       <div className="flex justify-between items-start mb-4">
                         <div className="min-w-0 flex-1 pr-2">
-                          <h4 className="text-base md:text-lg font-bold text-slate-900 tracking-tight truncate">{selectedReq.title}</h4>
+                          <h4 className="text-base md:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">{selectedReq.title}</h4>
                           <p className="text-[9px] md:text-[10px] font-mono text-slate-400 uppercase tracking-widest mt-0.5 md:mt-1 truncate">SYS_ID: {selectedReq.id.slice(-8)}</p>
                         </div>
                         <div className="text-right shrink-0">
@@ -369,28 +369,28 @@ export const ApprovalsPanel: React.FC = () => {
                           <p className="text-lg md:text-xl font-black text-primary font-mono">{formatCurrency(selectedReq.amount)}</p>
                         </div>
                       </div>
-                      <div className="p-3 md:p-4 bg-white rounded-lg md:rounded-xl border border-slate-200 text-[11px] md:text-xs text-slate-600 italic leading-relaxed max-h-32 overflow-y-auto scrollbar-hide">
+                      <div className="p-3 md:p-4 bg-white dark:bg-slate-900 rounded-lg md:rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] md:text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed max-h-32 overflow-y-auto scrollbar-hide">
                         "{selectedReq.description}"
                       </div>
 
                       {selectedReq.enableInstallments && Array.isArray(selectedReq.installments) && selectedReq.installments.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-200/80 space-y-2">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-700">
-                            <span className="flex items-center gap-1.5 uppercase tracking-wider text-indigo-700">
+                        <div className="mt-3 pt-3 border-t border-slate-200/80 dark:border-slate-700 space-y-2">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                            <span className="flex items-center gap-1.5 uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
                               <Split size={12} /> Phased Milestone Schedule ({selectedReq.installments.length} Installments)
                             </span>
-                            <span className="font-mono text-slate-500">
+                            <span className="font-mono text-slate-500 dark:text-slate-400">
                               {formatCurrency(selectedReq.disbursedAmount || 0)} / {formatCurrency(selectedReq.amount)}
                             </span>
                           </div>
                           <div className="grid grid-cols-1 gap-1.5 max-h-32 overflow-y-auto">
                             {selectedReq.installments.map((inst) => (
-                              <div key={inst.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px]">
+                              <div key={inst.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-[10px]">
                                 <div className="flex items-center gap-2">
-                                  <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-800 font-bold flex items-center justify-center text-[9px]">
+                                  <span className="w-4 h-4 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 font-bold flex items-center justify-center text-[9px]">
                                     {inst.installmentNumber}
                                   </span>
-                                  <span className="font-semibold text-slate-800">{inst.title}</span>
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200">{inst.title}</span>
                                   {inst.dueDate && (
                                     <span className="text-slate-400 font-mono text-[9px] flex items-center gap-0.5">
                                       <CalendarClock size={9} /> {new Date(inst.dueDate).toLocaleDateString('en-GB')}
@@ -398,7 +398,7 @@ export const ApprovalsPanel: React.FC = () => {
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <span className="font-mono font-bold text-slate-900">{formatCurrency(inst.amount)}</span>
+                                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatCurrency(inst.amount)}</span>
                                   <span className="text-[8px] text-slate-400 font-mono ml-1">({inst.percentage}%)</span>
                                 </div>
                               </div>
@@ -420,9 +420,9 @@ export const ApprovalsPanel: React.FC = () => {
                         />
                       </div>
                       
-                      <div className="p-3 md:p-4 bg-amber-50 rounded-xl md:rounded-2xl border border-amber-100 flex gap-2.5 md:gap-3 items-start">
+                      <div className="p-3 md:p-4 bg-amber-50 dark:bg-amber-950/40 rounded-xl md:rounded-2xl border border-amber-100 dark:border-amber-900/50 flex gap-2.5 md:gap-3 items-start">
                         <Info size={14} className="text-amber-500 shrink-0 mt-0.5 md:w-4 md:h-4" />
-                        <p className="text-[10px] md:text-[11px] text-amber-800 leading-relaxed font-medium">
+                        <p className="text-[10px] md:text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed font-medium">
                           Commitment will trigger subsequent protocol stages.
                         </p>
                       </div>
@@ -430,7 +430,7 @@ export const ApprovalsPanel: React.FC = () => {
                   </div>
 
                   {systemSettings?.fiscalYearStatus === "ARCHIVED" ? (
-                    <div className="px-5 md:px-8 py-4 md:py-6 border-t border-slate-100 bg-amber-500/5 flex justify-center text-amber-700 dark:text-amber-400 text-xs font-black uppercase tracking-wider">
+                    <div className="px-5 md:px-8 py-4 md:py-6 border-t border-slate-100 dark:border-slate-800 bg-amber-500/5 flex justify-center text-amber-700 dark:text-amber-400 text-xs font-black uppercase tracking-wider">
                        🚫 Approval actions are completely disabled for archived periods
                     </div>
                   ) : (

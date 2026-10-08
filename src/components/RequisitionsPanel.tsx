@@ -6384,13 +6384,13 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
       className={containerClass}
     >
       <div className={cn(
-        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-transparent gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
+        "px-3 sm:px-6 md:px-8 py-3.5 md:py-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md gap-2 min-w-0 max-w-full shrink-0 shadow-xs",
         isPage ? "rounded-t-2xl" : "rounded-t-none md:rounded-t-2xl"
       )}>
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <span className={cn(
             "p-1.5 md:p-2 rounded-xl border shrink-0",
-            req.status === RequisitionStatus.APPROVED_L2 ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50" : "bg-primary/5 text-primary border-primary/10"
+            req.status === RequisitionStatus.APPROVED_L2 ? "bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50" : "bg-primary/5 text-primary border-primary/10 dark:bg-primary/15 dark:text-primary-light dark:border-primary/20"
           )}>
             <ShieldCheck size={18} className="md:w-5 md:h-5" />
           </span>
@@ -6400,7 +6400,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 <HighlightText text={req.title} highlight={globalSearchTerm || ""} />
               </h3>
             </div>
-            <p className="text-[8px] md:text-[10px] font-mono text-slate-400 uppercase tracking-widest truncate">{req.id}</p>
+            <p className="text-[8px] md:text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-widest truncate">{req.id}</p>
           </div>
         </div>
 
@@ -6410,7 +6410,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           onClick={onClose}
           title="Close (Esc)"
           aria-label="Close"
-          className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white border border-rose-500/50 rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer shrink-0 active:scale-95 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider"
+          className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white border border-rose-500/50 dark:border-rose-400/40 rounded-xl shadow-md shadow-rose-600/20 dark:shadow-rose-950/40 transition-all cursor-pointer shrink-0 active:scale-95 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider"
         >
           <X size={16} className="stroke-[2.5]" />
         </button>
@@ -6462,12 +6462,12 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
             ];
 
             return (
-              <div className="bg-slate-50 border-b border-slate-100 p-4 sm:p-6 md:p-8 shrink-0">
+              <div className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-100 dark:border-slate-800/80 p-4 sm:p-6 md:p-8 shrink-0">
                 <div className="max-w-4xl mx-auto">
                   <div className="relative grid grid-cols-4 gap-1 sm:gap-2 md:gap-0 items-start">
                     
                     {/* Horizontal connection line */}
-                    <div className="absolute left-6 right-6 top-4 sm:top-5 md:top-6 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full">
+                    <div className="absolute left-6 right-6 top-4 sm:top-5 md:top-6 -translate-y-1/2 h-1 bg-slate-200 dark:bg-slate-800 z-0 rounded-full">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ 
@@ -6499,11 +6499,11 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             transition={{ delay: idx * 0.1 }}
                             className={cn(
                               "w-8 h-8 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center border-2 transition-all duration-500 shadow-sm shrink-0",
-                              isCompleted ? "bg-emerald-500 border-emerald-600 text-white shadow-emerald-200" :
-                              isActive ? "bg-white border-primary text-primary shadow-primary/20 ring-4 ring-primary/10" :
-                              isError ? "bg-rose-500 border-rose-600 text-white shadow-rose-200" :
-                              isWarning ? "bg-amber-500 border-amber-600 text-white shadow-amber-200" :
-                              "bg-slate-50 border-slate-200 text-slate-300"
+                              isCompleted ? "bg-emerald-500 border-emerald-600 text-white shadow-emerald-200 dark:shadow-emerald-950/50" :
+                              isActive ? "bg-white dark:bg-slate-900 border-primary text-primary shadow-primary/20 ring-4 ring-primary/10" :
+                              isError ? "bg-rose-500 border-rose-600 text-white shadow-rose-200 dark:shadow-rose-950/50" :
+                              isWarning ? "bg-amber-500 border-amber-600 text-white shadow-amber-200 dark:shadow-amber-950/50" :
+                              "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-600"
                             )}
                           >
                             {isCompleted ? (
@@ -6516,15 +6516,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                           <div className="text-center space-y-0.5">
                             <h4 className={cn(
                               "text-[8px] sm:text-[10px] md:text-[11px] font-black uppercase tracking-wider leading-tight",
-                              isCompleted ? "text-emerald-700" :
-                              isActive ? "text-primary" :
-                              isError ? "text-rose-700" :
-                              isWarning ? "text-amber-700" :
-                              "text-slate-400"
+                              isCompleted ? "text-emerald-700 dark:text-emerald-400" :
+                              isActive ? "text-primary dark:text-primary-light" :
+                              isError ? "text-rose-700 dark:text-rose-400" :
+                              isWarning ? "text-amber-700 dark:text-amber-400" :
+                              "text-slate-400 dark:text-slate-500"
                             )}>
                               {step.title}
                             </h4>
-                            <p className="text-[7px] sm:text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-tighter hidden xs:block sm:block">
+                            <p className="text-[7px] sm:text-[8px] md:text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter hidden xs:block sm:block">
                               {step.desc}
                             </p>
                           </div>
@@ -6534,15 +6534,15 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   </div>
 
                   {(isRejected || isCancelled) && (
-                    <div className="mt-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-700 shadow-sm">
-                      <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0">
-                        <XCircle size={18} className="text-rose-600" />
+                    <div className="mt-6 p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/50 rounded-2xl flex items-center gap-3 text-rose-700 dark:text-rose-300 shadow-sm">
+                      <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-900/50 flex items-center justify-center shrink-0">
+                        <XCircle size={18} className="text-rose-600 dark:text-rose-400" />
                       </div>
                       <div className="space-y-0.5">
                          <p className="text-[10px] md:text-xs font-black uppercase tracking-wider">
                            Process Terminated: {req.status}
                          </p>
-                         <p className="text-[9px] font-bold text-rose-600/70 uppercase">Requisition removed from active ledger workflow</p>
+                         <p className="text-[9px] font-bold text-rose-600/70 dark:text-rose-400/80 uppercase">Requisition removed from active ledger workflow</p>
                       </div>
                     </div>
                   )}
@@ -6553,12 +6553,12 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
           <div className={cn("flex-1 min-h-0 flex flex-col", !isSidePreviewOpen && "lg:grid lg:grid-cols-3")}>
             {/* Left Content */}
-            <div ref={leftPanelRef} className={cn("p-4 md:p-8 space-y-5 md:space-y-8 h-auto overflow-visible", isSidePreviewOpen ? "w-full border-b-0" : "lg:col-span-2 border-b lg:border-b-0 lg:border-r border-slate-100")}>
+            <div ref={leftPanelRef} className={cn("p-4 md:p-8 space-y-5 md:space-y-8 h-auto overflow-visible", isSidePreviewOpen ? "w-full border-b-0" : "lg:col-span-2 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-slate-800")}>
               <section className="space-y-3 md:space-y-4">
                 <div className="flex items-center gap-2">
                   <h4 className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-[0.2em]">Requisition Description</h4>
                 </div>
-                <div className="bg-slate-50 rounded-xl md:rounded-2xl p-3 md:p-6 border border-slate-100 space-y-4 text-[10px] md:text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap">
+                <div className="bg-slate-50 dark:bg-slate-800/40 rounded-xl md:rounded-2xl p-3 md:p-6 border border-slate-100 dark:border-slate-800 space-y-4 text-[10px] md:text-sm font-medium text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                   <HighlightText text={req.description} highlight={globalSearchTerm || ""} />
                 </div>
               </section>
@@ -6938,7 +6938,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                           {/* Hover Overlay */}
                           <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 backdrop-blur-[2px]">
-                            <span className="p-2.5 bg-white text-slate-900 rounded-xl shadow-lg hover:bg-slate-100 transition-transform active:scale-95 flex items-center gap-1.5 text-[10px] font-bold">
+                            <span className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl shadow-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-transform active:scale-95 flex items-center gap-1.5 text-[10px] font-bold">
                               <Eye size={14} />
                               <span>{isPdf ? "Open Document" : "Preview"}</span>
                             </span>
@@ -7043,7 +7043,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                               </div>
 
                               <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 backdrop-blur-[2px]">
-                                <span className="p-2.5 bg-white text-slate-900 rounded-xl shadow-lg hover:bg-slate-100 transition-transform active:scale-95 flex items-center gap-1.5 text-[10px] font-bold">
+                                <span className="p-2.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl shadow-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-transform active:scale-95 flex items-center gap-1.5 text-[10px] font-bold">
                                   <Eye size={14} />
                                   <span>Preview Receipt</span>
                                 </span>
@@ -8056,22 +8056,22 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                   initial={{ y: 10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   className={cn(
-                    "p-4 md:p-6 rounded-2xl border bg-slate-50",
-                    showDecisionForm === "APPROVE" ? "border-emerald-100" : showDecisionForm === "REJECT" ? "border-rose-100" : "border-amber-100"
+                    "p-4 md:p-6 rounded-2xl border bg-slate-50 dark:bg-slate-800/60",
+                    showDecisionForm === "APPROVE" ? "border-emerald-100 dark:border-emerald-900/60" : showDecisionForm === "REJECT" ? "border-rose-100 dark:border-rose-900/60" : "border-amber-100 dark:border-amber-900/60"
                   )}
                 >
-                  <h4 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-widest mb-4">
+                  <h4 className="text-[10px] md:text-xs font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest mb-4">
                     {showDecisionForm === "APPROVE" ? "Approve Transaction" : showDecisionForm === "REJECT" ? "Reject Transaction" : "Escalate Transaction"}
                   </h4>
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <label className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                      <label className="text-[9px] md:text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest ml-1">
                         {showDecisionForm === "REJECT" ? "Reason For Rejection (Optional)" : showDecisionForm === "APPROVE" ? "Reason For Approval (Optional)" : "Reason For Escalation (Optional)"}
                       </label>
                       <textarea 
                         value={decisionNote}
                         onChange={(e) => setDecisionNote(e.target.value)}
-                        className="input-field bg-white text-xs"
+                        className="input-field bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-700"
                         placeholder={showDecisionForm === "REJECT" ? "Enter reason for rejection if any..." : "Provide reasoning if any..."}
                         rows={3}
                       />
@@ -8079,7 +8079,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                     <div className="flex justify-end gap-3 pt-2">
                        <button 
                         onClick={() => setShowDecisionForm(null)}
-                        className="px-4 md:px-6 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] md:text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
+                        className="px-4 md:px-6 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] md:text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-750 transition-all cursor-pointer"
                       >
                         CANCEL
                       </button>
@@ -8103,7 +8103,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
             {/* Right Sidebar - History & Status (Hidden when side preview is open) */}
             {!isSidePreviewOpen && (
-              <div ref={rightPanelRef} className="bg-slate-50/50 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible lg:col-span-1">
+              <div ref={rightPanelRef} className="bg-slate-50/50 dark:bg-slate-950/40 p-6 md:p-8 space-y-6 md:space-y-8 lg:h-full lg:overflow-y-auto h-auto overflow-visible lg:col-span-1 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800">
               <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-800 pb-2">
                   <h4 className="text-[10px] md:text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest shrink-0">
@@ -8132,7 +8132,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">Timeline Minimized</p>
-                        <p className="text-[9px] text-slate-500 font-mono truncate">{getConsolidatedTimeline().length} audit records saved</p>
+                        <p className="text-[9px] text-slate-500 dark:text-slate-400 font-mono truncate">{getConsolidatedTimeline().length} audit records saved</p>
                       </div>
                     </div>
                     <button
@@ -8145,7 +8145,7 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                 ) : (
                   <div className="space-y-6 relative ml-1">
                     {/* Vertical Timeline Connector Line */}
-                    <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 rounded-full" />
+                    <div className="absolute left-3.5 top-3.5 bottom-3.5 w-[2px] bg-slate-200 dark:bg-slate-800 rounded-full" />
                     
                     {getConsolidatedTimeline().map((event) => {
                     let StepIcon = Activity;
@@ -8192,65 +8192,65 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                       <div key={event.id} className="relative pl-9 group">
                         {/* Circle badge marker with icon */}
                         <div className={cn(
-                          "absolute left-0 top-1 w-7.5 h-7.5 rounded-full border-2 border-white flex items-center justify-center ring-4 transition-transform group-hover:scale-105 shadow-sm z-10",
-                          cardColor === "blue" ? "bg-blue-50 text-blue-650 border-blue-200 ring-blue-50/50" :
-                          cardColor === "teal" ? "bg-teal-50 text-teal-650 border-teal-200 ring-teal-50/50" :
-                          cardColor === "indigo" ? "bg-indigo-50 text-indigo-650 border-indigo-200 ring-indigo-50/50" :
-                          cardColor === "emerald" ? "bg-emerald-50 text-emerald-650 border-emerald-250 ring-emerald-50/50" :
-                          cardColor === "rose" ? "bg-rose-50 text-rose-650 border-rose-200 ring-rose-50/50" :
-                          cardColor === "amber" ? "bg-amber-50 text-amber-650 border-amber-200 ring-amber-50/50" :
-                          "bg-slate-50 text-slate-500 border-slate-200 ring-slate-50/50"
+                          "absolute left-0 top-1 w-7.5 h-7.5 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center ring-4 transition-transform group-hover:scale-105 shadow-sm z-10",
+                          cardColor === "blue" ? "bg-blue-50 dark:bg-blue-950/60 text-blue-650 dark:text-blue-300 border-blue-200 dark:border-blue-800 ring-blue-50/50 dark:ring-blue-950/30" :
+                          cardColor === "teal" ? "bg-teal-50 dark:bg-teal-950/60 text-teal-650 dark:text-teal-300 border-teal-200 dark:border-teal-800 ring-teal-50/50 dark:ring-teal-950/30" :
+                          cardColor === "indigo" ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-650 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 ring-indigo-50/50 dark:ring-indigo-950/30" :
+                          cardColor === "emerald" ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-650 dark:text-emerald-300 border-emerald-250 dark:border-emerald-800 ring-emerald-50/50 dark:ring-emerald-950/30" :
+                          cardColor === "rose" ? "bg-rose-50 dark:bg-rose-950/60 text-rose-650 dark:text-rose-300 border-rose-200 dark:border-rose-800 ring-rose-50/50 dark:ring-rose-950/30" :
+                          cardColor === "amber" ? "bg-amber-50 dark:bg-amber-950/60 text-amber-650 dark:text-amber-300 border-amber-200 dark:border-amber-800 ring-amber-50/50 dark:ring-amber-950/30" :
+                          "bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 ring-slate-50/50 dark:ring-slate-950/30"
                         )}>
                           <StepIcon size={13} className="stroke-[2.5]" />
                         </div>
                         
                         <div>
-                          <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 mb-0.5">{formatDate(event.timestamp)}</p>
+                          <p className="text-[9px] md:text-[10px] font-semibold text-slate-400 dark:text-slate-500 mb-0.5">{formatDate(event.timestamp)}</p>
                           <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-                            <h5 className="text-[11px] font-extrabold text-slate-900 leading-tight uppercase tracking-tight">{event.title}</h5>
+                            <h5 className="text-[11px] font-extrabold text-slate-900 dark:text-slate-100 leading-tight uppercase tracking-tight">{event.title}</h5>
                             <span className={cn(
                               "px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest",
-                              cardColor === "blue" ? "bg-blue-100 text-blue-850" :
-                              cardColor === "teal" ? "bg-teal-100 text-teal-855" :
-                              cardColor === "indigo" ? "bg-indigo-100 text-indigo-855" :
-                              cardColor === "emerald" ? "bg-emerald-100 text-emerald-855" :
-                              cardColor === "rose" ? "bg-rose-100 text-rose-855" :
-                              cardColor === "amber" ? "bg-amber-100 text-amber-855" :
-                              "bg-slate-100 text-slate-855"
+                              cardColor === "blue" ? "bg-blue-100 dark:bg-blue-950/70 text-blue-850 dark:text-blue-300" :
+                              cardColor === "teal" ? "bg-teal-100 dark:bg-teal-950/70 text-teal-855 dark:text-teal-300" :
+                              cardColor === "indigo" ? "bg-indigo-100 dark:bg-indigo-950/70 text-indigo-855 dark:text-indigo-300" :
+                              cardColor === "emerald" ? "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-855 dark:text-emerald-300" :
+                              cardColor === "rose" ? "bg-rose-100 dark:bg-rose-950/70 text-rose-855 dark:text-rose-300" :
+                              cardColor === "amber" ? "bg-amber-100 dark:bg-amber-950/70 text-amber-855 dark:text-amber-300" :
+                              "bg-slate-100 dark:bg-slate-800 text-slate-855 dark:text-slate-300"
                             )}>
                               {event.type}
                             </span>
                             {event.role && (
-                              <span className="px-1 py-0.5 bg-slate-100 text-slate-500 rounded text-[6.5px] font-black uppercase tracking-wider">
+                              <span className="px-1 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded text-[6.5px] font-black uppercase tracking-wider">
                                 {event.role.split('_').pop()?.replace(')', '')}
                               </span>
                             )}
                           </div>
 
                           <div className={cn(
-                            "p-3 rounded-xl border space-y-2 bg-white transition-all shadow-sm",
-                            cardColor === "blue" ? "hover:border-blue-200" :
-                            cardColor === "teal" ? "hover:border-teal-200" :
-                            cardColor === "indigo" ? "hover:border-indigo-200" :
-                            cardColor === "emerald" ? "hover:border-emerald-200" :
-                            cardColor === "rose" ? "hover:border-rose-200" :
-                            cardColor === "amber" ? "hover:border-amber-200" :
-                            "hover:border-slate-200"
+                            "p-3 rounded-xl border space-y-2 bg-white dark:bg-slate-900/90 border-slate-200/80 dark:border-slate-800 transition-all shadow-sm",
+                            cardColor === "blue" ? "hover:border-blue-200 dark:hover:border-blue-700" :
+                            cardColor === "teal" ? "hover:border-teal-200 dark:hover:border-teal-700" :
+                            cardColor === "indigo" ? "hover:border-indigo-200 dark:hover:border-indigo-700" :
+                            cardColor === "emerald" ? "hover:border-emerald-200 dark:hover:border-emerald-700" :
+                            cardColor === "rose" ? "hover:border-rose-200 dark:hover:border-rose-700" :
+                            cardColor === "amber" ? "hover:border-amber-200 dark:hover:border-amber-700" :
+                            "hover:border-slate-200 dark:hover:border-slate-700"
                           )}>
-                            <div className="flex items-center justify-between text-[9px] border-b border-slate-50 pb-1.5">
-                              <span className="font-medium text-slate-405">Requestor:</span>
-                              <span className="font-extrabold text-slate-800">{event.actorName}</span>
+                            <div className="flex items-center justify-between text-[9px] border-b border-slate-50 dark:border-slate-800/80 pb-1.5">
+                              <span className="font-medium text-slate-400 dark:text-slate-500">Requestor:</span>
+                              <span className="font-extrabold text-slate-800 dark:text-slate-200">{event.actorName}</span>
                             </div>
 
                             {/* Authentication and security info (only for non-created, non-legacy generic steps) */}
                             {event.type !== "CREATED" && (event.method || event.approvalCode) && (
-                              <div className="flex items-center justify-between text-[8px] text-slate-400">
+                              <div className="flex items-center justify-between text-[8px] text-slate-400 dark:text-slate-500">
                                 <span className="flex items-center gap-1">
-                                  <MethodIcon size={10} className="text-slate-400" />
+                                  <MethodIcon size={10} className="text-slate-400 dark:text-slate-500" />
                                   {methodLabel}
                                 </span>
                                 {event.approvalCode && (
-                                  <span className="font-mono bg-slate-50 px-1 py-0.5 rounded text-slate-500 font-extrabold uppercase tracking-wide">
+                                  <span className="font-mono bg-slate-50 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-wide">
                                     Auth block verified
                                   </span>
                                 )}
@@ -8258,9 +8258,9 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
                             )}
 
                             {event.type === "CREATED" && (
-                              <div className="flex items-center justify-between text-[8px] text-slate-400">
+                              <div className="flex items-center justify-between text-[8px] text-slate-400 dark:text-slate-500">
                                 <span className="flex items-center gap-1">
-                                  <Activity size={10} className="text-slate-400" />
+                                  <Activity size={10} className="text-slate-400 dark:text-slate-500" />
                                   Requisition initiated and ready for approvals
                                 </span>
                               </div>
@@ -8268,8 +8268,8 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
 
                             {/* Event text note or comments */}
                             {event.note && (
-                              <div className="pt-2 border-t border-slate-50">
-                                <p className="text-[9px] md:text-[9.5px] text-slate-600 leading-relaxed italic bg-emerald-50/15 p-2 rounded-lg border border-slate-100">
+                              <div className="pt-2 border-t border-slate-50 dark:border-slate-800/80">
+                                <p className="text-[9px] md:text-[9.5px] text-slate-600 dark:text-slate-300 leading-relaxed italic bg-emerald-50/15 dark:bg-emerald-950/20 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
                                   "{event.note}"
                                 </p>
                               </div>
@@ -8551,27 +8551,27 @@ export const RequisitionDetailModal: React.FC<DetailModalProps> = ({ req: initia
           }}
           onCancel={() => setShowAssignConfirm(false)}
         >
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Double-Verification Safety Check</p>
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2.5">
+            <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Double-Verification Safety Check</p>
             
-            <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none">
+            <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
               <input 
                 type="checkbox"
                 checked={isGroupVerified}
                 onChange={(e) => setIsGroupVerified(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 accent-indigo-600 mt-0.5 shrink-0"
+                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 focus:ring-indigo-500/20 accent-indigo-600 mt-0.5 shrink-0"
               />
-              <span>I verify destination Ministry/Group is: <strong className="text-indigo-600 block text-[11px] uppercase tracking-wide">{req.groupName}</strong></span>
+              <span>I verify destination Ministry/Group is: <strong className="text-indigo-600 dark:text-indigo-400 block text-[11px] uppercase tracking-wide">{req.groupName}</strong></span>
             </label>
 
-            <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 cursor-pointer select-none border-t border-slate-200/60 pt-2">
+            <label className="flex items-start gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer select-none border-t border-slate-200/60 dark:border-slate-700 pt-2">
               <input 
                 type="checkbox"
                 checked={isAmountVerified}
                 onChange={(e) => setIsAmountVerified(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/20 accent-indigo-600 mt-0.5 shrink-0"
+                className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-indigo-600 focus:ring-indigo-500/20 accent-indigo-600 mt-0.5 shrink-0"
               />
-              <span>I verify transaction amount is correct: <strong className="text-indigo-600 block text-[11px] font-mono">KES {req.amount.toLocaleString()}</strong></span>
+              <span>I verify transaction amount is correct: <strong className="text-indigo-600 dark:text-indigo-400 block text-[11px] font-mono">KES {req.amount.toLocaleString()}</strong></span>
             </label>
           </div>
         </ConfirmationModal>

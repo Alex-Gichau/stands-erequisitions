@@ -174,7 +174,9 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
     toggleNoticeArchived,
     toggleNoticeDeleted,
     triggerToast,
-    deleteAlert
+    deleteAlert,
+    lastAutoMarkNotificationsReadAt,
+    runAutoMarkNotificationsReadNow
   } = useRequisitions();
 
   const [activeTab, setActiveTab] = useState<NotificationHubCategory>("ALL");
@@ -979,6 +981,32 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                 </button>
               )}
             </div>
+          </div>
+
+          {/* 14-DAY AUTO-READ MAINTENANCE BADGE */}
+          <div className="mx-3 my-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              <Clock size={12} className="text-emerald-500 shrink-0" />
+              <span className="truncate">Auto-mark read: Every 14 days (Active)</span>
+            </div>
+            {runAutoMarkNotificationsReadNow && (
+              <button
+                type="button"
+                onClick={() => {
+                  runAutoMarkNotificationsReadNow();
+                  triggerToast({
+                    type: "SYSTEM_INFO",
+                    severity: "LOW",
+                    message: "All notifications marked as read via 14-day auto-read maintenance.",
+                    timestamp: new Date().toISOString()
+                  });
+                }}
+                className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer shrink-0 ml-2"
+                title="Trigger 14-day auto-read maintenance right now"
+              >
+                Run Now
+              </button>
+            )}
           </div>
 
           {/* ALL CAUGHT UP BANNER */}

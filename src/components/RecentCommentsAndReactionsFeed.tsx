@@ -28,7 +28,9 @@ import {
   User as UserIcon,
   CornerDownRight,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  LayoutGrid,
+  List
 } from "lucide-react";
 
 interface RecentCommentsAndReactionsFeedProps {
@@ -189,12 +191,56 @@ const getAccessLevelLabel = (role?: string) => {
   }
 };
 
+const getMutedStatusLabel = (status?: string | RequisitionStatus): string => {
+  if (!status) return "Draft";
+  switch (status) {
+    case RequisitionStatus.SUBMITTED:
+      return "Current at Approver L1";
+    case RequisitionStatus.APPROVED_L1:
+      return "Current at Approver L1";
+    case RequisitionStatus.APPROVED_L2:
+      return "Current at Approver L2";
+    case RequisitionStatus.DISBURSED:
+      return "Disbursed";
+    case RequisitionStatus.PARTIALLY_DISBURSED:
+      return "Partially Disbursed";
+    case RequisitionStatus.ESCALATED:
+      return "Escalated";
+    case RequisitionStatus.REJECTED:
+      return "Rejected";
+    case RequisitionStatus.CANCELLED:
+      return "Cancelled";
+    case RequisitionStatus.DRAFT:
+      return "Draft";
+    default:
+      return String(status).replace(/_/g, " ");
+  }
+};
+
 export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactionsFeedProps> = ({ onViewChange }) => {
   const { requisitions, currentUser, users, setSelectedRequisition, setGlobalSearchTerm } = useRequisitions();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [displayLimit, setDisplayLimit] = useState(6);
   const [selectedPreviewCard, setSelectedPreviewCard] = useState<FlatCommentCardData | null>(null);
+
+  // View Mode: "rows" (default) or "cards"
+  const [viewMode, setViewMode] = useState<"cards" | "rows">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("recent_comments_view_mode_v2") || localStorage.getItem("recent_comments_view_mode");
+      if (saved === "cards" || saved === "rows") return saved;
+    }
+    return "rows";
+  });
+  const [rowsLimit, setRowsLimit] = useState<number>(8);
+
+  const handleViewModeChange = (mode: "cards" | "rows") => {
+    setViewMode(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("recent_comments_view_mode_v2", mode);
+      localStorage.setItem("recent_comments_view_mode", mode);
+    }
+  };
 
   // Get user's assigned group list
   const userGroups = useMemo(() => {
@@ -388,30 +434,30 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
   return (
     <div 
       id="recent-comments-reactions-feed-section"
-      className="p-4 md:p-6 space-y-6 relative overflow-hidden"
+      className="p-4 md:p-6 space-y-6 relative overflow-hidden  rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm backdrop-blur-xs transition-colors duration-200"
     >
-      
       {/* Section Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-5">
         <div className="space-y-1.5">
           <h3 className="text-base md:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
             Recent Comments & Reactions
           </h3>
-          <p className="text-slate-400 dark:text-slate-500 text-[10px] md:text-xs font-medium leading-relaxed max-w-2xl">
+          <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-medium leading-relaxed max-w-2xl">
             Discussions, comments and reactions from team members.
           </p>
         </div>
 
-        {/* Search & Row Navigation Controls */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="relative min-w-[200px] sm:min-w-[240px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Search, View Mode Toggle & Navigation Controls */}
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap lg:flex-nowrap shrink-0">
+          {/* Search Input */}
+          <div className="relative min-w-[180px] sm:min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search comments..."
-              className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all placeholder:text-slate-400"
+              className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
             {searchTerm && (
               <button 
@@ -423,9 +469,45 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
             )}
           </div>
 
-          {/* Left / Right Row Scroll Controls in Header */}
-          {displayedCards.length > 0 && (
-            <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+          {/* View Mode Toggle: Rows (Default) vs Cards */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700/80 shrink-0 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("rows")}
+              aria-pressed={viewMode === "rows"}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                viewMode === "rows"
+                  ? "bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-xs border border-slate-200/60 dark:border-slate-600/60"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+              )}
+              title="Display comments as Rows"
+              aria-label="Rows View"
+            >
+              <List size={14} />
+              <span className="text-[11px] sm:text-xs">Rows</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("cards")}
+              aria-pressed={viewMode === "cards"}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                viewMode === "cards"
+                  ? "bg-white dark:bg-slate-700 text-sky-600 dark:text-sky-400 shadow-xs border border-slate-200/60 dark:border-slate-600/60"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+              )}
+              title="Display comments as Cards"
+              aria-label="Cards View"
+            >
+              <LayoutGrid size={14} />
+              <span className="text-[11px] sm:text-xs">Cards</span>
+            </button>
+          </div>
+
+          {/* Left / Right Carousel Scroll Controls in Header (Only in Cards View) */}
+          {viewMode === "cards" && displayedCards.length > 0 && (
+            <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shrink-0">
               <button
                 onClick={scrollLeft}
                 aria-label="Scroll left"
@@ -449,174 +531,315 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
         </div>
       </div>
 
-      {/* Single-Row Horizontal Cards Carousel with Hidden Scrollbar & Edge Fades */}
+      {/* Main Content: Cards or Rows View */}
       {displayedCards.length > 0 ? (
-        <div className="relative group/carousel">
-          {/* Left Edge Fade & Floating Scroll Button */}
-          {canScrollLeft && (
-            <>
-              <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-l-2xl" />
-              <button
-                onClick={scrollLeft}
-                aria-label="Scroll left"
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
-                title="Scroll comments left"
-              >
-                <ChevronLeft size={20} />
-              </button>
-            </>
-          )}
+        viewMode === "cards" ? (
+          /* SINGLE-ROW HORIZONTAL CARDS CAROUSEL */
+          <div className="relative group/carousel">
+            {/* Left Edge Fade & Floating Scroll Button */}
+            {canScrollLeft && (
+              <>
+                <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-l-2xl" />
+                <button
+                  onClick={scrollLeft}
+                  aria-label="Scroll left"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
+                  title="Scroll comments left"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              </>
+            )}
 
-          {/* Right Edge Fade & Floating Scroll Button */}
-          {canScrollRight && (
-            <>
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-r-2xl" />
-              <button
-                onClick={scrollRight}
-                aria-label="Scroll right"
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
-                title="Scroll comments right"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
-          )}
+            {/* Right Edge Fade & Floating Scroll Button */}
+            {canScrollRight && (
+              <>
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white via-white/80 dark:from-slate-900 dark:via-slate-900/80 to-transparent z-10 transition-opacity duration-300 rounded-r-2xl" />
+                <button
+                  onClick={scrollRight}
+                  aria-label="Scroll right"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/95 dark:bg-slate-800/95 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 shadow-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md hover:border-sky-500/80 hover:text-sky-500 dark:hover:text-sky-400"
+                  title="Scroll comments right"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
 
-          <div 
-            ref={scrollContainerRef}
-            className="flex flex-row overflow-x-auto gap-4 md:gap-5 pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory focus:outline-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
-          {displayedCards.map((card) => {
-            const existingReactions = Object.entries(card.reactionCounts).filter(([_, count]) => count > 0);
+            <div 
+              ref={scrollContainerRef}
+              className="flex flex-row overflow-x-auto gap-4 md:gap-5 pb-4 pt-1 px-1 scroll-smooth snap-x snap-mandatory focus:outline-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {displayedCards.map((card) => {
+                const existingReactions = Object.entries(card.reactionCounts).filter(([_, count]) => count > 0);
 
-            return (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-                onClick={() => handleJumpToRequisition(card.rawRequisition)}
-                className="min-w-[300px] sm:min-w-[340px] md:min-w-[370px] max-w-[370px] shrink-0 snap-start bg-slate-50/80 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 rounded-2xl md:rounded-3xl p-5 md:p-6 transition-all duration-200 relative group flex flex-col justify-between border border-slate-200/70 dark:border-slate-700/60 hover:border-sky-400/80 dark:hover:border-sky-500/80 hover:shadow-lg hover:shadow-sky-500/5 cursor-pointer select-none"
-              >
-                <div>
-                  {/* Top Header: User Profile, Name, Verified Checkmark, Access Level, Title Badge */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Avatar Photo or Initial Circle */}
-                      <UserAvatar 
-                        user={{ name: card.authorName, email: card.authorEmail, photoURL: card.authorAvatar }} 
-                        size="md" 
-                        ring="ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs" 
-                        className="shrink-0"
-                      />
+                return (
+                  <motion.div
+                    key={card.id}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={() => handleJumpToRequisition(card.rawRequisition)}
+                    className="min-w-[300px] sm:min-w-[340px] md:min-w-[370px] max-w-[370px] shrink-0 snap-start bg-slate-50/80 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 rounded-2xl md:rounded-3xl p-5 md:p-6 transition-all duration-200 relative group flex flex-col justify-between border border-slate-200/70 dark:border-slate-700/60 hover:border-sky-400/80 dark:hover:border-sky-500/80 hover:shadow-lg hover:shadow-sky-500/5 cursor-pointer select-none"
+                  >
+                    <div>
+                      {/* Top Header: User Profile, Name, Verified Checkmark, Access Level, Title Badge */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Avatar Photo or Initial Circle */}
+                          <UserAvatar 
+                            user={{ name: card.authorName, email: card.authorEmail, photoURL: card.authorAvatar }} 
+                            size="md" 
+                            ring="ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs" 
+                            className="shrink-0"
+                          />
 
-                      {/* Name & Access Level */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={card.authorName}>
-                            {card.authorName}
-                          </h4>
-                          
-                          {/* Official Verified Blue Checkmark Icon */}
-                          <span className="inline-flex items-center justify-center text-sky-500 shrink-0" title="Verified Portal User">
-                            <svg className="w-4 h-4 fill-sky-500 text-white" viewBox="0 0 24 24">
-                              <path fill="currentColor" d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.38-1.93-4.31-4.313-4.31-.495 0-.965.084-1.4.238C14.23 2.155 12.86 1.28 11.28 1.28c-1.58 0-2.95.875-3.6 2.148-.435-.154-.905-.238-1.4-.238-2.38 0-4.31 1.93-4.31 4.313 0 .495.084.965.238 1.4C.875 9.55 0 10.92 0 12.5c0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.38 1.93 4.31 4.313 4.31.495 0 .965-.084 1.4-.238 1.28 1.273 2.65 2.148 4.23 2.148 1.58 0 2.95-.875 3.6-2.148.435.154.905.238 1.4.238 2.38 0 4.31-1.93 4.31-4.313 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.28 4.3l-4.2-4.2 1.41-1.41 2.79 2.79 6.29-6.29 1.41 1.41-7.7 7.7z"/>
-                            </svg>
-                          </span>
+                          {/* Name & Access Level */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={card.authorName}>
+                                {card.authorName}
+                              </h4>
+                              
+                              {/* Official Verified Blue Checkmark Icon */}
+                              <span className="inline-flex items-center justify-center text-sky-500 shrink-0" title="Verified Portal User">
+                                <svg className="w-4 h-4 fill-sky-500 text-white" viewBox="0 0 24 24">
+                                  <path fill="currentColor" d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.38-1.93-4.31-4.313-4.31-.495 0-.965.084-1.4.238C14.23 2.155 12.86 1.28 11.28 1.28c-1.58 0-2.95.875-3.6 2.148-.435-.154-.905-.238-1.4-.238-2.38 0-4.31 1.93-4.31 4.313 0 .495.084.965.238 1.4C.875 9.55 0 10.92 0 12.5c0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.38 1.93 4.31 4.313 4.31.495 0 .965-.084 1.4-.238 1.28 1.273 2.65 2.148 4.23 2.148 1.58 0 2.95-.875 3.6-2.148.435.154.905.238 1.4.238 2.38 0 4.31-1.93 4.31-4.313 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.28 4.3l-4.2-4.2 1.41-1.41 2.79 2.79 6.29-6.29 1.41 1.41-7.7 7.7z"/>
+                                </svg>
+                              </span>
+                            </div>
+
+                            {/* Access Level / Role & Ministry Group */}
+                            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium truncate">
+                              <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{getAccessLevelLabel(card.authorRole)}</span>
+                              <span className="text-slate-300 dark:text-slate-600 mx-1">•</span>
+                              <span className="text-slate-500 dark:text-slate-400">{card.groupName}</span>
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Access Level / Role & Ministry Group */}
-                        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium truncate">
-                          <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{getAccessLevelLabel(card.authorRole)}</span>
-                          <span className="text-slate-300 dark:text-slate-600 mx-1">•</span>
-                          <span className="text-slate-500 dark:text-slate-400">{card.groupName}</span>
-                        </p>
+                        {/* Top Right Requisition Title Badge */}
+                        <div
+                          className="shrink-0 bg-sky-50 dark:bg-sky-950/60 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/80 text-sky-600 dark:text-sky-400 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-sky-200/80 dark:border-sky-800/80 transition-all flex items-center gap-1 max-w-[130px] sm:max-w-[150px] truncate"
+                          title={`Requisition: ${card.requisitionTitle}`}
+                        >
+                          <Tag size={10} className="text-sky-500 shrink-0" />
+                          <span className="truncate">{card.requisitionTitle}</span>
+                        </div>
+                      </div>
+
+                      {/* Main Comment Narrative Body with 3-line clamp */}
+                      <div className="my-3 text-slate-800 dark:text-slate-100 text-xs md:text-sm font-normal leading-relaxed break-words font-sans line-clamp-3">
+                        {renderFormattedCommentText(card.text)}
+                      </div>
+
+                      {/* Timestamp Line */}
+                      <div className="text-[11px] font-sans text-slate-400 dark:text-slate-500 my-2 pt-2 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between">
+                        <span>{formatSocialTimestamp(card.timestamp)}</span>
+                        <span className="text-[10px] font-mono text-slate-400">({formatRelativeShort(card.timestamp)})</span>
                       </div>
                     </div>
 
-                    {/* Top Right Requisition Title Badge */}
-                    <div
-                      className="shrink-0 bg-sky-50 dark:bg-sky-950/60 group-hover:bg-sky-100 dark:group-hover:bg-sky-900/80 text-sky-600 dark:text-sky-400 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-sky-200/80 dark:border-sky-800/80 transition-all flex items-center gap-1 max-w-[130px] sm:max-w-[150px] truncate"
-                      title={`Requisition: ${card.requisitionTitle}`}
-                    >
-                      <Tag size={10} className="text-sky-500 shrink-0" />
-                      <span className="truncate">{card.requisitionTitle}</span>
+                    {/* Bottom Action / Reaction Bar */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-slate-400 text-xs" onClick={(e) => e.stopPropagation()}>
+                      {/* Icon 1: Reply / Comment Count */}
+                      <button
+                        onClick={() => setSelectedPreviewCard(card)}
+                        className="flex items-center gap-1.5 hover:text-sky-500 transition-colors cursor-pointer text-[11px] font-medium"
+                        title={`${card.replyCount} replies - Click for details`}
+                      >
+                        <MessageSquare size={15} className="text-slate-400 group-hover:text-sky-500" />
+                        <span>{card.replyCount}</span>
+                      </button>
+
+                      {/* Icon 2: Read-Only Reactions Display */}
+                      <div className="flex items-center gap-1">
+                        {existingReactions.length > 0 ? (
+                          existingReactions.map(([emoji, count]) => (
+                            <span
+                              key={emoji}
+                              className="px-2 py-0.5 rounded-md text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium select-none flex items-center gap-1 cursor-default"
+                              title={`${count} reaction${count === 1 ? "" : "s"}`}
+                            >
+                              <span>{emoji}</span>
+                              <span className="text-[10px] font-mono font-bold">{count}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-600 px-1 select-none">
+                            No reactions
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Icon 3: Requisition Workflow Status Pill */}
+                      <span className={cn(
+                        "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0",
+                        card.requisitionStatus === RequisitionStatus.DISBURSED
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800"
+                          : card.requisitionStatus === RequisitionStatus.APPROVED_L2
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-800"
+                          : card.requisitionStatus === RequisitionStatus.APPROVED_L1
+                          ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800"
+                          : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                      )}>
+                        {card.requisitionStatus}
+                      </span>
+
+                      {/* Icon 4: Open Full Requisition Details Button */}
+                      <button
+                        onClick={() => handleJumpToRequisition(card.rawRequisition)}
+                        className="p-1.5 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 rounded-md transition-all cursor-pointer"
+                        title="Open full requisition details page"
+                      >
+                        <ExternalLink size={15} />
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* STRUCTURED VERTICAL ROWS LIST VIEW */
+          <div className="space-y-3">
+            {displayedCards.slice(0, rowsLimit).map((card) => {
+              const existingReactions = Object.entries(card.reactionCounts).filter(([_, count]) => count > 0);
+
+              return (
+                <motion.div
+                  key={card.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={() => handleJumpToRequisition(card.rawRequisition)}
+                  className="group relative p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-800/90 transition-all duration-200 hover:border-sky-400/80 dark:hover:border-sky-500/80 hover:shadow-lg hover:shadow-sky-500/5 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3.5 select-none"
+                >
+                  {/* Left Column: Author Info & Ministry Group */}
+                  <div className="flex items-center gap-3 min-w-[200px] sm:min-w-[240px] shrink-0">
+                    <UserAvatar 
+                      user={{ name: card.authorName, email: card.authorEmail, photoURL: card.authorAvatar }} 
+                      size="md" 
+                      ring="ring-2 ring-slate-100 dark:ring-slate-800 shadow-2xs" 
+                      className="shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate" title={card.authorName}>
+                          {card.authorName}
+                        </h4>
+                        <span className="inline-flex items-center justify-center text-sky-500 shrink-0" title="Verified Portal User">
+                          <svg className="w-3.5 h-3.5 fill-sky-500 text-white" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.38-1.93-4.31-4.313-4.31-.495 0-.965.084-1.4.238C14.23 2.155 12.86 1.28 11.28 1.28c-1.58 0-2.95.875-3.6 2.148-.435-.154-.905-.238-1.4-.238-2.38 0-4.31 1.93-4.31 4.313 0 .495.084.965.238 1.4C.875 9.55 0 10.92 0 12.5c0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.38 1.93 4.31 4.313 4.31.495 0 .965-.084 1.4-.238 1.28 1.273 2.65 2.148 4.23 2.148 1.58 0 2.95-.875 3.6-2.148.435.154.905.238 1.4.238 2.38 0 4.31-1.93 4.31-4.313 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.28 4.3l-4.2-4.2 1.41-1.41 2.79 2.79 6.29-6.29 1.41 1.41-7.7 7.7z"/>
+                          </svg>
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
+                        <span className="text-indigo-600 dark:text-indigo-400 font-semibold">{getAccessLevelLabel(card.authorRole)}</span>
+                        <span className="text-slate-300 dark:text-slate-600 mx-1">•</span>
+                        <span className="text-slate-500 dark:text-slate-400">{card.groupName}</span>
+                      </p>
                     </div>
                   </div>
 
-                  {/* Main Comment Narrative Body with 3-line clamp */}
-                  <div className="my-3 text-slate-800 dark:text-slate-100 text-xs md:text-sm font-normal leading-relaxed break-words font-sans line-clamp-3">
-                    {renderFormattedCommentText(card.text)}
+                  {/* Middle Column: Comment Narrative */}
+                  <div className="flex-1 min-w-0 md:px-3">
+                    <div className="text-slate-800 dark:text-slate-100 text-xs sm:text-[13px] font-normal leading-relaxed break-words line-clamp-2 md:line-clamp-1">
+                      {renderFormattedCommentText(card.text)}
+                    </div>
                   </div>
 
-                  {/* Timestamp Line */}
-                  <div className="text-[11px] font-sans text-slate-400 dark:text-slate-500 my-2 pt-2 border-t border-slate-100/80 dark:border-slate-800/80 flex items-center justify-between">
-                    <span>{formatSocialTimestamp(card.timestamp)}</span>
-                    <span className="text-[10px] font-mono text-slate-400">({formatRelativeShort(card.timestamp)})</span>
+                  {/* Between Comment and Time Sent: Requisition Title & Muted Status (e.g. Current at Approver L1) */}
+                  <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 shrink-0 min-w-0 max-w-[220px] sm:max-w-[260px] md:max-w-[300px] lg:max-w-[380px]">
+                    <span 
+                      className="truncate text-slate-400 dark:text-slate-500 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
+                      title={`Requisition: ${card.requisitionTitle}`}
+                    >
+                      {card.requisitionTitle}
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600 shrink-0 select-none">•</span>
+                    <span className="shrink-0 text-slate-400 dark:text-slate-500 font-medium">
+                      {getMutedStatusLabel(card.requisitionStatus)}
+                    </span>
                   </div>
-                </div>
 
-                {/* Bottom Action / Reaction Bar */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-slate-400 text-xs" onClick={(e) => e.stopPropagation()}>
-                  {/* Icon 1: Reply / Comment Count */}
-                  <button
-                    onClick={() => setSelectedPreviewCard(card)}
-                    className="flex items-center gap-1.5 hover:text-sky-500 transition-colors cursor-pointer text-[11px] font-medium"
-                    title={`${card.replyCount} replies - Click for details`}
-                  >
-                    <MessageSquare size={15} className="text-slate-400 group-hover:text-sky-500" />
-                    <span>{card.replyCount}</span>
-                  </button>
-
-                  {/* Icon 2: Read-Only Reactions Display */}
-                  <div className="flex items-center gap-1">
-                    {existingReactions.length > 0 ? (
-                      existingReactions.map(([emoji, count]) => (
-                        <span
-                          key={emoji}
-                          className="px-2 py-0.5 rounded-md text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium select-none flex items-center gap-1 cursor-default"
-                          title={`${count} reaction${count === 1 ? "" : "s"}`}
-                        >
-                          <span>{emoji}</span>
-                          <span className="text-[10px] font-mono font-bold">{count}</span>
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-600 px-1 select-none">
-                        No reactions
+                  {/* Right Column: Timestamps, Reactions, Replies, & Action Jump Button */}
+                  <div className="flex items-center justify-between md:justify-end gap-2.5 sm:gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800 text-xs" onClick={(e) => e.stopPropagation()}>
+                    {/* Timestamp */}
+                    <div className="text-right min-w-[75px] sm:min-w-[90px]">
+                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 block font-medium">
+                        {formatRelativeShort(card.timestamp)}
                       </span>
-                    )}
+                      <span className="text-[9px] text-slate-400 dark:text-slate-500 hidden xl:inline">
+                        {card.timestamp ? new Date(card.timestamp).toLocaleDateString([], { month: "short", day: "numeric" }) : ""}
+                      </span>
+                    </div>
+
+                    {/* Reactions Pill Display */}
+                    <div className="flex items-center gap-1">
+                      {existingReactions.length > 0 ? (
+                        existingReactions.slice(0, 3).map(([emoji, count]) => (
+                          <span
+                            key={emoji}
+                            className="px-1.5 py-0.5 rounded-md text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium select-none flex items-center gap-1 cursor-default"
+                            title={`${count} reaction${count === 1 ? "" : "s"}`}
+                          >
+                            <span>{emoji}</span>
+                            <span className="font-mono font-bold">{count}</span>
+                          </span>
+                        ))
+                      ) : null}
+                    </div>
+
+                    {/* Reply / Comment Count Button */}
+                    <button
+                      onClick={() => setSelectedPreviewCard(card)}
+                      className="flex items-center gap-1 text-slate-400 hover:text-sky-500 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-[11px]"
+                      title={`${card.replyCount} replies - Click for details`}
+                    >
+                      <MessageSquare size={14} />
+                      <span className="font-mono text-[11px]">{card.replyCount}</span>
+                    </button>
+
+                    {/* Open Full Requisition Details Button */}
+                    <button
+                      onClick={() => handleJumpToRequisition(card.rawRequisition)}
+                      className="p-1.5 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 rounded-lg transition-all cursor-pointer"
+                      title="Open full requisition details page"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
                   </div>
+                </motion.div>
+              );
+            })}
 
-                  {/* Icon 3: Requisition Workflow Status Pill */}
-                  <span className={cn(
-                    "text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border shrink-0",
-                    card.requisitionStatus === RequisitionStatus.DISBURSED
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800"
-                      : card.requisitionStatus === RequisitionStatus.APPROVED_L2
-                      ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-400 dark:border-indigo-800"
-                      : card.requisitionStatus === RequisitionStatus.APPROVED_L1
-                      ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800"
-                      : "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
-                  )}>
-                    {card.requisitionStatus}
-                  </span>
-
-                  {/* Icon 4: Open Full Requisition Details Button */}
-                  <button
-                    onClick={() => handleJumpToRequisition(card.rawRequisition)}
-                    className="p-1.5 text-slate-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950 rounded-md transition-all cursor-pointer"
-                    title="Open full requisition details page"
-                  >
-                    <ExternalLink size={15} />
-                  </button>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      </div>
+            {/* Pagination Controls in Rows View */}
+            {displayedCards.length > rowsLimit && (
+              <div className="pt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setRowsLimit(prev => prev + 10)}
+                  className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/60 rounded-xl border border-sky-200 dark:border-sky-800/80 transition-all cursor-pointer shadow-xs"
+                >
+                  Load More Rows ({displayedCards.length - rowsLimit} remaining)
+                </button>
+              </div>
+            )}
+            {rowsLimit > 8 && displayedCards.length > 8 && (
+              <div className="pt-1 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setRowsLimit(8)}
+                  className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline cursor-pointer"
+                >
+                  Show Fewer Rows
+                </button>
+              </div>
+            )}
+          </div>
+        )
       ) : (
         /* Empty State */
         <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400">

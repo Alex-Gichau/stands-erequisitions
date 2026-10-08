@@ -92,6 +92,8 @@ export const SettingsPanel: React.FC = () => {
     requisitions,
     logout,
     churchGroups,
+    lastAutoMarkNotificationsReadAt,
+    runAutoMarkNotificationsReadNow,
   } = useRequisitions();
 
   const [activeTab, setActiveTab] = React.useState<"profile" | "security" | "expiry" | "notifications" | "backups" | "health" | "database">("profile");
@@ -1694,6 +1696,63 @@ export const SettingsPanel: React.FC = () => {
                           </button>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION: 14-DAY AUTOMATED NOTIFICATION READ MAINTENANCE */}
+                  <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-2xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                          <Clock size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>14-Day Auto-Read Maintenance</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              Active (14 Days)
+                            </span>
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Notifications are automatically marked as read every 14 days, preventing feed clutter and ensuring timely inbox hygiene.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">Auto-Read Cadence:</span>
+                          <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            Every 14 Days
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                          {lastAutoMarkNotificationsReadAt 
+                            ? `Last executed: ${new Date(lastAutoMarkNotificationsReadAt).toLocaleDateString(undefined, { dateStyle: "medium", timeStyle: "short" })} • Next run: ${new Date(lastAutoMarkNotificationsReadAt + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+                            : "Scheduled 14-day auto-read cycle is active. Any notifications older than 14 days are automatically cleared."
+                          }
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (runAutoMarkNotificationsReadNow) {
+                            runAutoMarkNotificationsReadNow();
+                            triggerToast({
+                              type: "SYSTEM_INFO",
+                              severity: "LOW",
+                              message: "14-day notification maintenance executed. All current notifications marked as read.",
+                              timestamp: new Date().toISOString()
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-all cursor-pointer shrink-0"
+                      >
+                        Run 14-Day Auto-Read Now
+                      </button>
                     </div>
                   </div>
 

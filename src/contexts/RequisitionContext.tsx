@@ -539,6 +539,8 @@ interface RequisitionContextType {
   readNoticeIds: string[];
   toggleNoticeRead: (id: string, forceRead?: boolean) => void;
   markAllNoticesRead: (ids: string[]) => void;
+  lastAutoMarkNotificationsReadAt?: number | null;
+  runAutoMarkNotificationsReadNow?: () => void;
   starredNoticeIds: string[];
   archivedNoticeIds: string[];
   deletedNoticeIds: string[];
@@ -898,6 +900,106 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return next;
     });
   }, [starredNoticeIds, archivedNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
+
+  // 14-Day Automated Notification Read Maintenance
+  const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+  const [lastAutoMarkNotificationsReadAt, setLastAutoMarkNotificationsReadAt] = useState<number | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("last_auto_mark_notifications_read_at");
+        if (saved) {
+          const val = parseInt(saved, 10);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+
+  const checkAndAutoMarkNotificationsRead = useCallback((force?: boolean) => {
+    const now = Date.now();
+    let lastRun = lastAutoMarkNotificationsReadAt;
+    if (!lastRun && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("last_auto_mark_notifications_read_at");
+        if (saved) lastRun = parseInt(saved, 10) || null;
+      } catch (e) {}
+    }
+
+    const is14DaysElapsed = !lastRun || (now - lastRun >= FOURTEEN_DAYS_MS);
+
+    if (is14DaysElapsed || force) {
+      // 14 days have elapsed (or forced trigger): automatically mark all notifications as read
+      const allAlertIds = alerts.map(a => a.id).filter(Boolean);
+
+      setReadNoticeIds(prev => {
+        const next = Array.from(new Set([...prev, ...allAlertIds]));
+        syncNotificationStatesToDB(next, starredNoticeIds, archivedNoticeIds, deletedNoticeIds);
+        return next;
+      });
+
+      setAlerts(prev => prev.map(a => ({ ...a, isRead: true })));
+
+      setLastAutoMarkNotificationsReadAt(now);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("last_auto_mark_notifications_read_at", String(now));
+        } catch (e) {}
+      }
+    } else {
+      // Also ensure any individual notifications older than 14 days are marked as read
+      const expiredAlertIds = alerts
+        .filter(a => {
+          if (!a || !a.timestamp) return false;
+          try {
+            const age = now - new Date(a.timestamp).getTime();
+            return !isNaN(age) && age >= FOURTEEN_DAYS_MS;
+          } catch {
+            return false;
+          }
+        })
+        .map(a => a.id);
+
+      if (expiredAlertIds.length > 0) {
+        setReadNoticeIds(prev => {
+          const unreadExpired = expiredAlertIds.filter(id => !prev.includes(id));
+          if (unreadExpired.length === 0) return prev;
+          const next = Array.from(new Set([...prev, ...unreadExpired]));
+          syncNotificationStatesToDB(next, starredNoticeIds, archivedNoticeIds, deletedNoticeIds);
+          return next;
+        });
+
+        setAlerts(prev => prev.map(a => expiredAlertIds.includes(a.id) ? { ...a, isRead: true } : a));
+      }
+    }
+  }, [alerts, lastAutoMarkNotificationsReadAt, starredNoticeIds, archivedNoticeIds, deletedNoticeIds, syncNotificationStatesToDB]);
+
+  const runAutoMarkNotificationsReadNow = useCallback(() => {
+    checkAndAutoMarkNotificationsRead(true);
+  }, [checkAndAutoMarkNotificationsRead]);
+
+  // Periodic automatic 14-day check: on mount, when alerts load, every hour, and on tab visibility change
+  useEffect(() => {
+    checkAndAutoMarkNotificationsRead(false);
+
+    // Hourly check timer
+    const hourlyTimer = setInterval(() => {
+      checkAndAutoMarkNotificationsRead(false);
+    }, 60 * 60 * 1000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAndAutoMarkNotificationsRead(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(hourlyTimer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkAndAutoMarkNotificationsRead]);
 
   const toggleNoticeStarred = useCallback((id: string, forceState?: boolean) => {
     setStarredNoticeIds(prev => {
@@ -4971,6 +5073,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       readNoticeIds,
       toggleNoticeRead,
       markAllNoticesRead,
+      lastAutoMarkNotificationsReadAt,
+      runAutoMarkNotificationsReadNow,
       starredNoticeIds,
       archivedNoticeIds,
       deletedNoticeIds,
@@ -5026,6 +5130,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
           triggerToast,
           activeToasts: uniqueActiveToasts,
           removeToast,
+          lastAutoMarkNotificationsReadAt,
+          runAutoMarkNotificationsReadNow,
         }}>
           <FiscalYearContext.Provider value={{
             fiscalYears: uniqueFiscalYears,

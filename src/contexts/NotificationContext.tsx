@@ -15,6 +15,8 @@ export interface NotificationContextType {
   triggerToast: (toast: Omit<BudgetAlert, "id" | "isRead"> & { isRead?: boolean }) => void;
   activeToasts: BudgetAlert[];
   removeToast: (id: string) => void;
+  lastAutoMarkNotificationsReadAt?: number | null;
+  runAutoMarkNotificationsReadNow?: () => void;
 }
 
 export const NotificationContext = createContext<NotificationContextType | null>(null);

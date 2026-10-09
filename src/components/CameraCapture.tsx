@@ -165,15 +165,15 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-2 sm:p-4">
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl"
+        className="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Camera className="text-primary w-5 h-5 animate-pulse" />
             <span className="text-xs font-black text-white uppercase tracking-[0.2em]">In-App Document Capture</span>
@@ -269,7 +269,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onClose
         </div>
 
         {/* Footer / Controls Panel */}
-        <div className="px-6 py-6 bg-slate-950 border-t border-slate-800 flex flex-col gap-4">
+        <div className="px-4 sm:px-6 py-4 sm:py-6 bg-slate-950 border-t border-slate-800 flex flex-col gap-3 sm:gap-4">
           <div className="flex items-center justify-between">
             {/* Camera Selection Switch */}
             {devices.length > 1 && !capturedImage && !error && (

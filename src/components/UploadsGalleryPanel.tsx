@@ -166,6 +166,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   const [isProjectionOpen, setIsProjectionOpen] = useState(false);
   const [projectionInitialIndex, setProjectionInitialIndex] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [mobileSplitTab, setMobileSplitTab] = useState<"list" | "details">("list");
+  const [mobileMinistrySplitTab, setMobileMinistrySplitTab] = useState<"list" | "details">("list");
 
   // Direct Upload & Staged Files Drawer State
   const [isUploadDrawerOpen, setIsUploadDrawerOpen] = useState(false);
@@ -981,14 +983,107 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   const currentMinistryName = activeFolder.startsWith("MINISTRY:") ? activeFolder.replace("MINISTRY:", "") : null;
 
   return (
-    <div id="uploads-gallery-panel" className="w-full min-h-screen text-slate-900 dark:text-slate-100 p-3 sm:p-5 lg:p-7 space-y-5 transition-colors">
+    <div id="uploads-gallery-panel" className="w-full min-h-screen text-slate-900 dark:text-slate-100 p-2.5 sm:p-5 lg:p-7 space-y-4 sm:space-y-5 transition-colors">
       
+      {/* Mobile Screen Category & Scope Quick Navigator (< md) */}
+      <div className="md:hidden w-full overflow-x-auto pb-1 no-scrollbar -mx-0.5 px-0.5">
+        <div className="flex items-center gap-1.5 min-w-max">
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter("ALL_EVER");
+              setActiveFolder("ALL");
+            }}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+              scopeFilter === "ALL_EVER" && activeFolder === "ALL"
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+            )}
+          >
+            <Globe size={13} />
+            <span>All Parish ({allMasterUploadsList.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter("MY_ALLOCATED");
+              setActiveFolder("ALL");
+            }}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+              scopeFilter === "MY_ALLOCATED" && activeFolder === "ALL"
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+            )}
+          >
+            <Users size={13} />
+            <span>My Ministry</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveFolder("MINISTRY_ALL")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+              activeFolder === "MINISTRY_ALL"
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+            )}
+          >
+            <FolderCheck size={13} />
+            <span>Ministries ({allAvailableMinistries.length})</span>
+          </button>
+
+          {[
+            { id: "FMT:pdf", label: `PDFs (${metrics.pdfs})`, icon: FileText },
+            { id: "FMT:image", label: `Images (${metrics.images})`, icon: ImageIcon },
+            { id: "FMT:spreadsheet", label: `Excel (${metrics.spreadsheets})`, icon: FileSpreadsheet },
+            { id: "FMT:document", label: `Docs (${metrics.documents})`, icon: File }
+          ].map(fmt => {
+            const Icon = fmt.icon;
+            const isActive = activeFolder === fmt.id;
+            return (
+              <button
+                key={fmt.id}
+                type="button"
+                onClick={() => setActiveFolder(fmt.id)}
+                className={cn(
+                  "px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+                  isActive
+                    ? "bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900"
+                    : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-600 dark:text-zinc-300"
+                )}
+              >
+                <Icon size={13} />
+                <span>{fmt.label}</span>
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setActiveFolder("ANALYTICS")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+              activeFolder === "ANALYTICS"
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+            )}
+          >
+            <BarChart3 size={13} />
+            <span>Analytics</span>
+          </button>
+        </div>
+      </div>
+
       {/* Main File Explorer Layout with Collapsible Folder Sidebar */}
       <div className="flex flex-row gap-3 sm:gap-4 lg:gap-5 items-start w-full">
         
-        {/* UNIFIED COMPACT ICON-DOCK SIDEBAR (ALL SCREEN SIZES) */}
+        {/* UNIFIED COMPACT ICON-DOCK SIDEBAR (DESKTOP SCREENS >= md) */}
         {isSidebarOpen && (
-          <div className="sticky top-4 sm:top-6 z-20 self-start flex flex-col items-center gap-2.5 w-12 sm:w-14 lg:w-16 bg-white/95 dark:bg-[#18181b]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-2 py-3.5 shadow-md dark:shadow-xl shrink-0 transition-all animate-in fade-in duration-200">
+          <div className="hidden md:flex sticky top-4 sm:top-6 z-20 self-start flex-col items-center gap-2.5 w-12 sm:w-14 lg:w-16 bg-white/95 dark:bg-[#18181b]/95 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-2 py-3.5 shadow-md dark:shadow-xl shrink-0 transition-all animate-in fade-in duration-200">
             {/* Scope Icons */}
             <div className="flex flex-col items-center gap-1.5 w-full">
               <button
@@ -1106,113 +1201,113 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         )}
 
         {/* RIGHT MAIN EXPLORER AREA */}
-        <div className="flex-1 w-full space-y-1">
+        <div className="flex-1 w-full min-w-0 space-y-3 sm:space-y-4">
           
           {/* Controls Bar: Search, Breadcrumb, Sort, View Toggle */}
-          <div className="bg-white dark:bg-[#18181b] p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs space-y-4 transition-colors">
+          <div className="bg-white dark:bg-[#18181b] p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs space-y-3 sm:space-y-4 transition-colors">
             
-                    <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 shadow-inner">
-            <FolderOpen className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Requisitions & Reciepts File Manager
-              </h1>
+            {/* Header Title & Subtitle */}
+            <div className="flex items-center gap-3 sm:gap-4 relative z-10">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/20 shadow-inner">
+                <FolderOpen className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 stroke-[2]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl md:text-2xl font-black tracking-tight text-slate-900 dark:text-white truncate sm:whitespace-normal">
+                  Requisitions & Receipts File Manager
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-0.5 line-clamp-1 sm:line-clamp-none">
+                  Quickly locate specific photos, receipts, and documents using smart category filters.
+                </p>
+              </div>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
-              Quickly locate specific photos, and documents using smart category filters.
-            </p>
-          </div>
-        </div>
 
-            {/* Top Row: Search and View Mode Switcher */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-              {/* Search Input */}
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search ministry or requisition..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#27272a] rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
-                />
-                {searchQuery && (
+            {/* Search Input & Action Toolbar */}
+            <div className="space-y-2.5">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-zinc-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search ministry, file, or requisition..."
+                    className="w-full pl-10 pr-9 py-2 sm:py-2.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#27272a] rounded-xl sm:rounded-2xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Primary Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Export Catalog CSV */}
                   <button
                     type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white cursor-pointer"
+                    onClick={handleExportCatalogCsv}
+                    className="p-2 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-200 dark:hover:text-white rounded-xl text-xs font-bold border border-slate-200 dark:border-[#3f3f46] transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                    title="Export catalog list of documents to CSV"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">Export</span>
                   </button>
-                )}
 
+                  {/* Camera Scanner Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStagedFiles([]);
+                      setIsCameraActive(true);
+                      setIsUploadDrawerOpen(true);
+                    }}
+                    className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Scan</span>
+                  </button>
+
+                  {/* Primary Upload Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStagedFiles([]);
+                      setIsCameraActive(false);
+                      setIsUploadDrawerOpen(true);
+                    }}
+                    className="flex-1 sm:flex-initial px-3.5 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Upload</span>
+                  </button>
+                </div>
               </div>
 
-                      {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
-          {/* Export Catalog CSV */}
-          <button
-            type="button"
-            onClick={handleExportCatalogCsv}
-            className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-200 dark:hover:text-white rounded-xl text-xs font-bold border border-slate-200 dark:border-[#3f3f46] transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
-            title="Export catalog list of documents to CSV"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden md:inline">Export</span>
-          </button>
-
-          {/* Camera Scanner Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setStagedFiles([]);
-              setIsCameraActive(true);
-              setIsUploadDrawerOpen(true);
-            }}
-            className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-400 rounded-xl text-xs font-bold border border-emerald-200 dark:border-emerald-500/30 transition-all cursor-pointer flex items-center gap-2 shadow-2xs"
-          >
-            <Camera className="w-4 h-4" />
-            <span>Scan</span>
-          </button>
-
-          {/* Primary Upload Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setStagedFiles([]);
-              setIsCameraActive(false);
-              setIsUploadDrawerOpen(true);
-            }}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Upload</span>
-          </button>
-        </div>
-
-
-
-              {/* View Mode & Sorting */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+              {/* View Mode & Sorting Row */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-[#27272a]">
                 {/* Sort Option */}
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs font-bold text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
-                >
-                  <option value="NEWEST">Sort: Newest First</option>
-                  <option value="OLDEST">Sort: Oldest First</option>
-                  <option value="TITLE_AZ">File Name (A-Z)</option>
-                  <option value="GROUP_AZ">Ministry (A-Z)</option>
-                  <option value="AMOUNT_HIGH">Highest Financial Value</option>
-                  <option value="FILE_TYPE">File Format</option>
-                </select>
+                <div className="flex-1 min-w-0 max-w-[190px] sm:max-w-[240px]">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="w-full px-2.5 sm:px-3 py-1.5 bg-slate-50 dark:bg-[#121214] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs font-bold text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-indigo-500 cursor-pointer truncate"
+                  >
+                    <option value="NEWEST">Sort: Newest First</option>
+                    <option value="OLDEST">Sort: Oldest First</option>
+                    <option value="TITLE_AZ">File Name (A-Z)</option>
+                    <option value="GROUP_AZ">Ministry (A-Z)</option>
+                    <option value="AMOUNT_HIGH">Highest Financial Value</option>
+                    <option value="FILE_TYPE">File Format</option>
+                  </select>
+                </div>
 
                 {/* View Mode Switcher: Grid vs Table vs Split Inspector */}
-                <div className="flex items-center bg-slate-100 dark:bg-[#121214] p-1 rounded-xl border border-slate-200 dark:border-[#27272a]">
+                <div className="flex items-center bg-slate-100 dark:bg-[#121214] p-1 rounded-xl border border-slate-200 dark:border-[#27272a] shrink-0">
                   <button
                     type="button"
                     onClick={() => {
@@ -1220,7 +1315,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       setViewMode("grid");
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
                       viewMode === "grid" && activeFolder !== "ANALYTICS"
                         ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs" 
                         : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -1228,7 +1323,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     title="Grid Card View"
                   >
                     <Grid className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Grid</span>
+                    <span className="hidden xs:inline sm:inline">Grid</span>
                   </button>
                   <button
                     type="button"
@@ -1237,7 +1332,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       setViewMode("table");
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
                       viewMode === "table" && activeFolder !== "ANALYTICS"
                         ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs" 
                         : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -1245,7 +1340,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     title="Row Table Explorer View"
                   >
                     <List className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Rows</span>
+                    <span className="hidden xs:inline sm:inline">Rows</span>
                   </button>
                   <button
                     type="button"
@@ -1260,7 +1355,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                       }
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
                       viewMode === "split" && activeFolder !== "ANALYTICS"
                         ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs" 
                         : "text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white"
@@ -1268,60 +1363,61 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     title="Split Inspector View"
                   >
                     <Columns2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Split</span>
+                    <span className="hidden xs:inline sm:inline">Split</span>
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Bottom Row: Active Breadcrumb & Quick Filter Strip */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-[#27272a]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 dark:border-[#27272a]">
               {/* Breadcrumb Indicator */}
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-zinc-400 flex-wrap">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400 flex-wrap min-w-0">
                 {currentMinistryName && (
                   <button
                     type="button"
                     onClick={() => setActiveFolder("MINISTRY_ALL")}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all border border-indigo-200 dark:border-indigo-800/80 cursor-pointer shadow-2xs group shrink-0 active:scale-95 mr-0.5"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all border border-indigo-200 dark:border-indigo-800/80 cursor-pointer shadow-2xs group shrink-0 active:scale-95 mr-0.5"
                     title="Back to all ministry folders"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+                    <ArrowLeft className="w-3 h-3 transition-transform group-hover:-translate-x-0.5" />
+                    <span className="text-[11px]">Back</span>
                   </button>
                 )}
 
-                <span className="font-bold text-slate-400 dark:text-zinc-500">Location:</span>
+                <span className="font-bold text-slate-400 dark:text-zinc-500 shrink-0">Location:</span>
                 
                 {isBrowsingMinistries ? (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 min-w-0 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setActiveFolder("MINISTRY_ALL")}
-                      className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                      className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1 shrink-0"
                     >
                       <Folder size={13} className="fill-indigo-500/20" />
-                      <span>Parish Ministries</span>
+                      <span>Ministries</span>
                     </button>
                     {currentMinistryName && (
                       <>
-                        <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600" />
-                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                          <FolderOpen size={13} className="text-indigo-500" />
-                          <span>{currentMinistryName}</span>
+                        <ChevronRight size={13} className="text-slate-300 dark:text-zinc-600 shrink-0" />
+                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate max-w-[150px] sm:max-w-none">
+                          <FolderOpen size={13} className="text-indigo-500 shrink-0" />
+                          <span className="truncate">{currentMinistryName}</span>
                         </span>
                       </>
                     )}
                   </div>
                 ) : (
-                  <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                  <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1 truncate max-w-[180px] sm:max-w-none">
                     {getActiveFolderLabel()}
                   </span>
                 )}
                 
-                <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono">({filteredUploads.length} files)</span>
+                <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono shrink-0">({filteredUploads.length})</span>
               </div>
 
               {/* Format Filter Quick Switcher */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 subtle-scrollbar">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar scroll-smooth">
                 {[
                   { id: "ALL", label: "All Formats" },
                   { id: "PDF", label: "PDFs" },
@@ -1334,7 +1430,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     type="button"
                     onClick={() => setSelectedFormat(fmt.id as FileFormatFilter)}
                     className={cn(
-                      "px-3 py-1 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border",
+                      "px-2.5 sm:px-3 py-1 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer border shrink-0",
                       selectedFormat === fmt.id
                         ? "bg-indigo-600 border-indigo-600 text-white shadow-2xs"
                         : "bg-slate-50 dark:bg-[#121214] border-slate-200 dark:border-[#27272a] text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#222227] hover:text-slate-900 dark:hover:text-zinc-200"
@@ -1498,64 +1594,116 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 </div>
               ) : (
                 /* 3. MINISTRIES SPLIT INSPECTOR VIEW */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-                  {/* Left Ministries List (7 Cols) */}
-                  <div className="lg:col-span-7 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden transition-colors">
-                    <div className="p-3.5 bg-slate-50 dark:bg-[#121214] border-b border-slate-200 dark:border-[#27272a] text-xs font-bold text-slate-700 dark:text-zinc-400 flex items-center justify-between">
+                <div className="space-y-3">
+                  {/* Mobile Tab Switcher (< lg) */}
+                  <div className="flex lg:hidden items-center bg-slate-100 dark:bg-[#121214] p-1 rounded-2xl border border-slate-200 dark:border-[#27272a]">
+                    <button
+                      type="button"
+                      onClick={() => setMobileMinistrySplitTab("list")}
+                      className={cn(
+                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                        mobileMinistrySplitTab === "list"
+                          ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                          : "text-slate-500 dark:text-zinc-400"
+                      )}
+                    >
+                      <Folder size={14} />
                       <span>Ministries ({filteredMinistries.length})</span>
-                      <span className="text-[11px] text-slate-400 dark:text-zinc-500">Select to inspect folder</span>
-                    </div>
-                    <div className="max-h-[620px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
-                      {paginatedMinistries.map((ministry) => {
-                        const isSelected = (selectedMinistryFolder || paginatedMinistries[0]?.name) === ministry.name;
-                        return (
-                          <div
-                            key={ministry.name}
-                            onClick={() => setSelectedMinistryFolder(ministry.name)}
-                            className={cn(
-                              "p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-[#222227] transition-all cursor-pointer",
-                              isSelected && "bg-slate-100 dark:bg-[#27272a] border-l-4 border-indigo-600 dark:border-indigo-500"
-                            )}
-                          >
-                            <div className="flex items-center gap-3 truncate min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-200 dark:border-indigo-800/40">
-                                <Folder size={15} className="fill-indigo-500/20" />
-                              </div>
-                              <div className="truncate min-w-0">
-                                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{ministry.name}</div>
-                                <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
-                                  {ministry.totalAmount > 0 ? formatCurrency(ministry.totalAmount) : "No linked expenses"}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-200/60 dark:bg-[#18181b] text-slate-700 dark:text-zinc-300">
-                                {ministry.count} files
-                              </span>
-                              <ChevronRight size={14} className="text-slate-400 dark:text-zinc-500" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {/* 15-Row Pagination for Ministries Split View */}
-                    {renderPaginationControls(ministriesPage, totalMinistriesPages, filteredMinistries.length, MINISTRIES_PER_PAGE, setMinistriesPage, "folders")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMinistrySplitTab("details")}
+                      className={cn(
+                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                        mobileMinistrySplitTab === "details"
+                          ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                          : "text-slate-500 dark:text-zinc-400"
+                      )}
+                    >
+                      <Info size={14} />
+                      <span>Folder Inspector</span>
+                    </button>
                   </div>
 
-                  {/* Right Ministry Inspector Pane (5 Cols) */}
-                  {(() => {
-                    const activeMinistryName = selectedMinistryFolder || filteredMinistries[0]?.name;
-                    const activeMinistry = allAvailableMinistries.find(m => m.name === activeMinistryName);
-                    const ministryFiles = scopedUploadsList.filter(item => (item.groupName || item.requisition?.groupName || "").trim().toLowerCase() === (activeMinistryName || "").trim().toLowerCase());
-                    const pdfCount = ministryFiles.filter(f => f.fileType === "pdf").length;
-                    const imgCount = ministryFiles.filter(f => f.fileType === "image").length;
-                    const sheetCount = ministryFiles.filter(f => f.fileType === "spreadsheet").length;
-                    const docCount = ministryFiles.filter(f => f.fileType === "document").length;
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    {/* Left Ministries List (7 Cols) */}
+                    <div className={cn(
+                      "lg:col-span-7 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden transition-colors",
+                      mobileMinistrySplitTab === "details" ? "hidden lg:block" : "block"
+                    )}>
+                      <div className="p-3.5 bg-slate-50 dark:bg-[#121214] border-b border-slate-200 dark:border-[#27272a] text-xs font-bold text-slate-700 dark:text-zinc-400 flex items-center justify-between">
+                        <span>Ministries ({filteredMinistries.length})</span>
+                        <span className="text-[11px] text-slate-400 dark:text-zinc-500">Select to inspect folder</span>
+                      </div>
+                      <div className="max-h-[620px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
+                        {paginatedMinistries.map((ministry) => {
+                          const isSelected = (selectedMinistryFolder || paginatedMinistries[0]?.name) === ministry.name;
+                          return (
+                            <div
+                              key={ministry.name}
+                              onClick={() => {
+                                setSelectedMinistryFolder(ministry.name);
+                                setMobileMinistrySplitTab("details");
+                              }}
+                              className={cn(
+                                "p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-[#222227] transition-all cursor-pointer",
+                                isSelected && "bg-slate-100 dark:bg-[#27272a] border-l-4 border-indigo-600 dark:border-indigo-500"
+                              )}
+                            >
+                              <div className="flex items-center gap-3 truncate min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-200 dark:border-indigo-800/40">
+                                  <Folder size={15} className="fill-indigo-500/20" />
+                                </div>
+                                <div className="truncate min-w-0">
+                                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{ministry.name}</div>
+                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
+                                    {ministry.totalAmount > 0 ? formatCurrency(ministry.totalAmount) : "No linked expenses"}
+                                  </div>
+                                </div>
+                              </div>
 
-                    return (
-                      <div className="lg:col-span-5 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-5 shadow-2xs space-y-4 sticky top-4 transition-colors">
-                        <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3">
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-200/60 dark:bg-[#18181b] text-slate-700 dark:text-zinc-300">
+                                  {ministry.count} files
+                                </span>
+                                <ChevronRight size={14} className="text-slate-400 dark:text-zinc-500" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* 15-Row Pagination for Ministries Split View */}
+                      {renderPaginationControls(ministriesPage, totalMinistriesPages, filteredMinistries.length, MINISTRIES_PER_PAGE, setMinistriesPage, "folders")}
+                    </div>
+
+                    {/* Right Ministry Inspector Pane (5 Cols) */}
+                    {(() => {
+                      const activeMinistryName = selectedMinistryFolder || filteredMinistries[0]?.name;
+                      const activeMinistry = allAvailableMinistries.find(m => m.name === activeMinistryName);
+                      const ministryFiles = scopedUploadsList.filter(item => (item.groupName || item.requisition?.groupName || "").trim().toLowerCase() === (activeMinistryName || "").trim().toLowerCase());
+                      const pdfCount = ministryFiles.filter(f => f.fileType === "pdf").length;
+                      const imgCount = ministryFiles.filter(f => f.fileType === "image").length;
+                      const sheetCount = ministryFiles.filter(f => f.fileType === "spreadsheet").length;
+                      const docCount = ministryFiles.filter(f => f.fileType === "document").length;
+
+                      return (
+                        <div className={cn(
+                          "lg:col-span-5 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-4 sm:p-5 shadow-2xs space-y-4 lg:sticky lg:top-4 transition-colors",
+                          mobileMinistrySplitTab === "list" ? "hidden lg:block" : "block"
+                        )}>
+                          {/* Mobile Back Button */}
+                          <div className="lg:hidden">
+                            <button
+                              type="button"
+                              onClick={() => setMobileMinistrySplitTab("list")}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              <ArrowLeft size={14} />
+                              <span>Back to Ministries List</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3">
                           <div className="flex items-center gap-2">
                             <Info size={16} className="text-indigo-600 dark:text-indigo-400" />
                             <h3 className="text-sm font-black text-slate-900 dark:text-white">Ministry Folder Inspector</h3>
@@ -1681,31 +1829,43 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     );
                   })()}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
+        )}
 
           {/* Batch Actions Strip (When files selected) */}
           {selectedItemIds.size > 0 && (
-            <div className="bg-indigo-600 text-white px-5 py-3 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-xl shadow-indigo-600/20 animate-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-black uppercase tracking-wider bg-indigo-700/80 px-2.5 py-1 rounded-lg">
-                  {selectedItemIds.size} Selected
-                </span>
+            <div className="sticky bottom-3 sm:static z-30 bg-indigo-600 text-white p-3 sm:px-5 sm:py-3 rounded-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 shadow-xl shadow-indigo-600/30 animate-in slide-in-from-bottom-2 duration-200 border border-indigo-400/20">
+              <div className="flex items-center justify-between sm:justify-start gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider bg-indigo-700/80 px-2.5 py-1 rounded-lg">
+                    {selectedItemIds.size} Selected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={selectAllFiltered}
+                    className="text-xs font-bold hover:underline cursor-pointer"
+                  >
+                    {selectedItemIds.size === filteredUploads.length ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={selectAllFiltered}
-                  className="text-xs font-bold hover:underline cursor-pointer"
+                  onClick={() => setSelectedItemIds(new Set())}
+                  className="sm:hidden p-1.5 hover:bg-indigo-700 rounded-lg text-white/80 hover:text-white cursor-pointer"
+                  title="Clear selection"
                 >
-                  {selectedItemIds.size === filteredUploads.length ? "Deselect All" : "Select All Filtered"}
+                  <X size={15} />
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
                 <button
                   type="button"
                   onClick={() => handleOpenProjection(0)}
-                  className="px-3 py-1.5 bg-white text-indigo-600 hover:bg-indigo-50 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-white text-indigo-600 hover:bg-indigo-50 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
                 >
                   <Eye size={14} />
                   <span>Preview ({selectedItemIds.size})</span>
@@ -1713,15 +1873,15 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 <button
                   type="button"
                   onClick={handleBatchDownload}
-                  className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Download size={14} />
-                  <span>Batch Download</span>
+                  <span>Download</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleBatchCopyLinks}
-                  className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Copy size={14} />
                   <span>Copy URLs</span>
@@ -1729,7 +1889,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedItemIds(new Set())}
-                  className="p-1.5 hover:bg-indigo-700 rounded-lg text-white/80 hover:text-white cursor-pointer ml-auto"
+                  className="hidden sm:block p-1.5 hover:bg-indigo-700 rounded-lg text-white/80 hover:text-white cursor-pointer ml-auto"
+                  title="Clear selection"
                 >
                   <X size={15} />
                 </button>
@@ -2029,9 +2190,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         {/* Multi-select Checkbox */}
                         <div 
                           onClick={(e) => toggleSelectItem(item.id, e)}
-                          className="absolute top-2.5 left-2.5 z-10 p-1.5 rounded-lg bg-white/80 dark:bg-black/60 backdrop-blur-md text-slate-700 dark:text-white border border-slate-200/60 dark:border-transparent hover:bg-white dark:hover:bg-black/80 transition-all cursor-pointer shadow-2xs"
+                          className="absolute top-2 left-2 z-10 p-2 sm:p-1.5 rounded-xl bg-white/90 dark:bg-black/70 backdrop-blur-md text-slate-700 dark:text-white border border-slate-200/60 dark:border-transparent hover:bg-white dark:hover:bg-black/90 transition-all cursor-pointer shadow-2xs active:scale-95"
                         >
-                          {isSelected ? <CheckSquare size={15} className="text-indigo-600 dark:text-indigo-400" /> : <Square size={15} className="text-slate-400 dark:text-zinc-400" />}
+                          {isSelected ? <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" /> : <Square size={16} className="text-slate-400 dark:text-zinc-400" />}
                         </div>
 
                         {/* File Format Badge */}
@@ -2116,30 +2277,30 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             <span className="text-slate-400 dark:text-zinc-500 text-[10px] italic">Direct Upload</span>
                           )}
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-0.5 sm:gap-1">
                             <button
                               type="button"
                               onClick={openThisItem}
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400 rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
                               title="Preview file"
                             >
-                              <Eye size={13} />
+                              <Eye size={14} />
                             </button>
                             <button
                               type="button"
                               onClick={(e) => handleDownload(item, e)}
-                              className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
                               title="Download file"
                             >
-                              <Download size={13} />
+                              <Download size={14} />
                             </button>
                             <button
                               type="button"
                               onClick={(e) => handleCopyUri(item, e)}
-                              className="p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                              className="p-2 sm:p-1.5 text-slate-400 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
                               title="Copy link"
                             >
-                              {copiedId === item.id ? <Check size={13} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={13} />}
+                              {copiedId === item.id ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
                             </button>
                           </div>
                         </div>
@@ -2448,59 +2609,111 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             (() => {
               const activeInspectorItem = inspectorItem || paginatedUploads[0] || filteredUploads[0];
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-                  {/* Files Table (Left 7 Cols) */}
-                  <div className="lg:col-span-7 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden transition-colors">
-                    <div className="p-3.5 bg-slate-50 dark:bg-[#121214] border-b border-slate-200 dark:border-[#27272a] text-xs font-bold text-slate-700 dark:text-zinc-400 flex items-center justify-between">
+                <div className="space-y-3">
+                  {/* Mobile Tab Switcher (< lg) */}
+                  <div className="flex lg:hidden items-center bg-slate-100 dark:bg-[#121214] p-1 rounded-2xl border border-slate-200 dark:border-[#27272a]">
+                    <button
+                      type="button"
+                      onClick={() => setMobileSplitTab("list")}
+                      className={cn(
+                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                        mobileSplitTab === "list"
+                          ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                          : "text-slate-500 dark:text-zinc-400"
+                      )}
+                    >
+                      <List size={14} />
                       <span>Files List ({filteredUploads.length})</span>
-                      <span className="text-[11px] text-slate-400 dark:text-zinc-500">Click any row to inspect details</span>
-                    </div>
-                    <div className="max-h-[650px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
-                      {paginatedUploads.map((item) => {
-                        const isSelected = activeInspectorItem?.id === item.id;
-                        return (
-                          <div
-                            key={item.id}
-                            onClick={() => setInspectorItem(item)}
-                            className={cn(
-                              "p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-[#222227] transition-all cursor-pointer",
-                              isSelected && "bg-slate-100 dark:bg-[#27272a] border-l-4 border-indigo-600 dark:border-indigo-500"
-                            )}
-                          >
-                            <div className="flex items-center gap-3 truncate min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#121214] text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#27272a]">
-                                {item.fileType === "pdf" ? <FileText size={15} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={15} /> : <ImageIcon size={15} />}
-                              </div>
-                              <div className="truncate min-w-0">
-                                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.fileName}</div>
-                                <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">{item.groupName} · {formatDate(item.date)}</div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={cn(
-                                "px-2 py-0.5 rounded text-[9px] font-black uppercase",
-                                item.fileType === "pdf" && "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
-                                item.fileType === "image" && "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-                                item.fileType === "spreadsheet" && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-                                item.fileType === "document" && "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-                                item.fileType === "other" && "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400"
-                              )}>
-                                {item.fileType}
-                              </span>
-                              <ChevronRight size={14} className="text-slate-400 dark:text-zinc-500" />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {/* 15-Row Pagination for Files Split View */}
-                    {renderPaginationControls(filesPage, totalFilesPages, filteredUploads.length, FILES_PER_PAGE, setFilesPage, "files")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileSplitTab("details")}
+                      className={cn(
+                        "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                        mobileSplitTab === "details"
+                          ? "bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 shadow-2xs"
+                          : "text-slate-500 dark:text-zinc-400"
+                      )}
+                    >
+                      <Info size={14} />
+                      <span>Document Details</span>
+                    </button>
                   </div>
 
-                  {/* Inspector Pane (Right 5 Cols) */}
-                  <div className="lg:col-span-5 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-5 shadow-2xs space-y-4 sticky top-4 transition-colors">
-                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                    {/* Files Table (Left 7 Cols) */}
+                    <div className={cn(
+                      "lg:col-span-7 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] shadow-2xs overflow-hidden transition-colors",
+                      mobileSplitTab === "details" ? "hidden lg:block" : "block"
+                    )}>
+                      <div className="p-3.5 bg-slate-50 dark:bg-[#121214] border-b border-slate-200 dark:border-[#27272a] text-xs font-bold text-slate-700 dark:text-zinc-400 flex items-center justify-between">
+                        <span>Files List ({filteredUploads.length})</span>
+                        <span className="text-[11px] text-slate-400 dark:text-zinc-500">Click any row to inspect details</span>
+                      </div>
+                      <div className="max-h-[650px] overflow-y-auto divide-y divide-slate-100 dark:divide-[#27272a] subtle-scrollbar">
+                        {paginatedUploads.map((item) => {
+                          const isSelected = activeInspectorItem?.id === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => {
+                                setInspectorItem(item);
+                                setMobileSplitTab("details");
+                              }}
+                              className={cn(
+                                "p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-[#222227] transition-all cursor-pointer",
+                                isSelected && "bg-slate-100 dark:bg-[#27272a] border-l-4 border-indigo-600 dark:border-indigo-500"
+                              )}
+                            >
+                              <div className="flex items-center gap-3 truncate min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#121214] text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#27272a]">
+                                  {item.fileType === "pdf" ? <FileText size={15} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={15} /> : <ImageIcon size={15} />}
+                                </div>
+                                <div className="truncate min-w-0">
+                                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.fileName}</div>
+                                  <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">{item.groupName} · {formatDate(item.date)}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded text-[9px] font-black uppercase",
+                                  item.fileType === "pdf" && "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+                                  item.fileType === "image" && "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+                                  item.fileType === "spreadsheet" && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+                                  item.fileType === "document" && "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+                                  item.fileType === "other" && "bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-400"
+                                )}>
+                                  {item.fileType}
+                                </span>
+                                <ChevronRight size={14} className="text-slate-400 dark:text-zinc-500" />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* 15-Row Pagination for Files Split View */}
+                      {renderPaginationControls(filesPage, totalFilesPages, filteredUploads.length, FILES_PER_PAGE, setFilesPage, "files")}
+                    </div>
+
+                    {/* Inspector Pane (Right 5 Cols) */}
+                    <div className={cn(
+                      "lg:col-span-5 bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200/80 dark:border-[#27272a] p-4 sm:p-5 shadow-2xs space-y-4 lg:sticky lg:top-4 transition-colors",
+                      mobileSplitTab === "list" ? "hidden lg:block" : "block"
+                    )}>
+                      {/* Mobile Back Button */}
+                      <div className="lg:hidden">
+                        <button
+                          type="button"
+                          onClick={() => setMobileSplitTab("list")}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                        >
+                          <ArrowLeft size={14} />
+                          <span>Back to Files List</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3">
                       <div className="flex items-center gap-2">
                         <Info size={16} className="text-indigo-600 dark:text-indigo-400" />
                         <h3 className="text-sm font-black text-slate-900 dark:text-white">Document Details</h3>
@@ -2612,6 +2825,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
               );
             })()
           )}
@@ -2642,35 +2856,35 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       {/* Upload Documents Drawer / Modal with Camera Scanner */}
       <AnimatePresence>
         {isUploadDrawerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-xl bg-white dark:bg-[#18181b] rounded-3xl border border-slate-200 dark:border-[#27272a] shadow-2xl overflow-hidden p-6 space-y-5 transition-colors"
+              className="w-full max-w-xl max-h-[92vh] sm:max-h-[88vh] flex flex-col bg-white dark:bg-[#18181b] rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-[#27272a] shadow-2xl overflow-hidden p-4 sm:p-6 space-y-4 sm:space-y-5 transition-colors"
             >
               {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20">
-                    <Upload className="w-5 h-5" />
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#27272a] pb-3 sm:pb-4 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                    <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">Upload New Documents</h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-400">Add files or scanned receipts to parish ministry folders</p>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-900 dark:text-white truncate">Upload New Documents</h3>
+                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-zinc-400 truncate">Add files or scanned receipts to parish ministry folders</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsUploadDrawerOpen(false)}
-                  className="p-2 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
+                  className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer transition-colors shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Drawer Body */}
-              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 subtle-scrollbar">
+              <div className="flex-1 overflow-y-auto pr-1 subtle-scrollbar space-y-4">
                 
                 {/* Camera Capture Mode */}
                 {isCameraActive ? (
@@ -2812,11 +3026,11 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
               </div>
 
               {/* Drawer Footer Buttons */}
-              <div className="pt-3 border-t border-slate-100 dark:border-[#27272a] flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-slate-100 dark:border-[#27272a] flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsUploadDrawerOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#27272a] dark:hover:bg-[#323238] text-slate-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
                 >
                   Cancel
                 </button>
@@ -2824,7 +3038,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   type="button"
                   disabled={stagedFiles.length === 0 || isUploading}
                   onClick={handleSaveStagedFiles}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-2.5 sm:py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer"
                 >
                   {isUploading ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                   <span>{isUploading ? "Saving..." : `Save ${stagedFiles.length} File(s)`}</span>

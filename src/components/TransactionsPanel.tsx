@@ -161,7 +161,7 @@ export const TransactionsPanel: React.FC = () => {
   return (
     <div className="flex-1 p-4 md:p-8 bg-slate-50 space-y-8">
       {/* Header Title Banner with Actions */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-[2rem] p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="rounded-[2rem] p-6 md:p-8 text-black dark:text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">

@@ -29,6 +29,8 @@ import {
   CornerDownRight,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   LayoutGrid,
   List
 } from "lucide-react";
@@ -815,27 +817,35 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
               );
             })}
 
-            {/* Pagination Controls in Rows View */}
+            {/* Downward Arrow Button in Rows View */}
             {displayedCards.length > rowsLimit && (
-              <div className="pt-2 flex justify-center">
+              <div className="pt-2 flex flex-col items-center justify-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setRowsLimit(prev => prev + 10)}
-                  className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/60 rounded-xl border border-sky-200 dark:border-sky-800/80 transition-all cursor-pointer shadow-xs"
+                  title={`View more rows (${displayedCards.length - rowsLimit} remaining)`}
+                  aria-label="View more rows"
+                  className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-700 hover:border-sky-300 dark:hover:border-sky-800/80 transition-all cursor-pointer shadow-xs hover:shadow-md flex items-center justify-center group active:scale-95"
                 >
-                  Load More Rows ({displayedCards.length - rowsLimit} remaining)
+                  <ChevronDown size={20} className="group-hover:translate-y-0.5 transition-transform" />
                 </button>
+                <span className="text-[10px] text-slate-400 font-medium font-mono">
+                  {displayedCards.length - rowsLimit} remaining
+                </span>
               </div>
             )}
             {rowsLimit > 8 && displayedCards.length > 8 && (
-              <div className="pt-1 flex justify-center">
+              <div className="pt-1 flex flex-col items-center justify-center gap-1">
                 <button
                   type="button"
                   onClick={() => setRowsLimit(8)}
-                  className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline cursor-pointer"
+                  title="Show fewer rows"
+                  aria-label="Show fewer rows"
+                  className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs flex items-center justify-center group active:scale-95"
                 >
-                  Show Fewer Rows
+                  <ChevronUp size={16} className="group-hover:-translate-y-0.5 transition-transform" />
                 </button>
+                <span className="text-[10px] text-slate-400 font-medium">Show less</span>
               </div>
             )}
           </div>

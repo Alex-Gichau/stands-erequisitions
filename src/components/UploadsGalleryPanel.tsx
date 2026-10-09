@@ -108,6 +108,24 @@ interface UploadsGalleryPanelProps {
   onClose?: () => void;
 }
 
+// Helper to resolve Requisition Title in place of raw file name
+export const getItemDisplayTitle = (item?: GalleryItem | null): string => {
+  if (!item) return "Document";
+  if (item.requisitionTitle && item.requisitionTitle.trim()) {
+    return item.requisitionTitle;
+  }
+  if (item.requisition?.title && item.requisition.title.trim()) {
+    return item.requisition.title;
+  }
+  if (item.projectTitle && item.projectTitle.trim()) {
+    return item.projectTitle;
+  }
+  if (item.project?.name && item.project.name.trim()) {
+    return item.project.name;
+  }
+  return item.fileName || "Document";
+};
+
 export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   onViewRequisition,
   onClose
@@ -149,7 +167,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
 
   // View & Scope Filter States
   const [scopeFilter, setScopeFilter] = useState<ScopeVisibilityFilter>("ALL_EVER");
-  const [activeFolder, setActiveFolder] = useState<string>("ALL");
+  // Default category on navbar: All Ministries directory
+  const [activeFolder, setActiveFolder] = useState<string>("MINISTRY_ALL");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,7 +176,21 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
-  const [viewMode, setViewMode] = useState<ExplorerViewMode>("grid");
+
+  // Default view: "split" on large screens (>= 1024px / lg), "grid" on small screens
+  const [viewMode, setViewMode] = useState<ExplorerViewMode>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("stands_file_manager_view_mode_v2");
+      if (saved === "split" || saved === "grid" || saved === "table") {
+        return saved;
+      }
+      if (window.innerWidth >= 1024) {
+        return "split";
+      }
+      return "grid";
+    }
+    return "split";
+  });
   
   // Selection & Inspector & Projection State
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -494,12 +527,14 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       // 5. Search Query
       if (deferredSearchQuery.trim()) {
         const query = deferredSearchQuery.toLowerCase().trim();
+        const displayTitle = getItemDisplayTitle(item).toLowerCase();
+        const matchTitle = displayTitle.includes(query);
         const matchName = item.fileName.toLowerCase().includes(query);
         const matchReqId = item.requisitionId?.toLowerCase().includes(query) || false;
         const matchReqTitle = item.requisitionTitle?.toLowerCase().includes(query) || false;
         const matchGroup = item.groupName?.toLowerCase().includes(query) || false;
         const matchNotes = item.notes?.toLowerCase().includes(query) || false;
-        if (!matchName && !matchReqId && !matchReqTitle && !matchGroup && !matchNotes) {
+        if (!matchTitle && !matchName && !matchReqId && !matchReqTitle && !matchGroup && !matchNotes) {
           return false;
         }
       }
@@ -513,7 +548,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       }
       if (sortBy === "TITLE_AZ") {
-        return a.fileName.localeCompare(b.fileName);
+        return getItemDisplayTitle(a).localeCompare(getItemDisplayTitle(b));
       }
       if (sortBy === "GROUP_AZ") {
         return (a.groupName || "").localeCompare(b.groupName || "");
@@ -527,6 +562,13 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
       return 0;
     });
   }, [scopedUploadsList, activeFolder, selectedFormat, selectedGroup, selectedStatus, deferredSearchQuery, sortBy]);
+
+  // Auto-select first item for split view inspector if none selected
+  useEffect(() => {
+    if (viewMode === "split" && !inspectorItem && filteredUploads.length > 0) {
+      setInspectorItem(filteredUploads[0]);
+    }
+  }, [viewMode, inspectorItem, filteredUploads]);
 
   // Document Files 15-row pagination
   const FILES_PER_PAGE = 15;
@@ -671,7 +713,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
     return sourceList.map((item) => ({
       id: item.id,
       url: item.url,
-      title: item.fileName,
+      title: getItemDisplayTitle(item),
+      fileName: item.fileName,
       category: item.fileType.toUpperCase(),
       groupName: item.groupName,
       amount: item.amount,
@@ -1033,7 +1076,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             )}
           >
             <FolderCheck size={13} />
-            <span>Ministries ({allAvailableMinistries.length})</span>
+            <span>All Ministries ({allAvailableMinistries.length})</span>
           </button>
 
           {[
@@ -1299,7 +1342,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   >
                     <option value="NEWEST">Sort: Newest First</option>
                     <option value="OLDEST">Sort: Oldest First</option>
-                    <option value="TITLE_AZ">File Name (A-Z)</option>
+                    <option value="TITLE_AZ">Requisition Title (A-Z)</option>
                     <option value="GROUP_AZ">Ministry (A-Z)</option>
                     <option value="AMOUNT_HIGH">Highest Financial Value</option>
                     <option value="FILE_TYPE">File Format</option>
@@ -1311,8 +1354,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeFolder === "ANALYTICS") setActiveFolder("ALL");
+                      if (activeFolder === "ANALYTICS") setActiveFolder("MINISTRY_ALL");
                       setViewMode("grid");
+                      try { localStorage.setItem("stands_file_manager_view_mode_v2", "grid"); } catch (e) {}
                     }}
                     className={cn(
                       "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
@@ -1328,8 +1372,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeFolder === "ANALYTICS") setActiveFolder("ALL");
+                      if (activeFolder === "ANALYTICS") setActiveFolder("MINISTRY_ALL");
                       setViewMode("table");
+                      try { localStorage.setItem("stands_file_manager_view_mode_v2", "table"); } catch (e) {}
                     }}
                     className={cn(
                       "flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
@@ -1345,8 +1390,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeFolder === "ANALYTICS") setActiveFolder("ALL");
+                      if (activeFolder === "ANALYTICS") setActiveFolder("MINISTRY_ALL");
                       setViewMode("split");
+                      try { localStorage.setItem("stands_file_manager_view_mode_v2", "split"); } catch (e) {}
                       if (!inspectorItem && filteredUploads.length > 0) {
                         setInspectorItem(filteredUploads[0]);
                       }
@@ -1786,7 +1832,11 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                                         <div className="w-6 h-6 rounded-md bg-white dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#3f3f46]">
                                           {file.fileType === "pdf" ? <FileText size={12} /> : file.fileType === "spreadsheet" ? <FileSpreadsheet size={12} /> : <ImageIcon size={12} />}
                                         </div>
-                                        <span className="text-xs font-medium text-slate-800 dark:text-zinc-200 truncate">{file.fileName}</span>
+                                        <div className="min-w-0 truncate">
+                                          <div className="text-xs font-medium text-slate-800 dark:text-zinc-200 truncate" title={getItemDisplayTitle(file)}>
+                                            {getItemDisplayTitle(file)}
+                                          </div>
+                                        </div>
                                       </div>
                                       <Eye size={13} className="text-slate-400 shrink-0" />
                                     </div>
@@ -2166,14 +2216,14 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         {item.fileType === "image" ? (
                           <CachedImage
                             src={item.url}
-                            alt={item.fileName}
+                            alt={getItemDisplayTitle(item)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : item.fileType === "pdf" ? (
                           <div className="w-full h-full p-2 flex items-center justify-center">
                             <PdfThumbnailPreview
                               url={item.url}
-                              title={item.fileName}
+                              title={getItemDisplayTitle(item)}
                               className="w-full h-full max-h-36 object-contain shadow-2xs rounded-lg"
                             />
                           </div>
@@ -2230,10 +2280,10 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         <div>
                           <h4 
                             className="text-xs font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" 
-                            title={item.fileName}
+                            title={getItemDisplayTitle(item)}
                             onClick={openThisItem}
                           >
-                            {item.fileName}
+                            {getItemDisplayTitle(item)}
                           </h4>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400 mt-1">
                             <span 
@@ -2332,7 +2382,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                           )}
                         </button>
                       </th>
-                      <th className="py-3 px-4">Document File Name</th>
+                      <th className="py-3 px-4">Requisition Title</th>
                       <th className="py-3 px-4">Format</th>
                       <th className="py-3 px-4">Ministry / Department</th>
                       <th className="py-3 px-4">Requisition / Project</th>
@@ -2370,7 +2420,11 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                               <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#27272a] text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-slate-200 dark:border-[#3f3f46]">
                                 {item.fileType === "pdf" ? <FileText size={14} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={14} /> : <ImageIcon size={14} />}
                               </div>
-                              <span className="truncate max-w-xs">{item.fileName}</span>
+                              <div className="min-w-0">
+                                <span className="truncate max-w-xs block font-bold text-xs" title={getItemDisplayTitle(item)}>
+                                  {getItemDisplayTitle(item)}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           <td className="py-3.5 px-4">
@@ -2506,15 +2560,16 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                             {item.fileType === "pdf" ? <FileText size={16} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={16} /> : <ImageIcon size={16} />}
                           </div>
 
-                          <div className="min-w-0 flex-1 space-y-1">
+                          <div className="min-w-0 flex-1 space-y-0.5">
                             <h4 
                               className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openThisItem();
                               }}
+                              title={getItemDisplayTitle(item)}
                             >
-                              {item.fileName}
+                              {getItemDisplayTitle(item)}
                             </h4>
                             <div className="flex items-center gap-2 flex-wrap text-[11px]">
                               <span 
@@ -2670,7 +2725,9 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                                   {item.fileType === "pdf" ? <FileText size={15} /> : item.fileType === "spreadsheet" ? <FileSpreadsheet size={15} /> : <ImageIcon size={15} />}
                                 </div>
                                 <div className="truncate min-w-0">
-                                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate">{item.fileName}</div>
+                                  <div className="text-xs font-bold text-slate-900 dark:text-white truncate" title={getItemDisplayTitle(item)}>
+                                    {getItemDisplayTitle(item)}
+                                  </div>
                                   <div className="text-[11px] text-slate-500 dark:text-zinc-400 truncate">{item.groupName} · {formatDate(item.date)}</div>
                                 </div>
                               </div>
@@ -2727,13 +2784,13 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                           {activeInspectorItem.fileType === "image" ? (
                             <CachedImage
                               src={activeInspectorItem.url}
-                              alt={activeInspectorItem.fileName}
+                              alt={getItemDisplayTitle(activeInspectorItem)}
                               className="w-full h-full object-contain"
                             />
                           ) : activeInspectorItem.fileType === "pdf" ? (
                             <PdfThumbnailPreview
                               url={activeInspectorItem.url}
-                              title={activeInspectorItem.fileName}
+                              title={getItemDisplayTitle(activeInspectorItem)}
                               className="w-full h-full object-contain"
                             />
                           ) : (
@@ -2747,8 +2804,14 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                         {/* Metadata Specs Table */}
                         <div className="space-y-2 text-xs">
                           <div className="flex justify-between py-1 border-b border-slate-100 dark:border-[#27272a]">
+                            <span className="text-slate-500 dark:text-zinc-400">Requisition Title</span>
+                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]" title={getItemDisplayTitle(activeInspectorItem)}>
+                              {getItemDisplayTitle(activeInspectorItem)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1 border-b border-slate-100 dark:border-[#27272a]">
                             <span className="text-slate-500 dark:text-zinc-400">File Name</span>
-                            <span className="font-bold text-slate-900 dark:text-white truncate max-w-[200px]" title={activeInspectorItem.fileName}>
+                            <span className="font-mono text-slate-600 dark:text-zinc-300 truncate max-w-[200px]" title={activeInspectorItem.fileName}>
                               {activeInspectorItem.fileName}
                             </span>
                           </div>

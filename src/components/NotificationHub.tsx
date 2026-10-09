@@ -983,32 +983,6 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
             </div>
           </div>
 
-          {/* 14-DAY AUTO-READ MAINTENANCE BADGE */}
-          <div className="mx-3 my-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
-            <div className="flex items-center gap-1.5 min-w-0 truncate">
-              <Clock size={12} className="text-emerald-500 shrink-0" />
-              <span className="truncate">Auto-mark read: Every 14 days (Active)</span>
-            </div>
-            {runAutoMarkNotificationsReadNow && (
-              <button
-                type="button"
-                onClick={() => {
-                  runAutoMarkNotificationsReadNow();
-                  triggerToast({
-                    type: "SYSTEM_INFO",
-                    severity: "LOW",
-                    message: "All notifications marked as read via 14-day auto-read maintenance.",
-                    timestamp: new Date().toISOString()
-                  });
-                }}
-                className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer shrink-0 ml-2"
-                title="Trigger 14-day auto-read maintenance right now"
-              >
-                Run Now
-              </button>
-            )}
-          </div>
-
           {/* ALL CAUGHT UP BANNER */}
           {unreadTotal === 0 && notificationItems.length > 0 && !showUnreadOnly && (
             <div className="m-3 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/70 flex items-center gap-3 text-emerald-900 dark:text-emerald-200 animate-in fade-in duration-300 shrink-0">
@@ -1214,8 +1188,8 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     onClick={() => setShowOlderNotifications(true)}
                     className="w-full py-2.5 px-4 bg-white dark:bg-slate-900 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer group"
                   >
-                    <Clock size={15} className="group-hover:rotate-[-45deg] transition-transform text-indigo-500" />
-                    <span>Load Older Notifications ({olderItems.length})</span>
+                    <ChevronDown size={15} className="group-hover:translate-y-0.5 transition-transform text-indigo-500" />
+                    <span>Older Notifications ({olderItems.length})</span>
                   </button>
                 ) : (
                   <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">

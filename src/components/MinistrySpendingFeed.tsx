@@ -41,63 +41,47 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
   const [isPaused, setIsPaused] = useState(false);
   const [selectedMinistry, setSelectedMinistry] = useState<MinistrySpendingData | null>(null);
 
-  // Canonical list of PCEA St. Andrew's Ministries
-  const baselineMinistries = useMemo(() => [
-    { id: "wg", name: "Woman's Guild", shortName: "Guild" },
-    { id: "pcmf", name: "PCMF (Men's Fellowship)", shortName: "PCMF" },
-    { id: "yf", name: "Youth Fellowship", shortName: "Youth" },
-    { id: "church_school", name: "Church School (Sunday School)", shortName: "Church School" },
-    { id: "health_board", name: "Health Board", shortName: "Health" },
-    { id: "choir", name: "Praise & Worship / Choir", shortName: "Choir" },
-    { id: "evangelism", name: "Evangelism & Mission", shortName: "Evangelism" },
-    { id: "development", name: "Development & Projects", shortName: "Development" },
-    { id: "brigade", name: "Boys' & Girls' Brigade", shortName: "Brigade" },
-    { id: "christian_ed", name: "Christian Education", shortName: "Christian Ed" },
-    { id: "hospitality", name: "Hospitality & Welfare", shortName: "Hospitality" },
-    { id: "av_media", name: "Audio-Visual & Media", shortName: "AV Media" },
-  ], []);
-
-  // Compute 2-week window analytics for all ministries
+  // Compute 2-week window analytics for all actual church groups from the directory
   const ministryData = useMemo<MinistrySpendingData[]>(() => {
+    if (!churchGroups || churchGroups.length === 0) {
+      return [];
+    }
+
     const now = Date.now();
     const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
     const FOUR_WEEKS_MS = 28 * 24 * 60 * 60 * 1000;
     const currentWindowStart = now - TWO_WEEKS_MS;
     const previousWindowStart = now - FOUR_WEEKS_MS;
 
-    // Combine custom churchGroups with baseline ministries
-    const allGroupsMap = new Map<string, { id: string; name: string; shortName: string }>();
+    return churchGroups.map((grp) => {
+      const targetId = (grp.id || "").toLowerCase().trim();
+      const targetName = (grp.name || "").toLowerCase().trim();
 
-    baselineMinistries.forEach(m => allGroupsMap.set(m.name.toLowerCase(), m));
-
-    if (churchGroups && churchGroups.length > 0) {
-      churchGroups.forEach(cg => {
-        const key = cg.name.toLowerCase();
-        if (!allGroupsMap.has(key)) {
-          allGroupsMap.set(key, {
-            id: cg.id || key,
-            name: cg.name,
-            shortName: cg.name.split(" ")[0] || cg.name
-          });
-        }
-      });
-    }
-
-    const groupsList = Array.from(allGroupsMap.values());
-
-    return groupsList.map((grp, index) => {
-      // Find requisitions matching this group
+      // Find requisitions matching this real church group from directory
       const grpReqs = requisitions.filter(r => {
-        const titleMatch = (r.title || "").toLowerCase().includes(grp.name.toLowerCase()) || 
-                           (r.title || "").toLowerCase().includes(grp.shortName.toLowerCase());
-        const groupMatch = (r.groupName || (r as any).group || (r as any).department || "").toLowerCase().includes(grp.name.toLowerCase()) ||
-                           (r.groupName || (r as any).group || (r as any).department || "").toLowerCase().includes(grp.shortName.toLowerCase());
-        return titleMatch || groupMatch;
+        if (!r) return false;
+        const reqGroupId = (r.groupId || "").toLowerCase().trim();
+        const reqGroupName = (r.groupName || (r as any).group || (r as any).department || "").toLowerCase().trim();
+        const reqTitle = (r.title || "").toLowerCase().trim();
+
+        const idMatch = Boolean(targetId && (reqGroupId === targetId || reqGroupName === targetId));
+        const nameMatch = Boolean(targetName && (
+          reqGroupName === targetName ||
+          reqGroupName.includes(targetName) ||
+          targetName.includes(reqGroupName)
+        ));
+        const titleMatch = Boolean(targetName && reqTitle.includes(targetName));
+
+        return idMatch || nameMatch || titleMatch;
       });
 
       // Filter for approved / disbursed or submitted expenditures
       const committedReqs = grpReqs.filter(r => 
-        r.status === "DISBURSED" || r.status === "APPROVED_L2" || r.status === "APPROVED_L1" || r.status === "SUBMITTED"
+        r.status === "DISBURSED" || 
+        r.status === "PARTIALLY_DISBURSED" ||
+        r.status === "APPROVED_L2" || 
+        r.status === "APPROVED_L1" || 
+        r.status === "SUBMITTED"
       );
 
       let current2wSpend = 0;
@@ -106,7 +90,7 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
       const recentRequisitions: Requisition[] = [];
 
       committedReqs.forEach(r => {
-        const reqDate = new Date(r.submittedAt || (r as any).createdAt || now).getTime();
+        const reqDate = new Date(r.submittedAt || (r as any).createdAt || (r as any).updatedAt || now).getTime();
         const amt = Number(r.amount) || 0;
 
         if (reqDate >= currentWindowStart && reqDate <= now) {
@@ -118,29 +102,14 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
         }
       });
 
-      // Realistic mock seeding if dataset has few recent timestamps to guarantee rich analytics for every single ministry
-      if (current2wSpend === 0 && previous2wSpend === 0) {
-        const baseValues = [
-          { curr: 145000, prev: 128000 },
-          { curr: 89000, prev: 112000 },
-          { curr: 215000, prev: 175000 },
-          { curr: 64000, prev: 69000 },
-          { curr: 182000, prev: 149000 },
-          { curr: 93000, prev: 93000 },
-          { curr: 120000, prev: 98000 },
-          { curr: 340000, prev: 410000 },
-          { curr: 42000, prev: 38000 },
-          { curr: 76000, prev: 82000 },
-          { curr: 55000, prev: 47000 },
-          { curr: 108000, prev: 94000 }
-        ];
-        const seed = baseValues[index % baseValues.length];
-        current2wSpend = seed.curr;
-        previous2wSpend = seed.prev;
-        requisitionCount2w = Math.max(1, (index % 4) + 1);
-      }
+      // Sort recent requisitions by date descending
+      recentRequisitions.sort((a, b) => {
+        const dateA = new Date(a.submittedAt || (a as any).createdAt || 0).getTime();
+        const dateB = new Date(b.submittedAt || (b as any).createdAt || 0).getTime();
+        return dateB - dateA;
+      });
 
-      // Calculate percentage change
+      // Calculate percentage change strictly from actual requisition data (no mock seeding)
       let percentChange = 0;
       let direction: "up" | "down" | "flat" = "flat";
 
@@ -163,7 +132,7 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
       return {
         id: grp.id,
         name: grp.name,
-        shortName: grp.shortName,
+        shortName: grp.name.split(" ")[0] || grp.name,
         current2wSpend,
         previous2wSpend,
         percentChange,
@@ -172,12 +141,18 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
         recentRequisitions
       };
     });
-  }, [requisitions, churchGroups, baselineMinistries]);
+  }, [requisitions, churchGroups]);
 
   // Triple duplicated list for seamless marquee looping
   const tickerTrack = useMemo(() => {
-    return [...ministryData, ...ministryData, ...ministryData];
+    if (ministryData.length === 0) return [];
+    const repeatCount = Math.max(2, Math.ceil(12 / ministryData.length));
+    return Array.from({ length: repeatCount }, () => ministryData).flat();
   }, [ministryData]);
+
+  if (ministryData.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full relative select-none">
@@ -356,6 +331,41 @@ export const MinistrySpendingFeed: React.FC<MinistrySpendingFeedProps> = ({ onSe
                   </span>
                 </div>
               </div>
+
+              {/* Actual Requisitions List in this 14-Day Cycle */}
+              {selectedMinistry.recentRequisitions.length > 0 ? (
+                <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Active in Current 14-Day Window ({selectedMinistry.recentRequisitions.length})
+                  </span>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 subtle-scrollbar">
+                    {selectedMinistry.recentRequisitions.slice(0, 5).map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-xs"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="font-bold text-slate-900 dark:text-white truncate">
+                            {r.title}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            #{r.id} · {new Date(r.submittedAt || (r as any).createdAt || Date.now()).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            {formatCurrency(Number(r.amount) || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-center">
+                  <p className="text-xs text-slate-400 italic">No requisitions logged in the current 14-day window for this group.</p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-3 pt-2">

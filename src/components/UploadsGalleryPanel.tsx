@@ -1028,9 +1028,23 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
   return (
     <div id="uploads-gallery-panel" className="w-full min-h-screen text-slate-900 dark:text-slate-100 p-2.5 sm:p-5 lg:p-7 space-y-4 sm:space-y-5 transition-colors">
       
-      {/* Mobile Screen Category & Scope Quick Navigator (< md) */}
-      <div className="md:hidden w-full overflow-x-auto pb-1 no-scrollbar -mx-0.5 px-0.5">
+      {/* Category & Scope Quick Navigator Navbar (All Ministries Default) */}
+      <div className="w-full overflow-x-auto pb-1 no-scrollbar -mx-0.5 px-0.5">
         <div className="flex items-center gap-1.5 min-w-max">
+          <button
+            type="button"
+            onClick={() => setActiveFolder("MINISTRY_ALL")}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
+              (activeFolder === "MINISTRY_ALL" || activeFolder.startsWith("MINISTRY:"))
+                ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#222227]"
+            )}
+          >
+            <FolderCheck size={13} />
+            <span>All Ministries ({allAvailableMinistries.length})</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -1040,8 +1054,8 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
               scopeFilter === "ALL_EVER" && activeFolder === "ALL"
-                ? "bg-indigo-600 border-indigo-600 text-white"
-                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+                ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#222227]"
             )}
           >
             <Globe size={13} />
@@ -1057,26 +1071,12 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
             className={cn(
               "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
               scopeFilter === "MY_ALLOCATED" && activeFolder === "ALL"
-                ? "bg-indigo-600 border-indigo-600 text-white"
-                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
+                ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
+                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#222227]"
             )}
           >
             <Users size={13} />
             <span>My Ministry</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveFolder("MINISTRY_ALL")}
-            className={cn(
-              "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border shadow-2xs",
-              activeFolder === "MINISTRY_ALL"
-                ? "bg-indigo-600 border-indigo-600 text-white"
-                : "bg-white dark:bg-[#18181b] border-slate-200/80 dark:border-[#27272a] text-slate-700 dark:text-zinc-300"
-            )}
-          >
-            <FolderCheck size={13} />
-            <span>All Ministries ({allAvailableMinistries.length})</span>
           </button>
 
           {[
@@ -1138,7 +1138,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 }}
                 className={cn(
                   "w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative",
-                  scopeFilter === "ALL_EVER" && activeFolder !== "ANALYTICS"
+                  scopeFilter === "ALL_EVER" && activeFolder === "ALL"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#27272a]"
                 )}
@@ -1156,7 +1156,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 }}
                 className={cn(
                   "w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative",
-                  scopeFilter === "MY_ALLOCATED" && activeFolder !== "ANALYTICS"
+                  scopeFilter === "MY_ALLOCATED" && activeFolder === "ALL"
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#27272a]"
                 )}
@@ -1177,7 +1177,7 @@ export const UploadsGalleryPanel: React.FC<UploadsGalleryPanelProps> = ({
                 onClick={() => setActiveFolder("MINISTRY_ALL")}
                 className={cn(
                   "w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative",
-                  activeFolder === "MINISTRY_ALL"
+                  (activeFolder === "MINISTRY_ALL" || activeFolder.startsWith("MINISTRY:"))
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                     : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#27272a]"
                 )}

@@ -35,6 +35,8 @@ import {
   ChevronDown, 
   ChevronLeft, 
   ArrowRight, 
+  ArrowDown,
+  ArrowUp,
   Eye, 
   Paperclip, 
   FileText, 
@@ -1179,20 +1181,26 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
               })
             )}
 
-            {/* Load More Older Notifications Toggle */}
+            {/* Older Notifications Downward Arrow Button */}
             {olderItems.length > 0 && (
-              <div className="pt-2 pb-4">
+              <div className="pt-2 pb-4 flex flex-col items-center justify-center">
                 {!showOlderNotifications ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowOlderNotifications(true)}
-                    className="w-full py-2.5 px-4 bg-white dark:bg-slate-900 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer group"
-                  >
-                    <ChevronDown size={15} className="group-hover:translate-y-0.5 transition-transform text-indigo-500" />
-                    <span>Older Notifications ({olderItems.length})</span>
-                  </button>
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowOlderNotifications(true)}
+                      title={`Load older notifications (${olderItems.length})`}
+                      aria-label={`Load older notifications (${olderItems.length})`}
+                      className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-center shadow-xs hover:shadow transition-all cursor-pointer group hover:scale-105 active:scale-95"
+                    >
+                      <ArrowDown size={17} className="group-hover:translate-y-0.5 transition-transform text-indigo-600 dark:text-indigo-400" />
+                    </button>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      {olderItems.length} older
+                    </span>
+                  </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">
+                  <div className="w-full flex items-center justify-between gap-2 px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 text-xs font-medium text-slate-500">
                     <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-400">
                       <CheckCircle2 size={13} className="text-emerald-500" />
                       Loaded {olderItems.length} older notification{olderItems.length > 1 ? 's' : ''}
@@ -1200,9 +1208,10 @@ export const NotificationHub: React.FC<NotificationHubProps> = ({ onSelectRequis
                     <button
                       type="button"
                       onClick={() => setShowOlderNotifications(false)}
-                      className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                      title="Collapse older notifications"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     >
-                      Current Week Only
+                      <ArrowUp size={14} />
                     </button>
                   </div>
                 )}

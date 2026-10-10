@@ -76,20 +76,6 @@ export const ProductTour: React.FC<ProductTourProps> = ({
       placement: "left",
       targetId: "profile-dropdown-trigger",
       targetView: "dashboard"
-    },
-    {
-      title: "Interactive Documentation Hub",
-      content: "We've replaced outdated PDF compliance guides with a searchable digital manual covering every operational scenario, role privilege, and security control.",
-      placement: "bottom",
-      targetId: "help-page-header",
-      targetView: "help"
-    },
-    {
-      title: "Validation Stage Simulator",
-      content: "Experience the direct journey of a requisition! Use this live sandbox simulator to dry-run validations under all security clearance levels step-by-step.",
-      placement: "top",
-      targetId: "help-sandbox-simulator",
-      targetView: "help"
     }
   ];
 

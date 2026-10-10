@@ -31,7 +31,6 @@ import { FinanceLedgerPanel } from "./components/FinanceLedgerPanel";
 import { AccessControlPanel } from "./components/AccessControlPanel";
 import { VendorsPanel } from "./components/VendorsPanel";
 import { AuditLogsPanel } from "./components/AuditLogsPanel";
-import { HelpPanel } from "./components/HelpPanel";
 import { TransactionsPanel } from "./components/TransactionsPanel";
 import { UploadsGalleryPanel } from "./components/UploadsGalleryPanel";
 import { FileUploadProjectionCenter } from "./components/FileUploadProjectionCenter";
@@ -72,7 +71,6 @@ import {
   EyeOff,
   Sliders,
   Shield,
-  HelpCircle,
   Calendar,
   ChevronDown,
   Layers,
@@ -2199,7 +2197,7 @@ function AppContent() {
       );
     }
 
-    if (currentView !== "help" && !canAccess(currentView)) {
+    if (!canAccess(currentView)) {
       return <Dashboard onViewChange={handleNavigate} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
     }
 
@@ -2231,7 +2229,6 @@ function AppContent() {
         case "finance": return <FinanceLedgerPanel />;
         case "accessControl": return <AccessControlPanel />;
         case "auditTrail": return <AuditLogsPanel />;
-        case "help": return <HelpPanel onPlayTour={() => setIsTourOpen(true)} />;
         default: return <Dashboard onViewChange={setCurrentView} darkMode={darkMode} setDarkMode={handleToggleTheme} />;
       }
     };
@@ -3510,16 +3507,6 @@ function AppContent() {
                       >
                         <KeyRound size={14} className="text-slate-400 dark:text-slate-500" />
                         UPDATE PASSWORD
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCurrentView("help");
-                          setIsProfileOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors text-left cursor-pointer"
-                      >
-                        <HelpCircle size={14} className="text-slate-400 dark:text-slate-500" />
-                        HOW TO USE
                       </button>
 
                       <div className="h-[1px] bg-slate-100 dark:bg-slate-800 my-1" />

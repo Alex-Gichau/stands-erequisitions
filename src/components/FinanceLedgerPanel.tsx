@@ -1489,17 +1489,17 @@ export const FinanceLedgerPanel: React.FC = () => {
   // Render Yearly Budgeting & Fiscal Books
   const renderYearlyBudgetingAndFiscalBooks = () => {
     return isFinanceOrAdmin && (
-      <section className="bg-card rounded-[2rem] border border-border overflow-hidden shadow-sm p-8 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/60">
+      <section className="bg-card rounded-2xl sm:rounded-[2rem] border border-border overflow-hidden shadow-sm p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6 pb-4 sm:pb-6 border-b border-border/60">
           <div className="space-y-1">
-            <h3 className="text-xs font-black text-foreground uppercase tracking-[0.2em] flex items-center gap-2">
-              <Coins size={16} className="text-primary" />
+            <h3 className="text-xs sm:text-sm font-black text-foreground uppercase tracking-[0.2em] flex items-center gap-2">
+              <Coins size={16} className="text-primary shrink-0" />
               Yearly Budgeting & Fiscal Books
             </h3>
-            <p className="text-[10px] text-muted font-medium italic">Allocate yearly group budget controls and manage financial year books</p>
+            <p className="text-[10px] sm:text-[11px] text-muted font-medium italic">Allocate yearly group budget controls and manage financial year books</p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 self-start sm:self-auto">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Active Year:</span>
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-border/60 rounded-xl">
               <span className="font-mono text-xs font-extrabold text-foreground">{activeYear}</span>
@@ -1513,20 +1513,20 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
 
           {/* 2. Multi-Year Fiscal Planning & Books Management */}
-          <div className="p-6 bg-slate-50/50 dark:bg-slate-900/50 rounded-[1.5rem] border border-border space-y-6">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+          <div className="p-3.5 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 rounded-xl sm:rounded-[1.5rem] border border-border space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-border/60 pb-3">
               <div>
                 <h4 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <BookOpen size={14} className="text-primary" />
+                  <BookOpen size={14} className="text-primary shrink-0" />
                   Multi-Year Fiscal Planning
                 </h4>
                 <p className="text-[10px] text-muted mt-0.5">Toggle status and manage multi-year budget horizons.</p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => {
@@ -1734,7 +1734,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                       <div 
                         key={fy.id} 
                         className={cn(
-                          "p-3 bg-white dark:bg-card border rounded-xl flex items-center justify-between gap-3 transition-all",
+                          "p-3 bg-white dark:bg-card border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all",
                           isActive ? "border-primary bg-primary/5 dark:bg-primary/5" : "border-border/65"
                         )}
                       >
@@ -1764,7 +1764,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto shrink-0">
                           <button
                             type="button"
                             title="Edit settings, start and end dates"
@@ -1893,20 +1893,20 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
 
           {/* 3. Global General Church Ledger Close-off Authorization */}
-          <div className="p-6 bg-slate-50/50 dark:bg-slate-900/50 rounded-[1.5rem] border border-border space-y-5 flex flex-col justify-between">
+          <div className="p-3.5 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 rounded-xl sm:rounded-[1.5rem] border border-border space-y-4 sm:space-y-5 flex flex-col justify-between">
             <div className="space-y-3">
               <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest px-2.5 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 w-fit block font-mono">
                 System Administrator Operations
               </span>
               <h4 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-primary" />
+                <ShieldCheck size={14} className="text-primary shrink-0" />
                 Authored Ledger Closeout protocol
               </h4>
               <p className="text-[10px] text-slate-500 leading-relaxed">
                 Freezing the financial calendar secures all transactions, baseline budget lines, allocations and disbursement histories. No new requisitions or adjustments can be posted by group contributors or fiscal offices during closure. 
               </p>
               
-              <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl space-y-1.5">
+              <div className="p-3.5 sm:p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl space-y-1.5">
                 <span className="text-[8px] font-bold text-amber-600 uppercase tracking-wider block font-sans">IMPORTANT CLARIFICATION NOTICE:</span>
                 <p className="text-[9px] text-slate-500 leading-normal">
                   Locking the year requires administrative authorization. Re-establishing access can only be executed by Super Admins or authorized Chief Finance Officers.
@@ -1915,7 +1915,7 @@ export const FinanceLedgerPanel: React.FC = () => {
             </div>
 
             <div className="pt-4 divide-y divide-border/40">
-              <div className="py-3 flex items-center justify-between gap-4">
+              <div className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-black text-foreground uppercase tracking-tight">Active Horizon status</p>
                   <p className="text-[9px] text-slate-400">Current active window is {yearStatus}</p>
@@ -1925,7 +1925,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                   type="button"
                   onClick={handleToggleYearClosure}
                   className={cn(
-                    "px-4.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5",
+                    "px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 w-full sm:w-auto",
                     yearStatus === "OPEN" 
                       ? "bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-950/15" 
                       : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/15"
@@ -1960,17 +1960,18 @@ export const FinanceLedgerPanel: React.FC = () => {
         onCancel={closeConfirmModal}
       />
       {/* 1. Brand Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Accounting & Budgets</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Accounting & Budgets</h1>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">Real-time parish financial ledgers, ministry allocations, and disbursements oversight.</p>
         </div>
       </div>
 
       {/* Time Horizon Transaction Volume Card Row */}
-      <div id="ledger-time-horizon-container" className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+      <div id="ledger-time-horizon-container" className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm space-y-3 sm:space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+            <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
               <Calendar size={15} strokeWidth={2.5} />
             </div>
             <div>
@@ -1981,63 +1982,63 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {/* Last Week */}
-          <div id="metric-last-week-card" className="bg-slate-50/60 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between group hover:border-indigo-100 transition-all hover:bg-white">
-            <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1">
+          <div id="metric-last-week-card" className="bg-slate-50/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 flex flex-col justify-between group hover:border-indigo-100 transition-all hover:bg-white">
+            <span className="text-[8px] sm:text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block mb-1">
               Last Week
             </span>
-            <div className="space-y-1">
-              <h4 className="text-lg font-black text-slate-800 tracking-tight font-mono">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h4 className="text-base sm:text-lg font-black text-slate-800 tracking-tight font-mono truncate">
                 {formatCurrency(timeBasedMetrics.lastWeek.total)}
               </h4>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+              <p className="text-[8.5px] sm:text-[9px] text-slate-400 font-bold uppercase tracking-wider truncate">
                 {timeBasedMetrics.lastWeek.count} approved voucher{timeBasedMetrics.lastWeek.count !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
 
           {/* This Week */}
-          <div id="metric-this-week-card" className="bg-indigo-50/30 p-4 rounded-2xl border border-indigo-500/15 flex flex-col justify-between group hover:border-indigo-300 transition-all hover:bg-indigo-50/50">
-            <span className="text-[9px] font-extrabold text-indigo-500 uppercase tracking-widest block mb-1 flex items-center gap-1">
+          <div id="metric-this-week-card" className="bg-indigo-50/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-500/15 flex flex-col justify-between group hover:border-indigo-300 transition-all hover:bg-indigo-50/50">
+            <span className="text-[8px] sm:text-[9px] font-extrabold text-indigo-500 uppercase tracking-widest block mb-1 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
               This Week
             </span>
-            <div className="space-y-1">
-              <h4 className="text-lg font-black text-indigo-900 tracking-tight font-mono">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h4 className="text-base sm:text-lg font-black text-indigo-900 tracking-tight font-mono truncate">
                 {formatCurrency(timeBasedMetrics.thisWeek.total)}
               </h4>
-              <p className="text-[9px] text-indigo-500/80 font-bold uppercase tracking-wider">
+              <p className="text-[8.5px] sm:text-[9px] text-indigo-500/80 font-bold uppercase tracking-wider truncate">
                 {timeBasedMetrics.thisWeek.count} active voucher{timeBasedMetrics.thisWeek.count !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
 
           {/* This Month */}
-          <div id="metric-this-month-card" className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-500/15 flex flex-col justify-between group hover:border-emerald-300 transition-all hover:bg-emerald-50/50">
-            <span className="text-[9px] font-extrabold text-emerald-600 uppercase tracking-widest block mb-1">
+          <div id="metric-this-month-card" className="bg-emerald-50/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-emerald-500/15 flex flex-col justify-between group hover:border-emerald-300 transition-all hover:bg-emerald-50/50">
+            <span className="text-[8px] sm:text-[9px] font-extrabold text-emerald-600 uppercase tracking-widest block mb-1">
               This Month
             </span>
-            <div className="space-y-1">
-              <h4 className="text-lg font-black text-emerald-950 tracking-tight font-mono">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h4 className="text-base sm:text-lg font-black text-emerald-950 tracking-tight font-mono truncate">
                 {formatCurrency(timeBasedMetrics.thisMonth.total)}
               </h4>
-              <p className="text-[9px] text-emerald-600/80 font-bold uppercase tracking-wider">
+              <p className="text-[8.5px] sm:text-[9px] text-emerald-600/80 font-bold uppercase tracking-wider truncate">
                 {timeBasedMetrics.thisMonth.count} voucher{timeBasedMetrics.thisMonth.count !== 1 ? "s" : ""} logged
               </p>
             </div>
           </div>
 
           {/* This Year */}
-          <div id="metric-this-year-card" className="bg-blue-50/30 p-4 rounded-2xl border border-blue-500/15 flex flex-col justify-between group hover:border-blue-300 transition-all hover:bg-blue-50/50">
-            <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-widest block mb-1">
+          <div id="metric-this-year-card" className="bg-blue-50/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-500/15 flex flex-col justify-between group hover:border-blue-300 transition-all hover:bg-blue-50/50">
+            <span className="text-[8px] sm:text-[9px] font-extrabold text-blue-600 uppercase tracking-widest block mb-1">
               This Fiscal Year
             </span>
-            <div className="space-y-1">
-              <h4 className="text-lg font-black text-blue-950 tracking-tight font-mono">
+            <div className="space-y-0.5 sm:space-y-1">
+              <h4 className="text-base sm:text-lg font-black text-blue-950 tracking-tight font-mono truncate">
                 {formatCurrency(timeBasedMetrics.thisYear.total)}
               </h4>
-              <p className="text-[9px] text-blue-600/80 font-bold uppercase tracking-wider">
+              <p className="text-[8.5px] sm:text-[9px] text-blue-600/80 font-bold uppercase tracking-wider truncate">
                 {timeBasedMetrics.thisYear.count} cumulative voucher{timeBasedMetrics.thisYear.count !== 1 ? "s" : ""}
               </p>
             </div>
@@ -2046,51 +2047,51 @@ export const FinanceLedgerPanel: React.FC = () => {
       </div>
 
       {/* 2. Fiscal Analytics Deck */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
-        <div id="metric-total-allocated-budget-card" className="bg-slate-900 p-5 rounded-2xl text-white border border-slate-800 shadow-md relative overflow-hidden group">
+        <div id="metric-total-allocated-budget-card" className="bg-slate-900 p-4 sm:p-5 rounded-xl sm:rounded-2xl text-white border border-slate-800 shadow-md relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:scale-125 transition-all text-indigo-400">
             <Building2 size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-between">
             Total Allocated Church Budget
           </p>
-          <h2 className="text-xl font-bold leading-none mb-2">{formatCurrency(metrics.totalActiveBudget)}</h2>
+          <h2 className="text-lg sm:text-xl font-bold leading-none mb-2 font-mono truncate">{formatCurrency(metrics.totalActiveBudget)}</h2>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-125 transition-all text-amber-500">
             <Clock size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Approved, Awaiting Payout</p>
-          <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalCommittedPending)}</h2>
+          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Approved, Awaiting Payout</p>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-none mb-2 font-mono truncate">{formatCurrency(metrics.totalCommittedPending)}</h2>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-125 transition-all text-[#10b981]">
             <CheckCircle2 size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Fund Disbursed</p>
-          <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalDisbursed)}</h2>
+          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Fund Disbursed</p>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-none mb-2 font-mono truncate">{formatCurrency(metrics.totalDisbursed)}</h2>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white p-4 sm:p-5 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
           <div className="absolute right-[-10px] top-[-10px] opacity-5 group-hover:scale-125 transition-all text-[#4f46e5]">
             <TrendingUp size={80} />
           </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Unspent Budget</p>
-          <h2 className="text-xl font-bold text-slate-900 leading-none mb-2">{formatCurrency(metrics.totalRemainingBudget)}</h2>
+          <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Unspent Budget</p>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-none mb-2 font-mono truncate">{formatCurrency(metrics.totalRemainingBudget)}</h2>
         </div>
 
       </div>
 
       {/* 3. Navigation between ledger journal vs. project budgets */}
-      <div className="flex border-b border-slate-200 gap-6">
+      <div className="flex border-b border-slate-200 gap-3 sm:gap-6 overflow-x-auto no-scrollbar -mx-1 px-1">
         {isFinanceOrAdmin && (
           <button
             onClick={() => setActiveTab("ledgers")}
             className={cn(
-              "pb-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+              "pb-3 pt-1 text-[11px] sm:text-xs font-bold uppercase tracking-widest border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[42px]",
               activeTab === "ledgers" ? "border-indigo-600 text-indigo-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
             )}
           >
@@ -2100,7 +2101,7 @@ export const FinanceLedgerPanel: React.FC = () => {
         <button
           onClick={() => setActiveTab("budgets")}
           className={cn(
-            "pb-3 text-xs font-bold uppercase tracking-widest border-b-2 transition-all cursor-pointer",
+            "pb-3 pt-1 text-[11px] sm:text-xs font-bold uppercase tracking-widest border-b-2 transition-all cursor-pointer whitespace-nowrap shrink-0 min-h-[42px]",
             activeTab === "budgets" ? "border-indigo-600 text-indigo-600 font-extrabold" : "border-transparent text-slate-400 hover:text-slate-600"
           )}
         >
@@ -2109,10 +2110,10 @@ export const FinanceLedgerPanel: React.FC = () => {
       </div>
 
       {activeTab === "ledgers" && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           
           {/* Project Budget Quick-View Cards */}
-          <div className="flex gap-3 overflow-x-auto pb-4 pt-1 -mx-2 px-2 scrollbar-hide">
+          <div className="flex gap-2.5 sm:gap-3 overflow-x-auto pb-3 sm:pb-4 pt-1 -mx-2 px-2 no-scrollbar touch-pan-x">
             {projects.map((project) => {
               const projectRequisitions = getProjectRequisitions(project, requisitions);
               const requisitionsCount = projectRequisitions.length;
@@ -2124,21 +2125,21 @@ export const FinanceLedgerPanel: React.FC = () => {
               return (
                 <div 
                   key={project.id} 
-                  className="min-w-[180px] md:min-w-[220px] bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-2 group cursor-pointer"
+                  className="min-w-[170px] sm:min-w-[200px] md:min-w-[220px] bg-white p-3 rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-2 group cursor-pointer shrink-0"
                   onClick={() => {
                     setSelectedProjectId(project.id);
                   }}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-[10px] font-extrabold text-slate-700 uppercase tracking-tight group-hover:text-indigo-600 transition-colors truncate max-w-[140px]">
+                  <div className="flex justify-between items-start gap-1">
+                    <div className="min-w-0">
+                      <h4 className="text-[10px] font-extrabold text-slate-700 uppercase tracking-tight group-hover:text-indigo-600 transition-colors truncate max-w-[110px] sm:max-w-[140px]">
                         {project.name}
                       </h4>
-                      <p className="text-[8px] font-mono text-slate-400">Remaining: {formatCurrency(remainingAmount)}</p>
+                      <p className="text-[8px] font-mono text-slate-400 truncate">Remaining: {formatCurrency(remainingAmount)}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-1 shrink-0">
                       <span className={cn(
-                        "text-[8px] font-black px-1.5 py-0.5 rounded-full border",
+                        "text-[7.5px] sm:text-[8px] font-black px-1.5 py-0.5 rounded-full border whitespace-nowrap",
                         spendingRatio >= 90 
                           ? "bg-rose-50 text-rose-600 border-rose-100" 
                           : spendingRatio >= 75 
@@ -2148,7 +2149,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                         {spendingRatio.toFixed(0)}% Used
                       </span>
                       {requisitionsCount > 0 && (
-                        <span className="text-[7px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 shadow-sm">
+                        <span className="text-[7px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 shadow-2xs">
                           {requisitionsCount} REQs
                         </span>
                       )}
@@ -2178,12 +2179,12 @@ export const FinanceLedgerPanel: React.FC = () => {
           </div>
 
           {/* 4. Filter Panel */}
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
+          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 items-stretch lg:items-center justify-between bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 items-center w-full lg:w-auto">
               <button 
                 onClick={() => setStatusFilter("ALL")}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer",
+                  "px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex-1 sm:flex-initial text-center",
                   statusFilter === "ALL" 
                     ? "bg-slate-900 text-white" 
                     : "bg-slate-50 text-slate-500 hover:bg-slate-100"
@@ -2194,7 +2195,7 @@ export const FinanceLedgerPanel: React.FC = () => {
               <button 
                 onClick={() => setStatusFilter("PENDING_DISBURSAL")}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial text-center",
                   statusFilter === "PENDING_DISBURSAL" 
                     ? "bg-amber-500 text-white" 
                     : "bg-amber-50 text-amber-700 hover:bg-amber-100"
@@ -2206,7 +2207,7 @@ export const FinanceLedgerPanel: React.FC = () => {
               <button 
                 onClick={() => setStatusFilter("DISBURSED")}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer",
+                  "px-2.5 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial text-center",
                   statusFilter === "DISBURSED" 
                     ? "bg-emerald-600 text-white" 
                     : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
@@ -2217,13 +2218,13 @@ export const FinanceLedgerPanel: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex gap-2 items-center w-full lg:w-auto">
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full lg:w-auto">
               {/* Search */}
-              <div className="relative flex-1 lg:w-64">
+              <div className="relative w-full sm:flex-1 lg:w-64">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder="Filter key words or voucher..."
+                  placeholder="Filter keywords or voucher..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={(e) => {
@@ -2231,7 +2232,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                       setTimeout(() => setSearchTerm(""), 1000);
                     }
                   }}
-                  className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none"
                 />
                 {searchTerm && (
                   <button
@@ -2245,35 +2246,38 @@ export const FinanceLedgerPanel: React.FC = () => {
                 )}
               </div>
 
-              {/* Project selector */}
-              <select
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-3 py-1.5 outline-none font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500/10"
-              >
-                <option value="ALL">All Accounts</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-
-              {/* Export CSV Button */}
-              {canExport && (
-                <button
-                  onClick={handleDownloadCSV}
-                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs rounded-lg px-3 py-1.5 font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-                  title="Export current filtered ledger logs to CSV"
+              {/* Project selector & Export CSV */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="flex-1 sm:flex-initial bg-slate-50 border border-slate-200 text-xs rounded-lg px-3 py-2 outline-none font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500/10 truncate max-w-full sm:max-w-[180px]"
                 >
-                  <Download size={13} strokeWidth={2.5} />
-                  <span>Export CSV</span>
-                </button>
-              )}
+                  <option value="ALL">All Accounts</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+
+                {/* Export CSV Button */}
+                {canExport && (
+                  <button
+                    onClick={handleDownloadCSV}
+                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs rounded-lg px-3 py-2 font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                    title="Export current filtered ledger logs to CSV"
+                  >
+                    <Download size={13} strokeWidth={2.5} />
+                    <span className="hidden sm:inline">Export CSV</span>
+                    <span className="sm:hidden">CSV</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* 5. Awaiting Disbursement Box */}
           {payoutQueueEntries.length > 0 && (
-            <div className="bg-amber-50/50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-inner">
+            <div className="bg-amber-50/50 rounded-xl sm:rounded-2xl border border-amber-200 p-3.5 sm:p-5 space-y-3 sm:space-y-4 shadow-inner">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="text-amber-600 shrink-0" size={18} />
@@ -2288,7 +2292,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {paginatedPayoutQueue.map((req) => {
                   const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
                   const remaining = req.remainingBalance ?? Math.max(0, (req.amount || 0) - (req.disbursedAmount || 0));
@@ -2297,9 +2301,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                     : null;
 
                   return (
-                    <div key={req.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-3">
+                    <div key={req.id} className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-3">
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-[9px] font-mono uppercase text-slate-400 font-bold">#{req.id.substr(0, 8)}</span>
                             {isPartial ? (
@@ -2312,8 +2316,8 @@ export const FinanceLedgerPanel: React.FC = () => {
                               </span>
                             ) : null}
                           </div>
-                          <div className="text-right">
-                            <span className="text-xs font-extrabold text-[#4f46e5] block">{formatCurrency(req.amount)}</span>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs sm:text-sm font-extrabold text-[#4f46e5] block font-mono">{formatCurrency(req.amount)}</span>
                             {isPartial && (
                               <span className="text-[8.5px] font-bold text-amber-600 block">
                                 Remaining: {formatCurrency(remaining)}
@@ -2337,7 +2341,7 @@ export const FinanceLedgerPanel: React.FC = () => {
 
                       <button
                         onClick={() => setDisbursingReq(req)}
-                        className="w-full text-center py-2 bg-slate-900 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full text-center py-2.5 min-h-[40px] bg-slate-900 hover:bg-indigo-600 text-white rounded-lg text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
                       >
                         <Banknote size={13} />
                         {isPartial ? "Process Next Installment" : req.enableInstallments ? "Process Installment Disbursement" : "Process Disbursement Voucher"}
@@ -2395,8 +2399,144 @@ export const FinanceLedgerPanel: React.FC = () => {
                 <p className="text-xs font-medium">No financial ledger entries found matching the filter.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto min-w-full">
-                <table className="w-full text-left border-collapse">
+              <>
+                {/* Mobile Card Feed for Small Screens (< md) */}
+                <div className="block md:hidden p-3 space-y-3 bg-slate-50/40">
+                  {paginatedLedgerEntries.map((req) => {
+                    const isExpanded = expandedReqId === req.id;
+                    const codeInfo = getAccountingCode(req.groupId);
+                    const isPartial = req.status === RequisitionStatus.PARTIALLY_DISBURSED;
+                    const disbursedAmt = req.disbursedAmount || 0;
+                    const percentDisbursed = req.amount > 0 ? Math.round((disbursedAmt / req.amount) * 100) : 0;
+
+                    return (
+                      <div key={`m-ledger-${req.id}`} className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-mono font-bold text-slate-800">#{req.id.substr(0, 8).toUpperCase()}</span>
+                            <span className="text-[8.5px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                              Acc: {codeInfo.code}
+                            </span>
+                            {req.enableInstallments && (
+                              <span className="inline-flex items-center gap-0.5 text-[8px] bg-slate-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">
+                                <Layers size={8} /> Phased ({req.installments?.length || 0})
+                              </span>
+                            )}
+                          </div>
+                          <span className={cn(
+                            "text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full inline-block",
+                            req.status === RequisitionStatus.DISBURSED 
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
+                              : isPartial
+                                ? "bg-indigo-50 text-indigo-700 border border-indigo-100"
+                                : "bg-amber-50 text-amber-700 border border-amber-100"
+                          )}>
+                            {req.status === RequisitionStatus.DISBURSED 
+                              ? "PAID OUT" 
+                              : isPartial 
+                                ? `PARTIAL (${percentDisbursed}%)` 
+                                : "UNPAID REQ"}
+                          </span>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">{req.title}</h4>
+                          <p className="text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-indigo-600">{req.groupName}</span>
+                            <span>•</span>
+                            <span className="truncate max-w-[150px]">{projects.find(p => p.id === req.projectId)?.name || "Central Reserve"}</span>
+                          </p>
+                        </div>
+
+                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between gap-2">
+                          <div>
+                            <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest block">Debit</span>
+                            <div className="font-mono font-bold text-xs sm:text-sm text-rose-600">
+                              {isPartial ? (
+                                <div>
+                                  <span>KES {disbursedAmt.toLocaleString()}.00</span>
+                                  <span className="text-[8.5px] font-normal text-slate-400 block">of KES {req.amount.toLocaleString()}</span>
+                                </div>
+                              ) : (
+                                <span>KES {req.amount.toLocaleString()}.00</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest block">Credit</span>
+                            <span className="font-mono text-[10px] text-slate-500 font-medium">Central Bank</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                          <div className="flex items-center gap-1.5">
+                            {(req.status === RequisitionStatus.APPROVED_L2 || isPartial) && (
+                              <button
+                                type="button"
+                                onClick={() => setDisbursingReq(req)}
+                                className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[9.5px] font-bold uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                                title={isPartial ? "Disburse Next Installment" : "Process Disbursement"}
+                              >
+                                <Banknote size={12} />
+                                <span>Payout</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => printLedgerVoucher(req)}
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors cursor-pointer"
+                              title="Print Cash Disbursement Voucher"
+                            >
+                              <Printer size={13} />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setExpandedReqId(isExpanded ? null : req.id)}
+                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                          >
+                            <span>{isExpanded ? "Hide Details" : "Details"}</span>
+                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          </button>
+                        </div>
+
+                        {/* Expanded Details inside mobile card */}
+                        {isExpanded && (
+                          <div className="p-3 bg-slate-50/70 rounded-xl border border-dashed border-slate-200 space-y-2 text-[10.5px] text-slate-600 animate-fadeIn">
+                            <div>
+                              <span className="font-bold text-slate-400 uppercase text-[9px] block">Requester:</span>
+                              <p className="font-semibold text-slate-800">{req.requesterName || "Official Requester"}</p>
+                            </div>
+                            {req.payableTo && (
+                              <div>
+                                <span className="font-bold text-slate-400 uppercase text-[9px] block">Payable To:</span>
+                                <p className="font-semibold text-slate-800">{req.payableTo}</p>
+                              </div>
+                            )}
+                            {req.description && (
+                              <div>
+                                <span className="font-bold text-slate-400 uppercase text-[9px] block">Purpose:</span>
+                                <p className="text-slate-700">{req.description}</p>
+                              </div>
+                            )}
+                            {req.amountWords && (
+                              <p className="italic text-[9.5px] text-slate-500">"{req.amountWords}"</p>
+                            )}
+                            <div className="pt-1 text-[9px] text-slate-400 border-t border-slate-200 space-y-0.5">
+                              <p>Submitted: {req.submittedAt ? new Date(req.submittedAt).toLocaleDateString() : "N/A"}</p>
+                              {req.approvedAtL2 && <p>L2 Approved: {new Date(req.approvedAtL2).toLocaleDateString()}</p>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View (>= md) */}
+                <div className="hidden md:block overflow-x-auto min-w-full">
+                  <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                       <th className="py-3 px-6">Requisition ID</th>
@@ -2643,7 +2783,8 @@ export const FinanceLedgerPanel: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            )}
+            </>
+          )}
 
             {/* Double-Entry Ledger Pagination Footer */}
             {totalLedgerPages > 1 && (
@@ -3042,7 +3183,7 @@ export const FinanceLedgerPanel: React.FC = () => {
           {isFinanceOrAdmin && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Ministry Budget Controls */}
-              <section id="allocation-form-section" className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 lg:col-span-12">
+              <section id="allocation-form-section" className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm space-y-3.5 sm:space-y-4 lg:col-span-12">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
@@ -3292,13 +3433,13 @@ export const FinanceLedgerPanel: React.FC = () => {
           )}
 
           {/* 7. Active progress dashboard */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-3.5 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-slate-100 pb-3 sm:pb-4">
               <div>
-                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-800">Ministry Group Budget Reserves</h3>
-                <p className="text-xs text-slate-500">Live fiscal matrix mapping allocations, spend trails, and unallocated buffer transactions.</p>
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-slate-800">Ministry Group Budget Reserves</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500">Live fiscal matrix mapping allocations, spend trails, and unallocated buffer transactions.</p>
               </div>
-              <div className="w-full md:w-80">
+              <div className="w-full sm:w-72 md:w-80">
                 <div className="relative">
                   <input
                     type="text"
@@ -3465,64 +3606,65 @@ export const FinanceLedgerPanel: React.FC = () => {
                     const codeInfo = getAccountingCode(project.groupId);
 
                     return (
-                      <div key={project.id} className="p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-all bg-slate-50/30">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
-                          <div>
-                            <div className="flex items-center gap-2">
+                      <div key={project.id} className="p-3.5 sm:p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-all bg-slate-50/30 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-mono text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
                                 ACC: {project.accountNumber || codeInfo.code}
                               </span>
-                              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">{project.name}</h4>
+                              <h4 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wider">{project.name}</h4>
                             </div>
                             <p className="text-[10px] text-slate-400 mt-0.5">Linked Group ID: {project.groupId} • Status: {project.status}</p>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-3">
-                            <div className="text-right">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Actual Spent</div>
-                              <div className="text-xs font-bold text-emerald-600">
-                                {formatCurrency(disbursedAmount)}
-                              </div>
+                          {isFinanceOrAdmin && (
+                            <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setAdjustingProject(project)}
+                                className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-indigo-600 text-slate-700 hover:text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                              >
+                                <Plus size={10} />
+                                Modify
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProjectBudget(project)}
+                                className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                                title="Delete Reserve"
+                              >
+                                <X size={10} className="shrink-0" />
+                                Delete
+                              </button>
                             </div>
+                          )}
+                        </div>
 
-                            <div className="text-right">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Committed vs. Allocated</div>
-                              <div className="text-xs font-bold text-slate-800">
-                                {formatCurrency(totalCommitted)} <span className="text-slate-400 font-medium">/ {formatCurrency(project.allocatedBudget)}</span>
-                              </div>
+                        {/* Financial Metrics 3-box Grid for Mobile & Desktop */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white dark:bg-slate-900/60 p-2.5 sm:p-3 rounded-xl border border-slate-200/80">
+                          <div className="space-y-0.5">
+                            <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest truncate">Actual Spent</div>
+                            <div className="text-xs sm:text-sm font-bold text-emerald-600 font-mono truncate">
+                              {formatCurrency(disbursedAmount)}
                             </div>
+                          </div>
 
-                            <div className="text-right">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Available Reserve</div>
-                              <div className={cn(
-                                "text-xs font-bold font-mono",
-                                remainingAmount < 0 ? "text-rose-600" : "text-indigo-600"
-                              )}>
-                                {formatCurrency(remainingAmount)}
-                              </div>
+                          <div className="space-y-0.5">
+                            <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest truncate">Committed / Allocated</div>
+                            <div className="text-xs sm:text-sm font-bold text-slate-800 font-mono truncate">
+                              {formatCurrency(totalCommitted)} <span className="text-slate-400 font-normal text-[9.5px]">/ {formatCurrency(project.allocatedBudget)}</span>
                             </div>
+                          </div>
 
-                            {isFinanceOrAdmin && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setAdjustingProject(project)}
-                                  className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-indigo-600 text-slate-700 hover:text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Plus size={10} />
-                                  Modify
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteProjectBudget(project)}
-                                  className="px-2.5 py-1.5 bg-rose-50 border border-rose-100 hover:border-rose-600 text-rose-700 hover:text-rose-600 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
-                                  title="Delete Reserve"
-                                >
-                                  <X size={10} className="shrink-0" />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
+                          <div className="col-span-2 sm:col-span-1 space-y-0.5 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                            <div className="text-[8.5px] font-bold text-slate-400 uppercase tracking-widest truncate">Available Reserve</div>
+                            <div className={cn(
+                              "text-xs sm:text-sm font-bold font-mono truncate",
+                              remainingAmount < 0 ? "text-rose-600" : "text-indigo-600"
+                            )}>
+                              {formatCurrency(remainingAmount)}
+                            </div>
                           </div>
                         </div>
 
@@ -3541,14 +3683,14 @@ export const FinanceLedgerPanel: React.FC = () => {
                             />
                           </div>
 
-                          <div className="flex items-center justify-between text-[10px] text-slate-400">
-                            <div className="flex items-center gap-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[9.5px] sm:text-[10px] text-slate-400">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                               <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                                 Disbursed ({disbursedRatio.toFixed(0)}%)
                               </span>
                               <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                                 Pending ({pendingRatio.toFixed(0)}%)
                               </span>
                               {totalRatio > 100 && (
@@ -3561,7 +3703,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                                 REQ LIMIT: {formatCurrency(project.requisitionLimit || project.allocatedBudget)}
                               </span>
                             </div>
-                            <span>{formatCurrency(remainingAmount)} Remaining Reserve</span>
+                            <span className="font-semibold text-slate-600 sm:text-slate-400">{formatCurrency(remainingAmount)} Remaining Reserve</span>
                           </div>
                         </div>
 
@@ -3589,7 +3731,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                   </div>
 
                   {totalReservesPages > 1 && (
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center justify-center sm:justify-end gap-1 sm:gap-1.5 flex-wrap w-full sm:w-auto">
                       <button
                         type="button"
                         disabled={reservesPage === 1}
@@ -3672,12 +3814,30 @@ export const FinanceLedgerPanel: React.FC = () => {
           {renderYearlyBudgetingAndFiscalBooks()}
 
           {/* 9. Budget Change History */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-800">Budget Change History</h3>
-                <p className="text-xs text-slate-500">Record of audit trails for budget limit adjustments and creations.</p>
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100">
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-widest text-slate-800">Budget Change History</h3>
+                <p className="text-[11px] sm:text-xs text-slate-500">Record of audit trails for budget limit adjustments and creations.</p>
               </div>
-              <div className="overflow-x-auto">
+
+              {/* Mobile Card Feed for Budget Logs (< md) */}
+              <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-2.5">
+                {paginatedBudgetLogs.map((log, idx) => (
+                  <div key={`budget-log-m-${log.id || idx}-${idx}`} className="bg-slate-50/60 p-3 rounded-xl border border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="font-mono text-slate-400">{formatDate(log.timestamp)}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-black uppercase text-[8px] border border-indigo-100">
+                        {log.action === 'BUDGET_ADJUSTMENT' ? 'ADJUSTMENT' : log.action}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-800 leading-snug">{log.details}</p>
+                    <p className="text-[10px] text-slate-500">By: <span className="font-semibold text-slate-700">{log.performedBy}</span></p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs text-slate-600">
                   <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     <tr>
@@ -3700,11 +3860,11 @@ export const FinanceLedgerPanel: React.FC = () => {
                 </table>
               </div>
               {totalBudgetHistoryPages > 1 && (
-                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
                   <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     Showing {paginatedBudgetLogs.length} of {budgetLogs.length} logs
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4">
                     <button
                       disabled={budgetHistoryPage === 1}
                       onClick={() => setBudgetHistoryPage(p => Math.max(p - 1, 1))}
@@ -3712,7 +3872,7 @@ export const FinanceLedgerPanel: React.FC = () => {
                     >
                       Prev
                     </button>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-mono">
                       Page {budgetHistoryPage} of {totalBudgetHistoryPages}
                     </span>
                     <button
@@ -4686,29 +4846,29 @@ export const FinanceLedgerPanel: React.FC = () => {
       {/* 9. MODAL: Budget Top Up Allocation Form */}
       <AnimatePresence>
         {adjustingProject && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 sm:p-4">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 dark:border-slate-800 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-h-[92vh] max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
             >
-              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-5 sticky top-0 z-10 flex items-center justify-between">
+              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-3.5 sm:p-5 sticky top-0 z-10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
                     <TrendingUp size={18} />
                   </div>
                   <div>
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Modify Budget Limits</h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Set overall allocations and requisition caps on ledger lines.</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Set overall allocations and requisition caps.</p>
                   </div>
                 </div>
-                <button onClick={() => setAdjustingProject(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-                  <X size={20} />
+                <button onClick={() => setAdjustingProject(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                  <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleBudgetTopUp} className="p-5 space-y-4 flex-1 overflow-y-auto">
+              <form onSubmit={handleBudgetTopUp} className="p-3.5 sm:p-5 space-y-3 sm:space-y-4 flex-1 overflow-y-auto">
                 
                 <div className="space-y-1 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">PROJECT</div>
@@ -4793,14 +4953,14 @@ export const FinanceLedgerPanel: React.FC = () => {
       {/* 10. MODAL: Manage Fiscal Year Settings */}
       <AnimatePresence>
         {managingFy && (
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 sm:p-4">
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-none md:rounded-2xl shadow-xl border-t md:border border-slate-200 dark:border-slate-800 h-full md:h-auto max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-h-[92vh] max-w-sm w-full overflow-hidden flex flex-col text-slate-900 dark:text-slate-100"
             >
-              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-5 sticky top-0 z-10 flex items-center justify-between">
+              <div className="bg-transparent border-b border-slate-100 dark:border-slate-800 text-slate-900 dark:text-white p-3.5 sm:p-5 sticky top-0 z-10 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-500/20">
                     <Settings size={18} />
@@ -4810,8 +4970,8 @@ export const FinanceLedgerPanel: React.FC = () => {
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">Configure boundaries, labels, and planning notes</p>
                   </div>
                 </div>
-                <button onClick={() => setManagingFy(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
-                  <X size={20} />
+                <button onClick={() => setManagingFy(null)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                  <X size={18} />
                 </button>
               </div>
 

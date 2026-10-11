@@ -66,7 +66,7 @@ const BudgetCircularGaugeItem: React.FC<BudgetCircularGaugeItemProps> = ({ proje
       id={`gauge-card-${project.id}`}
       whileHover={{ y: -4, transition: { duration: 0.2 } }}
       className={cn(
-        "bg-gradient-to-br p-5 rounded-3xl border shadow-xs flex flex-col items-center text-center justify-between min-h-[270px] relative overflow-hidden transition-all group",
+        "bg-gradient-to-br p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border shadow-xs flex flex-col items-center text-center justify-between min-h-[240px] sm:min-h-[270px] relative overflow-hidden transition-all group",
         isAssigned ? "border-indigo-300 ring-2 ring-indigo-500/20" : "border-slate-200/80",
         bgGradient
       )}
@@ -84,7 +84,7 @@ const BudgetCircularGaugeItem: React.FC<BudgetCircularGaugeItemProps> = ({ proje
       )}
 
       {/* Top Header line of card */}
-      <div className="w-full space-y-1 pt-2">
+      <div className="w-full space-y-1 pt-1.5 sm:pt-2">
         <div className="flex items-center justify-center gap-1">
           <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">MINISTRY BUDGET</span>
           {alertIcon}
@@ -95,7 +95,7 @@ const BudgetCircularGaugeItem: React.FC<BudgetCircularGaugeItemProps> = ({ proje
       </div>
 
       {/* Gauge Visual circle wrapper */}
-      <div className="relative w-28 h-28 flex items-center justify-center my-3 select-none">
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center my-2 sm:my-3 select-none">
         <svg className="w-full h-full transform -rotate-90">
           {/* Background circle track */}
           <circle
@@ -277,19 +277,21 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
         </div>
 
         {/* Global remaining Summary card */}
-        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center gap-4 shrink-0 transition-all hover:bg-slate-100/50">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <ArrowDownRight size={20} className="animate-bounce" />
-          </div>
-          <div>
-            <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL UNSPENT BUDGET</div>
-            <div className="text-base font-black text-slate-900 font-sans tracking-tight leading-none mb-1">
-              Ksh {summary.totalRemaining.toLocaleString()}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full md:w-auto shrink-0 transition-all hover:bg-slate-100/50">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <ArrowDownRight size={20} className="animate-bounce" />
+            </div>
+            <div>
+              <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL UNSPENT BUDGET</div>
+              <div className="text-sm sm:text-base font-black text-slate-900 font-sans tracking-tight leading-none">
+                Ksh {summary.totalRemaining.toLocaleString()}
+              </div>
             </div>
           </div>
-          <div className="ml-auto text-right pl-4 border-l border-slate-200">
+          <div className="w-full sm:w-auto sm:ml-auto text-left sm:text-right pt-2.5 sm:pt-0 sm:pl-4 border-t sm:border-t-0 sm:border-l border-slate-200">
             <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">TOTAL ACTUAL SPENT</div>
-            <div className="text-base font-black text-emerald-600 font-sans tracking-tight leading-none mb-1">
+            <div className="text-sm sm:text-base font-black text-emerald-600 font-sans tracking-tight leading-none">
               Ksh {summary.totalSpent.toLocaleString()}
             </div>
           </div>
@@ -298,36 +300,38 @@ export const BudgetCircularGauges: React.FC<BudgetCircularGaugesProps> = ({ proj
 
       {/* Filter Toggle for Users with assigned groups - hidden for restricted roles (approvers & church groups) who only see assigned ministries */}
       {!isRestrictedRole && assignedGroupsList.length > 0 && assignedProjects.length > 0 && (
-        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-2">Display Scope:</span>
-          <button
-            onClick={() => setFilterMode("MY_MINISTRIES")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border",
-              filterMode === "MY_MINISTRIES"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-            )}
-          >
-            My Ministries Budget ({assignedProjects.length})
-          </button>
-          <button
-            onClick={() => setFilterMode("ALL")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border",
-              filterMode === "ALL"
-                ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-            )}
-          >
-            All St Andrew's Ministries ({activeYearProjects.length})
-          </button>
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mr-1 w-full sm:w-auto">Display Scope:</span>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setFilterMode("MY_MINISTRIES")}
+              className={cn(
+                "px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border flex-1 sm:flex-none text-center",
+                filterMode === "MY_MINISTRIES"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              My Ministries ({assignedProjects.length})
+            </button>
+            <button
+              onClick={() => setFilterMode("ALL")}
+              className={cn(
+                "px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border flex-1 sm:flex-none text-center",
+                filterMode === "ALL"
+                  ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              All Ministries ({activeYearProjects.length})
+            </button>
+          </div>
         </div>
       )}
 
       {displayedProjectsList.length > 0 ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
             {displayedProjects.map(project => (
               <BudgetCircularGaugeItem 
                 key={project.id} 

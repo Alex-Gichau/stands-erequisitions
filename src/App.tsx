@@ -21,28 +21,30 @@ import { PanelSkeletonFallback } from "./components/PanelSkeletonFallback";
 import { getRecentSearches, saveRecentSearchTerm, removeRecentSearchTerm, clearAllRecentSearchTerms } from "./lib/searchHistory";
 import { databaseService } from "./lib/databaseService";
 import { UserRole, RequisitionStatus, BudgetAlert, SearchFilter, PermissionConfig } from "./types";
-
-import { RequisitionsPanel } from "./components/RequisitionsPanel";
-import { ApprovalsPanel } from "./components/ApprovalsPanel";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { UsersPanel } from "./components/UsersPanel";
-import { ReportsPanel } from "./components/ReportsPanel";
-import { FinanceLedgerPanel } from "./components/FinanceLedgerPanel";
-import { AccessControlPanel } from "./components/AccessControlPanel";
-import { VendorsPanel } from "./components/VendorsPanel";
-import { AuditLogsPanel } from "./components/AuditLogsPanel";
-import { TransactionsPanel } from "./components/TransactionsPanel";
-import { UploadsGalleryPanel } from "./components/UploadsGalleryPanel";
-import { FileUploadProjectionCenter } from "./components/FileUploadProjectionCenter";
-import { ReceiptTemplateGenerator } from "./components/ReceiptTemplateGenerator";
-import { NotificationHub } from "./components/NotificationHub";
-import { WaitingRoom } from "./components/WaitingRoom";
-import { CampaignsPanel } from "./components/CampaignsPanel";
 import { AnnouncementBanner } from "./components/AnnouncementBanner";
-import { ProductTour } from "./components/ProductTour";
-import { FeedbackModal } from "./components/FeedbackModal";
-import { SplashPage } from "./components/SplashPage";
-import { BackgroundUploadWidget } from "./components/BackgroundUploadWidget";
+
+// Lazy-loaded panel components to reduce initial JavaScript load
+const RequisitionsPanel = lazy(() => import("./components/RequisitionsPanel").then(m => ({ default: m.RequisitionsPanel })));
+const ApprovalsPanel = lazy(() => import("./components/ApprovalsPanel").then(m => ({ default: m.ApprovalsPanel })));
+const SettingsPanel = lazy(() => import("./components/SettingsPanel").then(m => ({ default: m.SettingsPanel })));
+const UsersPanel = lazy(() => import("./components/UsersPanel").then(m => ({ default: m.UsersPanel })));
+const ReportsPanel = lazy(() => import("./components/ReportsPanel").then(m => ({ default: m.ReportsPanel })));
+const FinanceLedgerPanel = lazy(() => import("./components/FinanceLedgerPanel").then(m => ({ default: m.FinanceLedgerPanel })));
+const AccessControlPanel = lazy(() => import("./components/AccessControlPanel").then(m => ({ default: m.AccessControlPanel })));
+const VendorsPanel = lazy(() => import("./components/VendorsPanel").then(m => ({ default: m.VendorsPanel })));
+const AuditLogsPanel = lazy(() => import("./components/AuditLogsPanel").then(m => ({ default: m.AuditLogsPanel })));
+const TransactionsPanel = lazy(() => import("./components/TransactionsPanel").then(m => ({ default: m.TransactionsPanel })));
+const UploadsGalleryPanel = lazy(() => import("./components/UploadsGalleryPanel").then(m => ({ default: m.UploadsGalleryPanel })));
+const NotificationHub = lazy(() => import("./components/NotificationHub").then(m => ({ default: m.NotificationHub })));
+const CampaignsPanel = lazy(() => import("./components/CampaignsPanel").then(m => ({ default: m.CampaignsPanel })));
+
+// Lazy-loaded auxiliary modals & tools
+const ReceiptTemplateGenerator = lazy(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
+const WaitingRoom = lazy(() => import("./components/WaitingRoom").then(m => ({ default: m.WaitingRoom })));
+const ProductTour = lazy(() => import("./components/ProductTour").then(m => ({ default: m.ProductTour })));
+const FeedbackModal = lazy(() => import("./components/FeedbackModal").then(m => ({ default: m.FeedbackModal })));
+const SplashPage = lazy(() => import("./components/SplashPage").then(m => ({ default: m.SplashPage })));
+const BackgroundUploadWidget = lazy(() => import("./components/BackgroundUploadWidget").then(m => ({ default: m.BackgroundUploadWidget })));
 import { 
   isDesktopNotificationSupported, 
   getDesktopNotificationPermission, 

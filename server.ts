@@ -555,33 +555,10 @@ function sanitizeAttachmentObject(att: any, targetDir: string): any {
       }
       dataUri = standardDataUri;
     } else {
-      // It's a plain path or relative URL
+      // It's a plain path or relative URL - keep fast reference without blocking disk reads
       url = rawContent;
       name = parsedName || path.basename(rawContent) || "Attachment";
       filePath = path.join(targetDir, path.basename(rawContent));
-
-      // Try reading file content from disk to populate dataUri
-      if (fs.existsSync(filePath)) {
-        try {
-          const fileBuffer = fs.readFileSync(filePath);
-          const base64 = fileBuffer.toString("base64");
-          const ext = path.extname(filePath).toLowerCase();
-          let mimeType = "application/octet-stream";
-          if (ext === ".pdf") mimeType = "application/pdf";
-          else if (ext === ".png") mimeType = "image/png";
-          else if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
-          else if (ext === ".gif") mimeType = "image/gif";
-          else if (ext === ".webp") mimeType = "image/webp";
-          else if (ext === ".xlsx") mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-          else if (ext === ".xls") mimeType = "application/vnd.ms-excel";
-          else if (ext === ".csv") mimeType = "text/csv";
-          else if (ext === ".docx") mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-          dataUri = `data:${mimeType};base64,${base64}`;
-        } catch (err) {
-          console.error("[sanitizeAttachmentObject] Error reading file for dataUri:", err);
-        }
-      }
     }
   } else if (typeof att === "object" && att !== null) {
     name = att.name || att.fileName || att.file_name || att.title || "Attachment";
@@ -594,29 +571,6 @@ function sanitizeAttachmentObject(att: any, targetDir: string): any {
     // If dataUri is missing but url is base64, use url as dataUri
     if (!dataUri && (url.startsWith("data:") || /^[A-Za-z0-9+/=\r\n\s]+$/.test(url.substring(0, 100)))) {
       dataUri = url;
-    }
-
-    // If dataUri is missing but the local file exists, populate it!
-    if (!dataUri && filePath && fs.existsSync(filePath)) {
-      try {
-        const fileBuffer = fs.readFileSync(filePath);
-        const base64 = fileBuffer.toString("base64");
-        const ext = path.extname(filePath).toLowerCase();
-        let mimeType = "application/octet-stream";
-        if (ext === ".pdf") mimeType = "application/pdf";
-        else if (ext === ".png") mimeType = "image/png";
-        else if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
-        else if (ext === ".gif") mimeType = "image/gif";
-        else if (ext === ".webp") mimeType = "image/webp";
-        else if (ext === ".xlsx") mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-        else if (ext === ".xls") mimeType = "application/vnd.ms-excel";
-        else if (ext === ".csv") mimeType = "text/csv";
-        else if (ext === ".docx") mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-        dataUri = `data:${mimeType};base64,${base64}`;
-      } catch (err) {
-        console.error("[sanitizeAttachmentObject] Error reading object file for dataUri:", err);
-      }
     }
   }
 
@@ -1723,7 +1677,12 @@ async function startServer() {
   app.get("/api/db-all", async (req, res) => {
     try {
       const dataMap: any = {};
-      for (const col of collectionsList) {
+      const requestedCols = req.query.collections
+        ? String(req.query.collections).split(",").map(c => c.trim()).filter(Boolean)
+        : collectionsList;
+
+      for (const col of requestedCols) {
+        if (!collectionsList.includes(col)) continue;
         if (mongoose.connection.readyState === 1) {
           const Model = modelMappings[col];
           if (Model) {

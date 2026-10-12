@@ -2478,7 +2478,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
             onClick={handleCloseAttempt}
             className="w-full md:w-auto px-6 py-3 md:py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-750 text-slate-600 dark:text-slate-350 rounded-xl text-[10px] md:text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer"
           >
-            {isEditMode ? "CANCEL / CLOSE" : "DISCARD DRAFT"}
+            {isEditMode ? "CANCEL" : "DISCARD DRAFT"}
           </button>
           <button 
             disabled={loading || !amount || (attachments.length === 0 && existingAttachments.length === 0) || !navigator.onLine}

@@ -8,7 +8,7 @@ import { useRequisitions, getActiveFiscalYear } from "../contexts/RequisitionCon
 import { numberToWords } from "../utils/numberUtils";
 import { formatCurrency, cn, uploadAttachmentsToLocalServer, handleImageError, getAttachmentFileName, getAbsoluteAttachmentUrl } from "../lib/utils";
 import { processFileToAttachmentStrings } from "../lib/pdfUtils";
-import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles, Lock } from "lucide-react";
+import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, Sparkles, Lock, PenTool, Type } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
 import { COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
@@ -52,6 +52,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     if (!targetReq?.attachments) return [];
     return Array.isArray(targetReq.attachments) ? targetReq.attachments : [targetReq.attachments];
   });
+  // Alternative option: Write down attachment details / quotation in a textfield
+  const [attachmentMode, setAttachmentMode] = useState<"upload" | "write">("upload");
+  const [writtenAttachmentTitle, setWrittenAttachmentTitle] = useState("");
+  const [writtenAttachmentText, setWrittenAttachmentText] = useState("");
   const [loading, setLoading] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -793,6 +797,33 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     setExistingAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Convert written text field into an attachment file
+  const handleAddWrittenAttachment = () => {
+    const text = writtenAttachmentText.trim();
+    if (!text) {
+      alert("Please enter the written details or quotation notes before attaching.");
+      return;
+    }
+    const safeTitle = (writtenAttachmentTitle.trim() || `Written-Quotation-Note-${Date.now()}`)
+      .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+      .replace(/\s+/g, "-");
+    const fileName = safeTitle.endsWith(".txt") ? safeTitle : `${safeTitle}.txt`;
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const file = new File([blob], fileName, { type: "text/plain;charset=utf-8", lastModified: Date.now() });
+
+    setAttachments(prev => [...prev, file]);
+    setWrittenAttachmentText("");
+    setWrittenAttachmentTitle("");
+    if (triggerToast) {
+      triggerToast({
+        type: "SYSTEM_INFO",
+        message: `Attached written document: ${fileName}`,
+        severity: "LOW",
+        timestamp: new Date().toISOString()
+      });
+    }
+  };
+
   const handleCloseAttempt = () => {
     if (isEditMode) {
       onClose();
@@ -812,7 +843,18 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
       const parsedAmount = Number(amount) || 0;
 
-      const readPromises = attachments.map((file) => processFileToAttachmentStrings(file));
+      let allLocalFiles = [...attachments];
+      if (writtenAttachmentText.trim()) {
+        const safeTitle = (writtenAttachmentTitle.trim() || `Written-Quotation-Note-${Date.now()}`)
+          .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+          .replace(/\s+/g, "-");
+        const fileName = safeTitle.endsWith(".txt") ? safeTitle : `${safeTitle}.txt`;
+        const blob = new Blob([writtenAttachmentText.trim()], { type: "text/plain;charset=utf-8" });
+        const file = new File([blob], fileName, { type: "text/plain;charset=utf-8", lastModified: Date.now() });
+        allLocalFiles.push(file);
+      }
+
+      const readPromises = allLocalFiles.map((file) => processFileToAttachmentStrings(file));
       const nestedEncoded = await Promise.all(readPromises);
       const encodedAttachments = nestedEncoded.flat();
 
@@ -873,9 +915,19 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
 
     try {
+      // Encode local attachment files to strings (including any written notes in progress)
+      let allLocalFiles = [...attachments];
+      if (writtenAttachmentText.trim()) {
+        const safeTitle = (writtenAttachmentTitle.trim() || `Written-Quotation-Note-${Date.now()}`)
+          .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+          .replace(/\s+/g, "-");
+        const fileName = safeTitle.endsWith(".txt") ? safeTitle : `${safeTitle}.txt`;
+        const blob = new Blob([writtenAttachmentText.trim()], { type: "text/plain;charset=utf-8" });
+        const file = new File([blob], fileName, { type: "text/plain;charset=utf-8", lastModified: Date.now() });
+        allLocalFiles.push(file);
+      }
 
-      // Encode local attachment files to strings
-      const readPromises = attachments.map((file) => processFileToAttachmentStrings(file));
+      const readPromises = allLocalFiles.map((file) => processFileToAttachmentStrings(file));
       const nestedEncoded = await Promise.all(readPromises);
       const encodedAttachments = nestedEncoded.flat();
 
@@ -1918,6 +1970,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                   <input 
                     name="amount" 
                     type="number" 
+                    inputMode="decimal"
+                    step="any"
+                    pattern="[0-9]*"
                     required 
                     value={amount}
                     onChange={(e) => {
@@ -2095,6 +2150,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                               <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Amount (KES)</label>
                               <input
                                 type="number"
+                                inputMode="decimal"
+                                step="any"
+                                pattern="[0-9]*"
                                 value={inst.amount}
                                 onChange={(e) => handleInstallmentChange(index, "amount", e.target.value)}
                                 placeholder="0.00"
@@ -2168,47 +2226,132 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
 
           {/* Section 3: Attachments */}
           <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Paperclip size={16} className="text-emerald-600" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                  <Paperclip size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Quotations & Documents</h4>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500">Upload quotation files or write down quotation/item breakdown directly</p>
+                </div>
               </div>
-              <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Quotations & Documents</h4>
+
+              {/* Mode Toggle: File Upload vs Write Down Details */}
+              <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setAttachmentMode("upload")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                    attachmentMode === "upload"
+                      ? "bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs border border-slate-200/60 dark:border-slate-700"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  <Upload size={12} />
+                  <span>Upload Files</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAttachmentMode("write")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                    attachmentMode === "write"
+                      ? "bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-400 shadow-xs border border-slate-200/60 dark:border-slate-700"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  )}
+                >
+                  <PenTool size={12} />
+                  <span>Write Details</span>
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col gap-3">
-                <label 
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={cn(
-                    "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group flex-1",
-                    isDragging 
-                      ? "border-emerald-500 bg-emerald-500/10 dark:border-emerald-400 dark:bg-emerald-400/10 scale-[1.02]" 
-                      : "border-slate-200 dark:border-slate-800 hover:border-primary/40 dark:hover:border-primary/60 hover:bg-primary/5 dark:hover:bg-primary/5"
-                  )}
-                >
-                  <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.xlsm,.xlsb,.csv,.ods,.tsv,.txt" onChange={handleFileChange} className="hidden" />
-                  <div className="w-9 h-9 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Upload size={16} className={cn("text-slate-400 dark:text-slate-300 group-hover:text-primary", isDragging && "text-emerald-500 dark:text-emerald-400")} />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {isDragging ? "Drop your files here!" : "Click or drag & drop documents"}
-                    </p>
-                    <p className="text-[9px] text-slate-400 dark:text-slate-550 mt-0.5 uppercase tracking-widest">PDF, Image, Excel, DOCX max 2MB</p>
-                  </div>
-                </label>
+                {attachmentMode === "upload" ? (
+                  <>
+                    <label 
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={cn(
+                        "border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center gap-2 transition-all cursor-pointer group flex-1 min-h-[140px]",
+                        isDragging 
+                          ? "border-emerald-500 bg-emerald-500/10 dark:border-emerald-400 dark:bg-emerald-400/10 scale-[1.02]" 
+                          : "border-slate-200 dark:border-slate-800 hover:border-primary/40 dark:hover:border-primary/60 hover:bg-primary/5 dark:hover:bg-primary/5"
+                      )}
+                    >
+                      <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.xlsm,.xlsb,.csv,.ods,.tsv,.txt" onChange={handleFileChange} className="hidden" />
+                      <div className="w-9 h-9 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Upload size={16} className={cn("text-slate-400 dark:text-slate-300 group-hover:text-primary", isDragging && "text-emerald-500 dark:text-emerald-400")} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          {isDragging ? "Drop your files here!" : "Click or drag & drop documents"}
+                        </p>
+                        <p className="text-[9px] text-slate-400 dark:text-slate-550 mt-0.5 uppercase tracking-widest">PDF, Image, Excel, DOCX max 2MB</p>
+                      </div>
+                    </label>
 
-                <button
-                  type="button"
-                  onClick={() => setIsCameraOpen(true)}
-                  className="flex items-center justify-center gap-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 hover:border-emerald-200 hover:bg-emerald-50/20 text-slate-700 dark:text-slate-300 hover:text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer group"
-                >
-                  <Camera size={14} className="text-slate-400 dark:text-slate-300 group-hover:text-emerald-500 group-hover:scale-110 transition-transform" />
-                  <span>Use Camera to Scan</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCameraOpen(true)}
+                      className="flex items-center justify-center gap-2.5 p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 hover:border-emerald-200 hover:bg-emerald-50/20 text-slate-700 dark:text-slate-300 hover:text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer group"
+                    >
+                      <Camera size={14} className="text-slate-400 dark:text-slate-300 group-hover:text-emerald-500 group-hover:scale-110 transition-transform" />
+                      <span>Use Camera to Scan</span>
+                    </button>
+                  </>
+                ) : (
+                  /* Alternative option: Write down in a textfield */
+                  <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 flex-1 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                          <Type size={13} className="text-indigo-600 dark:text-indigo-400" />
+                          <span>Written Quotation / Pro-forma Breakdown</span>
+                        </label>
+                        <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                          Text Attachment
+                        </span>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={writtenAttachmentTitle}
+                        onChange={(e) => setWrittenAttachmentTitle(e.target.value)}
+                        placeholder="Document Title (e.g., Quotation-Vendor-Details)"
+                        className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-indigo-500 font-medium"
+                      />
+
+                      <textarea
+                        rows={4}
+                        value={writtenAttachmentText}
+                        onChange={(e) => setWrittenAttachmentText(e.target.value)}
+                        placeholder="Write down full quotation details, itemized price list, vendor terms, or specification notes here..."
+                        className="w-full p-3 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-indigo-500 font-mono resize-none leading-relaxed text-slate-800 dark:text-slate-200"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80 dark:border-slate-700/80">
+                      <p className="text-[9.5px] text-slate-400 dark:text-slate-500 italic">
+                        Will be saved and attached as a readable text document.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleAddWrittenAttachment}
+                        disabled={!writtenAttachmentText.trim()}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm shadow-indigo-950/20 shrink-0"
+                      >
+                        <PlusCircle size={13} />
+                        <span>Add To Attachments</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2 scrollbar-hide">

@@ -4903,6 +4903,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Overall Budget Limit (KES)</label>
                   <input
                     type="number"
+                    inputMode="decimal"
+                    step="any"
+                    pattern="[0-9]*"
                     required
                     min="1"
                     placeholder="e.g., 500000"
@@ -4917,6 +4920,9 @@ export const FinanceLedgerPanel: React.FC = () => {
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Single Request Requisition Limit (KES)</label>
                   <input
                     type="number"
+                    inputMode="decimal"
+                    step="any"
+                    pattern="[0-9]*"
                     required
                     min="1"
                     placeholder="e.g., 200000"

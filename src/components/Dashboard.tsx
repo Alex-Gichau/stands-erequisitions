@@ -2147,6 +2147,9 @@ const Dashboard: React.FC<{
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Required Supplementary Amount (KES)</label>
                     <input 
                       type="number"
+                      inputMode="decimal"
+                      step="any"
+                      pattern="[0-9]*"
                       required
                       min={1}
                       placeholder="e.g. 150000"

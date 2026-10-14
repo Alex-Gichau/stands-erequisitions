@@ -1634,7 +1634,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.log("Allocating budget:", { groupId, amount, fiscalYear, accountNumber, projects });
       const match = projects.find(p => 
         p.groupId === groupId && 
-        (p.fiscalYear === fiscalYear || (!p.fiscalYear && fiscalYear === 2026))
+        p.fiscalYear === fiscalYear
       );
       console.log("Found match:", match);
       if (match) {
@@ -3860,16 +3860,34 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
 
+    const isApproverL1 = currentUser?.role === UserRole.APPROVER_L1;
+    const initialStatus = reqData.status 
+      ? reqData.status 
+      : (isApproverL1 ? RequisitionStatus.APPROVED_L1 : RequisitionStatus.SUBMITTED);
+
+    const initialApprovalHistory = isApproverL1 && initialStatus === RequisitionStatus.APPROVED_L1
+      ? [{
+          id: `an-${Math.random().toString(36).substr(2, 9)}`,
+          approverId: currentUser?.id || "u-approver",
+          approverName: currentUser?.name || "L1 Approver",
+          role: UserRole.APPROVER_L1,
+          note: "Self-initiated and auto-approved at Level 1 upon submission.",
+          decision: "APPROVED" as const,
+          timestamp: now.toISOString(),
+        }]
+      : [];
+
     const newReq: Requisition = {
       ...reqData,
       id,
       requesterEmail: reqData.requesterEmail || currentUser?.email || "",
-      status: reqData.status || RequisitionStatus.SUBMITTED,
+      status: initialStatus,
       submittedAt: now.toISOString(),
       updatedAt: now.toISOString(),
+      approvedAtL1: initialStatus === RequisitionStatus.APPROVED_L1 ? now.toISOString() : undefined,
       expiresAt: expiresAt.toISOString(),
       escalationLevel: 0,
-      approvalHistory: [],
+      approvalHistory: initialApprovalHistory,
       fiscalYear: systemSettings.currentFiscalYear || 2026,
       attachments: safeNormalizeAttachments(reqData.attachments),
     };
@@ -3882,14 +3900,17 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       await databaseService.saveRequisition(cleanFirestoreData(newReq));
       
       // Fire-and-forget non-blocking background tasks
-      addSystemLog("REQUISITION_CREATED", `Requisition '${newReq.title}' created (amount KES ${newReq.amount.toLocaleString()})`, {
+      addSystemLog("REQUISITION_CREATED", `Requisition '${newReq.title}' created (amount KES ${newReq.amount.toLocaleString()})${isApproverL1 ? " and automatically approved at Level 1" : ""}`, {
         requisitionId: id,
         title: newReq.title,
         amount: newReq.amount,
-        group: newReq.groupName
+        group: newReq.groupName,
+        status: newReq.status
       }).catch(() => {});
       
-      if (newReq.status === RequisitionStatus.SUBMITTED) {
+      if (newReq.status === RequisitionStatus.APPROVED_L1) {
+        sendEmailNotification(newReq, "APPROVED_L1").catch(() => {});
+      } else if (newReq.status === RequisitionStatus.SUBMITTED) {
         sendEmailNotification(newReq, "SUBMITTED").catch(() => {});
       }
       
@@ -3904,7 +3925,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw err;
     }
     });
-  }, [addSystemLog, systemSettings, projects, syncProjectAmounts, setRequisitions, withDbLoading]);
+  }, [currentUser, addSystemLog, systemSettings, projects, syncProjectAmounts, setRequisitions, withDbLoading, sendEmailNotification]);
 
   const updateRequisitionStatus = useCallback(async (
     id: string, 

@@ -271,15 +271,18 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   // Group Budget & Remaining Balance Calculation
   const effectiveGroupName = selectedGroup || targetReq?.groupName || currentUser?.group || (churchGroups?.[0]?.name || "");
 
+  const currentFiscalYear = systemSettings?.currentFiscalYear || 2026;
+
   const matchingProject = React.useMemo(() => {
     const clean = (effectiveGroupName || "").trim().toLowerCase();
     if (!clean) return undefined;
     return projects?.find(p => {
+      if (p.fiscalYear && p.fiscalYear !== currentFiscalYear) return false;
       const pGroup = (p.groupId || "").trim().toLowerCase();
       const pName = (p.name || "").trim().toLowerCase();
       return pGroup === clean || pName === clean || pGroup.includes(clean) || clean.includes(pGroup);
     });
-  }, [projects, effectiveGroupName]);
+  }, [projects, effectiveGroupName, currentFiscalYear]);
 
   const matchingLedger = React.useMemo(() => {
     const clean = (effectiveGroupName || "").trim().toLowerCase();
@@ -840,7 +843,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     try {
       setLoading(true);
       const groupVal = selectedGroup || currentUser?.group || "General Group";
-      const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
+      const matchingProject = projects.find(p => 
+        (p.groupId === groupVal || p.name === groupVal) &&
+        (!p.fiscalYear || p.fiscalYear === currentFiscalYear)
+      );
       const parsedAmount = Number(amount) || 0;
 
       let allLocalFiles = [...attachments];
@@ -912,7 +918,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     setLoading(true);
 
     const groupVal = selectedGroup || currentUser?.group || "General Group";
-    const matchingProject = projects.find(p => p.groupId === groupVal || p.name === groupVal);
+    const matchingProject = projects.find(p => 
+      (p.groupId === groupVal || p.name === groupVal) &&
+      (!p.fiscalYear || p.fiscalYear === currentFiscalYear)
+    );
 
     try {
       // Encode local attachment files to strings (including any written notes in progress)

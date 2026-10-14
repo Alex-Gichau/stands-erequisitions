@@ -619,7 +619,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     return churchGroups.filter(cg => {
       const groupProjs = projects.filter(p => 
         (p.groupId === cg.id || p.groupId === cg.name || (p.name && p.name.toLowerCase().includes(cg.name.toLowerCase()))) &&
-        (p.fiscalYear === activeYear || !p.fiscalYear)
+        p.fiscalYear === activeYear
       );
       const totalAllocated = groupProjs.reduce((sum, p) => sum + (Number(p.allocatedBudget) || 0), 0);
       return totalAllocated === 0;
@@ -648,10 +648,11 @@ export const FinanceLedgerPanel: React.FC = () => {
     const actNum = allocationAccountNumber.trim().toLowerCase();
     if (!actNum) return false;
     return projects.some(p => 
+      p.fiscalYear === activeYear &&
       p.accountNumber?.trim().toLowerCase() === actNum &&
       p.groupId !== selectedGroupId
     );
-  }, [allocationAccountNumber, selectedGroupId, projects]);
+  }, [allocationAccountNumber, selectedGroupId, activeYear, projects]);
 
   const processedProjects = useMemo(() => {
     let filtered = projects.filter(p => p.fiscalYear === activeYear);
@@ -793,7 +794,7 @@ export const FinanceLedgerPanel: React.FC = () => {
     let defCode = codeInfo.code;
     let finalCode = defCode;
     let suffix = 1;
-    while (projects.some(p => p.accountNumber === finalCode)) {
+    while (projects.some(p => p.fiscalYear === activeYear && p.accountNumber === finalCode)) {
       finalCode = `${defCode}-${suffix}`;
       suffix++;
     }
@@ -885,10 +886,11 @@ export const FinanceLedgerPanel: React.FC = () => {
     if (!actNum) return false;
     return projects.some(p => 
       p.id !== adjustingProject.id &&
+      (p.fiscalYear === adjustingProject.fiscalYear || p.fiscalYear === activeYear) &&
       p.accountNumber?.trim().toLowerCase() === actNum &&
       p.groupId !== adjustingProject.groupId
     );
-  }, [adjustingAccountNumber, adjustingProject, projects]);
+  }, [adjustingAccountNumber, adjustingProject, activeYear, projects]);
 
   React.useEffect(() => {
     if (adjustingProject) {
@@ -3259,15 +3261,15 @@ export const FinanceLedgerPanel: React.FC = () => {
                                     setGroupSearchQuery(cg.name);
                                     setIsGroupDropdownOpen(false);
 
-                                    // Suggest a default unique accounting code
-                                    const existingProjectWithCode = projects.find(p => p.groupId === cg.name && p.accountNumber);
+                                    // Suggest a default unique accounting code for active fiscal year
+                                    const existingProjectWithCode = projects.find(p => p.groupId === cg.name && p.fiscalYear === activeYear && p.accountNumber);
                                     if (existingProjectWithCode) {
                                       setAllocationAccountNumber(existingProjectWithCode.accountNumber || "");
                                     } else {
                                       const defCode = getAccountingCode(cg.name).code;
                                       let finalCode = defCode;
                                       let suffix = 1;
-                                      while (projects.some(p => p.accountNumber === finalCode)) {
+                                      while (projects.some(p => p.fiscalYear === activeYear && p.accountNumber === finalCode)) {
                                         finalCode = `${defCode}-${suffix}`;
                                         suffix++;
                                       }

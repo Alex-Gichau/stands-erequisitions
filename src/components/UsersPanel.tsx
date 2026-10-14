@@ -2396,6 +2396,44 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
                            Ministry Allocation (Select One or More)
                          </label>
+                         <div className="flex items-center gap-2">
+                           <button
+                             type="button"
+                             onClick={() => {
+                               const allGroupNames = churchGroups.map(cg => cg.name);
+                               if (isModalOpen) {
+                                 setGroups(allGroupNames);
+                                 setGroup(allGroupNames[0] || "");
+                               } else {
+                                 setEditGroups(allGroupNames);
+                                 setEditGroup(allGroupNames[0] || "");
+                               }
+                             }}
+                             className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider cursor-pointer hover:underline"
+                           >
+                             Assign All ({churchGroups.length})
+                           </button>
+                           {(isModalOpen ? groups : editGroups).length > 0 && (
+                             <>
+                               <span className="text-slate-300">•</span>
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   if (isModalOpen) {
+                                     setGroups([]);
+                                     setGroup("");
+                                   } else {
+                                     setEditGroups([]);
+                                     setEditGroup("");
+                                   }
+                                 }}
+                                 className="text-[10px] font-bold text-rose-500 hover:text-rose-700 uppercase tracking-wider cursor-pointer hover:underline"
+                               >
+                                 Clear All
+                               </button>
+                             </>
+                           )}
+                         </div>
                        </div>
                        <div 
                          className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 min-h-[46px] flex flex-wrap gap-2 items-center cursor-text transition-colors focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-600/10"
@@ -2466,6 +2504,32 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                                )}
                              </div>
                              <div className="max-h-[180px] overflow-y-auto p-1.5 space-y-0.5">
+                               {(!groupSearchQuery || "all groups".includes(groupSearchQuery.toLowerCase())) && (
+                                 <button
+                                   type="button"
+                                   onClick={() => {
+                                     const allGroupNames = churchGroups.map(cg => cg.name);
+                                     if (isModalOpen) {
+                                       setGroups(allGroupNames);
+                                       setGroup(allGroupNames[0] || "");
+                                     } else {
+                                       setEditGroups(allGroupNames);
+                                       setEditGroup(allGroupNames[0] || "");
+                                     }
+                                     setGroupSearchQuery("");
+                                     setIsGroupDropdownOpen(false);
+                                   }}
+                                   className="w-full text-left px-3 py-2 rounded-lg bg-indigo-50/70 hover:bg-indigo-100/80 transition-colors flex items-center justify-between border border-indigo-100"
+                                 >
+                                   <div className="flex flex-col gap-0.5">
+                                     <span className="text-xs font-black text-indigo-700 uppercase tracking-wider">
+                                       🌟 All Groups ({churchGroups.length})
+                                     </span>
+                                     <span className="text-[9.5px] text-indigo-500 font-medium">Assign user access to all church groups</span>
+                                   </div>
+                                   <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-600 text-white">Select All</span>
+                                 </button>
+                               )}
                                {churchGroups
                                  .filter(cg => cg.name.toLowerCase().includes(groupSearchQuery.toLowerCase()))
                                  .filter(cg => !(isModalOpen ? groups : editGroups).includes(cg.name))

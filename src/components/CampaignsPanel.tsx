@@ -39,7 +39,9 @@ import {
   Flame,
   ArrowUpRight,
   SlidersHorizontal,
-  Info
+  Info,
+  Power,
+  PowerOff
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -74,7 +76,10 @@ interface CampaignsPanelProps {
 }
 
 export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUsers }) => {
-  const { currentUser, users, churchGroups, getAuthHeaders, triggerToast } = useRequisitions();
+  const { currentUser, users, churchGroups, getAuthHeaders, triggerToast, systemSettings, updateSystemSettings } = useRequisitions();
+
+  const isMasterEnabled = systemSettings?.campaignsMasterEnabled !== false;
+  const [isTogglingMaster, setIsTogglingMaster] = useState(false);
 
   const [campaigns, setCampaigns] = useState<CampaignPromotion[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -374,6 +379,11 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
 
   // Immediate send action on existing scheduled or draft campaign
   const handleSendNow = async (campaign: CampaignPromotion) => {
+    if (!isMasterEnabled) {
+      alert("Campaigns Master Switch is OFF. Please enable campaigns before broadcasting.");
+      return;
+    }
+
     if (!confirm(`Are you sure you want to broadcast "${campaign.title}" immediately to all targeted members?`)) {
       return;
     }
@@ -529,7 +539,57 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
           </p>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Master Toggle Button */}
+          <button
+            type="button"
+            disabled={isTogglingMaster}
+            onClick={async () => {
+              const nextState = !isMasterEnabled;
+              const promptMsg = nextState
+                ? "Turn ON Campaigns Master Switch? Scheduled automated broadcasts and new campaign dispatches will be re-enabled."
+                : "Turn OFF Campaigns Master Switch? This will instantly pause all automated campaign broadcasts and prevent any promotional emails from being dispatched.";
+              
+              if (!confirm(promptMsg)) return;
+
+              setIsTogglingMaster(true);
+              try {
+                await updateSystemSettings({ campaignsMasterEnabled: nextState });
+                triggerToast({
+                  type: "SYSTEM_INFO",
+                  severity: nextState ? "LOW" : "HIGH",
+                  message: nextState 
+                    ? "Campaigns Master Switch is now ON. Promotional dispatches and scheduler are active." 
+                    : "Campaigns Master Switch is now OFF. All campaign dispatches and scheduler are paused.",
+                  timestamp: new Date().toISOString()
+                });
+              } catch (err: any) {
+                alert(err.message || "Failed to toggle campaigns master switch");
+              } finally {
+                setIsTogglingMaster(false);
+              }
+            }}
+            title={isMasterEnabled ? "Turn OFF all campaigns" : "Turn ON all campaigns"}
+            className={cn(
+              "py-2.5 px-4 rounded-2xl flex items-center gap-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer border shadow-sm",
+              isMasterEnabled
+                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/50 ring-2 ring-rose-500/20"
+            )}
+          >
+            {isMasterEnabled ? (
+              <>
+                <Power size={15} className="text-emerald-600 dark:text-emerald-400" />
+                <span>Campaigns Active (Turn Off)</span>
+              </>
+            ) : (
+              <>
+                <PowerOff size={15} className="text-rose-600 dark:text-rose-400 animate-pulse" />
+                <span>Campaigns Paused (Turn On)</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={fetchCampaigns}
             title="Refresh campaigns"
@@ -540,6 +600,10 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
 
           <button
             onClick={() => {
+              if (!isMasterEnabled) {
+                alert("Campaigns Master Switch is currently OFF. Please turn on the master toggle before creating new promotional campaigns.");
+                return;
+              }
               applyPresetTemplate("harambee-2026");
               setIsComposerOpen(true);
               setComposerStep("EDIT");
@@ -551,6 +615,52 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
           </button>
         </div>
       </div>
+
+      {/* Global Master Off Warning Banner */}
+      {!isMasterEnabled && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 md:p-5 rounded-3xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-300 flex items-center justify-center shrink-0">
+              <PowerOff size={20} />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-rose-900 dark:text-rose-200 uppercase tracking-wide">
+                Campaigns Master Switch is OFF
+              </h4>
+              <p className="text-xs text-rose-700 dark:text-rose-300/90 mt-0.5">
+                All scheduled promotional email dispatches are paused, dashboard campaign widgets are hidden, and new broadcasts cannot be triggered.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              setIsTogglingMaster(true);
+              try {
+                await updateSystemSettings({ campaignsMasterEnabled: true });
+                triggerToast({
+                  type: "SYSTEM_INFO",
+                  severity: "LOW",
+                  message: "Campaigns Master Switch is now ON.",
+                  timestamp: new Date().toISOString()
+                });
+              } catch (e: any) {
+                alert(e.message || "Failed to turn on master toggle");
+              } finally {
+                setIsTogglingMaster(false);
+              }
+            }}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm shrink-0"
+          >
+            Resume All Campaigns
+          </button>
+        </motion.div>
+      )}
 
       {/* Metrics Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

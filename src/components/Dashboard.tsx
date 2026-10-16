@@ -18,6 +18,7 @@ import { RecentCommentsAndReactionsFeed } from "./RecentCommentsAndReactionsFeed
 import { GlobalFiscalOverview } from "./GlobalFiscalOverview";
 import { NewRequisitionForm } from "./NewRequisitionForm";
 import { MinistrySpendingFeed } from "./MinistrySpendingFeed";
+import { ActiveCampaignsWidget } from "./ActiveCampaignsWidget";
 
 // Custom high-detail chart tooltip
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -143,7 +144,8 @@ const Dashboard: React.FC<{
     addCustomCalendarEvent,
     updateCustomCalendarEvent,
     deleteCustomCalendarEvent,
-    setSelectedRequisition
+    setSelectedRequisition,
+    getAuthHeaders
   } = useRequisitions();
 
   const canEditCalendar = useMemo(() => {
@@ -1012,6 +1014,9 @@ const Dashboard: React.FC<{
 
       {/* Budget Circular Gauges for different Church Group categories */}
       <BudgetCircularGauges projects={projects} />
+
+      {/* Active Promotional Campaigns & Broadcast Announcements */}
+      <ActiveCampaignsWidget onViewChange={onViewChange} getAuthHeaders={getAuthHeaders} />
 
       {/* Section Divider */}
       <div className="border-t border-slate-200/80 dark:border-slate-800/80" />

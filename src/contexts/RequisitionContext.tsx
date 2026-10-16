@@ -679,7 +679,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [forecastData, setForecastData] = useState<ForecastMonth[]>([]);
   const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
   const [systemLogLimit, setSystemLogLimit] = useState<number>(50);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings>({ currentFiscalYear: 2026, fiscalYearStatus: "OPEN" });
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({ currentFiscalYear: 2026, fiscalYearStatus: "OPEN", campaignsMasterEnabled: true });
   const [supplementaryRequests, setSupplementaryRequests] = useState<SupplementaryBudgetRequest[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [reports, setReports] = useState<SavedReport[]>([]);
@@ -2855,7 +2855,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                   hideSupplementaryBudgetBtn: Boolean(systemDoc.hide_supplementary_budget_btn !== undefined ? systemDoc.hide_supplementary_budget_btn : (systemDoc.hideSupplementaryBudgetBtn !== undefined ? systemDoc.hideSupplementaryBudgetBtn : prev.hideSupplementaryBudgetBtn)),
                   vendorListViewLevel: systemDoc.vendor_list_view_level || systemDoc.vendorListViewLevel || prev.vendorListViewLevel,
                   requisitionExpiryDays: Number(systemDoc.requisition_expiry_days || systemDoc.requisitionExpiryDays) || prev.requisitionExpiryDays,
-                  isSystemOffline: Boolean(systemDoc.is_system_offline !== undefined ? systemDoc.is_system_offline : (systemDoc.isSystemOffline !== undefined ? systemDoc.isSystemOffline : prev.isSystemOffline))
+                  isSystemOffline: Boolean(systemDoc.is_system_offline !== undefined ? systemDoc.is_system_offline : (systemDoc.isSystemOffline !== undefined ? systemDoc.isSystemOffline : prev.isSystemOffline)),
+                  campaignsMasterEnabled: systemDoc.campaigns_master_enabled !== undefined ? Boolean(systemDoc.campaigns_master_enabled) : (systemDoc.campaignsMasterEnabled !== undefined ? Boolean(systemDoc.campaignsMasterEnabled) : (prev.campaignsMasterEnabled !== undefined ? prev.campaignsMasterEnabled : true))
                 };
                 try {
                   localStorage.setItem("stands_cache_system_settings", JSON.stringify(nextSettings));

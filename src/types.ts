@@ -424,6 +424,7 @@ export interface SystemSettings {
   unapprovedSummaryEmailFrequencyDays?: number;
   lastUnapprovedSummaryEmailSentAt?: string;
   unapprovedSummaryEmailRecipients?: string;
+  campaignsMasterEnabled?: boolean;
 }
 
 export interface SupplementaryBudgetRequest {

@@ -3890,7 +3890,115 @@ async function startServer() {
   // GET /api/campaigns - List all promotional campaigns
   app.get("/api/campaigns", async (req: any, res: any) => {
     try {
-      const campaigns = readJsonCollection("campaign_promotions");
+      let campaigns = readJsonCollection("campaign_promotions");
+      if (!Array.isArray(campaigns) || campaigns.length === 0) {
+        const now = new Date();
+        const baseSeed = [
+          {
+            id: "camp-harambee-2026",
+            title: "Phase II Sanctuary Expansion & Development Harambee",
+            category: "FUNDRAISING",
+            subject: "🏛️ Special Appeal: Annual Harvest & Building Development Harambee 2026",
+            preheader: "Join hands with St. Andrew's Church as we expand God's house for future generations.",
+            badgeText: "SPECIAL HARAMBEE DRIVE",
+            headline: "Annual Harvest & Building Development Fund Drive",
+            bodyContent: "Dear Members and Friends of PCEA St. Andrew's Church,\n\nGrace and peace to you in the name of our Lord and Saviour Jesus Christ.\n\nWe warmly invite all congregation members, ministry groups, and partners to our upcoming Annual Harvest and Building Development Harambee. Through your steadfast generosity and prayers, our parish continues to be a vibrant beacon of faith, worship, and compassionate outreach across Nairobi and beyond.\n\nThis year, our collective focus is directed towards the Phase II Sanctuary Renovation, Youth Complex modernization, and community benevolent outreach programs.\n\nEvery gift, large or small, advances this divine calling. You can give conveniently via M-Pesa Paybill, bank deposit, or in person during Sunday services.\n\nMay the Lord bless you abundantly as you prayerfully consider your commitment.",
+            bannerImageUrl: "/campaign-banners/harambee-drive.svg",
+            bannerImageAlt: "PCEA St Andrews Harambee Banner",
+            eventDate: "Sunday, October 18, 2026",
+            eventTime: "09:30 AM & 11:30 AM EAT",
+            eventVenue: "Main Sanctuary & Live Virtual Broadcast",
+            targetAmount: 15000000,
+            scriptureVerse: "Each of you should give what you have decided in your heart to give, not reluctantly or under compulsion, for God loves a cheerful giver.",
+            scriptureReference: "2 Corinthians 9:7",
+            ctaText: "Give Towards Harambee",
+            ctaUrl: "https://accounts.pceastandrews.org",
+            targetAudience: "ALL_MEMBERS",
+            status: "SENT",
+            scheduledFor: null,
+            sentAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+            createdBy: "admin-system",
+            creatorName: "Very Rev. Dr. Parish Minister",
+            createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+            updatedAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+            stats: {
+              totalRecipients: 42,
+              successful: ["all@pceastandrews.org"],
+              failed: [],
+              simulated: true,
+              openedCount: 34,
+              clickedCount: 19,
+              openRate: 81.0,
+              clickRate: 45.2
+            }
+          },
+          {
+            id: "camp-easter-2026",
+            title: "Easter & Resurrection Festival Celebration",
+            category: "SPECIAL_SERVICE",
+            subject: "✝️ He is Risen! Celebrate Easter at PCEA St. Andrew's Church",
+            preheader: "Join us for an uplifting week of passion, cantatas, communion, and triumphant celebration.",
+            badgeText: "RESURRECTION FESTIVAL",
+            headline: "Easter Festival: The King is Risen in Majesty",
+            bodyContent: "The Kirk Session and Ministerial Staff cordially invite you and your family to commemorate the Passion, Crucifixion, and glorious Resurrection of Jesus Christ.\n\nOur Easter services feature celebratory mass choir choral renditions, orchestral presentations, baptism services, and special communion sacraments.\n\nInvite your neighbours, friends, and loved ones as we proclaim hope, peace, and eternal life in Christ.",
+            bannerImageUrl: "/campaign-banners/easter-celebration.svg",
+            bannerImageAlt: "Easter Celebration Banner",
+            eventDate: "April 3 - April 5, 2026",
+            eventTime: "07:30 AM, 09:30 AM & 11:30 AM EAT",
+            eventVenue: "Main Sanctuary & Chania Hall",
+            scriptureVerse: "He is not here; he has risen, just as he said. Come and see the place where he lay.",
+            scriptureReference: "Matthew 28:6",
+            ctaText: "View Easter Calendar",
+            ctaUrl: "https://accounts.pceastandrews.org",
+            targetAudience: "ALL_MEMBERS",
+            status: "SCHEDULED",
+            scheduledFor: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+            createdBy: "admin-system",
+            creatorName: "Session Clerk",
+            createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+            updatedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+            stats: {
+              totalRecipients: 42,
+              successful: [],
+              failed: []
+            }
+          },
+          {
+            id: "camp-youth-mission-2026",
+            title: "Transform Kenya: National Youth Mission & Evangelism Outing",
+            category: "YOUTH",
+            subject: "🔥 Youth Mission 2026: Arise and Shine in Compassion and Gospel Truth",
+            preheader: "Equipping young people to serve vulnerable communities and proclaim the Gospel.",
+            badgeText: "YOUTH & EVANGELISM",
+            headline: "National Youth Evangelism & Medical Outreach 2026",
+            bodyContent: "Calling all youth, teens, young adults, and supporters!\n\nThis year's Youth Mission heads to the Rift Valley Region for a week-long medical camp, tree planting initiative, school mentorship programs, and nightly evangelistic crusade.\n\nWe invite prayers, financial sponsorships, and active participant registrations.",
+            bannerImageUrl: "/campaign-banners/youth-mission.svg",
+            bannerImageAlt: "Youth Mission Banner",
+            eventDate: "August 10 - August 16, 2026",
+            eventTime: "Departure: 06:30 AM Sharp",
+            eventVenue: "St. Andrew's Grounds & Baringo Mission Centers",
+            targetAmount: 2500000,
+            scriptureVerse: "Don't let anyone look down on you because you are young, but set an example for the believers in speech, in conduct, in love, in faith and in purity.",
+            scriptureReference: "1 Timothy 4:12",
+            ctaText: "Register for Youth Mission",
+            ctaUrl: "https://accounts.pceastandrews.org",
+            targetAudience: "ALL_MEMBERS",
+            status: "SCHEDULED",
+            scheduledFor: new Date(now.getTime() + 12 * 24 * 60 * 60 * 1000).toISOString(),
+            createdBy: "admin-system",
+            creatorName: "Youth Ministry Patron",
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            stats: {
+              totalRecipients: 42,
+              successful: [],
+              failed: []
+            }
+          }
+        ];
+        campaigns = baseSeed;
+        writeJsonCollection("campaign_promotions", baseSeed);
+      }
       // Sort newest first
       campaigns.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       res.json({ success: true, campaigns });
@@ -3916,6 +4024,13 @@ async function startServer() {
     try {
       if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
         return res.status(403).json({ error: "Access Denied: Only Administrators can create and broadcast email campaigns." });
+      }
+
+      const settings = getSystemSettingsObject();
+      if (settings.campaignsMasterEnabled === false || settings.campaigns_master_enabled === false) {
+        return res.status(403).json({ 
+          error: "Campaigns Master Switch is OFF: Promotional campaigns and email broadcasts are currently disabled by system administration." 
+        });
       }
 
       const {
@@ -4048,6 +4163,13 @@ async function startServer() {
         return res.status(403).json({ error: "Access Denied: Only Administrators can trigger campaign broadcasts." });
       }
 
+      const settings = getSystemSettingsObject();
+      if (settings.campaignsMasterEnabled === false || settings.campaigns_master_enabled === false) {
+        return res.status(403).json({ 
+          error: "Campaigns Master Switch is OFF: Promotional campaigns and email broadcasts are currently disabled by system administration." 
+        });
+      }
+
       const campaigns = readJsonCollection("campaign_promotions");
       const campaign = campaigns.find((c: any) => c.id === req.params.id);
       if (!campaign) {
@@ -4135,6 +4257,12 @@ async function startServer() {
   // Periodically polls every 20 seconds for scheduled campaigns that have reached their trigger time
   setInterval(async () => {
     try {
+      const settings = getSystemSettingsObject();
+      if (settings.campaignsMasterEnabled === false || settings.campaigns_master_enabled === false) {
+        // Master switch is OFF: skip automated dispatches
+        return;
+      }
+
       const campaigns = readJsonCollection("campaign_promotions");
       const now = Date.now();
       let changed = false;

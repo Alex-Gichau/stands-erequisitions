@@ -34,6 +34,7 @@ import {
   Plus,
   RefreshCw,
   Power,
+  PowerOff,
   Check,
   KeyRound,
   Cloud,
@@ -1730,7 +1731,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                           {lastAutoMarkNotificationsReadAt 
-                            ? `Last executed: ${new Date(lastAutoMarkNotificationsReadAt).toLocaleDateString(undefined, { dateStyle: "medium", timeStyle: "short" })} • Next run: ${new Date(lastAutoMarkNotificationsReadAt + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+                            ? `Last executed: ${new Date(lastAutoMarkNotificationsReadAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} • Next run: ${new Date(lastAutoMarkNotificationsReadAt + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { dateStyle: "medium" })}`
                             : "Scheduled 14-day auto-read cycle is active. Any notifications older than 14 days are automatically cleared."
                           }
                         </p>
@@ -2158,6 +2159,80 @@ export const SettingsPanel: React.FC = () => {
                           </>
                         )}
                       </button>
+                    </div>
+                  </div>
+
+                  {/* CAMPAIGNS & PROMOTIONAL EMAILS MASTER SWITCH CARD */}
+                  <div className="p-6 rounded-3xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 space-y-4 max-w-3xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-2xl flex items-center justify-center font-bold shrink-0 transition-colors",
+                          systemSettings.campaignsMasterEnabled !== false
+                            ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400"
+                            : "bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400"
+                        )}>
+                          {systemSettings.campaignsMasterEnabled !== false ? <Megaphone size={20} /> : <PowerOff size={20} />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                              Campaigns &amp; Promotional Broadcasts Master Switch
+                            </h3>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider",
+                              systemSettings.campaignsMasterEnabled !== false
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                            )}>
+                              {systemSettings.campaignsMasterEnabled !== false ? "Active / Enabled" : "Paused / Disabled"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Master system killswitch to enable or halt all church newsletter broadcasts, automated scheduled email dispatches, and dashboard campaign displays.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Master Toggle */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const currentState = systemSettings.campaignsMasterEnabled !== false;
+                          const nextState = !currentState;
+                          await updateSystemSettings({ campaignsMasterEnabled: nextState });
+                          triggerToast({
+                            type: "SYSTEM_INFO",
+                            severity: nextState ? "LOW" : "HIGH",
+                            message: nextState
+                              ? "Campaigns Master Switch is now ON. Promotional dispatches are active."
+                              : "Campaigns Master Switch is now OFF. All campaign dispatches are halted.",
+                            timestamp: new Date().toISOString()
+                          });
+                        }}
+                        className={cn(
+                          "relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                          systemSettings.campaignsMasterEnabled !== false ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-700"
+                        )}
+                        role="switch"
+                        aria-checked={systemSettings.campaignsMasterEnabled !== false}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out",
+                            systemSettings.campaignsMasterEnabled !== false ? "translate-x-5" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 flex items-center justify-between text-xs">
+                      <span className="text-slate-600 dark:text-slate-300 font-medium">
+                        {systemSettings.campaignsMasterEnabled !== false 
+                          ? "✓ Background campaign scheduler and dispatches are running normally." 
+                          : "⚠️ All campaign dispatches, background scheduler workers, and dashboard widgets are turned off."}
+                      </span>
                     </div>
                   </div>
 

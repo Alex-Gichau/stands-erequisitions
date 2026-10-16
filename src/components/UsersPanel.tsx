@@ -2685,7 +2685,7 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
                   >
                     {(isSubmitting || isSaving) ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
                     <span className="text-[10px] md:text-xs uppercase tracking-widest font-black">
-                      {isModalOpen ? "CONFIRM AUTHORIZATION" : "CONFIRM UPDATE"}
+                      {isModalOpen ? "CONFIRM AUTHORIZATION" : "SAVE USER SETTINGS"}
                     </span>
                   </button>
                 </div>
@@ -2717,17 +2717,40 @@ export const UsersPanel: React.FC<UsersPanelProps> = ({ onNavigateToCampaigns })
 
               <form onSubmit={async (e) => {
                 e.preventDefault();
+                const trimmed = groupName.trim();
+                if (!trimmed) return;
+                const isDup = churchGroups.some(cg => (cg.name || "").trim().toLowerCase() === trimmed.toLowerCase());
+                if (isDup) {
+                  alert(`Duplicate Group Detected: A church group with the name "${trimmed}" already exists.`);
+                  return;
+                }
                 setIsGroupSubmitting(true);
                 try {
-                  await addChurchGroup(groupName, groupDesc);
-                  setGroupName(""); setGroupDesc("");
+                  await addChurchGroup(trimmed, groupDesc.trim() || undefined);
+                  setGroupName(""); 
+                  setGroupDesc("");
                   setIsGroupModalOpen(false);
-                } catch (err) {
+                } catch (err: any) {
                   console.error(err);
+                  alert(err.message || "Failed to create church group.");
                 } finally {
                   setIsGroupSubmitting(false);
                 }
               }} className="p-6 md:p-8 space-y-6 flex-1 overflow-y-auto min-h-0">
+                {(() => {
+                  const trimmed = groupName.trim();
+                  const isDup = trimmed ? churchGroups.some(cg => (cg.name || "").trim().toLowerCase() === trimmed.toLowerCase()) : false;
+                  return isDup ? (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[10.5px] font-bold flex items-start gap-2">
+                      <AlertTriangle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-black uppercase tracking-wider block">Duplicate Group Name</span>
+                        A church group named "{trimmed}" already exists. Please choose a unique name to prevent conflicting records.
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Group Name</label>
                   <input 

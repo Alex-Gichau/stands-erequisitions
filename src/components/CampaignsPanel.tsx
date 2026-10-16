@@ -58,6 +58,7 @@ import {
 } from "recharts";
 import { motion, AnimatePresence } from "motion/react";
 import { useRequisitions } from "../contexts/RequisitionContext";
+import { ConfirmationModal } from "./ConfirmationModal";
 import { CampaignPromotion, CampaignCategory, CampaignAudienceType, UserRole } from "../types";
 import { 
   buildCampaignEmailHtml, 
@@ -89,6 +90,7 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
   // Action states
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<CampaignPromotion | null>(null);
 
   // Composer Form State
   const [title, setTitle] = useState("");
@@ -428,8 +430,13 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
   };
 
   // Delete campaign
-  const handleDeleteCampaign = async (campaign: CampaignPromotion) => {
-    if (!confirm(`Delete campaign "${campaign.title}" permanently?`)) return;
+  const promptDeleteCampaign = (campaign: CampaignPromotion) => {
+    setCampaignToDelete(campaign);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!campaignToDelete) return;
+    const campaign = campaignToDelete;
 
     try {
       setActionLoadingId(campaign.id);
@@ -440,17 +447,22 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
       });
       if (res.ok) {
         setCampaigns(prev => prev.filter(c => c.id !== campaign.id));
+        setCampaignToDelete(null);
         triggerToast({
           type: "SYSTEM_INFO",
-          message: "Campaign deleted.",
+          message: `Campaign "${campaign.title}" was permanently deleted.`,
           severity: "LOW",
           timestamp: new Date().toISOString()
         });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete campaign");
       }
     } catch (err: any) {
       alert(err.message || "Failed to delete");
     } finally {
       setActionLoadingId(null);
+      setCampaignToDelete(null);
     }
   };
 
@@ -852,7 +864,7 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
                       )}
 
                       <button
-                        onClick={() => handleDeleteCampaign(camp)}
+                        onClick={() => promptDeleteCampaign(camp)}
                         disabled={isLoadingAction}
                         title="Delete campaign"
                         className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
@@ -1581,6 +1593,22 @@ export const CampaignsPanel: React.FC<CampaignsPanelProps> = ({ onNavigateToUser
           </div>
         )}
       </AnimatePresence>
+
+      {/* DELETE CAMPAIGN CONFIRMATION MODAL */}
+      <ConfirmationModal
+        isOpen={Boolean(campaignToDelete)}
+        title="Delete Promotional Campaign"
+        message={
+          campaignToDelete
+            ? `Are you sure you want to permanently delete "${campaignToDelete.title}"? This campaign promotional email, scheduled dispatch, and delivery records will be erased.`
+            : "Are you sure you want to delete this campaign?"
+        }
+        confirmText="Delete Campaign"
+        cancelText="Keep Campaign"
+        isDestructive={true}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setCampaignToDelete(null)}
+      />
     </div>
   );
 };

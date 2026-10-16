@@ -164,7 +164,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
 
   const [activeTab, setActiveTab] = useState<"SEARCH" | "CREATE">("SEARCH");
 
-  const isAdminOrFinance = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.FINANCE;
+  const isAdminOrFinance = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN || currentUser?.role === UserRole.FINANCE;
   const [selectedGroup, setSelectedGroup] = useState<string>(targetReq?.groupName || "");
 
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
@@ -176,16 +176,23 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   const [hasConfirmedOverBudget, setHasConfirmedOverBudget] = useState(false);
 
   const handleAddNewGroup = async () => {
-    if (!newGroupName.trim()) return;
+    const trimmed = newGroupName.trim();
+    if (!trimmed) return;
+    const isDup = churchGroups.some(cg => (cg.name || "").trim().toLowerCase() === trimmed.toLowerCase());
+    if (isDup) {
+      alert(`Duplicate Group Detected: A church group with the name "${trimmed}" already exists.`);
+      return;
+    }
     setAddingGroup(true);
     try {
-      await addChurchGroup(newGroupName.trim(), newGroupDescription.trim() || undefined);
-      setSelectedGroup(newGroupName.trim());
+      await addChurchGroup(trimmed, newGroupDescription.trim() || undefined);
+      setSelectedGroup(trimmed);
       setNewGroupName("");
       setNewGroupDescription("");
       setShowNewGroupInput(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add group:", err);
+      alert(err.message || "Failed to add church group.");
     } finally {
       setAddingGroup(false);
     }
@@ -1215,6 +1222,16 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3.5"
               >
+                {(() => {
+                  const trimmed = newGroupName.trim();
+                  const isDup = trimmed ? churchGroups.some(cg => (cg.name || "").trim().toLowerCase() === trimmed.toLowerCase()) : false;
+                  return isDup ? (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[10.5px] font-bold flex items-center gap-2">
+                      <AlertTriangle size={14} className="text-rose-600 shrink-0" />
+                      <span>Duplicate: A church group named "{trimmed}" already exists.</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">New Church Group Name</label>

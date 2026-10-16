@@ -3104,21 +3104,34 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
       throw new Error("Unauthorized: Only Admins can manage church groups.");
     }
+    const cleanName = (name || "").trim();
+    if (!cleanName) {
+      throw new Error("Group name is required.");
+    }
+
+    // Duplicate detection: check existing church groups (case-insensitive)
+    const normalizedTarget = cleanName.toLowerCase();
+    const isDuplicate = churchGroups.some(cg => (cg.name || "").trim().toLowerCase() === normalizedTarget);
+    if (isDuplicate) {
+      throw new Error(`Duplicate Group Detected: A church group with the name "${cleanName}" already exists.`);
+    }
+
     const id = `cg-${Math.random().toString(36).substr(2, 9)}`;
     const newGroup: ChurchGroup = {
       id,
-      name,
-      description,
+      name: cleanName,
+      description: description?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
     try {
       await databaseService.saveChurchGroup(newGroup);
-      await addSystemLog("GROUP_CREATED", `Church group '${name}' created by admin`, { groupId: id, name });
+      setChurchGroups(prev => [...prev.filter(g => g.id !== id), newGroup]);
+      await addSystemLog("GROUP_CREATED", `Church group '${cleanName}' created by admin`, { groupId: id, name: cleanName });
     } catch (err) {
       console.error("Error creating church group", err);
       throw err;
     }
-  }, [currentUser, addSystemLog]);
+  }, [currentUser, churchGroups, addSystemLog]);
 
   const deleteChurchGroup = useCallback(async (id: string) => {
     if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
@@ -3444,10 +3457,8 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : prev);
       }
 
-      // 2. Non-blocking asynchronous backend save (no full screen loading overlay)
-      databaseService.saveUserProfile(updatedUser).catch(e => {
-        console.warn("[User Sync] Background save profile failed:", e);
-      });
+      // 2. Persist directly to database service
+      await databaseService.saveUserProfile(updatedUser);
 
       if (updates.group && updates.group !== existingUser?.group) {
         addSystemLog("USER_ADDED_TO_GROUP", `${updatedUser.name || updatedUser.email} was assigned to ministry group: ${updates.group}`, {

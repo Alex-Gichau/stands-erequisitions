@@ -2081,8 +2081,28 @@ async function startServer() {
     if (collection === "requisitions") {
       body = sanitizeRequisitionAttachments(body, getUploadsDir());
     }
-    if (collection === "users") {
-      body = enforceServerUserGroup(body);
+    if (collection === "church_groups") {
+      const groupName = (body.name || "").trim().toLowerCase();
+      if (!groupName) {
+        return res.status(400).json({ error: "Church group name is required." });
+      }
+      if (mongoose.connection.readyState === 1) {
+        const Model = modelMappings.church_groups;
+        if (Model) {
+          const existing = await Model.findOne({
+            name: { $regex: new RegExp(`^${groupName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+          }).lean();
+          if (existing) {
+            return res.status(400).json({ error: `A church group with the name "${body.name.trim()}" already exists.` });
+          }
+        }
+      } else {
+        const list = readJsonCollection("church_groups");
+        const existing = list.find((g: any) => (g.name || "").trim().toLowerCase() === groupName);
+        if (existing) {
+          return res.status(400).json({ error: `A church group with the name "${body.name.trim()}" already exists.` });
+        }
+      }
     }
     const id = body.id || body.document_id || `${collection}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     try {
@@ -2126,8 +2146,31 @@ async function startServer() {
     if (collection === "requisitions") {
       body = sanitizeRequisitionAttachments(body, getUploadsDir());
     }
-    if (collection === "users") {
-      body = enforceServerUserGroup(body);
+    if (collection === "church_groups") {
+      const groupName = (body.name || "").trim().toLowerCase();
+      if (!groupName) {
+        return res.status(400).json({ error: "Church group name is required." });
+      }
+      if (mongoose.connection.readyState === 1) {
+        const Model = modelMappings.church_groups;
+        if (Model) {
+          const existing = await Model.findOne({
+            id: { $ne: id },
+            name: { $regex: new RegExp(`^${groupName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+          }).lean();
+          if (existing) {
+            return res.status(400).json({ error: `A church group with the name "${body.name.trim()}" already exists.` });
+          }
+        }
+      } else {
+        const list = readJsonCollection("church_groups");
+        const existing = list.find((g: any) => 
+          g.id !== id && (g.name || "").trim().toLowerCase() === groupName
+        );
+        if (existing) {
+          return res.status(400).json({ error: `A church group with the name "${body.name.trim()}" already exists.` });
+        }
+      }
     }
     try {
       if (mongoose.connection.readyState === 1) {

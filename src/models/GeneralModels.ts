@@ -284,7 +284,6 @@ export interface ISettings extends Document {
   unapprovedSummaryEmailFrequencyDays?: number;
   lastUnapprovedSummaryEmailSentAt?: string;
   unapprovedSummaryEmailRecipients?: string;
-  campaignsMasterEnabled?: boolean;
   [key: string]: any;
 }
 const SettingsSchema = new Schema<ISettings>({

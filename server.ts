@@ -51,8 +51,7 @@ const fileMappings: { [key: string]: string } = {
   "supplementary_budgets": "supplementary_budgets.json",
   "user_reaction_histories": "user_reaction_histories.json",
   "user_reaction_history": "user_reaction_histories.json",
-  "notification_states": "notification_states.json",
-  "campaign_promotions": "campaign_promotions.json"
+  "notification_states": "notification_states.json"
 };
 
 // Helper function to resolve paths from environment variables relative to process.cwd() or absolute path
@@ -1634,7 +1633,6 @@ async function startServer() {
   app.use("/api/send-summary-email", authMiddleware);
   app.use("/api/send-unapproved-summary-email", authMiddleware);
   app.use("/api/send-bulk-email", authMiddleware);
-  app.use("/api/campaigns", authMiddleware);
   app.use("/api/slack", authMiddleware);
   app.use("/api/attachments/upload", authMiddleware);
 
@@ -1643,7 +1641,7 @@ async function startServer() {
     "requisitions", "projects", "alerts", "alert", "fiscal_years", "transactions",
     "forecast", "reports", "audit_logs", "system_logs", "users", "permissions",
     "thresholds", "church_groups", "ledger_books", "supplementary_budgets", "vendors", "settings",
-    "user_reaction_histories", "notification_states", "campaign_promotions"
+    "user_reaction_histories", "notification_states"
   ];
 
   const modelMappings: { [key: string]: any } = {
@@ -3318,6 +3316,13 @@ async function startServer() {
     // Authorization check
     if (req.userRole !== "ADMIN" && req.userRole !== "SUPER_ADMIN") {
       return res.status(403).json({ error: "Access Denied: Only Administrators can send bulk emails." });
+    }
+
+    const settings = getSystemSettingsObject();
+    if (settings.campaignsMasterEnabled === false || settings.campaigns_master_enabled === false) {
+      return res.status(403).json({ 
+        error: "Campaigns Master Switch is OFF: Promotional campaigns and email broadcasts are currently disabled by system administration." 
+      });
     }
 
     if (!subject || !content) {

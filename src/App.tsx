@@ -36,7 +36,6 @@ const AuditLogsPanel = lazy(() => import("./components/AuditLogsPanel").then(m =
 const TransactionsPanel = lazy(() => import("./components/TransactionsPanel").then(m => ({ default: m.TransactionsPanel })));
 const UploadsGalleryPanel = lazy(() => import("./components/UploadsGalleryPanel").then(m => ({ default: m.UploadsGalleryPanel })));
 const NotificationHub = lazy(() => import("./components/NotificationHub").then(m => ({ default: m.NotificationHub })));
-const CampaignsPanel = lazy(() => import("./components/CampaignsPanel").then(m => ({ default: m.CampaignsPanel })));
 
 // Lazy-loaded auxiliary modals & tools
 const ReceiptTemplateGenerator = lazy(() => import("./components/ReceiptTemplateGenerator").then(m => ({ default: m.ReceiptTemplateGenerator })));
@@ -916,7 +915,6 @@ function AppContent() {
         setSyncTargets(['reports', 'requisitions']);
         break;
       case "users":
-      case "campaigns":
         setSyncTargets(['users', 'church_groups']);
         break;
       case "accessControl":
@@ -2224,8 +2222,7 @@ function AppContent() {
         case "vendors": return <VendorsPanel />;
         case "approvals": return <ApprovalsPanel />;
         case "settings": return <SettingsPanel />;
-        case "users": return <UsersPanel onNavigateToCampaigns={() => setCurrentView("campaigns")} />;
-        case "campaigns": return <CampaignsPanel onNavigateToUsers={() => setCurrentView("users")} />;
+        case "users": return <UsersPanel />;
         case "reports": return <ReportsPanel />;
         case "transactions": return <TransactionsPanel />;
         case "finance": return <FinanceLedgerPanel />;
@@ -2729,7 +2726,7 @@ function AppContent() {
         <header className="min-h-[5rem] py-3 bg-transparent border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 md:px-8 shrink-0 select-none transition-all">
           <div className="flex flex-col justify-center">
             <h1 className="text-sm md:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate max-w-[220px] md:max-w-none">
-              Your {currentView === "campaigns" ? "Promotional Campaigns" : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+              Your {currentView.charAt(0).toUpperCase() + currentView.slice(1)}
             </h1>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hidden sm:flex items-center gap-2 mt-0.5">
               {isSyncingData ? (

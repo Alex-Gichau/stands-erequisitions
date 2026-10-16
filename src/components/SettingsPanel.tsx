@@ -1731,7 +1731,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                           {lastAutoMarkNotificationsReadAt 
-                            ? `Last executed: ${new Date(lastAutoMarkNotificationsReadAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} • Next run: ${new Date(lastAutoMarkNotificationsReadAt + 14 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { dateStyle: "medium" })}`
+                            ? `Last executed: ${new Date(lastAutoMarkNotificationsReadAt).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' })} • Next run: ${new Date(lastAutoMarkNotificationsReadAt + 14 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' })}`
                             : "Scheduled 14-day auto-read cycle is active. Any notifications older than 14 days are automatically cleared."
                           }
                         </p>

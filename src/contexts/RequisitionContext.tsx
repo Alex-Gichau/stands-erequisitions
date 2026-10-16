@@ -679,7 +679,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [forecastData, setForecastData] = useState<ForecastMonth[]>([]);
   const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
   const [systemLogLimit, setSystemLogLimit] = useState<number>(50);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings>({ currentFiscalYear: 2026, fiscalYearStatus: "OPEN", campaignsMasterEnabled: true });
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({ currentFiscalYear: 2026, fiscalYearStatus: "OPEN" });
   const [supplementaryRequests, setSupplementaryRequests] = useState<SupplementaryBudgetRequest[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [reports, setReports] = useState<SavedReport[]>([]);
@@ -1081,10 +1081,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return [UserRole.CHURCH_GROUP, UserRole.APPROVER_L1, UserRole.APPROVER_L2, UserRole.FINANCE, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);
     }
 
-    if (viewId === "campaigns") {
-      return [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(currentUser.role);
-    }
-    
+
     if (viewId === "vendors") {
       const viewLevel = systemSettings.vendorListViewLevel || "ALL_USERS";
       if (viewLevel === "ADMINS_ONLY") {
@@ -1109,7 +1106,7 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
       [UserRole.APPROVER_L1]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
       [UserRole.APPROVER_L2]: ["dashboard", "requisitions", "approvals", "notifications", "finance", "transactions", "vendors", "settings"],
       [UserRole.FINANCE]: ["dashboard", "requisitions", "finance", "reports", "notifications", "settings", "auditTrail", "transactions", "vendors"],
-      [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "campaigns", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
+      [UserRole.ADMIN]: ["dashboard", "requisitions", "vendors", "approvals", "finance", "reports", "users", "settings", "notifications", "auditTrail", "accessControl", "transactions"],
     };
     return defaults[currentUser.role]?.includes(viewId) ?? false;
   }, [currentUser, permissionConfigs, systemSettings]);

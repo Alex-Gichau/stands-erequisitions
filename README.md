@@ -162,35 +162,24 @@ Featuring a **dual-database architecture** (MongoDB with automated fallback to J
 
 ---
 
-## 📋 Changes Log (Changelog)
+## 📋 Changes Log (Past 15 System Updates)
 
-### v2.4.0 (Latest Release)
-- **Disbursement Channel Logos & Icons**: Integrated high-fidelity, authentic vector logos for all payout channels (**M-PESA**, **Bank EFT**, **Cheque**, and **Cash**) inside the Disbursement Payout Release Details dialog.
-- **Collapsible Requisition History with Click-to-Open**: Configured the Requisition History audit timeline in the disbursement dialog to always default to collapsed upon opening, and made the entire Requisition History card/div clickable so clicking anywhere on the div immediately opens and reveals the timeline.
-- **Theme & Color Consistency Audit (`App.tsx` & Treasury Panels)**: Fully audited all color classes to strictly respect dark mode (`#121214` / `slate-900` / `slate-800`) and light mode (`bg-white` / `slate-50`). Fixed invalid classes (e.g. `bg-slate-850`, `bg-slate-550`, `text-slate-650`), polished text contrast on date range selectors, search suggestions, compliance ledger warnings, password dialogs, and maintenance views.
-- **Google Sign-In Button Persistence**: Locked the Google login button to a clean white background (`#ffffff`), dark black text (`#000000`), and official multi-color Google logo across both light and dark themes.
-- **Ministry File Manager Folder Navigation**: Added interactive "Back to Folders" navigation in breadcrumbs, folder view banners, and empty folder placeholders in `UploadsGalleryPanel.tsx`.
-- **Streamlined Ministry Directory Cards**: Refactored ministry folder cards into clean, distraction-free cards with folder icons, file counter badges, and direct access controls.
-
-### v2.3.0
-- **Requisition Installment Disbursements**: Enabled high-value expense tracking in multi-stage tranches (`RequisitionInstallment`) with partial disbursement vouchers (`printInstallmentVoucher`) and remaining balance computations.
-- **System Health Diagnostics & Automated Slack Alerts**: Implemented `SystemHealth.tsx` monitoring active memory and database status, paired with scheduled Slack webhook report dispatches.
-- **Notification Hub Enhancements**: Refined category tagging, unread badges, and desktop notification permission toggling.
-
-### v2.2.0
-- **RFC 2397 Data URI Pipeline**: Added `normalizeAttachmentUrl` in `src/lib/utils.ts` to preserve base64 Data URIs and external domain references without local truncation.
-- **Canvas-Powered PDF Previews**: Implemented `PdfThumbnailPreview.tsx` for fast first-page rendering without intrusive badges.
-- **Direct Document Scanner**: Added in-app camera scanner integration for quick mobile invoice captures in the file explorer.
-
-### v2.1.0
-- **Receipt Approver Audit Trail**: Added Level 1, Level 2, and Finance Officer sign-offs with exact verification timestamps on printable expenditure receipts.
-- **4-Stage Stepper Tracker**: Embedded interactive progress diagrams (`Submitted` ➔ `L1 Verified` ➔ `L2 Cleared` ➔ `Disbursed`) across vouchers and modal previews.
-- **Cloud Run Health Probes**: Resolved dynamic `process.env.PORT` binding, exposed `/api/health`, and configured CommonJS bundling compatibility with esbuild.
-
-### v2.0.0
-- **Dual-Database Persistence Engine**: Built MongoDB Mongoose document store with seamless automatic fallback to local JSON collections for uninterrupted availability.
-- **Firebase Authentication & RBAC**: Integrated role-based clearance (`CHURCH_GROUP`, `APPROVER_L1`, `APPROVER_L2`, `FINANCE`, `SUPER_ADMIN`).
-- **Nodemailer SMTP & Slack Alert Integration**: Automated financial dispatch alerts and notification webhooks.
+### v2.5.0 (Latest Release)
+1. 📣 **Active Campaign Previews & Management Hub**: Added active promotional campaign preview cards on the dashboard and campaign management hub with interactive email previews.
+2. 🎛️ **Campaigns Master Killswitch**: Implemented a master system switch in settings to globally enable or pause all campaign broadcasts, scheduled dispatches, and dashboard widgets.
+3. 🔒 **Campaign Send Protection**: Added strict backend and frontend checks preventing campaign dispatches and bulk emails when the campaigns master switch is turned off.
+4. 🎨 **Disbursement Channel Logos & Icons**: Integrated high-fidelity, authentic vector logos for all payout channels (**M-PESA**, **Bank EFT**, **Cheque**, and **Cash**) inside the Disbursement Payout Release Details dialog.
+5. 📂 **Collapsible Requisition History with Click-to-Open**: Configured the Requisition History audit timeline in the disbursement dialog to default to collapsed, with a clickable container that instantly expands to reveal the full audit history.
+6. 🌓 **Theme & Color Consistency Audit**: Fully audited all color classes across `App.tsx` and treasury panels to strictly respect dark mode (`#121214` / `slate-900`) and light mode (`bg-white` / `slate-50`), polishing text contrast.
+7. 🔤 **Google Sign-In Button Persistence**: Locked the Google login button to a clean white background (`#ffffff`), dark black text (`#000000`), and official multi-color Google logo across both themes.
+8. 📁 **Ministry File Manager Folder Navigation**: Added interactive "Back to Folders" navigation in breadcrumbs, folder view banners, and empty folder placeholders in `UploadsGalleryPanel.tsx`.
+9. 📊 **Requisition Installment Disbursements**: Enabled high-value expense tracking in multi-stage tranches (`RequisitionInstallment`) with partial disbursement vouchers and remaining balance computations.
+10. 🩺 **System Health Diagnostics & Automated Slack Alerts**: Implemented `SystemHealth.tsx` monitoring active memory and database status, paired with scheduled Slack webhook report dispatches.
+11. 🖼️ **RFC 2397 Data URI Pipeline**: Added `normalizeAttachmentUrl` in `src/lib/utils.ts` to preserve base64 Data URIs and external domain references without local truncation.
+12. 📄 **Canvas-Powered PDF Previews**: Implemented `PdfThumbnailPreview.tsx` for fast first-page rendering without intrusive badges.
+13. 📷 **Direct Document Scanner**: Added in-app camera scanner integration for quick mobile invoice captures in the file explorer.
+14. ✍️ **Receipt Approver Audit Trail**: Added Level 1, Level 2, and Finance Officer sign-offs with exact verification timestamps on printable expenditure receipts.
+15. 🗄️ **Dual-Database Persistence Engine**: Built MongoDB Mongoose document store with seamless automatic fallback to local JSON collections for uninterrupted availability.
 
 ---
 

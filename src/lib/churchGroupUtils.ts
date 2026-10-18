@@ -27,7 +27,7 @@ export const CANONICAL_CHURCH_GROUPS = [
 export type CanonicalChurchGroupName = typeof CANONICAL_CHURCH_GROUPS[number];
 
 /**
- * Normalizes any legacy, casing, or informal church group name into its canonical PCEA ministry title.
+ * Normalizes church group names while strictly preserving custom and admin-allocated church groups.
  */
 export function canonicalizeGroupName(name?: string | null): string {
   if (!name || typeof name !== "string") return "";
@@ -39,85 +39,13 @@ export function canonicalizeGroupName(name?: string | null): string {
     return "";
   }
 
-  // Exact canonical match check
+  // Exact canonical match check (case-insensitive) - normalize to canonical casing if matched
   const exactMatch = CANONICAL_CHURCH_GROUPS.find(
     g => g.toLowerCase() === lower
   );
   if (exactMatch) return exactMatch;
 
-  // Keyword-based canonical matching
-  if (lower.includes("ict") || lower.includes("information tech") || lower.includes("media team")) {
-    return "ICT Ministry";
-  }
-  if (lower.includes("security")) {
-    return "Security Committee";
-  }
-  if (lower.includes("pcmf") || lower.includes("men's") || lower.includes("mens") || lower.includes("men fellowship")) {
-    return "Men's Fellowship (PCMF)";
-  }
-  if (lower.includes("deacon")) {
-    return "Deacons Board";
-  }
-  if (lower.includes("brigade")) {
-    return "Boys & Girls Brigade";
-  }
-  if (lower.includes("admin")) {
-    return "Administration";
-  }
-  if (lower.includes("pastor") || lower.includes("rev") || lower.includes("clergy") || lower.includes("ministerial")) {
-    return "Pastoral Ministry";
-  }
-  if (lower.includes("finance") || lower.includes("treasur") || lower.includes("accounts") || lower.includes("audit")) {
-    return "Finance Department";
-  }
-  if (
-    lower.includes("church school") ||
-    lower.includes("sunday school") ||
-    lower.includes("children") ||
-    lower.includes("kids") ||
-    lower.includes("teens church")
-  ) {
-    return "Sunday School & Children";
-  }
-  if (
-    lower.includes("outreach") ||
-    lower.includes("mission") ||
-    lower.includes("evangelism") ||
-    lower.includes("kileleshwa") ||
-    lower.includes("missions commitee")
-  ) {
-    return "Evangelism & Missions";
-  }
-  if (
-    lower.includes("instrument") ||
-    lower.includes("choir") ||
-    lower.includes("singers") ||
-    lower.includes("music")
-  ) {
-    return "Music Ministry";
-  }
-  if (lower.includes("youth") || lower.includes("teens") || lower.includes("young adults")) {
-    return "Youth Ministry";
-  }
-  if (lower.includes("district") || lower.includes("zone") || lower.includes("cell")) {
-    return "District Fellowships";
-  }
-  if (lower.includes("welfare") || lower.includes("health") || lower.includes("benevolent")) {
-    return "Health & Welfare Board";
-  }
-  if (lower.includes("guild") || lower.includes("women") || lower.includes("mother")) {
-    return "Women's Guild";
-  }
-  if (lower.includes("praise") || lower.includes("worship")) {
-    return "Praise & Worship Team";
-  }
-  if (lower.includes("sanctuary") || lower.includes("renovation") || lower.includes("development") || lower.includes("building")) {
-    return "Sanctuary Renovation";
-  }
-  if (lower.includes("french")) {
-    return "French Congregation";
-  }
-
+  // Preserve admin-allocated custom church groups exactly as specified
   return clean;
 }
 
@@ -174,9 +102,9 @@ export function resolveDefaultChurchGroup(user: { email?: string; role?: string;
 /**
  * Enforces strict, zero-unallocated group allocation for a given user profile or raw database document.
  * Guarantees that:
- * 1. `group` is a non-empty canonical ministry name.
- * 2. `groups` is an array of non-empty strings with at least `[group]`.
- * 3. `group` is always present in `groups`.
+ * 1. Admin/Super-Admin allocations are strictly PRESERVED and never overwritten.
+ * 2. `group` is a non-empty ministry name.
+ * 3. `groups` contains the user's allocated groups, with `group` included.
  */
 export function enforceUserGroupAllocation(user: any): { group: string; groups: string[] } {
   if (!user) {
@@ -185,52 +113,50 @@ export function enforceUserGroupAllocation(user: any): { group: string; groups: 
 
   // Parse raw groups input
   let parsedGroups: string[] = [];
-  const rawGroups = user.groups;
+  const rawGroups = user.groups || user.church_groups || user.churchGroups;
   if (rawGroups) {
     if (Array.isArray(rawGroups)) {
-      parsedGroups = rawGroups.map((g: any) => (typeof g === "string" ? g : String(g || "")));
+      parsedGroups = rawGroups.map((g: any) => (typeof g === "string" ? g.trim() : String(g || "").trim())).filter(Boolean);
     } else if (typeof rawGroups === "string" && rawGroups.trim() !== "") {
       try {
         const parsed = JSON.parse(rawGroups);
         if (Array.isArray(parsed)) {
-          parsedGroups = parsed.map((g: any) => String(g || ""));
+          parsedGroups = parsed.map((g: any) => String(g || "").trim()).filter(Boolean);
         } else {
-          parsedGroups = [rawGroups];
+          parsedGroups = [rawGroups.trim()];
         }
       } catch (e) {
-        parsedGroups = rawGroups.split(",").map((s: string) => s.trim());
+        parsedGroups = rawGroups.split(",").map((s: string) => s.trim()).filter(Boolean);
       }
     }
   }
 
-  // Canonicalize all groups in array
+  // Clean and filter groups in array
   let cleanGroups = parsedGroups
     .map(g => canonicalizeGroupName(g))
     .filter(Boolean);
 
-  // Canonicalize primary group
-  let primaryGroup = canonicalizeGroupName(user.group);
+  // Clean primary group
+  let primaryGroup = canonicalizeGroupName(user.group || user.church_group || user.churchGroup);
 
-  // If primary group is missing, select first from cleanGroups or determine smart default
-  if (!primaryGroup) {
-    primaryGroup = cleanGroups[0] || resolveDefaultChurchGroup(user);
+  // If user already has an allocated primary group or groups, STRICTLY PRESERVE THEM!
+  if (primaryGroup || cleanGroups.length > 0) {
+    if (!primaryGroup && cleanGroups.length > 0) {
+      primaryGroup = cleanGroups[0];
+    }
+    if (primaryGroup && !cleanGroups.includes(primaryGroup)) {
+      cleanGroups = [primaryGroup, ...cleanGroups];
+    }
+    return {
+      group: primaryGroup || cleanGroups[0],
+      groups: cleanGroups.length > 0 ? cleanGroups : [primaryGroup]
+    };
   }
 
-  // Ensure cleanGroups has primaryGroup
-  if (!cleanGroups.includes(primaryGroup)) {
-    cleanGroups = [primaryGroup, ...cleanGroups];
-  }
-
-  // Final sanity check: never empty
-  if (cleanGroups.length === 0) {
-    cleanGroups = [primaryGroup || "Youth Ministry"];
-  }
-  if (!primaryGroup) {
-    primaryGroup = cleanGroups[0];
-  }
-
+  // Only if completely missing: determine a smart default
+  const defaultGroup = resolveDefaultChurchGroup(user);
   return {
-    group: primaryGroup,
-    groups: cleanGroups
+    group: defaultGroup,
+    groups: [defaultGroup]
   };
 }

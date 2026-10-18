@@ -234,7 +234,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
     }
     return "rows";
   });
-  const [rowsLimit, setRowsLimit] = useState<number>(8);
+  const [rowsLimit, setRowsLimit] = useState<number>(3);
 
   const handleViewModeChange = (mode: "cards" | "rows") => {
     setViewMode(mode);
@@ -822,7 +822,7 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
               <div className="pt-2 flex flex-col items-center justify-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setRowsLimit(prev => prev + 10)}
+                  onClick={() => setRowsLimit(prev => prev + 6)}
                   title={`View more rows (${displayedCards.length - rowsLimit} remaining)`}
                   aria-label="View more rows"
                   className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-700 hover:border-sky-300 dark:hover:border-sky-800/80 transition-all cursor-pointer shadow-xs hover:shadow-md flex items-center justify-center group active:scale-95"
@@ -834,18 +834,18 @@ export const RecentCommentsAndReactionsFeed: React.FC<RecentCommentsAndReactions
                 </span>
               </div>
             )}
-            {rowsLimit > 8 && displayedCards.length > 8 && (
+            {rowsLimit > 3 && displayedCards.length > 3 && (
               <div className="pt-1 flex flex-col items-center justify-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setRowsLimit(8)}
-                  title="Show fewer rows"
+                  onClick={() => setRowsLimit(3)}
+                  title="Show fewer rows (3 rows)"
                   aria-label="Show fewer rows"
                   className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs flex items-center justify-center group active:scale-95"
                 >
                   <ChevronUp size={16} className="group-hover:-translate-y-0.5 transition-transform" />
                 </button>
-                <span className="text-[10px] text-slate-400 font-medium">Show less</span>
+                <span className="text-[10px] text-slate-400 font-medium">Show 3 rows</span>
               </div>
             )}
           </div>

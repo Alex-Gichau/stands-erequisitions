@@ -536,9 +536,15 @@ export const databaseService = {
     if (updates.email !== undefined) mapped.email = updates.email;
     if (updates.role !== undefined) mapped.role = updates.role;
     if (updates.group !== undefined || updates.groups !== undefined) {
-      const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(updates);
-      mapped.group = cleanGroup;
-      mapped.groups = cleanGroups;
+      const cleanGroup = updates.group !== undefined ? String(updates.group).trim() : undefined;
+      let cleanGroups = Array.isArray(updates.groups)
+        ? updates.groups.map(g => String(g || "").trim()).filter(Boolean)
+        : (cleanGroup ? [cleanGroup] : undefined);
+      if (cleanGroup && cleanGroups && !cleanGroups.includes(cleanGroup)) {
+        cleanGroups.unshift(cleanGroup);
+      }
+      if (cleanGroup !== undefined) mapped.group = cleanGroup;
+      if (cleanGroups !== undefined) mapped.groups = cleanGroups;
     }
     if (updates.approverCode !== undefined) mapped.approver_code = updates.approverCode;
     if (updates.isActive !== undefined) mapped.is_active = updates.isActive;

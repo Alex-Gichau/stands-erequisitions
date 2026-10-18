@@ -430,20 +430,19 @@ export const UsersPanel: React.FC<UsersPanelProps> = () => {
     setEditSuccess(null);
   };
 
-  // Dynamic Self-Healing Auto-Enforcement of Church Group Allocations
+  // Dynamic Auto-Enforcement ONLY for genuinely unallocated users without any group
   const autoEnforceInProgressRef = React.useRef(false);
   useEffect(() => {
     if (!users || users.length === 0 || autoEnforceInProgressRef.current) return;
     
     const unallocatedUsers = users.filter((u) => {
-      const { group: cleanGroup, groups: cleanGroups } = enforceUserGroupAllocation(u);
-      return !u.group || 
-             u.group === "INDEPENDENT" || 
-             u.group === "UNALLOCATED" || 
-             u.group !== cleanGroup || 
-             !u.groups || 
-             u.groups.length === 0 ||
-             JSON.stringify(u.groups) !== JSON.stringify(cleanGroups);
+      const g = (u.group || "").trim();
+      const hasValidGroup = g && g !== "INDEPENDENT" && g !== "UNALLOCATED" && g.toLowerCase() !== "none" && g.toLowerCase() !== "no group";
+      const hasValidGroups = Array.isArray(u.groups) && u.groups.length > 0 && u.groups.some(x => {
+        const str = String(x || "").trim();
+        return str && str !== "INDEPENDENT" && str !== "UNALLOCATED" && str.toLowerCase() !== "none";
+      });
+      return !hasValidGroup && !hasValidGroups;
     });
 
     if (unallocatedUsers.length > 0) {

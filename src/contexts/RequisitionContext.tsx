@@ -2781,8 +2781,11 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 idleTimeoutDuration: Number(u?.idle_timeout_duration) || Number(u?.idleTimeoutDuration) || 15
               } as UserProfile);
 
-              // Auto-heal any legacy unassigned, unallocated, or uncanonicalized user in background
-              if (!u.group || u.group === "INDEPENDENT" || u.group === "UNALLOCATED" || u.group !== normalized.group) {
+              // Auto-heal ONLY truly unallocated users with no church group
+              const userGroup = (u.group || "").trim();
+              const hasNoValidGroup = !userGroup || userGroup === "INDEPENDENT" || userGroup === "UNALLOCATED" || userGroup.toLowerCase() === "none";
+              const hasNoValidGroups = !Array.isArray(u.groups) || u.groups.length === 0;
+              if (hasNoValidGroup && hasNoValidGroups) {
                 databaseService.saveUserProfile(normalized).catch(() => {});
               }
 

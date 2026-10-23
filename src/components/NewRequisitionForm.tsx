@@ -11,6 +11,7 @@ import { processFileToAttachmentStrings } from "../lib/pdfUtils";
 import { Upload, X, Paperclip, Loader2, DollarSign, FileText, FileSpreadsheet, Info, Users, PlusCircle, Save, Camera, Mail, UserPlus, Check, Share2, Layers, Building2, Search, ChevronDown, Store, Split, Calendar, Clock, Trash2, CheckCircle2, ShieldCheck, AlertCircle, AlertTriangle, Sparkles, Lock, PenTool, Type } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { UserRole, RequisitionInstallment, Requisition, RequisitionStatus } from "../types";
+import { canonicalizeGroupName, resolveDefaultChurchGroup } from "../lib/churchGroupUtils";
 import { COMMITTED_REQUISITION_STATUSES } from "../utils/budgetUtils";
 import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
@@ -165,7 +166,84 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   const [activeTab, setActiveTab] = useState<"SEARCH" | "CREATE">("SEARCH");
 
   const isAdminOrFinance = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.SUPER_ADMIN || currentUser?.role === UserRole.FINANCE;
-  const [selectedGroup, setSelectedGroup] = useState<string>(targetReq?.groupName || "");
+  const [customAddedGroups, setCustomAddedGroups] = useState<string[]>([]);
+
+  // Compute strictly the church groups that the current user is allocated to
+  const userAllocatedGroups = React.useMemo(() => {
+    const rawList: string[] = [];
+    if (currentUser?.group && typeof currentUser.group === "string" && currentUser.group.trim()) {
+      rawList.push(currentUser.group.trim());
+    }
+    if (Array.isArray(currentUser?.groups)) {
+      currentUser.groups.forEach(g => {
+        if (typeof g === "string" && g.trim()) {
+          rawList.push(g.trim());
+        }
+      });
+    } else if (typeof (currentUser as any)?.groups === "string" && (currentUser as any).groups.trim()) {
+      try {
+        const parsed = JSON.parse((currentUser as any).groups);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((g: any) => {
+            if (typeof g === "string" && g.trim()) rawList.push(g.trim());
+          });
+        }
+      } catch {
+        (currentUser as any).groups.split(",").forEach((s: string) => {
+          if (s.trim()) rawList.push(s.trim());
+        });
+      }
+    }
+    if (currentUser?.department && typeof currentUser.department === "string" && currentUser.department.trim()) {
+      rawList.push(currentUser.department.trim());
+    }
+    if (customAddedGroups.length > 0) {
+      rawList.push(...customAddedGroups);
+    }
+
+    // Deduplicate case-insensitively while preserving canonical or first casing
+    const result: string[] = [];
+    const seen = new Set<string>();
+    for (const item of rawList) {
+      const clean = canonicalizeGroupName(item) || item.trim();
+      const lower = clean.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push(clean);
+      }
+    }
+
+    // If editing existing requisition, ensure targetReq.groupName is also available in options
+    if (isEditMode && targetReq?.groupName) {
+      const editGroup = canonicalizeGroupName(targetReq.groupName) || targetReq.groupName.trim();
+      if (editGroup && !seen.has(editGroup.toLowerCase())) {
+        result.push(editGroup);
+      }
+    }
+
+    // Fallback if user profile doesn't have any allocated groups
+    if (result.length === 0) {
+      const def = resolveDefaultChurchGroup(currentUser || {});
+      if (def) {
+        result.push(def);
+      } else if (churchGroups && churchGroups.length > 0) {
+        result.push(churchGroups[0].name);
+      } else {
+        result.push("Youth Ministry");
+      }
+    }
+
+    return result;
+  }, [currentUser, targetReq, isEditMode, churchGroups, customAddedGroups]);
+
+  const [selectedGroup, setSelectedGroup] = useState<string>(() => {
+    if (targetReq?.groupName) return targetReq.groupName;
+    if (currentUser?.group && currentUser.group.trim()) return currentUser.group.trim();
+    if (Array.isArray(currentUser?.groups) && currentUser.groups.length > 0 && currentUser.groups[0]?.trim()) {
+      return currentUser.groups[0].trim();
+    }
+    return "";
+  });
 
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -186,6 +264,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     setAddingGroup(true);
     try {
       await addChurchGroup(trimmed, newGroupDescription.trim() || undefined);
+      setCustomAddedGroups(prev => [...prev, trimmed]);
       setSelectedGroup(trimmed);
       setNewGroupName("");
       setNewGroupDescription("");
@@ -607,27 +686,39 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
   const installmentDiff = Math.round((totalReqAmountNum - totalInstallmentScheduled) * 100) / 100;
   const isInstallmentSumBalanced = Math.abs(installmentDiff) < 0.01 && totalReqAmountNum > 0;
 
-  // Handle default group setting ONLY if there is no auto-saved group in localStorage
+  // Ensure selectedGroup strictly defaults to and stays within the user's allocated groups
   useEffect(() => {
-    if (isEditMode || !currentUser?.id) return;
-    const draftKey = `stands_requisition_draft_${currentUser.id}`;
-    const hasDraft = localStorage.getItem(draftKey);
-    if (hasDraft) return;
-
-    if (isAdminOrFinance) {
-      if (churchGroups && churchGroups.length > 0) {
-        setSelectedGroup(churchGroups[0].name);
-      } else {
-        setSelectedGroup(`Youth Camp ${activeYear}`);
-      }
-    } else {
-      if (currentUser?.groups && currentUser.groups.length > 0) {
-        setSelectedGroup(currentUser.group || currentUser.groups[0]);
-      } else {
-        setSelectedGroup(currentUser?.group || `Youth Camp ${activeYear}`);
+    if (isEditMode) return;
+    const draftKey = currentUser?.id ? `stands_requisition_draft_${currentUser.id}` : null;
+    const savedDraft = draftKey ? localStorage.getItem(draftKey) : null;
+    let draftGroup = "";
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        draftGroup = parsed.selectedGroup || "";
+      } catch {
+        // ignore
       }
     }
-  }, [currentUser, churchGroups, isAdminOrFinance, isEditMode]);
+
+    // If draftGroup is one of the user's allocated groups, respect it!
+    if (draftGroup && userAllocatedGroups.includes(draftGroup)) {
+      if (selectedGroup !== draftGroup) {
+        setSelectedGroup(draftGroup);
+      }
+      return;
+    }
+
+    // Otherwise, ensure selectedGroup is strictly one of userAllocatedGroups
+    if (!selectedGroup || !userAllocatedGroups.includes(selectedGroup)) {
+      const defaultAllocated = (currentUser?.group && userAllocatedGroups.includes(currentUser.group))
+        ? currentUser.group
+        : userAllocatedGroups[0];
+      if (defaultAllocated && selectedGroup !== defaultAllocated) {
+        setSelectedGroup(defaultAllocated);
+      }
+    }
+  }, [currentUser, userAllocatedGroups, isEditMode, selectedGroup]);
 
   // Real-time auto-save form inputs to localStorage on state updates
   useEffect(() => {
@@ -1284,54 +1375,38 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                 </span>
               </div>
               
-              {isAdminOrFinance ? (
+              {userAllocatedGroups.length > 1 ? (
                 <div className="space-y-1.5">
                   <select
+                    id="requisition-department-group-select"
                     value={selectedGroup}
                     onChange={(e) => setSelectedGroup(e.target.value)}
                     className="input-field cursor-pointer h-10 px-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-bold uppercase tracking-widest text-[11px] text-slate-900 dark:text-slate-200"
                   >
-                    {churchGroups && churchGroups.length > 0 ? (
-                      churchGroups.map((g) => (
-                        <option key={g.id} value={g.name} className="font-sans text-xs">
-                          {g.name}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="Youth Camp 2026">YOUTH CAMP 2026</option>
-                    )}
-                  </select>
-                  <p className="text-[9px] text-primary font-black uppercase tracking-wider pl-1 font-mono">
-                    ★ Privileged Terminal Mode: Change designated church group manually
-                  </p>
-                </div>
-              ) : currentUser?.groups && currentUser.groups.length > 1 ? (
-                <div className="space-y-1.5">
-                  <select
-                    value={selectedGroup}
-                    onChange={(e) => setSelectedGroup(e.target.value)}
-                    className="input-field cursor-pointer h-10 px-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-bold uppercase tracking-widest text-[11px] text-slate-900 dark:text-slate-200"
-                  >
-                    {currentUser.groups.map((groupName, idx) => (
+                    {userAllocatedGroups.map((groupName, idx) => (
                       <option key={idx} value={groupName} className="font-sans text-xs">
                         {groupName}
                       </option>
                     ))}
                   </select>
                   <p className="text-[9px] text-indigo-500 font-bold uppercase tracking-widest pl-1 font-mono flex items-center gap-1">
-                    <span>⚡ Group Selection: You are affiliated with multiple ministry groups. Choose the correct group for permission scoping.</span>
+                    <span>⚡ Group Selection: Showing only groups allocated to you ({userAllocatedGroups.length} available).</span>
                   </p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <input
-                    type="text"
+                  <select
+                    id="requisition-department-group-select"
+                    value={selectedGroup || userAllocatedGroups[0]}
                     disabled
-                    value={selectedGroup}
-                    className="input-field h-10 px-3 bg-slate-200/50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider cursor-not-allowed"
-                  />
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest pl-1 font-mono flex items-center gap-1">
-                    <span>⚡ Group Auto-filled: Requisition matches user church group securely</span>
+                    className="input-field h-10 px-3 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-bold uppercase tracking-widest text-[11px] text-slate-700 dark:text-slate-300 cursor-not-allowed"
+                  >
+                    <option value={userAllocatedGroups[0]} className="font-sans text-xs">
+                      {userAllocatedGroups[0]}
+                    </option>
+                  </select>
+                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-widest pl-1 font-mono flex items-center gap-1">
+                    <span>⚡ Group Allocated: Scoped to your assigned church group ({userAllocatedGroups[0]}).</span>
                   </p>
                 </div>
               )}

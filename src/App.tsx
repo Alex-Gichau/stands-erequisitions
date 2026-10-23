@@ -95,7 +95,9 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
-  Plus
+  Plus,
+  Globe,
+  ExternalLink
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { PerformanceTracker } from "./components/PerformanceTracker";
@@ -1607,6 +1609,24 @@ function AppContent() {
                 </button>
               </div>
             </form>
+
+            <div className="pt-2">
+              <a
+                href="https://cp.pceastandrews.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]",
+                  darkMode
+                    ? "bg-[#121214] hover:bg-[#27272a] border-[#27272a] text-zinc-300 hover:text-white"
+                    : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900"
+                )}
+              >
+                <Globe size={14} className="shrink-0 text-primary" />
+                <span>Go to STANDS Home</span>
+                <ExternalLink size={12} className="shrink-0 opacity-60" />
+              </a>
+            </div>
           </div>
 
           <div className={cn("pt-6 border-t flex justify-center gap-6 transition-colors", darkMode ? "border-[#27272a]" : "border-slate-200")}>

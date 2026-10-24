@@ -1591,13 +1591,30 @@ function AppContent() {
                     </div>
                   </div>
               )}
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl transition-all font-black text-xs shadow-xl shadow-primary/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
-              >
-                {isSubmitting ? "Processing..." : authMode === "EMAIL_LOGIN" ? "Login" : "Request Activation"}
-              </button>
+              <div className="flex items-center gap-2.5 mt-4">
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl transition-all font-black text-xs shadow-xl shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? "Processing..." : authMode === "EMAIL_LOGIN" ? "LOGIN" : "Request Activation"}
+                </button>
+
+                <a
+                  href="https://cp.pceastandrews.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    "flex-1 py-3.5 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-[0.98] text-center whitespace-nowrap",
+                    darkMode
+                      ? "bg-[#121214] hover:bg-[#27272a] border-[#27272a] text-zinc-300 hover:text-white"
+                      : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900"
+                  )}
+                  title="STANDS Home"
+                >
+                  <span className="truncate">STANDS Home</span>
+                </a>
+              </div>
 
               <div className="space-y-4 pt-2">
                 <button 
@@ -1609,36 +1626,9 @@ function AppContent() {
                 </button>
               </div>
             </form>
-
-            <div className="pt-2">
-              <a
-                href="https://cp.pceastandrews.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "w-full py-3 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.98]",
-                  darkMode
-                    ? "bg-[#121214] hover:bg-[#27272a] border-[#27272a] text-zinc-300 hover:text-white"
-                    : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900"
-                )}
-              >
-                <Globe size={14} className="shrink-0 text-primary" />
-                <span>Go to STANDS Home</span>
-                <ExternalLink size={12} className="shrink-0 opacity-60" />
-              </a>
-            </div>
           </div>
 
-          <div className={cn("pt-6 border-t flex justify-center gap-6 transition-colors", darkMode ? "border-[#27272a]" : "border-slate-200")}>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className={cn("text-[8px] font-black uppercase tracking-widest", darkMode ? "text-zinc-500" : "text-slate-500")}>Active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Lock size={10} className={darkMode ? "text-zinc-500" : "text-slate-500"} />
-              <span className={cn("text-[8px] font-black uppercase tracking-widest", darkMode ? "text-zinc-500" : "text-slate-500")}>Secure</span>
-            </div>
-          </div>
+        
         </motion.div>
 
         {/* Real-time Toast Notifications */}

@@ -204,17 +204,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 item.desktopOnly ? "hidden lg:flex" : ""
               )}
             >
-              <Icon size={18} className={cn("shrink-0", isActive ? "text-white" : "text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300")} />
+              <div className="relative shrink-0 flex items-center justify-center">
+                <Icon size={18} className={cn("shrink-0", isActive ? "text-white" : "text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300")} />
+                {isCollapsed && item.id === "notifications" && notificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                )}
+              </div>
               {!isCollapsed && <span>{item.label}</span>}
               {!isCollapsed && item.id === "notifications" && notificationsCount > 0 && (
-                <span className="ml-auto bg-rose-500 text-white font-black text-[9px] px-2 py-0.5 rounded-full ring-2 ring-white dark:ring-slate-900 leading-none">
-                  {notificationsCount}
-                </span>
-              )}
-              {isCollapsed && item.id === "notifications" && notificationsCount > 0 && (
-                <span className="absolute top-1 right-1 bg-rose-500 text-white font-black text-[8px] w-4.5 h-4.5 rounded-full flex items-center justify-center ring-2 ring-white dark:ring-slate-900">
-                  {notificationsCount}
-                </span>
+                <span className="ml-auto w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900" />
               )}
               
               {isActive && !isCollapsed && (
@@ -318,9 +316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="relative">
                       <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                       {item.id === "notifications" && notificationsCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white font-black text-[8px] h-4 w-4 rounded-full flex items-center justify-center ring-2 ring-white dark:ring-slate-900 group-hover:scale-110 transition-transform">
-                          {notificationsCount}
-                        </span>
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white dark:ring-slate-900 group-hover:scale-110 transition-transform" />
                       )}
                     </div>
                     <span className="text-[8px] font-black uppercase tracking-tighter">{item.label.split(" ")[0]}</span>

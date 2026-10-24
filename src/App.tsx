@@ -3183,12 +3183,12 @@ function AppContent() {
                     : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-slate-100/80 shadow-md"
                 )}
               >
-                <Bell size={18} className={cn("transition-transform", isNotificationsOpen && "scale-110")} />
-                {!isDoNotDisturb && unreadNotificationsCount > 0 && (
-                  <div className="absolute -top-1 -right-1 bg-[#8b8df2] text-white font-black text-[9px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-sm">
-                    {unreadNotificationsCount}
-                  </div>
-                )}
+                <div className="relative flex items-center justify-center">
+                  <Bell size={18} className={cn("transition-transform", isNotificationsOpen && "scale-110")} />
+                  {!isDoNotDisturb && unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 ring-1 ring-rose-500/20" />
+                  )}
+                </div>
               </button>
 
               <AnimatePresence>

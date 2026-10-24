@@ -156,6 +156,9 @@ export interface Requisition {
   description: string;
   amount: number;
   amountWords?: string;
+  currency?: string; // e.g. "KES" | "USD" | "EUR" | "GBP"
+  originalCurrencyAmount?: number; // e.g. Amount in USD when currency is USD
+  exchangeRate?: number; // e.g. 130 KES per 1 USD
   groupId: string;
   groupName: string;
   requesterId: string;

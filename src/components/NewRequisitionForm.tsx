@@ -17,6 +17,22 @@ import { CameraCapture } from "./CameraCapture";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { PdfThumbnailPreview } from "./PdfThumbnailPreview";
 
+export interface CurrencyOption {
+  code: string;
+  label: string;
+  symbol: string;
+  name: string;
+  defaultRate: number;
+  flag: string;
+}
+
+export const CURRENCY_OPTIONS: CurrencyOption[] = [
+  { code: "KES", label: "KES (Kenyan Shillings)", symbol: "Ksh", name: "Kenyan Shillings", defaultRate: 1, flag: "🇰🇪" },
+  { code: "USD", label: "USD (US Dollars $)", symbol: "$", name: "US Dollars", defaultRate: 130, flag: "🇺🇸" },
+  { code: "EUR", label: "EUR (Euros €)", symbol: "€", name: "Euros", defaultRate: 140, flag: "🇪🇺" },
+  { code: "GBP", label: "GBP (British Pounds £)", symbol: "£", name: "British Pounds", defaultRate: 165, flag: "🇬🇧" },
+];
+
 interface NewRequisitionFormProps {
   onClose: () => void;
   editReq?: Requisition;
@@ -44,8 +60,42 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     systemSettings
   } = useRequisitions();
   const activeYear = getActiveFiscalYear();
-  const [amount, setAmount] = useState<string>(targetReq?.amount !== undefined ? targetReq.amount.toString() : "");
-  const [amountWords, setAmountWords] = useState<string>(targetReq?.amountWords || (targetReq?.amount ? numberToWords(targetReq.amount) : ""));
+  const [currency, setCurrency] = useState<string>(targetReq?.currency || "KES");
+  const [exchangeRate, setExchangeRate] = useState<string>(() => {
+    if (targetReq?.exchangeRate !== undefined && targetReq.exchangeRate > 0) {
+      return targetReq.exchangeRate.toString();
+    }
+    const found = CURRENCY_OPTIONS.find(c => c.code === (targetReq?.currency || "KES"));
+    return (found?.defaultRate || 130).toString();
+  });
+  const [amount, setAmount] = useState<string>(() => {
+    if (targetReq?.originalCurrencyAmount !== undefined && targetReq.currency && targetReq.currency !== "KES") {
+      return targetReq.originalCurrencyAmount.toString();
+    }
+    return targetReq?.amount !== undefined ? targetReq.amount.toString() : "";
+  });
+  const [amountWords, setAmountWords] = useState<string>(() => {
+    if (targetReq?.amountWords) return targetReq.amountWords;
+    if (targetReq?.amount) {
+      return numberToWords(targetReq.amount, targetReq.currency || "KES");
+    }
+    return "";
+  });
+
+  const activeCurrencyOption = React.useMemo(() => {
+    return CURRENCY_OPTIONS.find(c => c.code === currency) || CURRENCY_OPTIONS[0];
+  }, [currency]);
+
+  const currencySymbol = activeCurrencyOption.symbol;
+
+  const handleCurrencyChange = (newCode: string) => {
+    setCurrency(newCode);
+    const found = CURRENCY_OPTIONS.find(c => c.code === newCode);
+    if (found) {
+      setExchangeRate(found.defaultRate.toString());
+    }
+    setHasConfirmedOverBudget(false);
+  };
   const [title, setTitle] = useState(targetReq?.title || "");
   const [description, setDescription] = useState(targetReq?.description || "");
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -418,7 +468,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     return Math.max(0, groupAllocatedBudget - groupExistingCommitments);
   }, [groupAllocatedBudget, groupExistingCommitments]);
 
-  const parsedAmountNum = Number(amount) || 0;
+  const rawAmountNum = parseFloat(amount) || 0;
+  const parsedExchangeRateNum = currency === "KES" ? 1 : (parseFloat(exchangeRate) > 0 ? parseFloat(exchangeRate) : 130);
+  const convertedKesAmount = currency === "KES" ? rawAmountNum : Math.round(rawAmountNum * parsedExchangeRateNum * 100) / 100;
+  const parsedAmountNum = convertedKesAmount;
   const isBudgetConfigured = groupAllocatedBudget > 0;
   const totalProjectedCommitment = groupExistingCommitments + parsedAmountNum;
   const isOverBudget = isBudgetConfigured && parsedAmountNum > 0 && (totalProjectedCommitment > groupAllocatedBudget);
@@ -508,6 +561,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       title,
       description,
       amount,
+      currency,
+      exchangeRate,
       payableTo,
       selectedGroup,
       vendorContact,
@@ -535,6 +590,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     title,
     description,
     amount,
+    currency,
+    exchangeRate,
     payableTo,
     selectedGroup,
     vendorContact,
@@ -558,6 +615,8 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         const draft = JSON.parse(savedDraft);
         if (draft.title) setTitle(draft.title);
         if (draft.description) setDescription(draft.description);
+        if (draft.currency) setCurrency(draft.currency);
+        if (draft.exchangeRate) setExchangeRate(draft.exchangeRate);
         if (draft.amount) setAmount(draft.amount);
         if (draft.payableTo) setPayableTo(draft.payableTo);
         if (draft.selectedGroup) setSelectedGroup(draft.selectedGroup);
@@ -737,7 +796,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [saveDraftToStorage, currentUser, title, description, amount, payableTo]);
+  }, [saveDraftToStorage, currentUser, title, description, amount, currency, exchangeRate, payableTo]);
 
   // Window event listeners for tab closing & visibility changes to guarantee zero data loss
   useEffect(() => {
@@ -761,16 +820,24 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [saveDraftToStorage, title, description, amount, payableTo]);
+  }, [saveDraftToStorage, title, description, amount, currency, exchangeRate, payableTo]);
 
   useEffect(() => {
     const val = parseFloat(amount);
-    if (!isNaN(val)) {
-      setAmountWords(numberToWords(val));
+    if (!isNaN(val) && val > 0) {
+      if (currency !== "KES") {
+        const rate = parseFloat(exchangeRate) || 130;
+        const converted = Math.round(val * rate * 100) / 100;
+        const origWords = numberToWords(val, currency);
+        const kesWords = numberToWords(converted, "KES");
+        setAmountWords(`${origWords} (Equivalent to ${kesWords})`);
+      } else {
+        setAmountWords(numberToWords(val, "KES"));
+      }
     } else {
       setAmountWords("");
     }
-  }, [amount]);
+  }, [amount, currency, exchangeRate]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -945,7 +1012,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         (p.groupId === groupVal || p.name === groupVal) &&
         (!p.fiscalYear || p.fiscalYear === currentFiscalYear)
       );
-      const parsedAmount = Number(amount) || 0;
+      const parsedAmount = convertedKesAmount;
 
       let allLocalFiles = [...attachments];
       if (writtenAttachmentText.trim()) {
@@ -969,6 +1036,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
         description: description.trim() || "",
         payableTo: payableTo.trim() || undefined,
         amount: parsedAmount,
+        currency,
+        originalCurrencyAmount: currency !== "KES" ? rawAmountNum : undefined,
+        exchangeRate: currency !== "KES" ? parsedExchangeRateNum : undefined,
         amountWords: amountWords || "",
         groupId: groupVal,
         groupName: groupVal,
@@ -1000,7 +1070,7 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       return;
     }
 
-    const parsedAmount = Number(amount);
+    const parsedAmount = convertedKesAmount;
     if (parsedAmount <= 0) {
       setLoading(false);
       alert("Amount must be greater than 0.");
@@ -1054,23 +1124,27 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
       if (enableInstallments) {
         if (!isInstallmentSumBalanced) {
           setLoading(false);
-          alert(`Installment schedule mismatch: The sum of installments (KES ${totalInstallmentScheduled.toLocaleString()}) must equal the Requisition Total (KES ${parsedAmount.toLocaleString()}). Please balance the installments.`);
+          alert(`Installment schedule mismatch: The sum of installments (${currencySymbol} ${totalInstallmentScheduled.toLocaleString()}) must equal the Requisition Total (${currencySymbol} ${rawAmountNum.toLocaleString()}). Please balance the installments.`);
           return;
         }
-        finalInstallments = installments.map((inst, idx) => ({
-          id: inst.id || `inst-${Date.now()}-${idx + 1}`,
-          installmentNumber: idx + 1,
-          amount: parseFloat(inst.amount) || 0,
-          description: inst.description.trim() || `Installment #${idx + 1}`,
-          dueDate: inst.dueDate || undefined,
-          status: (inst.status as any) || "PENDING",
-          disbursedAt: inst.disbursedAt,
-          disbursedBy: inst.disbursedBy,
-          disbursedByName: inst.disbursedByName,
-          disbursementReference: inst.disbursementReference,
-          paymentMethod: inst.paymentMethod,
-          notes: inst.notes,
-        }));
+        finalInstallments = installments.map((inst, idx) => {
+          const instRawAmt = parseFloat(inst.amount) || 0;
+          const instKesAmt = currency !== "KES" ? Math.round(instRawAmt * parsedExchangeRateNum * 100) / 100 : instRawAmt;
+          return {
+            id: inst.id || `inst-${Date.now()}-${idx + 1}`,
+            installmentNumber: idx + 1,
+            amount: instKesAmt,
+            description: currency !== "KES" ? `${inst.description.trim() || `Installment #${idx + 1}`} (${currencySymbol} ${instRawAmt})` : (inst.description.trim() || `Installment #${idx + 1}`),
+            dueDate: inst.dueDate || undefined,
+            status: (inst.status as any) || "PENDING",
+            disbursedAt: inst.disbursedAt,
+            disbursedBy: inst.disbursedBy,
+            disbursedByName: inst.disbursedByName,
+            disbursementReference: inst.disbursementReference,
+            paymentMethod: inst.paymentMethod,
+            notes: inst.notes,
+          };
+        });
       }
 
       // 1. Convert/upload any base64 attachments to server storage first
@@ -1093,7 +1167,10 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
           description: description.trim() || "No description provided",
           payableTo: payableTo.trim() || undefined,
           amount: parsedAmount,
-          amountWords: amountWords || (parsedAmount ? numberToWords(parsedAmount) : ""),
+          currency,
+          originalCurrencyAmount: currency !== "KES" ? rawAmountNum : undefined,
+          exchangeRate: currency !== "KES" ? parsedExchangeRateNum : undefined,
+          amountWords: amountWords || (parsedAmount ? numberToWords(parsedAmount, currency) : ""),
           groupId: groupVal,
           groupName: groupVal,
           projectId: matchingProject ? matchingProject.id : (targetReq.projectId || undefined),
@@ -1124,6 +1201,9 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
           description: description.trim() || "No description provided",
           payableTo: payableTo.trim() || undefined,
           amount: parsedAmount,
+          currency,
+          originalCurrencyAmount: currency !== "KES" ? rawAmountNum : undefined,
+          exchangeRate: currency !== "KES" ? parsedExchangeRateNum : undefined,
           amountWords: amountWords || "",
           groupId: groupVal,
           groupName: groupVal,
@@ -2056,18 +2136,69 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
 
           {/* Section 2: Financial Information */}
           <div className="space-y-4 p-4 md:p-6 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
-                <DollarSign size={16} className="text-secondary" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center shrink-0">
+                  <DollarSign size={16} className="text-secondary" />
+                </div>
+                <div>
+                  <h4 className="text-[10px] md:text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
+                    Financial breakdown
+                  </h4>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                    Write amount in Kenyan Shillings (KES), US Dollars ($), or choose another currency.
+                  </p>
+                </div>
               </div>
-              <h4 className="text-[10px] md:text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Financial breakdown</h4>
+
+              {/* Currency Selector Pills */}
+              <div className="flex flex-wrap items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                {CURRENCY_OPTIONS.map((c) => {
+                  const isSelected = currency === c.code;
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => handleCurrencyChange(c.code)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer",
+                        isSelected
+                          ? "bg-primary text-white shadow-xs"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                      title={c.label}
+                    >
+                      <span className="text-[11px]">{c.flag}</span>
+                      <span>{c.code}</span>
+                      {c.code === "USD" && <span className="text-[9px] opacity-90 font-mono">($)</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Amount (KES)</label>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                    <span>Amount ({activeCurrencyOption.code})</span>
+                    {currency !== "KES" && (
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.2 rounded">
+                        {currency === "USD" ? "Dollar Amount" : "Foreign Currency"}
+                      </span>
+                    )}
+                  </label>
+                  {currency !== "KES" && (
+                    <span className="text-[9px] font-mono text-slate-400">
+                      Standard: 1 {currency} ≈ {activeCurrencyOption.defaultRate} KES
+                    </span>
+                  )}
+                </div>
+
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px] md:text-xs uppercase">Ksh</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px] md:text-xs uppercase">
+                    {currencySymbol}
+                  </span>
                   <input 
                     name="amount" 
                     type="number" 
@@ -2084,6 +2215,54 @@ export const NewRequisitionForm: React.FC<NewRequisitionFormProps> = ({ onClose,
                     placeholder="0.00"
                   />
                 </div>
+
+                {/* Conversion & Exchange Rate Bar when foreign currency (USD, EUR, GBP) is selected */}
+                {currency !== "KES" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="p-3 bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-800/60 rounded-xl space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider">
+                        Exchange Rate:
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-mono">1 {currency} = </span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={exchangeRate}
+                          onChange={(e) => {
+                            setExchangeRate(e.target.value);
+                            setHasConfirmedOverBudget(false);
+                          }}
+                          className="w-20 text-right font-mono font-bold text-xs px-2 py-0.5 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-lg text-indigo-900 dark:text-indigo-100 shadow-2xs"
+                          placeholder="Rate"
+                        />
+                        <span className="text-[10px] font-mono font-bold text-slate-500">KES</span>
+                        <button
+                          type="button"
+                          onClick={() => setExchangeRate(activeCurrencyOption.defaultRate.toString())}
+                          className="text-[9px] text-indigo-600 dark:text-indigo-400 hover:underline uppercase tracking-wider font-bold ml-1"
+                          title="Reset to standard rate"
+                        >
+                          Default
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Calculated KES equivalent pill */}
+                    <div className="flex items-center justify-between pt-1 border-t border-indigo-200/60 dark:border-indigo-800/50 text-[11px]">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">
+                        Converted Ledger Book Value:
+                      </span>
+                      <span className="font-mono font-black text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-indigo-200/60 dark:border-indigo-800/40">
+                        KES {convertedKesAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Muted indicator below the requisition amount showing group remaining balance */}
                 <div className="mt-1.5 px-0.5 space-y-1.5">

@@ -260,12 +260,29 @@ export function getAttachmentFileName(doc: any): string {
   return cleaned || "Attachment";
 }
 
-export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-  }).format(amount);
+export function formatCurrency(amount: number, currency: string = "KES") {
+  const curr = currency?.toUpperCase() || "KES";
+  try {
+    return new Intl.NumberFormat(curr === "KES" ? "en-KE" : "en-US", {
+      style: "currency",
+      currency: curr,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch (e) {
+    return `${curr} ${Number(amount).toLocaleString()}`;
+  }
 }
+
+export function formatRequisitionAmount(req?: { amount: number; currency?: string; originalCurrencyAmount?: number }): string {
+  if (!req) return "KES 0.00";
+  if (req.currency && req.currency !== "KES" && req.originalCurrencyAmount !== undefined && req.originalCurrencyAmount > 0) {
+    const origFormatted = formatCurrency(req.originalCurrencyAmount, req.currency);
+    const kesFormatted = formatCurrency(req.amount, "KES");
+    return `${origFormatted} (${kesFormatted})`;
+  }
+  return formatCurrency(req.amount, "KES");
+}
+
 
 export function resolveSenderName(
   userObj: { id?: string; email?: string; name?: string; role?: string } | null | undefined,

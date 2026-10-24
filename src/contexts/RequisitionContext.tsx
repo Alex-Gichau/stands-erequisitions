@@ -2530,7 +2530,10 @@ export const RequisitionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 enableInstallments: Boolean(r?.enable_installments ?? r?.enableInstallments),
                 installments: safeNormalizeInstallments(r?.installments),
                 disbursedAmount: Number(r?.disbursed_amount ?? r?.disbursedAmount) || 0,
-                remainingBalance: r?.remaining_balance !== undefined ? Number(r?.remaining_balance) : (r?.remainingBalance !== undefined ? Number(r?.remainingBalance) : (Number(r?.amount) || 0))
+                remainingBalance: r?.remaining_balance !== undefined ? Number(r?.remaining_balance) : (r?.remainingBalance !== undefined ? Number(r?.remainingBalance) : (Number(r?.amount) || 0)),
+                currency: r?.currency || "KES",
+                originalCurrencyAmount: r?.original_currency_amount !== undefined ? Number(r?.original_currency_amount) : (r?.originalCurrencyAmount !== undefined ? Number(r?.originalCurrencyAmount) : undefined),
+                exchangeRate: r?.exchange_rate !== undefined ? Number(r?.exchange_rate) : (r?.exchangeRate !== undefined ? Number(r?.exchangeRate) : undefined)
               } as Requisition;
             }).filter(Boolean) as Requisition[];
 

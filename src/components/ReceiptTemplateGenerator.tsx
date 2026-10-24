@@ -205,7 +205,16 @@ export const ReceiptTemplateGenerator: React.FC<ReceiptTemplateGeneratorProps> =
                         </div>
                       </td>
                       <td className="py-4 text-right align-top font-mono font-extrabold text-slate-900 text-base">
-                        {formatCurrency(req.amount)}
+                        {req.currency && req.currency !== "KES" ? (
+                          <div>
+                            <div>{formatCurrency(req.originalCurrencyAmount || req.amount, req.currency)}</div>
+                            <div className="text-xs font-semibold text-slate-500 font-mono mt-0.5">
+                              ≈ {formatCurrency(req.amount, "KES")}
+                            </div>
+                          </div>
+                        ) : (
+                          formatCurrency(req.amount)
+                        )}
                       </td>
                     </tr>
                   </tbody>

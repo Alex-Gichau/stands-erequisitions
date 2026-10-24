@@ -1,10 +1,19 @@
 /**
  * Converts a number into its English words representation.
- * Specifically tailored for Shillings and Cents.
+ * Supports KES (Shillings & Cents), USD (Dollars & Cents), EUR (Euros & Cents), GBP (Pounds & Pence).
  */
 
-export const numberToWords = (num: number): string => {
-  if (num === 0) return "Zero Shillings Only";
+export const numberToWords = (num: number, currency: string = "KES"): string => {
+  const currencyLabels: Record<string, { major: string; minor: string }> = {
+    KES: { major: "Shillings", minor: "Cents" },
+    USD: { major: "Dollars", minor: "Cents" },
+    EUR: { major: "Euros", minor: "Cents" },
+    GBP: { major: "Pounds", minor: "Pence" },
+  };
+
+  const labels = currencyLabels[currency?.toUpperCase()] || { major: currency || "Shillings", minor: "Cents" };
+
+  if (num === 0) return `Zero ${labels.major} Only`;
 
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
   const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -41,11 +50,12 @@ export const numberToWords = (num: number): string => {
     word += convertThreeDigits(integerPart);
   }
 
-  word = word.trim() + " Shillings";
+  word = word.trim() + " " + labels.major;
 
   if (decimalPart > 0) {
-    word += " and " + convertThreeDigits(decimalPart) + " Cents";
+    word += " and " + convertThreeDigits(decimalPart) + " " + labels.minor;
   }
 
   return word.trim() + " Only";
 };
+

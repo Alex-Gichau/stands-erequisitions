@@ -91,6 +91,7 @@ import { compressImageFile } from "../lib/imageCompression";
 import { databaseService } from "../lib/databaseService";
 import { 
   formatCurrency, 
+  formatRequisitionAmount,
   formatDate, 
   cn, 
   getDaysSinceSubmission, 
@@ -1863,7 +1864,7 @@ const DocumentPreviewModal = ({
   const requesterEmail = requisition?.requesterEmail || "";
   const groupName = requisition?.groupName || "Ministry Group";
   const submittedAt = requisition?.submittedAt ? formatDate(requisition.submittedAt) : (requisition?.createdAt ? formatDate(requisition.createdAt) : null);
-  const amountStr = requisition?.amount !== undefined ? formatCurrency(requisition.amount) : null;
+  const amountStr = requisition ? formatRequisitionAmount(requisition) : null;
   const title = requisition?.title || "Requisition Attachment";
   const reqId = requisition?.id || "";
 
@@ -3647,7 +3648,22 @@ export const RequisitionsPanel: React.FC = () => {
                       )}
                     </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4 text-right">
-                      <span className="font-mono font-bold text-slate-900 text-[10px] md:text-sm">{formatCurrency(req.amount)}</span>
+                      <div className="flex flex-col items-end">
+                        {req.currency && req.currency !== "KES" && req.originalCurrencyAmount ? (
+                          <>
+                            <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 text-[11px] md:text-sm">
+                              {formatCurrency(req.originalCurrencyAmount, req.currency)}
+                            </span>
+                            <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-semibold">
+                              ≈ {formatCurrency(req.amount, "KES")}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-[10px] md:text-sm">
+                            {formatCurrency(req.amount)}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 md:px-6 py-2.5 md:py-4">
                       <div className="flex justify-center">

@@ -1794,7 +1794,10 @@ export function generateReceiptHtml(req: Requisition): string {
                 <div class="item-status">Status: ${req.status.replace(/_/g, " ")}</div>
               </td>
               <td class="item-amount">
-                ${formatCurrency(req.amount)}
+                ${req.currency && req.currency !== "KES"
+                  ? `${formatCurrency(req.originalCurrencyAmount || req.amount, req.currency)}<br><span style="font-size:11px;color:#64748b;font-weight:600;">≈ ${formatCurrency(req.amount, "KES")}</span>`
+                  : formatCurrency(req.amount)
+                }
               </td>
             </tr>
           </tbody>

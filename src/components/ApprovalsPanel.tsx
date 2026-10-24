@@ -254,11 +254,33 @@ export const ApprovalsPanel: React.FC = () => {
                 <div className="flex md:flex-col items-center md:items-end justify-between md:justify-start gap-1">
                   <div className="md:hidden">
                     <p className="text-[7.5px] font-black text-slate-400 uppercase tracking-[0.15em] mb-0.5">Value</p>
-                    <p className="text-base font-black text-slate-900 font-mono">{formatCurrency(req.amount)}</p>
+                    {req.currency && req.currency !== "KES" ? (
+                      <div>
+                        <p className="text-base font-black text-slate-900 font-mono">
+                          {formatCurrency(req.originalCurrencyAmount || req.amount, req.currency)}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-500 font-mono">
+                          ≈ {formatCurrency(req.amount, "KES")}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-base font-black text-slate-900 font-mono">{formatCurrency(req.amount)}</p>
+                    )}
                   </div>
                   <div className="hidden md:block text-right">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-0.5">Impact Value</p>
-                    <p className="text-xl font-black text-slate-900 leading-none font-mono tracking-tighter">{formatCurrency(req.amount)}</p>
+                    {req.currency && req.currency !== "KES" ? (
+                      <div>
+                        <p className="text-xl font-black text-slate-900 leading-none font-mono tracking-tighter">
+                          {formatCurrency(req.originalCurrencyAmount || req.amount, req.currency)}
+                        </p>
+                        <p className="text-[10px] font-medium text-slate-500 font-mono mt-0.5">
+                          ≈ {formatCurrency(req.amount, "KES")}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xl font-black text-slate-900 leading-none font-mono tracking-tighter">{formatCurrency(req.amount)}</p>
+                    )}
                   </div>
                   {req.status === RequisitionStatus.APPROVED_L1 && (
                     <div className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 text-[7.5px] md:text-[8px] font-black uppercase tracking-widest">
@@ -366,7 +388,18 @@ export const ApprovalsPanel: React.FC = () => {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Amount</p>
-                          <p className="text-lg md:text-xl font-black text-primary font-mono">{formatCurrency(selectedReq.amount)}</p>
+                          {selectedReq.currency && selectedReq.currency !== "KES" ? (
+                            <div>
+                              <p className="text-lg md:text-xl font-black text-primary font-mono">
+                                {formatCurrency(selectedReq.originalCurrencyAmount || selectedReq.amount, selectedReq.currency)}
+                              </p>
+                              <p className="text-[10px] md:text-xs font-semibold text-slate-500 font-mono mt-0.5">
+                                ≈ {formatCurrency(selectedReq.amount, "KES")}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-lg md:text-xl font-black text-primary font-mono">{formatCurrency(selectedReq.amount)}</p>
+                          )}
                         </div>
                       </div>
                       <div className="p-3 md:p-4 bg-white dark:bg-slate-900 rounded-lg md:rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] md:text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed max-h-32 overflow-y-auto scrollbar-hide">
